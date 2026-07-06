@@ -1,0 +1,64 @@
+:root {
+  --bg: #0d1017;
+  --bg-secondary: #151b24;
+  --bg-card: #161d28;
+  --bg-hover: #1a2230;
+  --accent: #f5ecd9;
+  --accent-dim: rgba(245, 236, 217, 0.6);
+  --text: #ffffff;
+  --text-muted: rgba(255, 255, 255, 0.5);
+  --text-secondary: rgba(255, 255, 255, 0.35);
+  --border: rgba(255, 255, 255, 0.07);
+  --border-strong: rgba(255, 255, 255, 0.12);
+  --glass: rgba(255, 255, 255, 0.03);
+  --sidebar-width: 220px;
+
+  --status-pending: #f59e3a;
+  --status-proposed: #6fa3e8;
+  --status-confirmed: #4cc98a;
+  --status-completed: rgba(255,255,255,0.35);
+  --status-cancelled: rgba(255,255,255,0.2);
+  --status-rejected: #e86f6f;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  height: 100%;
+  font-family: var(--font-body), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  cursor: pointer;
+  font-family: inherit;
+}
+
+input,
+textarea {
+  font-family: inherit;
+}
+
+/* ── Scrollbar ─────────────────────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+}
