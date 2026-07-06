@@ -3,9 +3,12 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { getSupabase } from '@/lib/supabase';
+import { getMyStudioAccount } from '@/lib/api';
+import SignUpFlow from '@/components/SignUpFlow';
 
-export default function LoginPage() {
+export default function HomePage() {
   const router = useRouter();
+  const [tab, setTab] = useState('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -21,7 +24,7 @@ export default function LoginPage() {
       });
   }, [router]);
 
-  async function handleSubmit(e) {
+  async function handleSignIn(e) {
     e.preventDefault();
     setError('');
     setLoading(true);
@@ -30,64 +33,102 @@ export default function LoginPage() {
     if (authError) {
       setError(authError.message);
       setLoading(false);
-    } else {
-      router.replace('/dashboard');
+      return;
+    }
+    // Verify this is a studio account
+    try {
+      const account = await getMyStudioAccount();
+      if (account.status === 'pending') {
+        router.replace('/pending');
+      } else if (account.status === 'approved') {
+        router.replace('/dashboard');
+      } else {
+        // rejected
+        router.replace('/pending');
+      }
+    } catch {
+      // No studio account — sign them out and block access
+      await supabase.auth.signOut();
+      setError('This account doesn\'t have studio access. Sign up below to apply.');
+      setLoading(false);
     }
   }
 
   if (checking) return null;
 
   return (
-    <div style={styles.page}>
-      <div style={styles.noise} />
+    <div style={s.page}>
+      <div style={s.noise} />
 
-      <div style={styles.card}>
-        <div style={styles.brand}>
-          <span style={styles.wordmark}>vanta</span>
-          <span style={styles.wordmarkSub}>studio</span>
+      <div style={s.card}>
+        <div style={s.brand}>
+          <span style={s.wordmark}>vanta</span>
+          <span style={s.wordmarkSub}>studio</span>
         </div>
 
-        <p style={styles.subtitle}>Sign in to your studio</p>
-
-        <form onSubmit={handleSubmit} style={styles.form}>
-          <div style={styles.field}>
-            <label style={styles.label}>Email</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              autoComplete="email"
-              style={styles.input}
-              placeholder="you@studio.com"
-            />
-          </div>
-
-          <div style={styles.field}>
-            <label style={styles.label}>Password</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              autoComplete="current-password"
-              style={styles.input}
-              placeholder="••••••••"
-            />
-          </div>
-
-          {error && <p style={styles.error}>{error}</p>}
-
-          <button type="submit" disabled={loading} style={{ ...styles.btn, opacity: loading ? 0.6 : 1 }}>
-            {loading ? 'Signing in…' : 'Sign in'}
+        {/* Tab switcher */}
+        <div style={s.tabs}>
+          <button
+            onClick={() => { setTab('signin'); setError(''); }}
+            style={{ ...s.tab, ...(tab === 'signin' ? s.tabActive : {}) }}
+          >
+            Sign in
           </button>
-        </form>
+          <button
+            onClick={() => { setTab('signup'); setError(''); }}
+            style={{ ...s.tab, ...(tab === 'signup' ? s.tabActive : {}) }}
+          >
+            Create account
+          </button>
+        </div>
+
+        {tab === 'signin' ? (
+          <form onSubmit={handleSignIn} style={s.form}>
+            <Field label="Email">
+              <input
+                type="email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                required
+                autoComplete="email"
+                style={s.input}
+                placeholder="you@studio.com"
+              />
+            </Field>
+            <Field label="Password">
+              <input
+                type="password"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                required
+                autoComplete="current-password"
+                style={s.input}
+                placeholder="••••••••"
+              />
+            </Field>
+            {error && <p style={s.errorBox}>{error}</p>}
+            <button type="submit" disabled={loading} style={{ ...s.btn, opacity: loading ? 0.6 : 1 }}>
+              {loading ? 'Signing in…' : 'Sign in'}
+            </button>
+          </form>
+        ) : (
+          <SignUpFlow onSwitchToSignIn={() => setTab('signin')} />
+        )}
       </div>
     </div>
   );
 }
 
-const styles = {
+function Field({ label, children }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+      <label style={{ fontSize: '0.8rem', fontWeight: 500, color: 'rgba(255,255,255,0.55)' }}>{label}</label>
+      {children}
+    </div>
+  );
+}
+
+const s = {
   page: {
     minHeight: '100vh',
     display: 'flex',
@@ -102,18 +143,17 @@ const styles = {
     position: 'absolute',
     inset: 0,
     opacity: 0.025,
-    backgroundImage:
-      'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 256 256\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'noise\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.9\' numOctaves=\'4\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23noise)\'/%3E%3C/svg%3E")',
+    backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 256 256\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'noise\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.9\' numOctaves=\'4\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23noise)\'/%3E%3C/svg%3E")',
     backgroundSize: '256px 256px',
     pointerEvents: 'none',
   },
   card: {
     width: '100%',
-    maxWidth: 380,
+    maxWidth: 420,
     background: 'rgba(255,255,255,0.03)',
     border: '1px solid rgba(255,255,255,0.08)',
     borderRadius: 16,
-    padding: '2.5rem 2rem',
+    padding: '2.25rem 2rem',
     backdropFilter: 'blur(12px)',
     position: 'relative',
     zIndex: 1,
@@ -122,14 +162,13 @@ const styles = {
     display: 'flex',
     alignItems: 'baseline',
     gap: '0.4rem',
-    marginBottom: '0.5rem',
+    marginBottom: '1.5rem',
   },
   wordmark: {
     fontSize: '1.6rem',
     fontWeight: 700,
     color: '#ffffff',
     letterSpacing: '-0.02em',
-    fontFamily: 'var(--font-body)',
   },
   wordmarkSub: {
     fontSize: '1.1rem',
@@ -137,26 +176,35 @@ const styles = {
     color: 'rgba(245,236,217,0.7)',
     letterSpacing: '0.02em',
   },
-  subtitle: {
-    fontSize: '0.875rem',
-    color: 'rgba(255,255,255,0.45)',
-    marginBottom: '2rem',
+  tabs: {
+    display: 'flex',
+    gap: '0',
+    background: 'rgba(255,255,255,0.04)',
+    borderRadius: 8,
+    padding: '3px',
+    marginBottom: '1.75rem',
+  },
+  tab: {
+    flex: 1,
+    padding: '0.5rem',
+    borderRadius: 6,
+    border: 'none',
+    background: 'transparent',
+    color: 'rgba(255,255,255,0.4)',
+    fontSize: '0.83rem',
+    fontWeight: 500,
+    cursor: 'pointer',
+    transition: 'all 0.15s',
+  },
+  tabActive: {
+    background: 'rgba(255,255,255,0.08)',
+    color: '#ffffff',
+    fontWeight: 600,
   },
   form: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '1.25rem',
-  },
-  field: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '0.4rem',
-  },
-  label: {
-    fontSize: '0.8rem',
-    fontWeight: 500,
-    color: 'rgba(255,255,255,0.55)',
-    letterSpacing: '0.02em',
+    gap: '1.1rem',
   },
   input: {
     background: 'rgba(255,255,255,0.04)',
@@ -166,9 +214,9 @@ const styles = {
     fontSize: '0.9rem',
     color: '#ffffff',
     outline: 'none',
-    transition: 'border-color 0.15s',
+    width: '100%',
   },
-  error: {
+  errorBox: {
     fontSize: '0.8rem',
     color: '#e86f6f',
     background: 'rgba(232,111,111,0.08)',
@@ -185,7 +233,7 @@ const styles = {
     padding: '0.75rem',
     fontSize: '0.9rem',
     fontWeight: 600,
-    letterSpacing: '0.01em',
-    transition: 'opacity 0.15s',
+    cursor: 'pointer',
+    width: '100%',
   },
 };

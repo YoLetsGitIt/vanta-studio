@@ -4,14 +4,17 @@ import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { getSupabase } from '@/lib/supabase';
-import { getArtistProfile } from '@/lib/api';
+import { getArtistProfile, getMyStudioAccount } from '@/lib/api';
 
 const NAV = [
   { href: '/dashboard/appointments', label: 'Appointments', icon: CalendarIcon },
   { href: '/dashboard/artists',      label: 'Artists',      icon: UsersIcon },
   { href: '/dashboard/clients',      label: 'Clients',      icon: PersonIcon },
   { href: '/dashboard/analytics',    label: 'Analytics',    icon: ChartIcon },
+  { href: '/dashboard/studios',      label: 'Studios',      icon: BuildingIcon, adminOnly: true },
 ];
+
+const ADMIN_EMAIL = 'matthew.m.kwon@gmail.com';
 
 export default function DashboardLayout({ children }) {
   const router = useRouter();
@@ -26,11 +29,30 @@ export default function DashboardLayout({ children }) {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) { router.replace('/'); return; }
       setUser(session.user);
+
+      // Only studio accounts can access the dashboard
+      try {
+        const studioAccount = await getMyStudioAccount();
+        if (studioAccount.status === 'pending') {
+          router.replace('/pending');
+          return;
+        }
+        if (studioAccount.status === 'rejected') {
+          router.replace('/pending');
+          return;
+        }
+      } catch {
+        // No studio account — boot them out
+        await getSupabase().auth.signOut();
+        router.replace('/');
+        return;
+      }
+
       try {
         const profile = await getArtistProfile(session.user.id);
         setArtist(profile);
       } catch {
-        // not an artist — still let them in, just no artist profile
+        // not an artist — fine, studio-only account
       }
       setReady(true);
     }
@@ -63,7 +85,7 @@ export default function DashboardLayout({ children }) {
           </Link>
 
           <nav style={s.nav}>
-            {NAV.map(({ href, label, icon: Icon }) => {
+            {NAV.filter(item => !item.adminOnly || user?.email === ADMIN_EMAIL).map(({ href, label, icon: Icon }) => {
               const active = pathname.startsWith(href);
               return (
                 <Link key={href} href={href} style={{ ...s.navItem, ...(active ? s.navActive : {}) }}>
@@ -132,6 +154,17 @@ function ChartIcon({ size = 16, color = 'currentColor' }) {
     <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
       <path d="M2 12l3.5-4 3 2.5L12 5" stroke={color} strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
       <circle cx="12" cy="5" r="1.2" fill={color} />
+    </svg>
+  );
+}
+
+function BuildingIcon({ size = 16, color = 'currentColor' }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
+      <rect x="2" y="3" width="12" height="11" rx="1.5" stroke={color} strokeWidth="1.2" />
+      <path d="M5 14V10h6v4" stroke={color} strokeWidth="1.2" strokeLinecap="round" />
+      <path d="M5 7h1.5M9.5 7H11M5 5h1.5M9.5 5H11" stroke={color} strokeWidth="1.2" strokeLinecap="round" />
+      <path d="M2 6.5h12" stroke={color} strokeWidth="1.2" />
     </svg>
   );
 }

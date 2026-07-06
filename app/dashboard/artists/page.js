@@ -7,7 +7,6 @@ import { getArtistProfile } from '@/lib/api';
 export default function ArtistsPage() {
   const [artist, setArtist] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
 
   useEffect(() => {
     async function load() {
@@ -16,8 +15,8 @@ export default function ArtistsPage() {
         if (!session) return;
         const profile = await getArtistProfile(session.user.id);
         setArtist(profile);
-      } catch (e) {
-        setError(e.message);
+      } catch {
+        // Studio accounts are not artists — no profile to show
       } finally {
         setLoading(false);
       }
@@ -33,8 +32,10 @@ export default function ArtistsPage() {
 
       <div style={s.body}>
         {loading && <p style={s.msg}>Loading…</p>}
-        {error && <p style={{ ...s.msg, color: '#e86f6f' }}>{error}</p>}
-        {!loading && !error && artist && <ArtistCard artist={artist} isSelf />}
+        {!loading && !artist && (
+          <p style={s.msg}>No artist profile is linked to this studio account.</p>
+        )}
+        {!loading && artist && <ArtistCard artist={artist} isSelf />}
       </div>
     </div>
   );
