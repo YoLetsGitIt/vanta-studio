@@ -47,8 +47,6 @@
     { id: 'VN', flag: '🇻🇳', dial: '+84'  },
   ];
 
-  var SESSION_TYPES = ['Tattoo', 'Piercing', 'Consultation', 'Touch-up', 'Cover-up', 'Other'];
-
   var PLACEMENTS = [
     'Ankle', 'Arm', 'Back', 'Calf', 'Chest', 'Foot', 'Forearm',
     'Hand', 'Head', 'Hip', 'Knee', 'Neck', 'Ribs', 'Shoulder',
@@ -256,21 +254,6 @@
       form.appendChild(field('Artist', artistEl));
     }
 
-    // Session type
-    var sessionEl = mk('select', 'vb-input');
-    sessionEl.required = true;
-    var sessionBlank = document.createElement('option');
-    sessionBlank.value = '';
-    sessionBlank.textContent = 'Select…';
-    sessionEl.appendChild(sessionBlank);
-    SESSION_TYPES.forEach(function (t) {
-      var opt = document.createElement('option');
-      opt.value = t;
-      opt.textContent = t;
-      sessionEl.appendChild(opt);
-    });
-    form.appendChild(field('Session type', sessionEl));
-
     // Placement chips
     var countSpan = mk('span', 'vb-count');
     countSpan.textContent = '0/3';
@@ -430,7 +413,6 @@
           email: emailEl.value.trim(),
           phone: phoneFull,
           dob: dobEl.value,
-          session_type: sessionEl.value,
           body_location: placements.join(', '),
           design_details: designEl.value.trim(),
           notes: notesEl.value.trim(),
