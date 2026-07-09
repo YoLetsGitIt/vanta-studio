@@ -100,7 +100,7 @@
     '.vb-phone-code{flex-shrink:0;width:auto}',
     '.vb-chips{display:flex;flex-wrap:wrap;gap:0.4rem}',
     '.vb-chip{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:20px;color:rgba(255,255,255,0.6);font-size:0.78rem;font-weight:500;padding:0.35rem 0.75rem;cursor:pointer;font-family:inherit}',
-    '.vb-chip-on{background:rgba(245,236,217,0.12);border-color:rgba(245,236,217,0.35);color:#f5ecd9}',
+    '.vb-chip-on{background:var(--vb-chip-bg,rgba(245,236,217,0.12));border-color:var(--vb-chip-border,rgba(245,236,217,0.35));color:var(--vb-accent,#f5ecd9)}',
     '.vb-chip-off{opacity:.3;cursor:default}',
     '.vb-count{color:rgba(255,255,255,0.2);font-weight:400;margin-left:6px}',
     '.vb-upload-label{display:inline-flex;align-items:center;gap:0.4rem;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:0.5rem 0.85rem;font-size:0.82rem;color:rgba(255,255,255,0.55);cursor:pointer;font-family:inherit}',
@@ -111,7 +111,7 @@
     '.vb-consent{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:1rem;display:flex;flex-direction:column;gap:0.85rem}',
     '.vb-consent-text{font-size:0.8rem;color:rgba(255,255,255,0.55);margin:0;line-height:1.65;max-height:160px;overflow-y:auto}',
     '.vb-consent-check{display:flex;align-items:flex-start;gap:0.6rem;font-size:0.8rem;color:rgba(255,255,255,0.7);cursor:pointer}',
-    '.vb-btn{width:100%;padding:0.85rem;background:#f5ecd9;color:#0e0e0e;border:none;border-radius:10px;font-size:0.9rem;font-weight:700;cursor:pointer;font-family:inherit;transition:opacity .15s}',
+    '.vb-btn{width:100%;padding:0.85rem;background:var(--vb-accent,#f5ecd9);color:var(--vb-btn-text,#0e0e0e);border:none;border-radius:10px;font-size:0.9rem;font-weight:700;cursor:pointer;font-family:inherit;transition:opacity .15s}',
     '.vb-btn:hover{opacity:.88}',
     '.vb-btn:disabled{opacity:.5;cursor:default}',
     '.vb-err{font-size:0.78rem;color:#e86f6f}',
@@ -120,6 +120,32 @@
     '.vb-ok-title{font-size:1.3rem;font-weight:700;color:#fff;margin:0}',
     '.vb-ok-sub{font-size:0.85rem;color:rgba(255,255,255,0.45);margin:0;line-height:1.6}',
   ].join('');
+
+  function hexToRgba(hex, alpha) {
+    if (!hex || hex[0] !== '#') return null;
+    var h = hex.slice(1);
+    if (h.length === 3) h = h[0]+h[0]+h[1]+h[1]+h[2]+h[2];
+    var r = parseInt(h.slice(0,2),16), g = parseInt(h.slice(2,4),16), b = parseInt(h.slice(4,6),16);
+    return 'rgba('+r+','+g+','+b+','+alpha+')';
+  }
+
+  function isLight(hex) {
+    if (!hex || hex[0] !== '#') return false;
+    var h = hex.slice(1);
+    if (h.length === 3) h = h[0]+h[0]+h[1]+h[1]+h[2]+h[2];
+    var r = parseInt(h.slice(0,2),16), g = parseInt(h.slice(2,4),16), b = parseInt(h.slice(4,6),16);
+    return (0.299*r + 0.587*g + 0.114*b)/255 > 0.55;
+  }
+
+  function applyColors(card, bg, accent) {
+    if (bg) card.style.background = bg;
+    if (accent) {
+      card.style.setProperty('--vb-accent', accent);
+      card.style.setProperty('--vb-btn-text', isLight(accent) ? '#0e0e0e' : '#ffffff');
+      card.style.setProperty('--vb-chip-bg', hexToRgba(accent, 0.12) || 'rgba(245,236,217,0.12)');
+      card.style.setProperty('--vb-chip-border', hexToRgba(accent, 0.35) || 'rgba(245,236,217,0.35)');
+    }
+  }
 
   function injectStyles() {
     if (document.getElementById('vanta-embed-css')) return;
@@ -185,6 +211,8 @@
     var placements = [];
     var selectedFiles = [];
     var photoPreviews = [];
+
+    applyColors(card, studio.widget_bg_color, studio.widget_accent_color);
 
     // ── Header ────────────────────────────────────────────────────────────────
     var header = mk('div', 'vb-header');
