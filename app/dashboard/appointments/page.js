@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { listBookings, proposeBooking, acceptBooking, rejectBooking, recordOutcome } from '@/lib/api';
+import { getCached, setCached, invalidatePrefix } from '@/lib/cache';
 
 const STATUS_FILTERS = [
   { value: '', label: 'All' },
@@ -29,12 +30,18 @@ export default function AppointmentsPage() {
   const [selected, setSelected] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (bust = false) => {
+    if (bust) invalidatePrefix('bookings:');
+    const key = `bookings:${filter}`;
+    const cached = getCached(key);
+    if (cached) { setBookings(cached); setLoading(false); return; }
     setLoading(true);
     setError('');
     try {
       const data = await listBookings(filter);
-      setBookings(data.bookings ?? []);
+      const b = data.bookings ?? [];
+      setCached(key, b);
+      setBookings(b);
     } catch (e) {
       setError(e.message);
     } finally {
@@ -46,7 +53,7 @@ export default function AppointmentsPage() {
 
   async function handleAccept(id) {
     setActionLoading(true);
-    try { await acceptBooking(id); await load(); setSelected(null); }
+    try { await acceptBooking(id); await load(true); setSelected(null); }
     catch (e) { alert(e.message); }
     finally { setActionLoading(false); }
   }
@@ -54,14 +61,14 @@ export default function AppointmentsPage() {
   async function handleReject(id) {
     const reason = prompt('Reason for rejection (optional):') ?? '';
     setActionLoading(true);
-    try { await rejectBooking(id, reason); await load(); setSelected(null); }
+    try { await rejectBooking(id, reason); await load(true); setSelected(null); }
     catch (e) { alert(e.message); }
     finally { setActionLoading(false); }
   }
 
   async function handleComplete(id) {
     setActionLoading(true);
-    try { await recordOutcome(id, 'completed'); await load(); setSelected(null); }
+    try { await recordOutcome(id, 'completed'); await load(true); setSelected(null); }
     catch (e) { alert(e.message); }
     finally { setActionLoading(false); }
   }

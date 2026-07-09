@@ -5,12 +5,15 @@ import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { getSupabase } from '@/lib/supabase';
 import { getArtistProfile, getMyStudioAccount } from '@/lib/api';
+import { isDemoMode, setDemoMode } from '@/lib/mode';
 
 const NAV = [
-  { href: '/dashboard/appointments', label: 'Appointments', icon: CalendarIcon },
+  { href: '/dashboard/home',         label: 'Dashboard',    icon: HomeIcon },
+  { href: '/dashboard/schedule',     label: 'Schedule',     icon: GridCalIcon },
   { href: '/dashboard/artists',      label: 'Artists',      icon: UsersIcon },
   { href: '/dashboard/clients',      label: 'Clients',      icon: PersonIcon },
-  { href: '/dashboard/analytics',    label: 'Analytics',    icon: ChartIcon },
+  { href: '/dashboard/appointments', label: 'Appointments', icon: CalendarIcon },
+  // { href: '/dashboard/analytics',    label: 'Analytics',    icon: ChartIcon },
   { href: '/dashboard/studios',      label: 'Studios',      icon: BuildingIcon, adminOnly: true },
 ];
 
@@ -21,7 +24,11 @@ export default function DashboardLayout({ children }) {
   const pathname = usePathname();
   const [user, setUser] = useState(null);
   const [artist, setArtist] = useState(null);
+  const [studioName, setStudioName] = useState('');
   const [ready, setReady] = useState(false);
+  const [demo, setDemo] = useState(false);
+
+  useEffect(() => { setDemo(isDemoMode()); }, []);
 
   useEffect(() => {
     async function init() {
@@ -41,6 +48,7 @@ export default function DashboardLayout({ children }) {
           router.replace('/pending');
           return;
         }
+        setStudioName(studioAccount.studio?.name ?? '');
       } catch {
         // No studio account — boot them out
         await getSupabase().auth.signOut();
@@ -61,6 +69,7 @@ export default function DashboardLayout({ children }) {
 
   async function handleSignOut() {
     await getSupabase().auth.signOut();
+    setDemoMode(false);
     router.replace('/');
   }
 
@@ -72,10 +81,18 @@ export default function DashboardLayout({ children }) {
     );
   }
 
-  const displayName = artist?.name ?? user?.email?.split('@')[0] ?? 'Studio';
+  const displayName = studioName || 'Studio';
 
   return (
     <div style={s.shell}>
+      {/* ── Demo banner ──────────────────────────────────────────────── */}
+      {demo && (
+        <div style={s.demoBanner}>
+          <span style={s.demoBannerText}>DEMO — data is isolated from production</span>
+        </div>
+      )}
+
+      <div style={s.body}>
       {/* ── Sidebar ──────────────────────────────────────────────────── */}
       <aside style={s.sidebar}>
         <div style={s.sidebarTop}>
@@ -106,13 +123,16 @@ export default function DashboardLayout({ children }) {
               <span style={s.userName}>{displayName}</span>
               <span style={s.userEmail}>{user?.email}</span>
             </div>
+            <Link href="/dashboard/settings" style={s.gearBtn} title="Settings">
+              <GearIcon size={17} color={pathname.startsWith('/dashboard/settings') ? '#f5ecd9' : 'rgba(255,255,255,0.55)'} />
+            </Link>
           </div>
-          <button onClick={handleSignOut} style={s.signOutBtn}>Sign out</button>
         </div>
       </aside>
 
       {/* ── Main ─────────────────────────────────────────────────────── */}
       <main style={s.main}>{children}</main>
+      </div>
     </div>
   );
 }
@@ -158,6 +178,35 @@ function ChartIcon({ size = 16, color = 'currentColor' }) {
   );
 }
 
+function HomeIcon({ size = 16, color = 'currentColor' }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
+      <path d="M2 6.5L8 2l6 4.5V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V6.5Z" stroke={color} strokeWidth="1.2" strokeLinejoin="round" />
+      <path d="M6 15v-5h4v5" stroke={color} strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function GridCalIcon({ size = 16, color = 'currentColor' }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
+      <rect x="1.5" y="2.5" width="13" height="12" rx="1.5" stroke={color} strokeWidth="1.2" />
+      <path d="M1.5 6.5h13" stroke={color} strokeWidth="1.2" />
+      <path d="M5.5 1.5v2M10.5 1.5v2" stroke={color} strokeWidth="1.2" strokeLinecap="round" />
+      <path d="M4.5 9.5h2M9.5 9.5h2M4.5 12h2M9.5 12h2" stroke={color} strokeWidth="1.2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function GearIcon({ size = 16, color = 'currentColor' }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" />
+      <path d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+    </svg>
+  );
+}
+
 function BuildingIcon({ size = 16, color = 'currentColor' }) {
   return (
     <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
@@ -191,9 +240,30 @@ const loadingStyles = {
 const s = {
   shell: {
     display: 'flex',
+    flexDirection: 'column',
     height: '100vh',
     overflow: 'hidden',
     background: '#0d1017',
+  },
+  demoBanner: {
+    flexShrink: 0,
+    height: 32,
+    background: 'rgba(255,200,60,0.1)',
+    borderBottom: '1px solid rgba(255,200,60,0.2)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  demoBannerText: {
+    fontSize: '0.72rem',
+    fontWeight: 600,
+    color: '#ffc83c',
+    letterSpacing: '0.04em',
+  },
+  body: {
+    flex: 1,
+    display: 'flex',
+    overflow: 'hidden',
   },
   sidebar: {
     width: 220,
@@ -249,14 +319,21 @@ const s = {
   },
   sidebarBottom: {
     padding: '0 1rem',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '0.75rem',
   },
   userRow: {
     display: 'flex',
     alignItems: 'center',
     gap: '0.65rem',
+  },
+  gearBtn: {
+    marginLeft: 'auto',
+    flexShrink: 0,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '0.25rem',
+    borderRadius: 6,
+    textDecoration: 'none',
   },
   avatar: {
     width: 30,
@@ -290,18 +367,6 @@ const s = {
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
-  },
-  signOutBtn: {
-    background: 'rgba(255,255,255,0.04)',
-    border: '1px solid rgba(255,255,255,0.08)',
-    borderRadius: 6,
-    padding: '0.4rem',
-    fontSize: '0.75rem',
-    color: 'rgba(255,255,255,0.4)',
-    textAlign: 'center',
-    width: '100%',
-    cursor: 'pointer',
-    transition: 'background 0.12s, color 0.12s',
   },
   main: {
     flex: 1,

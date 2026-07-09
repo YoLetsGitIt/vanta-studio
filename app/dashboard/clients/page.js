@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { listBookings } from '@/lib/api';
+import { getCached, setCached } from '@/lib/cache';
 
 export default function ClientsPage() {
   const [bookings, setBookings] = useState([]);
@@ -12,9 +13,14 @@ export default function ClientsPage() {
 
   useEffect(() => {
     async function load() {
+      const key = 'bookings:';
+      const cached = getCached(key);
+      if (cached) { setBookings(cached); setLoading(false); return; }
       try {
         const data = await listBookings('');
-        setBookings(data.bookings ?? []);
+        const b = data.bookings ?? [];
+        setCached(key, b);
+        setBookings(b);
       } catch (e) {
         setError(e.message);
       } finally {
