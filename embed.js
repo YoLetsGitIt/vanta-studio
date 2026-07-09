@@ -243,7 +243,7 @@
       artistEl = mk('select', 'vb-input');
       var blank = document.createElement('option');
       blank.value = '';
-      blank.textContent = 'Select an artist…';
+      blank.textContent = 'No preference — studio will assign';
       artistEl.appendChild(blank);
       artists.forEach(function (a) {
         var opt = document.createElement('option');
@@ -251,7 +251,7 @@
         opt.textContent = a.name || '';
         artistEl.appendChild(opt);
       });
-      form.appendChild(field('Artist', artistEl));
+      form.appendChild(field('Artist (optional)', artistEl));
     }
 
     // Placement chips
