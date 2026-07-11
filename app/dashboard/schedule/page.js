@@ -1,8 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getStudioArtists, getStudioSchedule, getStudioScheduleRange, getBooking, acceptBookingWithStation, assignArtist, createManualBooking, getWalkIns, getAvailableStations, rejectBooking, recordOutcome } from '@/lib/api';
+import { getStudioArtists, getStudioSchedule, getStudioScheduleRange, getBooking, acceptBookingWithStation, assignArtist, createManualBooking, getWalkIns, rejectBooking, recordOutcome } from '@/lib/api';
+import BookingDetailPanel from '@/components/BookingDetailPanel';
 import { getCached, setCached, invalidate } from '@/lib/cache';
+import CompleteBookingModal from '@/components/CompleteBookingModal';
+import RejectBookingModal from '@/components/RejectBookingModal';
 
 const HOUR_PX   = 64;
 const DAY_START = 8;
@@ -79,6 +82,9 @@ function WeekView({ weekStart, onDayClick }) {
   const [detailBooking, setDetailBooking] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+  const [completeTarget, setCompleteTarget] = useState(null);
+  const [noShowTarget, setNoShowTarget] = useState(null);
+  const [rejectTarget, setRejectTarget] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -121,15 +127,53 @@ function WeekView({ weekStart, onDayClick }) {
 
   async function handleAction(action, stationId) {
     if (!selectedEntry) return;
+    if (action === 'complete') {
+      const price = detailBooking?.final_price ?? detailBooking?.estimated_quote ?? selectedEntry?.estimatedQuote;
+      setCompleteTarget({ id: selectedEntry.bookingId, price });
+      return;
+    }
+    if (action === 'no_show') { setNoShowTarget(selectedEntry.bookingId); return; }
+    if (action === 'reject') { setRejectTarget(selectedEntry.bookingId); return; }
     setActionLoading(true);
     try {
-      if (action === 'complete') await recordOutcome(selectedEntry.bookingId, 'completed');
-      else if (action === 'accept') await acceptBookingWithStation(selectedEntry.bookingId, stationId);
+      if (action === 'accept') await acceptBookingWithStation(selectedEntry.bookingId, stationId);
       else if (action === 'assign') await assignArtist(selectedEntry.bookingId, stationId);
-      else if (action === 'reject') {
-        const reason = prompt('Reason for rejection (optional):') ?? '';
-        await rejectBooking(selectedEntry.bookingId, reason);
-      }
+      setSelectedEntry(null);
+      setDetailBooking(null);
+      invalidate(`schedule:week:${toISO(weekStart)}`);
+    } catch (e) { alert(e.message); }
+    finally { setActionLoading(false); }
+  }
+
+  async function confirmComplete(finalPrice, paymentMethod) {
+    setActionLoading(true);
+    try {
+      await recordOutcome(completeTarget.id, 'completed', finalPrice, paymentMethod);
+      setCompleteTarget(null);
+      setSelectedEntry(null);
+      setDetailBooking(null);
+      invalidate(`schedule:week:${toISO(weekStart)}`);
+    } catch (e) { alert(e.message); }
+    finally { setActionLoading(false); }
+  }
+
+  async function confirmNoShow() {
+    setActionLoading(true);
+    try {
+      await recordOutcome(noShowTarget, 'no_show');
+      setNoShowTarget(null);
+      setSelectedEntry(null);
+      setDetailBooking(null);
+      invalidate(`schedule:week:${toISO(weekStart)}`);
+    } catch (e) { alert(e.message); }
+    finally { setActionLoading(false); }
+  }
+
+  async function confirmReject(reason) {
+    setActionLoading(true);
+    try {
+      await rejectBooking(rejectTarget, reason);
+      setRejectTarget(null);
       setSelectedEntry(null);
       setDetailBooking(null);
       invalidate(`schedule:week:${toISO(weekStart)}`);
@@ -227,7 +271,34 @@ function WeekView({ weekStart, onDayClick }) {
         loading={detailLoading}
         actionLoading={actionLoading}
         onClose={() => { setSelectedEntry(null); setDetailBooking(null); }}
-        onAction={handleAction}
+        onAccept={(stationId) => handleAction('accept', stationId)}
+        onReject={() => handleAction('reject')}
+        onComplete={() => handleAction('complete')}
+        onNoShow={() => handleAction('no_show')}
+      />
+    )}
+    {completeTarget && (
+      <CompleteBookingModal
+        outcome="completed"
+        initialPrice={completeTarget.price}
+        saving={actionLoading}
+        onConfirm={confirmComplete}
+        onCancel={() => setCompleteTarget(null)}
+      />
+    )}
+    {noShowTarget && (
+      <CompleteBookingModal
+        outcome="no_show"
+        saving={actionLoading}
+        onConfirm={confirmNoShow}
+        onCancel={() => setNoShowTarget(null)}
+      />
+    )}
+    {rejectTarget && (
+      <RejectBookingModal
+        saving={actionLoading}
+        onConfirm={confirmReject}
+        onCancel={() => setRejectTarget(null)}
       />
     )}
     </div>
@@ -247,6 +318,9 @@ function DayView({ date }) {
   const [detailLoading, setDetailLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [showNewBooking, setShowNewBooking] = useState(false);
+  const [completeTarget, setCompleteTarget] = useState(null);
+  const [noShowTarget, setNoShowTarget] = useState(null);
+  const [rejectTarget, setRejectTarget] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -292,15 +366,53 @@ function DayView({ date }) {
 
   async function handleAction(action, stationId) {
     if (!selectedEntry) return;
+    if (action === 'complete') {
+      const price = detailBooking?.final_price ?? detailBooking?.estimated_quote ?? selectedEntry?.estimatedQuote;
+      setCompleteTarget({ id: selectedEntry.bookingId, price });
+      return;
+    }
+    if (action === 'no_show') { setNoShowTarget(selectedEntry.bookingId); return; }
+    if (action === 'reject') { setRejectTarget(selectedEntry.bookingId); return; }
     setActionLoading(true);
     try {
-      if (action === 'complete') await recordOutcome(selectedEntry.bookingId, 'completed');
-      else if (action === 'accept') await acceptBookingWithStation(selectedEntry.bookingId, stationId);
+      if (action === 'accept') await acceptBookingWithStation(selectedEntry.bookingId, stationId);
       else if (action === 'assign') await assignArtist(selectedEntry.bookingId, stationId);
-      else if (action === 'reject') {
-        const reason = prompt('Reason for rejection (optional):') ?? '';
-        await rejectBooking(selectedEntry.bookingId, reason);
-      }
+      setSelectedEntry(null);
+      setDetailBooking(null);
+      invalidate(`schedule:${toISO(date)}`);
+    } catch (e) { alert(e.message); }
+    finally { setActionLoading(false); }
+  }
+
+  async function confirmComplete(finalPrice, paymentMethod) {
+    setActionLoading(true);
+    try {
+      await recordOutcome(completeTarget.id, 'completed', finalPrice, paymentMethod);
+      setCompleteTarget(null);
+      setSelectedEntry(null);
+      setDetailBooking(null);
+      invalidate(`schedule:${toISO(date)}`);
+    } catch (e) { alert(e.message); }
+    finally { setActionLoading(false); }
+  }
+
+  async function confirmNoShow() {
+    setActionLoading(true);
+    try {
+      await recordOutcome(noShowTarget, 'no_show');
+      setNoShowTarget(null);
+      setSelectedEntry(null);
+      setDetailBooking(null);
+      invalidate(`schedule:${toISO(date)}`);
+    } catch (e) { alert(e.message); }
+    finally { setActionLoading(false); }
+  }
+
+  async function confirmReject(reason) {
+    setActionLoading(true);
+    try {
+      await rejectBooking(rejectTarget, reason);
+      setRejectTarget(null);
       setSelectedEntry(null);
       setDetailBooking(null);
       invalidate(`schedule:${toISO(date)}`);
@@ -425,7 +537,10 @@ function DayView({ date }) {
         loading={detailLoading}
         actionLoading={actionLoading}
         onClose={() => { setSelectedEntry(null); setDetailBooking(null); }}
-        onAction={handleAction}
+        onAccept={(stationId) => handleAction('accept', stationId)}
+        onReject={() => handleAction('reject')}
+        onComplete={() => handleAction('complete')}
+        onNoShow={() => handleAction('no_show')}
       />
     )}
     {showNewBooking && (
@@ -440,196 +555,30 @@ function DayView({ date }) {
         }}
       />
     )}
-    </div>
-  );
-}
-
-// ── Booking detail panel ──────────────────────────────────────────────────────
-
-function StatusBadge({ status }) {
-  const map = {
-    confirmed:         { label: 'Confirmed',         bg: 'rgba(76,201,138,0.15)',  color: '#4cc98a' },
-    accepted:          { label: 'Accepted',           bg: 'rgba(76,201,138,0.15)',  color: '#4cc98a' },
-    completed:         { label: 'Completed',          bg: 'rgba(111,163,232,0.15)', color: '#6fa3e8' },
-    awaiting_deposit:  { label: 'Awaiting Deposit',   bg: 'rgba(245,158,58,0.15)',  color: '#f59e3a' },
-    pending:           { label: 'Pending',            bg: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.45)' },
-    rejected:          { label: 'Rejected',           bg: 'rgba(232,111,111,0.15)', color: '#e86f6f' },
-  };
-  const { label, bg, color } = map[status] ?? { label: status, bg: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.45)' };
-  return (
-    <span style={{ fontSize: '0.7rem', fontWeight: 600, borderRadius: 20, padding: '0.2rem 0.6rem', background: bg, color }}>
-      {label}
-    </span>
-  );
-}
-
-function DetailRow({ label, value }) {
-  if (!value) return null;
-  return (
-    <div style={s.detailRow}>
-      <span style={s.detailLabel}>{label}</span>
-      <span style={s.detailValue}>{value}</span>
-    </div>
-  );
-}
-
-function BookingDetailPanel({ entry, booking, loading, actionLoading, onClose, onAction }) {
-  const [stationStep, setStationStep] = useState(false);
-  const [availableStations, setAvailableStations] = useState([]);
-  const [stationsLoading, setStationsLoading] = useState(false);
-  const [stationError, setStationError] = useState('');
-
-  async function handleAcceptClick() {
-    setStationsLoading(true);
-    setStationError('');
-    try {
-      const dateStr = (entry.chosenTime ?? booking?.chosen_time ?? '').split('T')[0];
-      const data = await getAvailableStations(dateStr, entry.bookingId);
-      const stations = data.stations ?? [];
-      if (stations.length === 0) {
-        setStationError('No stations available on this date. Free up a station in Settings.');
-        return;
-      }
-      setAvailableStations(stations);
-      setStationStep(true);
-    } catch {
-      setStationError('Failed to load stations.');
-    } finally {
-      setStationsLoading(false);
-    }
-  }
-
-  function handleStationPick(stationId) {
-    setStationStep(false);
-    onAction('accept', stationId);
-  }
-
-  const b = booking ?? entry;
-  const clientName    = b.clientName    ?? b.requester_name  ?? '—';
-  const sessionType   = b.sessionType   ?? b.session_type    ?? '—';
-  const status        = b.status        ?? entry.status      ?? '—';
-  const time          = entry.chosenTime ?? b.chosenTime ?? b.chosen_time;
-  const durMins       = entry.durationMins ?? b.durationMins ?? b.proposed_duration_minutes;
-  const quote         = b.estimatedQuote ?? b.estimated_quote;
-  const email         = b.requesterEmail ?? b.email;
-  const phone         = b.phone;
-  const placement     = b.placement;
-  const designDetails = b.designDetails ?? b.design_details;
-  const notes         = b.notes;
-  const depositPaid   = b.depositPaid   ?? b.deposit_paid;
-
-  const timeStr = time ? `${fmtTime(time)}${durMins ? ` · ${fmtDuration(durMins)}` : ''}` : null;
-
-  const canAccept   = ['pending', 'awaiting_deposit'].includes(status);
-  const canComplete = ['confirmed', 'accepted'].includes(status);
-  const canReject   = !['completed', 'rejected'].includes(status);
-
-  return (
-    <div style={s.panel}>
-      {/* Header */}
-      <div style={s.panelHeader}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1, minWidth: 0 }}>
-          <span style={s.panelTitle}>{clientName}</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <StatusBadge status={status} />
-            {depositPaid && (
-              <span style={{ fontSize: '0.68rem', color: '#4cc98a', fontWeight: 500 }}>Deposit paid</span>
-            )}
-          </div>
-        </div>
-        <button onClick={onClose} style={s.panelClose}>✕</button>
-      </div>
-
-      {/* Body */}
-      <div style={s.panelBody}>
-        {loading && <p style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.3)' }}>Loading…</p>}
-
-        <div style={s.detailSection}>
-          <DetailRow label="Artist"       value={entry.artistName} />
-          <DetailRow label="Time"         value={timeStr} />
-          <DetailRow label="Session type" value={sessionType} />
-          <DetailRow label="Placement"    value={placement} />
-        </div>
-
-        {(designDetails || notes) && (
-          <div style={s.detailSection}>
-            {designDetails && (
-              <div style={s.detailBlock}>
-                <span style={s.detailLabel}>Design details</span>
-                <span style={{ ...s.detailValue, whiteSpace: 'pre-wrap', marginTop: 2 }}>{designDetails}</span>
-              </div>
-            )}
-            {notes && (
-              <div style={s.detailBlock}>
-                <span style={s.detailLabel}>Notes</span>
-                <span style={{ ...s.detailValue, whiteSpace: 'pre-wrap', marginTop: 2 }}>{notes}</span>
-              </div>
-            )}
-          </div>
-        )}
-
-        <div style={s.detailSection}>
-          {quote != null && (
-            <DetailRow label="Quote" value={`$${Number(quote).toLocaleString()}`} />
-          )}
-          <DetailRow label="Email" value={email} />
-          <DetailRow label="Phone" value={phone} />
-        </div>
-
-        {/* Station picker */}
-        {stationStep && (
-          <div style={s.stationPicker}>
-            <p style={s.stationPickerLabel}>Assign a station</p>
-            <div style={s.stationBtns}>
-              {availableStations.map(st => (
-                <button
-                  key={st.id}
-                  onClick={() => handleStationPick(st.id)}
-                  disabled={actionLoading}
-                  style={s.stationPickerBtn}
-                >
-                  {st.name}
-                </button>
-              ))}
-            </div>
-            <button onClick={() => setStationStep(false)} style={s.stationCancelBtn}>Cancel</button>
-          </div>
-        )}
-
-        {/* Actions */}
-        {!stationStep && (canAccept || canComplete || canReject) && (
-          <div style={s.panelActions}>
-            {canAccept && (
-              <button
-                onClick={handleAcceptClick}
-                disabled={actionLoading || stationsLoading}
-                style={{ ...s.actionBtn, ...s.actionBtnPrimary }}
-              >
-                {stationsLoading ? 'Loading…' : 'Accept'}
-              </button>
-            )}
-            {canComplete && (
-              <button
-                onClick={() => onAction('complete')}
-                disabled={actionLoading}
-                style={{ ...s.actionBtn, ...s.actionBtnPrimary }}
-              >
-                Mark complete
-              </button>
-            )}
-            {canReject && (
-              <button
-                onClick={() => onAction('reject')}
-                disabled={actionLoading}
-                style={{ ...s.actionBtn, ...s.actionBtnDanger }}
-              >
-                Reject
-              </button>
-            )}
-            {stationError && <p style={s.stationError}>{stationError}</p>}
-          </div>
-        )}
-      </div>
+    {completeTarget && (
+      <CompleteBookingModal
+        outcome="completed"
+        initialPrice={completeTarget.price}
+        saving={actionLoading}
+        onConfirm={confirmComplete}
+        onCancel={() => setCompleteTarget(null)}
+      />
+    )}
+    {noShowTarget && (
+      <CompleteBookingModal
+        outcome="no_show"
+        saving={actionLoading}
+        onConfirm={confirmNoShow}
+        onCancel={() => setNoShowTarget(null)}
+      />
+    )}
+    {rejectTarget && (
+      <RejectBookingModal
+        saving={actionLoading}
+        onConfirm={confirmReject}
+        onCancel={() => setRejectTarget(null)}
+      />
+    )}
     </div>
   );
 }
@@ -682,9 +631,9 @@ function PendingWalkIns({ onAssigned }) {
   if (loading || items.length === 0) return null;
 
   const wipInp = {
-    background: 'rgba(255,255,255,0.04)',
-    border: '1px solid rgba(255,255,255,0.1)',
-    borderRadius: 6, color: '#fff',
+    background: 'var(--bg-input)',
+    border: '1px solid var(--border)',
+    borderRadius: 6, color: 'var(--text)',
     fontSize: '0.75rem', padding: '0.3rem 0.5rem',
     outline: 'none',
   };
@@ -694,7 +643,7 @@ function PendingWalkIns({ onAssigned }) {
       <button style={s.wipHeader} onClick={() => setOpen(o => !o)}>
         <span style={s.wipTitle}>Walk-in requests</span>
         <span style={s.wipCount}>{items.length}</span>
-        <span style={{ marginLeft: 'auto', fontSize: '0.7rem', color: 'rgba(255,255,255,0.3)' }}>{open ? '▲' : '▼'}</span>
+        <span style={{ marginLeft: 'auto', fontSize: '0.7rem', color: 'var(--text-secondary)' }}>{open ? '▲' : '▼'}</span>
       </button>
 
       {open && (
@@ -805,8 +754,8 @@ function ManualBookingModal({ artists, defaultDate, onClose, onCreated }) {
     }
   }
 
-  const inp = { background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 7, color: '#fff', fontSize: '0.82rem', padding: '0.45rem 0.65rem', width: '100%', boxSizing: 'border-box', outline: 'none' };
-  const lbl = { fontSize: '0.68rem', color: 'rgba(255,255,255,0.35)', fontWeight: 500, display: 'block', marginBottom: 4 };
+  const inp = { background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 7, color: 'var(--text)', fontSize: '0.82rem', padding: '0.45rem 0.65rem', width: '100%', boxSizing: 'border-box', outline: 'none' };
+  const lbl = { fontSize: '0.68rem', color: 'var(--text-faint)', fontWeight: 500, display: 'block', marginBottom: 4 };
 
   return (
     <div style={s.modalOverlay}>
@@ -852,7 +801,7 @@ function ManualBookingModal({ artists, defaultDate, onClose, onCreated }) {
           </div>
           {error && <p style={{ ...s.stationError, textAlign: 'left' }}>{error}</p>}
           <div style={{ display: 'flex', gap: '0.5rem', paddingTop: '0.25rem' }}>
-            <button type="button" onClick={onClose} style={{ ...s.actionBtn, flex: 1, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.5)' }}>Cancel</button>
+            <button type="button" onClick={onClose} style={{ ...s.actionBtn, flex: 1, background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}>Cancel</button>
             <button type="submit" disabled={saving} style={{ ...s.actionBtn, ...s.actionBtnPrimary, flex: 2 }}>{saving ? 'Creating…' : 'Create booking'}</button>
           </div>
         </form>
@@ -861,10 +810,125 @@ function ManualBookingModal({ artists, defaultDate, onClose, onCreated }) {
   );
 }
 
+// ── Station utilization view ──────────────────────────────────────────────────
+
+const STATUS_COLORS_SU = {
+  confirmed:       '#4cc98a',
+  accepted:        '#4cc98a',
+  awaiting_deposit:'#fb923c',
+  completed:       '#6fa3e8',
+};
+
+function StationView({ date }) {
+  const [entries,  setEntries]  = useState([]);
+  const [loading,  setLoading]  = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    const key = `schedule:${toISO(date)}`;
+    const cached = getCached(key);
+    if (cached) { setEntries(cached); setLoading(false); }
+    getStudioSchedule(toISO(date))
+      .then(d => { const e = d.entries ?? []; setCached(key, e); setEntries(e); })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [toISO(date)]);
+
+  // Separate assigned (have stationName) from unassigned
+  const assigned   = entries.filter(e => e.stationName);
+  const unassigned = entries.filter(e => !e.stationName);
+
+  // Unique stations, preserving encounter order
+  const stations = [...new Map(assigned.map(e => [e.stationId, e.stationName])).entries()]
+    .map(([id, name]) => ({ id, name }));
+
+  if (loading) return <p style={{ padding: '2rem', fontSize: '0.875rem', color: 'var(--text-faint)' }}>Loading…</p>;
+  if (!entries.length) return <p style={{ padding: '2rem', fontSize: '0.875rem', color: 'var(--text-faint)' }}>No bookings on this day.</p>;
+
+  const hourToY = (h) => (h - DAY_START) * HOUR_PX;
+
+  return (
+    <div style={{ flex: 1, overflowY: 'auto', padding: '1rem 2rem 2rem' }}>
+      {stations.length > 0 && (
+        <div style={{ overflowX: 'auto' }}>
+          <div style={{ display: 'flex', minWidth: stations.length * 160 + 48 }}>
+            {/* Time axis */}
+            <div style={{ width: 44, flexShrink: 0, position: 'relative', height: GRID_H + HOUR_PX }}>
+              {HOURS.map(h => (
+                <div key={h} style={{ position: 'absolute', top: hourToY(h), fontSize: '0.65rem', color: 'var(--text-ghost)', lineHeight: 1 }}>
+                  {h % 12 || 12}{h < 12 ? 'am' : 'pm'}
+                </div>
+              ))}
+            </div>
+            {/* Station columns */}
+            {stations.map(st => {
+              const col = assigned.filter(e => e.stationId === st.id);
+              return (
+                <div key={st.id} style={{ flex: 1, minWidth: 140, position: 'relative', borderLeft: '1px solid var(--border-faint)' }}>
+                  <div style={{ padding: '0 0 0.5rem 0.75rem', fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-ghost)', textTransform: 'uppercase', letterSpacing: '0.06em', position: 'sticky', top: 0, background: 'var(--bg)', zIndex: 1 }}>
+                    {st.name}
+                  </div>
+                  <div style={{ position: 'relative', height: GRID_H }}>
+                    {/* Hour grid lines */}
+                    {HOURS.map(h => (
+                      <div key={h} style={{ position: 'absolute', top: hourToY(h), left: 0, right: 0, borderTop: '1px solid var(--border-faint)', opacity: 0.5 }} />
+                    ))}
+                    {col.map(e => {
+                      const startMin = minutesFromMidnight(e.chosenTime);
+                      const topPx    = ((startMin - DAY_START * 60) / 60) * HOUR_PX;
+                      const durMins  = e.durationMins ?? 60;
+                      const heightPx = Math.max((durMins / 60) * HOUR_PX, 24);
+                      const color    = STATUS_COLORS_SU[e.status] ?? 'var(--text-ghost)';
+                      return (
+                        <div key={e.bookingId} style={{
+                          position: 'absolute', top: topPx, left: 6, right: 6, height: heightPx,
+                          background: color + '20', border: `1px solid ${color}55`,
+                          borderLeft: `3px solid ${color}`, borderRadius: 5,
+                          padding: '0.2rem 0.4rem', overflow: 'hidden',
+                        }}>
+                          <div style={{ fontSize: '0.72rem', fontWeight: 700, color, lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {e.clientName}
+                          </div>
+                          {durMins >= 45 && (
+                            <div style={{ fontSize: '0.65rem', color: 'var(--text-ghost)', marginTop: 2 }}>
+                              {fmtTime(e.chosenTime)} · {fmtDuration(durMins)}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {unassigned.length > 0 && (
+        <div style={{ marginTop: stations.length > 0 ? '1.5rem' : 0 }}>
+          <p style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-ghost)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '0.5rem' }}>
+            No station assigned ({unassigned.length})
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+            {unassigned.map(e => (
+              <div key={e.bookingId} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.5rem 0.75rem', background: 'var(--bg-chip)', border: '1px solid var(--border-faint)', borderRadius: 7 }}>
+                <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text)' }}>{e.clientName}</span>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{fmtTime(e.chosenTime)}{e.durationMins ? ` · ${fmtDuration(e.durationMins)}` : ''}</span>
+                {e.artistName && <span style={{ fontSize: '0.72rem', color: 'var(--text-ghost)' }}>{e.artistName}</span>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Page shell ────────────────────────────────────────────────────────────────
 
 export default function SchedulePage() {
-  const [view,      setView]      = useState('week'); // 'week' | 'day'
+  const [view,      setView]      = useState('week'); // 'week' | 'day' | 'stations'
   const [weekStart, setWeekStart] = useState(() => getMonday(new Date()));
   const [dayDate,   setDayDate]   = useState(() => new Date());
   const [wipKey,    setWipKey]    = useState(0);
@@ -904,6 +968,12 @@ export default function SchedulePage() {
             >
               Day
             </button>
+            <button
+              onClick={() => setView('stations')}
+              style={{ ...s.toggleBtn, ...(view === 'stations' ? s.toggleActive : {}) }}
+            >
+              Stations
+            </button>
           </div>
         </div>
 
@@ -932,10 +1002,9 @@ export default function SchedulePage() {
 
       <PendingWalkIns key={wipKey} onAssigned={() => setWipKey(k => k + 1)} />
 
-      {view === 'week'
-        ? <WeekView weekStart={weekStart} onDayClick={goToDayView} />
-        : <DayView  date={dayDate} />
-      }
+      {view === 'week'    && <WeekView weekStart={weekStart} onDayClick={goToDayView} />}
+      {view === 'day'     && <DayView  date={dayDate} />}
+      {view === 'stations' && <StationView date={dayDate} />}
     </div>
   );
 }
@@ -946,7 +1015,7 @@ const s = {
   page: { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' },
   header: {
     padding: '1.5rem 2rem 1rem',
-    borderBottom: '1px solid rgba(255,255,255,0.06)',
+    borderBottom: '1px solid var(--border-faint)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -955,11 +1024,11 @@ const s = {
     flexShrink: 0,
   },
   headerLeft: { display: 'flex', alignItems: 'center', gap: '1rem' },
-  title: { fontSize: '1.2rem', fontWeight: 700, color: '#ffffff', letterSpacing: '-0.01em', margin: 0 },
+  title: { fontSize: '1.2rem', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.01em', margin: 0 },
   viewToggle: {
     display: 'flex',
-    background: 'rgba(255,255,255,0.04)',
-    border: '1px solid rgba(255,255,255,0.08)',
+    background: 'var(--bg-input)',
+    border: '1px solid var(--border-faint)',
     borderRadius: 8,
     padding: 2,
     gap: 2,
@@ -969,21 +1038,21 @@ const s = {
     borderRadius: 6,
     border: 'none',
     background: 'transparent',
-    color: 'rgba(255,255,255,0.4)',
+    color: 'var(--text-muted)',
     fontSize: '0.78rem',
     fontWeight: 600,
     cursor: 'pointer',
   },
   toggleActive: {
-    background: 'rgba(255,255,255,0.08)',
-    color: '#ffffff',
+    background: 'var(--bg-chip)',
+    color: 'var(--text)',
   },
   nav: { display: 'flex', alignItems: 'center', gap: '0.5rem' },
   navBtn: {
-    background: 'rgba(255,255,255,0.05)',
-    border: '1px solid rgba(255,255,255,0.1)',
+    background: 'var(--bg-chip)',
+    border: '1px solid var(--border)',
     borderRadius: 7,
-    color: 'rgba(255,255,255,0.7)',
+    color: 'var(--text-dim)',
     fontSize: '0.9rem',
     padding: '0.35rem 0.65rem',
     cursor: 'pointer',
@@ -992,34 +1061,34 @@ const s = {
   navLabel: {
     fontSize: '0.875rem',
     fontWeight: 600,
-    color: '#ffffff',
+    color: 'var(--text)',
     minWidth: 200,
     textAlign: 'center',
   },
   todayBtn: {
-    background: 'rgba(245,236,217,0.08)',
-    border: '1px solid rgba(245,236,217,0.2)',
+    background: 'var(--accent-tint)',
+    border: '1px solid var(--accent-tint-border)',
     borderRadius: 7,
-    color: '#f5ecd9',
+    color: 'var(--accent)',
     fontSize: '0.78rem',
     fontWeight: 600,
     padding: '0.35rem 0.75rem',
     cursor: 'pointer',
     marginLeft: '0.25rem',
   },
-  msg: { padding: '2rem', fontSize: '0.875rem', color: 'rgba(255,255,255,0.35)' },
+  msg: { padding: '2rem', fontSize: '0.875rem', color: 'var(--text-faint)' },
 
   // Day filter bar
   dayFilter: {
     display: 'flex', alignItems: 'center', gap: '0.75rem',
     padding: '0.6rem 2rem',
-    borderBottom: '1px solid rgba(255,255,255,0.05)',
+    borderBottom: '1px solid var(--border-faint)',
     flexShrink: 0,
   },
-  dayFilterLabel: { fontSize: '0.78rem', color: 'rgba(255,255,255,0.35)' },
+  dayFilterLabel: { fontSize: '0.78rem', color: 'var(--text-faint)' },
   dayFilterBtn: {
-    background: 'none', border: '1px solid rgba(255,255,255,0.1)',
-    borderRadius: 6, color: 'rgba(255,255,255,0.5)',
+    background: 'none', border: '1px solid var(--border)',
+    borderRadius: 6, color: 'var(--text-muted)',
     fontSize: '0.75rem', fontWeight: 500, padding: '0.2rem 0.65rem', cursor: 'pointer',
   },
 
@@ -1030,25 +1099,25 @@ const s = {
     display: 'grid',
     gridTemplateColumns: 'repeat(7, minmax(120px, 1fr))',
     minWidth: 700,
-    borderBottom: '1px solid rgba(255,255,255,0.06)',
+    borderBottom: '1px solid var(--border-faint)',
   },
   weekDayCol: {
-    borderRight: '1px solid rgba(255,255,255,0.05)',
+    borderRight: '1px solid var(--border-faint)',
     display: 'flex', flexDirection: 'column',
     minHeight: 220,
   },
-  weekDayColToday: { background: 'rgba(255,255,255,0.015)' },
+  weekDayColToday: { background: 'var(--bg-row-active)' },
   weekDayHeader: {
     display: 'flex', alignItems: 'center', gap: '0.4rem',
     padding: '0.65rem 0.75rem 0.5rem',
-    borderBottom: '1px solid rgba(255,255,255,0.06)',
+    borderBottom: '1px solid var(--border-faint)',
     cursor: 'pointer',
   },
   weekDayCount: {
     marginLeft: 'auto',
     fontSize: '0.68rem', fontWeight: 600,
-    color: 'rgba(255,255,255,0.25)',
-    background: 'rgba(255,255,255,0.06)',
+    color: 'var(--text-ghost)',
+    background: 'var(--bg-chip)',
     borderRadius: 20, padding: '0.05rem 0.4rem',
   },
   chipList: {
@@ -1058,46 +1127,46 @@ const s = {
   chip: {
     display: 'flex', alignItems: 'center', gap: '0.35rem',
     padding: '0.2rem 0.35rem', borderRadius: 4,
-    background: 'rgba(255,255,255,0.04)', overflow: 'hidden',
+    background: 'var(--bg-card)', overflow: 'hidden',
   },
   chipTime: {
     fontSize: '0.68rem', fontWeight: 600,
-    color: 'rgba(255,255,255,0.4)', flexShrink: 0,
+    color: 'var(--text-muted)', flexShrink: 0,
   },
   chipClient: {
     fontSize: '0.72rem', fontWeight: 500,
-    color: 'rgba(255,255,255,0.75)',
+    color: 'var(--text-dim)',
     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1,
   },
   moreBtn: {
     background: 'none', border: 'none',
-    color: 'rgba(255,255,255,0.3)', fontSize: '0.68rem', fontWeight: 500,
+    color: 'var(--text-secondary)', fontSize: '0.68rem', fontWeight: 500,
     cursor: 'pointer', padding: '0.1rem 0.35rem', textAlign: 'left',
   },
   emptyDay: {
-    fontSize: '0.72rem', color: 'rgba(255,255,255,0.12)', paddingLeft: '0.35rem',
+    fontSize: '0.72rem', color: 'var(--text-ghost)', paddingLeft: '0.35rem',
   },
   legend: {
     display: 'flex', flexWrap: 'wrap', gap: '0.5rem 1.25rem',
     padding: '0.75rem 1.5rem',
-    borderTop: '1px solid rgba(255,255,255,0.05)',
+    borderTop: '1px solid var(--border-faint)',
     flexShrink: 0,
   },
   legendItem: { display: 'flex', alignItems: 'center', gap: '0.4rem' },
-  legendName: { fontSize: '0.72rem', color: 'rgba(255,255,255,0.4)', fontWeight: 500 },
+  legendName: { fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 500 },
 
   // ── Shared label styles ────────────────────────────────────────────────────
   dayName: {
     fontSize: '0.65rem', fontWeight: 600,
-    color: 'rgba(255,255,255,0.3)',
+    color: 'var(--text-secondary)',
     textTransform: 'uppercase', letterSpacing: '0.06em',
   },
-  dayNum: { fontSize: '1rem', fontWeight: 700, color: 'rgba(255,255,255,0.6)', lineHeight: 1 },
-  dayNumToday: { color: '#f5ecd9' },
+  dayNum: { fontSize: '1rem', fontWeight: 700, color: 'var(--text-muted)', lineHeight: 1 },
+  dayNumToday: { color: 'var(--accent)' },
 
   // ── Day view grid ──────────────────────────────────────────────────────────
   grid: { display: 'grid', minWidth: 'max-content' },
-  cornerCell: { height: 52, borderBottom: '1px solid rgba(255,255,255,0.06)' },
+  cornerCell: { height: 52, borderBottom: '1px solid var(--border-faint)' },
 
   // Day view artist headers
   artistHeader: {
@@ -1106,8 +1175,8 @@ const s = {
     alignItems: 'center',
     gap: '0.5rem',
     padding: '0 0.75rem',
-    borderBottom: '1px solid rgba(255,255,255,0.06)',
-    borderLeft: '1px solid rgba(255,255,255,0.04)',
+    borderBottom: '1px solid var(--border-faint)',
+    borderLeft: '1px solid var(--border-faint)',
   },
   artistAvatar: {
     width: 26, height: 26, borderRadius: '50%',
@@ -1115,8 +1184,8 @@ const s = {
     border: '1.5px solid transparent',
   },
   artistAvatarFallback: {
-    background: 'rgba(255,255,255,0.06)',
-    color: 'rgba(255,255,255,0.6)',
+    background: 'var(--bg-chip)',
+    color: 'var(--text-muted)',
     fontSize: '0.65rem', fontWeight: 700,
     display: 'flex', alignItems: 'center', justifyContent: 'center',
   },
@@ -1125,40 +1194,40 @@ const s = {
     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
   },
 
-  gutterCol: { position: 'relative', borderRight: '1px solid rgba(255,255,255,0.06)' },
+  gutterCol: { position: 'relative', borderRight: '1px solid var(--border-faint)' },
   hourLabel: {
     position: 'absolute', right: 8,
-    fontSize: '0.63rem', color: 'rgba(255,255,255,0.22)',
+    fontSize: '0.63rem', color: 'var(--text-ghost)',
     transform: 'translateY(-50%)', whiteSpace: 'nowrap', userSelect: 'none',
   },
 
   dayCol: {
     position: 'relative',
-    borderLeft: '1px solid rgba(255,255,255,0.04)',
-    background: 'rgba(255,255,255,0.005)',
+    borderLeft: '1px solid var(--border-faint)',
+    background: 'var(--bg-card)',
   },
   gridLine: {
     position: 'absolute', left: 0, right: 0, height: 1,
-    background: 'rgba(255,255,255,0.04)', pointerEvents: 'none',
+    background: 'var(--border-faint)', pointerEvents: 'none',
   },
 
   block: {
     position: 'absolute',
     borderRadius: 5,
     borderLeft: '3px solid',
-    background: 'rgba(255,255,255,0.065)',
+    background: 'var(--bg-chip)',
     padding: '3px 6px',
     overflow: 'hidden',
     display: 'flex', flexDirection: 'column', gap: 1,
     boxSizing: 'border-box',
   },
   blockSelected: {
-    background: 'rgba(255,255,255,0.12)',
-    boxShadow: '0 0 0 1.5px rgba(255,255,255,0.18)',
+    background: 'var(--bg-row-active)',
+    boxShadow: '0 0 0 1.5px var(--border-strong)',
   },
   blockClient: {
     fontSize: '0.72rem', fontWeight: 700,
-    color: 'rgba(255,255,255,0.85)',
+    color: 'var(--text-dim)',
     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
     lineHeight: 1.2,
   },
@@ -1168,52 +1237,26 @@ const s = {
     lineHeight: 1.2,
   },
   blockMeta: {
-    fontSize: '0.62rem', color: 'rgba(255,255,255,0.3)',
+    fontSize: '0.62rem', color: 'var(--text-secondary)',
     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
     lineHeight: 1.2,
   },
 
-  // ── Detail panel ──────────────────────────────────────────────────────────
-  panel: {
-    position: 'absolute', top: 0, right: 0, bottom: 0,
-    width: 300,
-    background: '#1a1a1a',
-    borderLeft: '1px solid rgba(255,255,255,0.08)',
-    display: 'flex', flexDirection: 'column',
-    zIndex: 10,
-    boxShadow: '-4px 0 20px rgba(0,0,0,0.4)',
-  },
+  // ── ManualBookingModal shared styles ──────────────────────────────────────
   panelHeader: {
     display: 'flex', alignItems: 'flex-start', gap: '0.75rem',
     padding: '1.1rem 1.1rem 0.9rem',
-    borderBottom: '1px solid rgba(255,255,255,0.07)',
+    borderBottom: '1px solid var(--border-faint)',
     flexShrink: 0,
   },
   panelTitle: {
-    fontSize: '0.95rem', fontWeight: 700, color: '#ffffff',
+    fontSize: '0.95rem', fontWeight: 700, color: 'var(--text)',
     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
   },
   panelClose: {
-    background: 'none', border: 'none', color: 'rgba(255,255,255,0.35)',
+    background: 'none', border: 'none', color: 'var(--text-faint)',
     fontSize: '0.85rem', cursor: 'pointer', padding: '0.1rem 0.3rem',
     flexShrink: 0, lineHeight: 1,
-  },
-  panelBody: {
-    flex: 1, overflowY: 'auto',
-    padding: '0.75rem 1.1rem',
-    display: 'flex', flexDirection: 'column', gap: '0.75rem',
-  },
-  detailSection: {
-    display: 'flex', flexDirection: 'column', gap: '0.45rem',
-    paddingBottom: '0.75rem',
-    borderBottom: '1px solid rgba(255,255,255,0.05)',
-  },
-  detailRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.5rem' },
-  detailBlock: { display: 'flex', flexDirection: 'column' },
-  detailLabel: { fontSize: '0.68rem', color: 'rgba(255,255,255,0.3)', fontWeight: 500, flexShrink: 0 },
-  detailValue: { fontSize: '0.78rem', color: 'rgba(255,255,255,0.8)', fontWeight: 500, textAlign: 'right' },
-  panelActions: {
-    display: 'flex', flexDirection: 'column', gap: '0.4rem', paddingTop: '0.25rem',
   },
   actionBtn: {
     padding: '0.55rem 0', borderRadius: 8, border: 'none',
@@ -1221,52 +1264,9 @@ const s = {
     width: '100%',
   },
   actionBtnPrimary: {
-    background: 'rgba(245,236,217,0.1)',
-    color: '#f5ecd9',
-    border: '1px solid rgba(245,236,217,0.2)',
-  },
-  actionBtnDanger: {
-    background: 'rgba(232,111,111,0.1)',
-    color: '#e86f6f',
-    border: '1px solid rgba(232,111,111,0.2)',
-  },
-  stationPicker: {
-    padding: '0.75rem',
-    background: 'rgba(255,255,255,0.03)',
-    borderRadius: 8,
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '0.6rem',
-  },
-  stationPickerLabel: {
-    fontSize: '0.78rem',
-    fontWeight: 600,
-    color: 'rgba(255,255,255,0.6)',
-    margin: 0,
-  },
-  stationBtns: {
-    display: 'flex',
-    flexWrap: 'wrap',
-    gap: '0.4rem',
-  },
-  stationPickerBtn: {
-    background: 'rgba(245,236,217,0.08)',
-    border: '1px solid rgba(245,236,217,0.2)',
-    borderRadius: 6,
-    padding: '0.35rem 0.75rem',
-    fontSize: '0.8rem',
-    fontWeight: 500,
-    color: '#f5ecd9',
-    cursor: 'pointer',
-  },
-  stationCancelBtn: {
-    alignSelf: 'flex-start',
-    background: 'transparent',
-    border: 'none',
-    fontSize: '0.75rem',
-    color: 'rgba(255,255,255,0.3)',
-    cursor: 'pointer',
-    padding: 0,
+    background: 'var(--accent-tint)',
+    color: 'var(--accent)',
+    border: '1px solid var(--accent-tint-border)',
   },
   stationError: {
     fontSize: '0.75rem',
@@ -1277,7 +1277,7 @@ const s = {
 
   // ── Walk-in panel ──────────────────────────────────────────────────────────
   wip: {
-    borderBottom: '1px solid rgba(255,255,255,0.06)',
+    borderBottom: '1px solid var(--border-faint)',
     flexShrink: 0,
     background: 'rgba(245,158,58,0.04)',
   },
@@ -1288,7 +1288,7 @@ const s = {
   },
   wipTitle: {
     fontSize: '0.75rem', fontWeight: 600,
-    color: 'rgba(255,255,255,0.5)',
+    color: 'var(--text-muted)',
     textTransform: 'uppercase', letterSpacing: '0.05em',
   },
   wipCount: {
@@ -1305,31 +1305,31 @@ const s = {
   wipCard: {
     display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem',
     padding: '0.6rem 2rem',
-    borderTop: '1px solid rgba(255,255,255,0.04)',
+    borderTop: '1px solid var(--border-faint)',
   },
   wipCardMain: {
     display: 'flex', flexDirection: 'column', gap: 2, flex: 1, minWidth: 0,
   },
   wipName: {
-    fontSize: '0.82rem', fontWeight: 600, color: 'rgba(255,255,255,0.85)',
+    fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-dim)',
   },
   wipTag: {
-    fontSize: '0.68rem', fontWeight: 500, color: 'rgba(255,255,255,0.35)',
+    fontSize: '0.68rem', fontWeight: 500, color: 'var(--text-faint)',
     textTransform: 'capitalize',
   },
   wipContact: {
-    fontSize: '0.72rem', color: 'rgba(255,255,255,0.3)',
+    fontSize: '0.72rem', color: 'var(--text-secondary)',
     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
   },
   wipNotes: {
-    fontSize: '0.7rem', color: 'rgba(255,255,255,0.25)',
+    fontSize: '0.7rem', color: 'var(--text-ghost)',
     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
     maxWidth: 400,
   },
   wipAssignBtn: {
-    background: 'rgba(245,236,217,0.07)',
-    border: '1px solid rgba(245,236,217,0.15)',
-    borderRadius: 6, color: '#f5ecd9',
+    background: 'var(--accent-tint)',
+    border: '1px solid var(--accent-tint-border)',
+    borderRadius: 6, color: 'var(--accent)',
     fontSize: '0.72rem', fontWeight: 600,
     padding: '0.3rem 0.75rem', cursor: 'pointer', flexShrink: 0,
   },
@@ -1345,16 +1345,16 @@ const s = {
   },
   wipCancelBtn: {
     background: 'none', border: 'none',
-    color: 'rgba(255,255,255,0.25)', fontSize: '0.7rem',
+    color: 'var(--text-ghost)', fontSize: '0.7rem',
     cursor: 'pointer', padding: '0.25rem 0',
   },
 
   newBookingBtn: {
     marginLeft: 'auto',
-    background: 'rgba(245,236,217,0.08)',
-    border: '1px solid rgba(245,236,217,0.2)',
+    background: 'var(--accent-tint)',
+    border: '1px solid var(--accent-tint-border)',
     borderRadius: 7,
-    color: '#f5ecd9',
+    color: 'var(--accent)',
     fontSize: '0.75rem',
     fontWeight: 600,
     padding: '0.3rem 0.75rem',
@@ -1368,8 +1368,8 @@ const s = {
     zIndex: 100,
   },
   modal: {
-    background: '#1a1a1a',
-    border: '1px solid rgba(255,255,255,0.1)',
+    background: 'var(--bg-modal)',
+    border: '1px solid var(--border)',
     borderRadius: 12,
     width: 380,
     maxWidth: '90vw',

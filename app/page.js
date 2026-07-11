@@ -3,12 +3,10 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { getSupabase } from '@/lib/supabase';
-import { getMyStudioAccount } from '@/lib/api';
+import { getMyStudioAccount, demoLogin } from '@/lib/api';
 import { isDemoMode, setDemoMode } from '@/lib/mode';
 import SignUpFlow from '@/components/SignUpFlow';
 
-const DEMO_EMAIL = process.env.NEXT_PUBLIC_DEMO_EMAIL ?? '';
-const DEMO_PASSWORD = process.env.NEXT_PUBLIC_DEMO_PASSWORD ?? '';
 
 export default function HomePage() {
   const router = useRouter();
@@ -31,12 +29,21 @@ export default function HomePage() {
   }, [router]);
 
   async function handleEnterDemo() {
-    setDemoMode(true);
-    setDemoModeState(true);
-    setEmail(DEMO_EMAIL);
-    setPassword(DEMO_PASSWORD);
-    setTab('signin');
+    setLoading(true);
     setError('');
+    try {
+      const session = await demoLogin();
+      await getSupabase().auth.setSession({
+        access_token: session.access_token,
+        refresh_token: session.refresh_token,
+      });
+      setDemoMode(true);
+      setDemoModeState(true);
+      router.replace('/dashboard');
+    } catch {
+      setError('Demo unavailable. Please try again later.');
+      setLoading(false);
+    }
   }
 
   function handleExitDemo() {
@@ -143,7 +150,7 @@ export default function HomePage() {
             <button type="submit" disabled={loading} style={{ ...s.btn, opacity: loading ? 0.6 : 1 }}>
               {loading ? 'Signing in…' : 'Sign in'}
             </button>
-            {!demoMode && DEMO_EMAIL && (
+            {!demoMode && (
               <button type="button" onClick={handleEnterDemo} style={s.demoBtn}>
                 Enter demo
               </button>

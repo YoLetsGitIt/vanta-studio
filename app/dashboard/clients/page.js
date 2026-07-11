@@ -1,23 +1,33 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
-import { listBookings } from '@/lib/api';
+import { useState, useEffect, useMemo, useCallback, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { listStudioBookings, getClientConsents, recordConsentInStudio, getNotes, addNote, deleteNote } from '@/lib/api';
 import { getCached, setCached } from '@/lib/cache';
 
-export default function ClientsPage() {
+function ClientsInner() {
+  const params = useSearchParams();
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState(null);
+  const [consents, setConsents] = useState({});
+  const [consentVersion, setConsentVersion] = useState('1');
+
+  // Auto-select a client when navigated from booking detail.
+  useEffect(() => {
+    const client = params.get('client');
+    if (client) setSelected(client);
+  }, [params]);
 
   useEffect(() => {
     async function load() {
-      const key = 'bookings:';
+      const key = 'clients:all';
       const cached = getCached(key);
       if (cached) { setBookings(cached); setLoading(false); return; }
       try {
-        const data = await listBookings('');
+        const data = await listStudioBookings('');
         const b = data.bookings ?? [];
         setCached(key, b);
         setBookings(b);
@@ -30,6 +40,19 @@ export default function ClientsPage() {
     load();
   }, []);
 
+  // Once bookings load, batch-fetch consent statuses.
+  useEffect(() => {
+    if (bookings.length === 0) return;
+    const emails = [...new Set(bookings.map(b => b.requester_email).filter(Boolean))];
+    if (emails.length === 0) return;
+    getClientConsents(emails)
+      .then(data => {
+        setConsents(data.consents ?? {});
+        setConsentVersion(data.current_version ?? '1');
+      })
+      .catch(() => {});
+  }, [bookings]);
+
   const clients = useMemo(() => {
     const map = new Map();
     for (const b of bookings) {
@@ -39,12 +62,14 @@ export default function ClientsPage() {
           name: b.requester_name,
           email: b.requester_email,
           phone: b.requester_phone,
+          dob: b.dob || null,
           bookings: [],
           lastBooking: null,
         });
       }
       const client = map.get(key);
       client.bookings.push(b);
+      if (!client.dob && b.dob) client.dob = b.dob;
       const date = b.chosen_time || b.proposed_time_primary || b.created_at;
       if (date && (!client.lastBooking || new Date(date) > new Date(client.lastBooking))) {
         client.lastBooking = date;
@@ -69,6 +94,14 @@ export default function ClientsPage() {
   }, [clients, search]);
 
   const selectedClient = selected ? filtered.find(c => (c.email || c.name) === selected) : null;
+
+  const handleRecordConsent = useCallback(async (email) => {
+    await recordConsentInStudio(email);
+    setConsents(prev => ({
+      ...prev,
+      [email]: { consent_version: consentVersion, agreed_at: new Date().toISOString(), source: 'in_studio' },
+    }));
+  }, [consentVersion]);
 
   return (
     <div style={s.page}>
@@ -95,12 +128,13 @@ export default function ClientsPage() {
           {filtered.map(client => {
             const key = client.email || client.name;
             const active = selected === key;
-            const completedCount = client.bookings.filter(b => b.status === 'completed').length;
+            const consent = client.email ? consents[client.email] : null;
+            const consentStatus = getConsentStatus(consent, consentVersion);
             return (
               <div
                 key={key}
                 onClick={() => setSelected(prev => prev === key ? null : key)}
-                style={{ ...s.row, background: active ? 'rgba(255,255,255,0.04)' : undefined, borderColor: active ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.06)' }}
+                style={{ ...s.row, background: active ? 'var(--bg-row-active)' : undefined, borderColor: active ? 'var(--border-strong)' : 'var(--border-faint)' }}
               >
                 <div style={s.clientAvatar}>
                   {client.name.charAt(0).toUpperCase()}
@@ -113,11 +147,7 @@ export default function ClientsPage() {
                 </div>
                 <div style={s.clientStats}>
                   <span style={s.sessionCount}>{client.bookings.length} session{client.bookings.length !== 1 ? 's' : ''}</span>
-                  {client.lastBooking && (
-                    <span style={s.lastSeen}>
-                      {new Date(client.lastBooking).toLocaleDateString('en-AU', { month: 'short', year: 'numeric' })}
-                    </span>
-                  )}
+                  <ConsentBadge status={consentStatus} />
                 </div>
               </div>
             );
@@ -125,25 +155,104 @@ export default function ClientsPage() {
         </div>
 
         {selectedClient && (
-          <ClientDetail client={selectedClient} onClose={() => setSelected(null)} />
+          <ClientDetail
+            client={selectedClient}
+            onClose={() => setSelected(null)}
+            consent={selectedClient.email ? consents[selectedClient.email] : null}
+            consentVersion={consentVersion}
+            onRecordConsent={handleRecordConsent}
+          />
         )}
       </div>
     </div>
   );
 }
 
-function ClientDetail({ client, onClose }) {
+export default function ClientsPage() {
+  return (
+    <Suspense>
+      <ClientsInner />
+    </Suspense>
+  );
+}
+
+function getConsentStatus(consent, currentVersion) {
+  if (!consent) return 'none';
+  if (consent.consent_version === currentVersion) return 'current';
+  return 'outdated';
+}
+
+function ConsentBadge({ status }) {
+  if (status === 'current') return <span style={{ ...s.badge, ...s.badgeGreen }}>Consented</span>;
+  if (status === 'outdated') return <span style={{ ...s.badge, ...s.badgeYellow }}>Outdated</span>;
+  return <span style={{ ...s.badge, ...s.badgeRed }}>No consent</span>;
+}
+
+function ClientDetail({ client, onClose, consent, consentVersion, onRecordConsent }) {
+  const [recording,   setRecording]   = useState(false);
+  const [recordErr,   setRecordErr]   = useState('');
+  const [notes,       setNotes]       = useState(null); // null = loading
+  const [noteInput,   setNoteInput]   = useState('');
+  const [noteAdding,  setNoteAdding]  = useState(false);
+  const [noteErr,     setNoteErr]     = useState('');
+
+  useEffect(() => {
+    if (!client.email) { setNotes([]); return; }
+    setNotes(null);
+    getNotes('client', client.email)
+      .then(d => setNotes(d.notes ?? []))
+      .catch(() => setNotes([]));
+  }, [client.email]);
+
+  async function handleAddNote() {
+    if (!noteInput.trim() || !client.email) return;
+    setNoteAdding(true);
+    setNoteErr('');
+    try {
+      const d = await addNote('client', client.email, noteInput.trim());
+      setNotes(prev => [d.note, ...(prev ?? [])]);
+      setNoteInput('');
+    } catch (e) {
+      setNoteErr(e.message);
+    } finally {
+      setNoteAdding(false);
+    }
+  }
+
+  async function handleDeleteNote(id) {
+    try {
+      await deleteNote(id);
+      setNotes(prev => (prev ?? []).filter(n => n.id !== id));
+    } catch { /* silent */ }
+  }
+
   const sorted = [...client.bookings].sort(
     (a, b) => new Date(b.created_at) - new Date(a.created_at),
   );
+
+  const consentStatus = getConsentStatus(consent, consentVersion);
+
+  async function handleRecord() {
+    if (!client.email) return;
+    setRecording(true);
+    setRecordErr('');
+    try {
+      await onRecordConsent(client.email);
+    } catch (e) {
+      setRecordErr(e.message);
+    } finally {
+      setRecording(false);
+    }
+  }
 
   const STATUS_COLORS = {
     pending:   '#f59e3a',
     proposed:  '#6fa3e8',
     confirmed: '#4cc98a',
-    completed: 'rgba(255,255,255,0.4)',
-    cancelled: 'rgba(255,255,255,0.2)',
     rejected:  '#e86f6f',
+    declined:  '#e86f6f',
+    cancelled: 'var(--text-ghost)',
+    timed_out: 'var(--text-ghost)',
   };
 
   return (
@@ -155,24 +264,93 @@ function ClientDetail({ client, onClose }) {
       <div style={s.panelBody}>
         {client.email && <Field label="Email">{client.email}</Field>}
         {client.phone && <Field label="Phone">{client.phone}</Field>}
+        {client.dob && <Field label="Date of birth">{formatDob(client.dob)}</Field>}
         <Field label="Total sessions">{client.bookings.length}</Field>
-        <Field label="Completed">{client.bookings.filter(b => b.status === 'completed').length}</Field>
+        <Field label="Completed">{client.bookings.filter(b => b.outcome === 'completed').length}</Field>
 
-        <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '1rem', marginTop: '0.25rem' }}>
+        <div style={s.consentSection}>
+          <span style={s.sectionLabel}>Consent form</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginTop: '0.5rem' }}>
+            <ConsentBadge status={consentStatus} />
+            {consent && (
+              <span style={{ fontSize: '0.72rem', color: 'var(--text-ghost)' }}>
+                v{consent.consent_version} · {new Date(consent.agreed_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
+              </span>
+            )}
+          </div>
+          {(consentStatus === 'none' || consentStatus === 'outdated') && client.email && (
+            <>
+              <button
+                onClick={handleRecord}
+                disabled={recording}
+                style={{ ...s.consentBtn, marginTop: '0.6rem' }}
+              >
+                {recording ? 'Recording…' : consentStatus === 'outdated' ? 'Record updated consent' : 'Record consent'}
+              </button>
+              {recordErr && <p style={{ fontSize: '0.72rem', color: '#e86f6f', margin: '0.3rem 0 0' }}>{recordErr}</p>}
+            </>
+          )}
+        </div>
+
+        {/* Notes */}
+        <div style={{ borderTop: '1px solid var(--border-faint)', paddingTop: '1rem', marginTop: '0.25rem' }}>
+          <span style={s.sectionLabel}>Notes</span>
+          <div style={{ marginTop: '0.6rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+            <textarea
+              rows={2}
+              placeholder="Add a note about this client…"
+              value={noteInput}
+              onChange={e => setNoteInput(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleAddNote(); }}
+              style={{ width: '100%', boxSizing: 'border-box', resize: 'vertical', background: 'var(--bg-input)', border: '1px solid var(--border-faint)', borderRadius: 6, padding: '0.45rem 0.6rem', fontSize: '0.8rem', color: 'var(--text)', fontFamily: 'inherit', lineHeight: 1.5 }}
+            />
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              {noteErr && <span style={{ fontSize: '0.72rem', color: '#e86f6f' }}>{noteErr}</span>}
+              <span style={{ fontSize: '0.68rem', color: 'var(--text-ghost)', marginLeft: 'auto', marginRight: '0.5rem' }}>⌘↵ to save</span>
+              <button
+                onClick={handleAddNote}
+                disabled={noteAdding || !noteInput.trim()}
+                style={{ fontSize: '0.75rem', fontWeight: 600, padding: '0.25rem 0.75rem', borderRadius: 5, border: '1px solid var(--border-faint)', background: 'var(--bg-chip)', color: 'var(--text-dim)', cursor: 'pointer', opacity: (!noteInput.trim() || noteAdding) ? 0.45 : 1 }}
+              >
+                {noteAdding ? 'Saving…' : 'Add note'}
+              </button>
+            </div>
+            {notes === null && <p style={{ fontSize: '0.78rem', color: 'var(--text-ghost)' }}>Loading…</p>}
+            {notes !== null && notes.length === 0 && <p style={{ fontSize: '0.78rem', color: 'var(--text-ghost)' }}>No notes yet.</p>}
+            {notes !== null && notes.map(n => (
+              <div key={n.id} style={{ background: 'var(--bg-chip)', border: '1px solid var(--border-faint)', borderRadius: 6, padding: '0.5rem 0.65rem', position: 'relative' }}>
+                <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text)', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{n.content}</p>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.35rem' }}>
+                  <span style={{ fontSize: '0.68rem', color: 'var(--text-ghost)' }}>
+                    {new Date(n.created_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  </span>
+                  <button
+                    onClick={() => handleDeleteNote(n.id)}
+                    style={{ fontSize: '0.68rem', color: '#e86f6f', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ borderTop: '1px solid var(--border-faint)', paddingTop: '1rem', marginTop: '0.25rem' }}>
           <span style={s.sectionLabel}>Booking history</span>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', marginTop: '0.75rem' }}>
             {sorted.map(b => (
               <div key={b.id} style={s.historyRow}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
-                  <span style={{ fontSize: '0.82rem', color: '#fff', fontWeight: 600 }}>
-                    {capitalise(b.session_type.replace(/_/g, ' '))} · {b.body_location}
+                  <span style={{ fontSize: '0.82rem', color: 'var(--text)', fontWeight: 600 }}>
+                    {[b.session_type ? capitalise(b.session_type.replace(/_/g, ' ')) : null, b.body_location || null].filter(Boolean).join(' · ') || '—'}
                   </span>
-                  <span style={{ fontSize: '0.73rem', color: 'rgba(255,255,255,0.35)' }}>
+                  <span style={{ fontSize: '0.73rem', color: 'var(--text-faint)' }}>
                     {new Date(b.created_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
                   </span>
                 </div>
-                <span style={{ fontSize: '0.72rem', fontWeight: 600, color: STATUS_COLORS[b.status] ?? '#fff' }}>
-                  {capitalise(b.status)}
+                <span style={{ fontSize: '0.72rem', fontWeight: 600, color: STATUS_COLORS[b.status] ?? 'var(--text)' }}>
+                  {capitalise(b.outcome ?? b.status)}
                 </span>
               </div>
             ))}
@@ -186,10 +364,10 @@ function ClientDetail({ client, onClose }) {
 function Field({ label, children }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
-      <span style={{ fontSize: '0.7rem', fontWeight: 600, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+      <span style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-ghost)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
         {label}
       </span>
-      <span style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.8)' }}>{children}</span>
+      <span style={{ fontSize: '0.85rem', color: 'var(--text-dim)' }}>{children}</span>
     </div>
   );
 }
@@ -198,16 +376,22 @@ function capitalise(str) {
   return str ? str.charAt(0).toUpperCase() + str.slice(1) : str;
 }
 
+function formatDob(dob) {
+  if (!dob) return null;
+  return new Date(dob + 'T12:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
 const s = {
   page: {
     flex: 1,
     display: 'flex',
     flexDirection: 'column',
     overflow: 'hidden',
+    position: 'relative',
   },
   header: {
     padding: '1.75rem 2rem 1.25rem',
-    borderBottom: '1px solid rgba(255,255,255,0.06)',
+    borderBottom: '1px solid var(--border-faint)',
     display: 'flex',
     flexDirection: 'column',
     gap: '0.85rem',
@@ -216,7 +400,7 @@ const s = {
   title: {
     fontSize: '1.2rem',
     fontWeight: 700,
-    color: '#ffffff',
+    color: 'var(--text)',
     letterSpacing: '-0.01em',
   },
   searchWrap: {
@@ -224,19 +408,18 @@ const s = {
   },
   searchInput: {
     width: '100%',
-    background: 'rgba(255,255,255,0.04)',
-    border: '1px solid rgba(255,255,255,0.1)',
+    background: 'var(--bg-input)',
+    border: '1px solid var(--border)',
     borderRadius: 8,
     padding: '0.55rem 0.85rem',
     fontSize: '0.85rem',
-    color: '#ffffff',
+    color: 'var(--text)',
     outline: 'none',
   },
   layout: {
     flex: 1,
     display: 'flex',
     overflow: 'hidden',
-    position: 'relative',
   },
   list: {
     flex: 1,
@@ -248,7 +431,7 @@ const s = {
   },
   msg: {
     fontSize: '0.875rem',
-    color: 'rgba(255,255,255,0.35)',
+    color: 'var(--text-faint)',
     padding: '0.5rem 0',
   },
   row: {
@@ -257,7 +440,7 @@ const s = {
     gap: '0.85rem',
     padding: '0.85rem 1rem',
     borderRadius: 10,
-    border: '1px solid rgba(255,255,255,0.06)',
+    border: '1px solid var(--border-faint)',
     cursor: 'pointer',
     transition: 'background 0.12s, border-color 0.12s',
   },
@@ -265,8 +448,8 @@ const s = {
     width: 36,
     height: 36,
     borderRadius: '50%',
-    background: 'rgba(255,255,255,0.07)',
-    color: 'rgba(255,255,255,0.6)',
+    background: 'var(--bg-chip)',
+    color: 'var(--text-muted)',
     fontSize: '0.875rem',
     fontWeight: 700,
     display: 'flex',
@@ -284,11 +467,11 @@ const s = {
   clientName: {
     fontSize: '0.875rem',
     fontWeight: 600,
-    color: '#ffffff',
+    color: 'var(--text)',
   },
   clientMeta: {
     fontSize: '0.75rem',
-    color: 'rgba(255,255,255,0.35)',
+    color: 'var(--text-faint)',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
@@ -297,43 +480,59 @@ const s = {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'flex-end',
-    gap: '0.2rem',
+    gap: '0.3rem',
     flexShrink: 0,
   },
   sessionCount: {
     fontSize: '0.78rem',
-    color: 'rgba(245,236,217,0.6)',
+    color: 'var(--text-muted)',
     fontWeight: 600,
   },
-  lastSeen: {
-    fontSize: '0.72rem',
-    color: 'rgba(255,255,255,0.25)',
+  badge: {
+    fontSize: '0.65rem',
+    fontWeight: 700,
+    letterSpacing: '0.04em',
+    textTransform: 'uppercase',
+    padding: '0.15rem 0.45rem',
+    borderRadius: 4,
+  },
+  badgeGreen: {
+    background: 'rgba(76,201,138,0.12)',
+    color: '#4cc98a',
+  },
+  badgeYellow: {
+    background: 'rgba(245,158,58,0.12)',
+    color: '#f59e3a',
+  },
+  badgeRed: {
+    background: 'rgba(232,111,111,0.12)',
+    color: '#e86f6f',
   },
   panel: {
-    width: 300,
-    flexShrink: 0,
-    background: '#0f151e',
-    borderLeft: '1px solid rgba(255,255,255,0.08)',
+    position: 'absolute', top: 0, right: 0, bottom: 0, width: 320,
+    background: 'var(--bg-panel)',
+    borderLeft: '1px solid var(--border)',
     display: 'flex',
     flexDirection: 'column',
+    zIndex: 10,
   },
   panelHeader: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: '1.25rem 1.25rem 1rem',
-    borderBottom: '1px solid rgba(255,255,255,0.06)',
+    borderBottom: '1px solid var(--border-faint)',
     flexShrink: 0,
   },
   panelTitle: {
     fontSize: '0.95rem',
     fontWeight: 700,
-    color: '#ffffff',
+    color: 'var(--text)',
   },
   closeBtn: {
     background: 'none',
     border: 'none',
-    color: 'rgba(255,255,255,0.35)',
+    color: 'var(--text-faint)',
     fontSize: '0.9rem',
     cursor: 'pointer',
   },
@@ -345,12 +544,29 @@ const s = {
     flexDirection: 'column',
     gap: '0.85rem',
   },
+  consentSection: {
+    borderTop: '1px solid var(--border-faint)',
+    paddingTop: '0.85rem',
+    display: 'flex',
+    flexDirection: 'column',
+  },
   sectionLabel: {
     fontSize: '0.7rem',
     fontWeight: 600,
-    color: 'rgba(255,255,255,0.3)',
+    color: 'var(--text-ghost)',
     textTransform: 'uppercase',
     letterSpacing: '0.06em',
+  },
+  consentBtn: {
+    background: 'var(--bg-chip)',
+    border: '1px solid var(--border-strong)',
+    borderRadius: 7,
+    color: 'var(--text-dim)',
+    fontSize: '0.78rem',
+    fontWeight: 600,
+    padding: '0.45rem 0.75rem',
+    cursor: 'pointer',
+    alignSelf: 'flex-start',
   },
   historyRow: {
     display: 'flex',

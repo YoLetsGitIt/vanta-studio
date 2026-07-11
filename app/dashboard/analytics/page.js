@@ -23,6 +23,19 @@ export default function AnalyticsPage() {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [isLight, setIsLight] = useState(false);
+  useEffect(() => {
+    const check = () => setIsLight(document.documentElement.getAttribute('data-theme') === 'light');
+    check();
+    const obs = new MutationObserver(check);
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    return () => obs.disconnect();
+  }, []);
+  const tickColor = isLight ? 'rgba(17,16,8,0.4)' : 'rgba(255,255,255,0.3)';
+  const gridColor = isLight ? 'rgba(0,0,0,0.07)' : 'rgba(255,255,255,0.05)';
+  const tooltipBg = isLight ? '#f5f2ec' : '#151b24';
+  const tooltipBorder = isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)';
+  const tooltipColor = isLight ? '#111008' : '#fff';
 
   useEffect(() => {
     async function load() {
@@ -119,7 +132,7 @@ export default function AnalyticsPage() {
                 <StatCard label="Pending" value={bookingStats.pending} color="#f59e3a" />
                 <StatCard label="Confirmed" value={bookingStats.confirmed} color="#6fa3e8" />
                 <StatCard label="Completed" value={bookingStats.completed} color="#4cc98a" />
-                <StatCard label="Cancelled" value={bookingStats.cancelled} color="rgba(255,255,255,0.3)" />
+                <StatCard label="Cancelled" value={bookingStats.cancelled} color={tickColor} />
                 <StatCard label="Conversion" value={`${bookingStats.conversionRate}%`} color="#f5ecd9" />
               </div>
             </section>
@@ -144,28 +157,28 @@ export default function AnalyticsPage() {
                     <div style={s.chartWrap}>
                       <ResponsiveContainer width="100%" height={200}>
                         <LineChart data={chartData} margin={{ top: 4, right: 8, bottom: 0, left: -20 }}>
-                          <CartesianGrid stroke="rgba(255,255,255,0.05)" vertical={false} />
+                          <CartesianGrid stroke={gridColor} vertical={false} />
                           <XAxis
                             dataKey="week"
-                            tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 11 }}
+                            tick={{ fill: tickColor, fontSize: 11 }}
                             axisLine={false}
                             tickLine={false}
                             interval="preserveStartEnd"
                           />
                           <YAxis
-                            tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 11 }}
+                            tick={{ fill: tickColor, fontSize: 11 }}
                             axisLine={false}
                             tickLine={false}
                           />
                           <Tooltip
                             contentStyle={{
-                              background: '#151b24',
-                              border: '1px solid rgba(255,255,255,0.1)',
+                              background: tooltipBg,
+                              border: `1px solid ${tooltipBorder}`,
                               borderRadius: 8,
                               fontSize: 12,
-                              color: '#fff',
+                              color: tooltipColor,
                             }}
-                            labelStyle={{ color: 'rgba(255,255,255,0.5)' }}
+                            labelStyle={{ color: tickColor }}
                           />
                           <Line
                             type="monotone"
@@ -188,28 +201,28 @@ export default function AnalyticsPage() {
                     <div style={s.chartWrap}>
                       <ResponsiveContainer width="100%" height={180}>
                         <BarChart data={chartData} margin={{ top: 4, right: 8, bottom: 0, left: -20 }}>
-                          <CartesianGrid stroke="rgba(255,255,255,0.05)" vertical={false} />
+                          <CartesianGrid stroke={gridColor} vertical={false} />
                           <XAxis
                             dataKey="week"
-                            tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 11 }}
+                            tick={{ fill: tickColor, fontSize: 11 }}
                             axisLine={false}
                             tickLine={false}
                             interval="preserveStartEnd"
                           />
                           <YAxis
-                            tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 11 }}
+                            tick={{ fill: tickColor, fontSize: 11 }}
                             axisLine={false}
                             tickLine={false}
                           />
                           <Tooltip
                             contentStyle={{
-                              background: '#151b24',
-                              border: '1px solid rgba(255,255,255,0.1)',
+                              background: tooltipBg,
+                              border: `1px solid ${tooltipBorder}`,
                               borderRadius: 8,
                               fontSize: 12,
-                              color: '#fff',
+                              color: tooltipColor,
                             }}
-                            labelStyle={{ color: 'rgba(255,255,255,0.5)' }}
+                            labelStyle={{ color: tickColor }}
                           />
                           <Bar dataKey="contacts" fill="rgba(111,163,232,0.5)" radius={[3, 3, 0, 0]} name="Contacts" />
                         </BarChart>
@@ -244,7 +257,7 @@ const s = {
   },
   header: {
     padding: '1.75rem 2rem 1.25rem',
-    borderBottom: '1px solid rgba(255,255,255,0.06)',
+    borderBottom: '1px solid var(--border-faint)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -253,7 +266,7 @@ const s = {
   title: {
     fontSize: '1.2rem',
     fontWeight: 700,
-    color: '#ffffff',
+    color: 'var(--text)',
     letterSpacing: '-0.01em',
   },
   weekPicker: {
@@ -263,17 +276,17 @@ const s = {
   weekBtn: {
     padding: '0.3rem 0.75rem',
     borderRadius: 20,
-    border: '1px solid rgba(255,255,255,0.1)',
+    border: '1px solid var(--border)',
     background: 'transparent',
-    color: 'rgba(255,255,255,0.4)',
+    color: 'var(--text-muted)',
     fontSize: '0.78rem',
     fontWeight: 500,
     cursor: 'pointer',
   },
   weekBtnActive: {
-    background: 'rgba(245,236,217,0.1)',
-    borderColor: 'rgba(245,236,217,0.3)',
-    color: '#f5ecd9',
+    background: 'var(--accent-tint)',
+    borderColor: 'var(--accent-tint-border)',
+    color: 'var(--accent)',
   },
   body: {
     flex: 1,
@@ -285,7 +298,7 @@ const s = {
   },
   msg: {
     fontSize: '0.875rem',
-    color: 'rgba(255,255,255,0.35)',
+    color: 'var(--text-faint)',
   },
   section: {
     display: 'flex',
@@ -295,7 +308,7 @@ const s = {
   sectionTitle: {
     fontSize: '0.85rem',
     fontWeight: 600,
-    color: 'rgba(255,255,255,0.5)',
+    color: 'var(--text-muted)',
     letterSpacing: '0.01em',
   },
   statGrid: {
@@ -304,8 +317,8 @@ const s = {
     gap: '0.75rem',
   },
   statCard: {
-    background: 'rgba(255,255,255,0.03)',
-    border: '1px solid rgba(255,255,255,0.07)',
+    background: 'var(--bg-card)',
+    border: '1px solid var(--border-faint)',
     borderRadius: 10,
     padding: '1rem',
     display: 'flex',
@@ -319,12 +332,12 @@ const s = {
   },
   statLabel: {
     fontSize: '0.72rem',
-    color: 'rgba(255,255,255,0.35)',
+    color: 'var(--text-faint)',
     fontWeight: 500,
   },
   chartWrap: {
-    background: 'rgba(255,255,255,0.02)',
-    border: '1px solid rgba(255,255,255,0.06)',
+    background: 'var(--bg-card)',
+    border: '1px solid var(--border-faint)',
     borderRadius: 12,
     padding: '1.25rem 1rem 1rem',
   },

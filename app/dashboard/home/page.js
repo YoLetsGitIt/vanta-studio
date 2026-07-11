@@ -96,7 +96,7 @@ export default function HomePage() {
               </div>
             </div>
             <div style={s.walkInQr}>
-              <QRCodeSVG value={walkInUrl} size={88} bgColor="transparent" fgColor="#ffffff" level="M" />
+              <QRCodeSVG value={walkInUrl} size={88} bgColor="transparent" fgColor="currentColor" level="M" />
             </div>
           </div>
         )}
@@ -166,19 +166,19 @@ const s = {
   },
   header: {
     padding: '1.75rem 2rem 1.25rem',
-    borderBottom: '1px solid rgba(255,255,255,0.06)',
+    borderBottom: '1px solid var(--border-faint)',
     flexShrink: 0,
   },
   title: {
     fontSize: '1.2rem',
     fontWeight: 700,
-    color: '#ffffff',
+    color: 'var(--text)',
     letterSpacing: '-0.01em',
     margin: 0,
   },
   date: {
     fontSize: '0.8rem',
-    color: 'rgba(255,255,255,0.35)',
+    color: 'var(--text-faint)',
     marginTop: '0.2rem',
     marginBottom: 0,
   },
@@ -190,15 +190,15 @@ const s = {
     flexDirection: 'column',
     gap: '0.75rem',
   },
-  msg: { fontSize: '0.875rem', color: 'rgba(255,255,255,0.35)' },
+  msg: { fontSize: '0.875rem', color: 'var(--text-faint)' },
   statRow: {
     display: 'grid',
     gridTemplateColumns: '1fr 1fr',
     gap: '0.75rem',
   },
   statCard: {
-    background: 'rgba(255,255,255,0.03)',
-    border: '1px solid rgba(255,255,255,0.07)',
+    background: 'var(--bg-card)',
+    border: '1px solid var(--border-faint)',
     borderRadius: 12,
     padding: '1.25rem 1.5rem',
     display: 'flex',
@@ -208,18 +208,18 @@ const s = {
   statValue: {
     fontSize: '2.2rem',
     fontWeight: 700,
-    color: '#ffffff',
+    color: 'var(--text)',
     letterSpacing: '-0.03em',
     lineHeight: 1,
   },
   statLabel: {
     fontSize: '0.75rem',
-    color: 'rgba(255,255,255,0.35)',
+    color: 'var(--text-faint)',
     fontWeight: 500,
   },
   card: {
-    background: 'rgba(255,255,255,0.03)',
-    border: '1px solid rgba(255,255,255,0.07)',
+    background: 'var(--bg-card)',
+    border: '1px solid var(--border-faint)',
     borderRadius: 12,
     padding: '1rem 1.25rem',
     display: 'flex',
@@ -239,8 +239,8 @@ const s = {
     flexShrink: 0,
   },
   avatarFallback: {
-    background: 'rgba(245,236,217,0.1)',
-    color: '#f5ecd9',
+    background: 'var(--accent-tint)',
+    color: 'var(--accent)',
     fontSize: '0.8rem',
     fontWeight: 700,
     display: 'flex',
@@ -255,17 +255,17 @@ const s = {
   artistName: {
     fontSize: '0.925rem',
     fontWeight: 700,
-    color: '#ffffff',
+    color: 'var(--text)',
   },
   bookingCount: {
     fontSize: '0.72rem',
-    color: 'rgba(255,255,255,0.3)',
+    color: 'var(--text-secondary)',
   },
   bookingList: {
     display: 'flex',
     flexDirection: 'column',
     gap: '0.4rem',
-    borderTop: '1px solid rgba(255,255,255,0.05)',
+    borderTop: '1px solid var(--border-faint)',
     paddingTop: '0.75rem',
   },
   bookingRow: {
@@ -276,14 +276,14 @@ const s = {
   time: {
     fontSize: '0.8rem',
     fontWeight: 600,
-    color: 'rgba(255,255,255,0.55)',
+    color: 'var(--text-muted)',
     minWidth: 68,
     flexShrink: 0,
   },
   client: {
     fontSize: '0.85rem',
     fontWeight: 500,
-    color: 'rgba(255,255,255,0.85)',
+    color: 'var(--text-dim)',
     flex: 1,
     minWidth: 0,
     overflow: 'hidden',
@@ -292,19 +292,19 @@ const s = {
   },
   sessionType: {
     fontSize: '0.72rem',
-    color: 'rgba(255,255,255,0.3)',
+    color: 'var(--text-secondary)',
     flexShrink: 0,
   },
   duration: {
     fontSize: '0.72rem',
-    color: 'rgba(255,255,255,0.25)',
+    color: 'var(--text-ghost)',
     flexShrink: 0,
   },
 
   // Walk-in link card
   walkInCard: {
-    background: 'rgba(255,255,255,0.03)',
-    border: '1px solid rgba(255,255,255,0.09)',
+    background: 'var(--bg-card)',
+    border: '1px solid var(--border)',
     borderRadius: 12,
     padding: '1rem 1.25rem',
     display: 'flex',
@@ -315,29 +315,29 @@ const s = {
     display: 'flex', flexDirection: 'column', gap: '0.35rem', flex: 1, minWidth: 0,
   },
   walkInTitle: {
-    fontSize: '0.78rem', fontWeight: 700, color: '#ffffff',
+    fontSize: '0.78rem', fontWeight: 700, color: 'var(--text)',
   },
   walkInSub: {
-    fontSize: '0.72rem', color: 'rgba(255,255,255,0.3)',
+    fontSize: '0.72rem', color: 'var(--text-secondary)',
   },
   walkInUrlRow: {
     display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.15rem',
   },
   walkInUrlText: {
-    fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)',
+    fontSize: '0.7rem', color: 'var(--text-muted)',
     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1,
   },
   copyBtn: {
-    background: 'rgba(255,255,255,0.07)',
-    border: '1px solid rgba(255,255,255,0.1)',
+    background: 'var(--bg-chip)',
+    border: '1px solid var(--border)',
     borderRadius: 6,
-    color: 'rgba(255,255,255,0.6)',
+    color: 'var(--text-muted)',
     fontSize: '0.7rem', fontWeight: 600,
     padding: '0.2rem 0.6rem', cursor: 'pointer', flexShrink: 0,
   },
   walkInQr: {
     flexShrink: 0,
-    background: 'rgba(255,255,255,0.04)',
+    background: 'var(--bg-card)',
     borderRadius: 8,
     padding: 6,
   },

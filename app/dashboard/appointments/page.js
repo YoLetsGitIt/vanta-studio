@@ -1,106 +1,263 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { listBookings, proposeBooking, acceptBooking, rejectBooking, recordOutcome } from '@/lib/api';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { listStudioBookings, acceptBookingWithStation, rejectBooking, cancelBooking, recordOutcome } from '@/lib/api';
 import { getCached, setCached, invalidatePrefix } from '@/lib/cache';
+import CompleteBookingModal from '@/components/CompleteBookingModal';
+import RejectBookingModal from '@/components/RejectBookingModal';
+import BookingDetailPanel from '@/components/BookingDetailPanel';
 
 const STATUS_FILTERS = [
-  { value: '', label: 'All' },
-  { value: 'pending', label: 'Pending' },
-  { value: 'proposed', label: 'Proposed' },
-  { value: 'confirmed', label: 'Confirmed' },
-  { value: 'completed', label: 'Completed' },
-  { value: 'cancelled', label: 'Cancelled' },
+  { value: 'pending,modified,deposit_pending_confirmation', label: 'Needs Action' },
+  { value: 'proposed,awaiting_deposit,confirmed',           label: 'Upcoming' },
+  { value: 'completed,no_show',                            label: 'Completed' },
+  { value: 'rejected,declined,cancelled,timed_out',        label: 'Closed' },
 ];
 
 const STATUS_COLORS = {
-  pending:   { bg: 'rgba(245,158,58,0.12)',  text: '#f59e3a', border: 'rgba(245,158,58,0.25)' },
-  proposed:  { bg: 'rgba(111,163,232,0.12)', text: '#6fa3e8', border: 'rgba(111,163,232,0.25)' },
-  confirmed: { bg: 'rgba(76,201,138,0.12)',  text: '#4cc98a', border: 'rgba(76,201,138,0.25)' },
-  completed: { bg: 'rgba(255,255,255,0.06)', text: 'rgba(255,255,255,0.5)', border: 'rgba(255,255,255,0.1)' },
-  cancelled: { bg: 'rgba(255,255,255,0.04)', text: 'rgba(255,255,255,0.3)', border: 'rgba(255,255,255,0.07)' },
-  rejected:  { bg: 'rgba(232,111,111,0.1)',  text: '#e86f6f', border: 'rgba(232,111,111,0.2)' },
+  pending:                      { bg: 'rgba(245,158,58,0.12)',  text: '#f59e3a', border: 'rgba(245,158,58,0.25)' },
+  proposed:                     { bg: 'rgba(111,163,232,0.12)', text: '#6fa3e8', border: 'rgba(111,163,232,0.25)' },
+  modified:                     { bg: 'rgba(167,139,250,0.12)', text: '#a78bfa', border: 'rgba(167,139,250,0.25)' },
+  awaiting_deposit:             { bg: 'rgba(251,146,60,0.12)',  text: '#fb923c', border: 'rgba(251,146,60,0.25)' },
+  deposit_pending_confirmation: { bg: 'rgba(250,204,21,0.12)',  text: '#facc15', border: 'rgba(250,204,21,0.25)' },
+  confirmed:                    { bg: 'rgba(76,201,138,0.12)',  text: '#4cc98a', border: 'rgba(76,201,138,0.25)' },
+  completed:                    { bg: 'rgba(76,201,138,0.1)',   text: '#4cc98a', border: 'rgba(76,201,138,0.2)' },
+  no_show:                      { bg: 'rgba(232,111,111,0.08)', text: '#e86f6f', border: 'rgba(232,111,111,0.15)' },
+  rejected:                     { bg: 'rgba(232,111,111,0.1)',  text: '#e86f6f', border: 'rgba(232,111,111,0.2)' },
+  declined:                     { bg: 'rgba(232,111,111,0.07)', text: '#e06060', border: 'rgba(232,111,111,0.15)' },
+  cancelled:                    { bg: 'var(--bg-chip)', text: 'var(--text-ghost)', border: 'var(--border-faint)' },
+  timed_out:                    { bg: 'var(--bg-chip)', text: 'var(--text-faint)', border: 'var(--border-faint)' },
 };
 
+const DEFAULT_FILTER = 'pending,modified,deposit_pending_confirmation';
+
 export default function AppointmentsPage() {
-  const [filter, setFilter] = useState('');
+  const [activeFilters, setActiveFilters] = useState(() => new Set([DEFAULT_FILTER]));
+  const [sortDir, setSortDir] = useState('desc');
+  const [search, setSearch] = useState('');
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [nextCursor, setNextCursor] = useState('');
   const [error, setError] = useState('');
   const [selected, setSelected] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [completeTarget, setCompleteTarget] = useState(null);
+  const [noShowTarget, setNoShowTarget] = useState(null);
+  const [rejectTarget, setRejectTarget] = useState(null);
+  const [cancelTarget, setCancelTarget] = useState(null);
+  const [toast, setToast] = useState(null);
+
+  const combinedStatus = useMemo(() => {
+    return [...activeFilters].flatMap(f => f.split(',')).join(',');
+  }, [activeFilters]);
+
+  function showToast(msg) {
+    setToast(msg);
+    setTimeout(() => setToast(null), 3000);
+  }
+
+  function toggleFilter(value) {
+    setActiveFilters(prev => {
+      const next = new Set(prev);
+      if (next.has(value)) next.delete(value); else next.add(value);
+      return next;
+    });
+    setSelected(null);
+  }
+
+  function toggleSort() {
+    setSortDir(d => d === 'desc' ? 'asc' : 'desc');
+    setSelected(null);
+  }
 
   const load = useCallback(async (bust = false) => {
     if (bust) invalidatePrefix('bookings:');
-    const key = `bookings:${filter}`;
+    const key = `bookings:${combinedStatus}:${sortDir}`;
     const cached = getCached(key);
-    if (cached) { setBookings(cached); setLoading(false); return; }
+    if (cached) {
+      setBookings(cached.bookings);
+      setNextCursor(cached.next ?? '');
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError('');
+    setNextCursor('');
     try {
-      const data = await listBookings(filter);
+      const data = await listStudioBookings(combinedStatus, '', sortDir);
       const b = data.bookings ?? [];
-      setCached(key, b);
+      const next = data.next_cursor ?? '';
+      setCached(key, { bookings: b, next });
       setBookings(b);
+      setNextCursor(next);
     } catch (e) {
       setError(e.message);
     } finally {
       setLoading(false);
     }
-  }, [filter]);
+  }, [combinedStatus, sortDir]);
 
   useEffect(() => { load(); }, [load]);
 
-  async function handleAccept(id) {
+  async function loadMore() {
+    if (!nextCursor || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const data = await listStudioBookings(combinedStatus, nextCursor, sortDir);
+      const more = data.bookings ?? [];
+      const next = data.next_cursor ?? '';
+      setBookings(prev => [...prev, ...more]);
+      setNextCursor(next);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setLoadingMore(false);
+    }
+  }
+
+  async function handleAccept(id, stationId) {
     setActionLoading(true);
-    try { await acceptBooking(id); await load(true); setSelected(null); }
+    try { await acceptBookingWithStation(id, stationId); await load(true); setSelected(null); }
     catch (e) { alert(e.message); }
     finally { setActionLoading(false); }
   }
 
-  async function handleReject(id) {
-    const reason = prompt('Reason for rejection (optional):') ?? '';
+  function handleReject(id) { setRejectTarget(id); }
+
+  async function confirmReject(reason) {
     setActionLoading(true);
-    try { await rejectBooking(id, reason); await load(true); setSelected(null); }
+    try { await rejectBooking(rejectTarget, reason); await load(true); setSelected(null); setRejectTarget(null); }
     catch (e) { alert(e.message); }
     finally { setActionLoading(false); }
   }
 
-  async function handleComplete(id) {
+  function handleComplete(id, price) { setCompleteTarget({ id, price }); }
+  function handleNoShow(id) { setNoShowTarget(id); }
+  function handleCancel(id) { setCancelTarget(id); }
+
+  async function confirmComplete(finalPrice, paymentMethod) {
     setActionLoading(true);
-    try { await recordOutcome(id, 'completed'); await load(true); setSelected(null); }
+    try {
+      await recordOutcome(completeTarget.id, 'completed', finalPrice, paymentMethod);
+      await load(true);
+      setSelected(null);
+      setCompleteTarget(null);
+      showToast('Booking marked as complete');
+    }
     catch (e) { alert(e.message); }
     finally { setActionLoading(false); }
   }
+
+  async function confirmNoShow() {
+    setActionLoading(true);
+    try {
+      await recordOutcome(noShowTarget, 'no_show');
+      await load(true);
+      setSelected(null);
+      setNoShowTarget(null);
+      showToast('Booking marked as no show');
+    }
+    catch (e) { alert(e.message); }
+    finally { setActionLoading(false); }
+  }
+
+  async function confirmCancel(reason) {
+    setActionLoading(true);
+    try { await cancelBooking(cancelTarget, reason); await load(true); setSelected(null); setCancelTarget(null); }
+    catch (e) { alert(e.message); }
+    finally { setActionLoading(false); }
+  }
+
+  const filteredBookings = useMemo(() => {
+    if (!search.trim()) return bookings;
+    const q = search.trim().toLowerCase();
+    return bookings.filter(b =>
+      b.requester_name?.toLowerCase().includes(q) ||
+      b.requester_email?.toLowerCase().includes(q)
+    );
+  }, [bookings, search]);
 
   const selectedBooking = selected ? bookings.find(b => b.id === selected) : null;
 
   return (
     <div style={s.page}>
-      {/* Header */}
+      {toast && (
+        <div style={s.toast}>
+          <span style={s.toastCheck}>✓</span>
+          {toast}
+        </div>
+      )}
+
+      {completeTarget && (
+        <CompleteBookingModal
+          outcome="completed"
+          initialPrice={completeTarget.price}
+          saving={actionLoading}
+          onConfirm={confirmComplete}
+          onCancel={() => setCompleteTarget(null)}
+        />
+      )}
+      {noShowTarget && (
+        <CompleteBookingModal
+          outcome="no_show"
+          saving={actionLoading}
+          onConfirm={confirmNoShow}
+          onCancel={() => setNoShowTarget(null)}
+        />
+      )}
+      {rejectTarget && (
+        <RejectBookingModal
+          saving={actionLoading}
+          onConfirm={confirmReject}
+          onCancel={() => setRejectTarget(null)}
+        />
+      )}
+      {cancelTarget && (
+        <RejectBookingModal
+          title="Cancel booking"
+          placeholder="Reason for cancellation…"
+          confirmLabel="Cancel booking"
+          saving={actionLoading}
+          onConfirm={confirmCancel}
+          onCancel={() => setCancelTarget(null)}
+        />
+      )}
+
       <div style={s.header}>
-        <h1 style={s.title}>Appointments</h1>
-        <div style={s.filters}>
-          {STATUS_FILTERS.map(f => (
-            <button
-              key={f.value}
-              onClick={() => setFilter(f.value)}
-              style={{ ...s.filterBtn, ...(filter === f.value ? s.filterActive : {}) }}
-            >
-              {f.label}
-            </button>
-          ))}
+        <h1 style={s.title}>Bookings</h1>
+        <input
+          type="search"
+          placeholder="Search by name or email…"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          style={s.searchInput}
+        />
+        <div style={s.filterRow}>
+          <div style={s.filters}>
+            {STATUS_FILTERS.map(f => (
+              <button
+                key={f.value}
+                onClick={() => toggleFilter(f.value)}
+                style={{ ...s.filterBtn, ...(activeFilters.has(f.value) ? s.filterActive : {}) }}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+          <button onClick={toggleSort} style={s.sortBtn}>
+            {sortDir === 'desc' ? '↓ Newest' : '↑ Oldest'}
+          </button>
         </div>
       </div>
 
-      {/* List */}
       <div style={s.body}>
-        {loading && <p style={s.msg}>Loading…</p>}
+        {loading && <SkeletonList />}
         {error && <p style={{ ...s.msg, color: '#e86f6f' }}>{error}</p>}
-        {!loading && !error && bookings.length === 0 && (
-          <p style={s.msg}>No appointments found.</p>
+        {!loading && !error && filteredBookings.length === 0 && (
+          <p style={s.msg}>{search ? 'No results for that search.' : 'No appointments found.'}</p>
         )}
-        {!loading && bookings.map(b => (
+        {!loading && filteredBookings.map(b => (
           <BookingRow
             key={b.id}
             booking={b}
@@ -108,16 +265,23 @@ export default function AppointmentsPage() {
             onSelect={() => setSelected(prev => prev === b.id ? null : b.id)}
           />
         ))}
+        {nextCursor && !loading && (
+          <button onClick={loadMore} disabled={loadingMore} style={s.loadMore}>
+            {loadingMore ? 'Loading…' : 'Load more'}
+          </button>
+        )}
       </div>
 
-      {/* Detail Panel */}
       {selectedBooking && (
-        <DetailPanel
+        <BookingDetailPanel
           booking={selectedBooking}
+          allBookings={bookings}
           onClose={() => setSelected(null)}
-          onAccept={() => handleAccept(selectedBooking.id)}
+          onAccept={(stationId) => handleAccept(selectedBooking.id, stationId)}
           onReject={() => handleReject(selectedBooking.id)}
-          onComplete={() => handleComplete(selectedBooking.id)}
+          onCancel={() => handleCancel(selectedBooking.id)}
+          onComplete={() => handleComplete(selectedBooking.id, selectedBooking.estimated_quote ?? selectedBooking.final_price)}
+          onNoShow={() => handleNoShow(selectedBooking.id)}
           actionLoading={actionLoading}
         />
       )}
@@ -125,132 +289,84 @@ export default function AppointmentsPage() {
   );
 }
 
+function SkeletonList() {
+  const widths = [120, 160, 100, 140, 110];
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+      {widths.map((w, i) => (
+        <div key={i} className="skeleton" style={{ ...s.row, cursor: 'default', pointerEvents: 'none' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+            <div style={{ width: w, height: 13, borderRadius: 4, background: 'var(--bg-chip)' }} />
+            <div style={{ width: w * 0.6, height: 11, borderRadius: 4, background: 'var(--bg-chip)', opacity: 0.7 }} />
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.35rem' }}>
+            <div style={{ width: 64, height: 20, borderRadius: 20, background: 'var(--bg-chip)' }} />
+            <div style={{ width: 76, height: 11, borderRadius: 4, background: 'var(--bg-chip)', opacity: 0.7 }} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function BookingRow({ booking: b, selected, onSelect }) {
-  const sc = STATUS_COLORS[b.status] ?? STATUS_COLORS.pending;
-  const date = b.proposed_time_primary
-    ? new Date(b.proposed_time_primary).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })
-    : b.chosen_time
-    ? new Date(b.chosen_time).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })
-    : '—';
+  const sc = STATUS_COLORS[b.status] ?? { bg: 'var(--bg-chip)', text: 'var(--text-ghost)', border: 'var(--border-faint)' };
+  const dateStr = b.chosen_time || b.proposed_time_primary;
+  const date = dateStr
+    ? new Date(dateStr).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })
+    : null;
+  const sessionParts = [
+    b.session_type ? capitalise(b.session_type.replace(/_/g, ' ')) : null,
+    b.body_location || null,
+  ].filter(Boolean);
+  const SOURCE_LABELS = { walkin: 'Walk-in', personal: 'Manual', app: 'App' };
+  const sourceLabel = SOURCE_LABELS[b.source] ?? null;
 
   return (
     <div
       onClick={onSelect}
       style={{
         ...s.row,
-        background: selected ? 'rgba(255,255,255,0.04)' : undefined,
-        borderColor: selected ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.06)',
+        background: selected ? 'var(--bg-row-active)' : undefined,
+        borderColor: selected ? 'var(--border-strong)' : 'var(--border-faint)',
       }}
     >
       <div style={s.rowLeft}>
-        <span style={s.clientName}>{b.requester_name}</span>
-        <span style={s.rowMeta}>
-          {capitalise(b.session_type.replace(/_/g, ' '))} · {b.body_location}
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <span style={s.clientName}>{b.requester_name}</span>
+          {sourceLabel && <span style={s.sourceTag}>{sourceLabel}</span>}
+        </div>
+        {sessionParts.length > 0 && <span style={s.rowMeta}>{sessionParts.join(' · ')}</span>}
       </div>
       <div style={s.rowRight}>
         <span style={{ ...s.statusBadge, background: sc.bg, color: sc.text, border: `1px solid ${sc.border}` }}>
-          {capitalise(b.status)}
+          {statusLabel(b.status)}
         </span>
-        <span style={s.dateText}>{date}</span>
+        {date
+          ? <span style={s.dateText}>{date}</span>
+          : <span style={{ ...s.dateText, opacity: 0.35 }}>No date</span>
+        }
       </div>
     </div>
   );
 }
 
-function DetailPanel({ booking: b, onClose, onAccept, onReject, onComplete, actionLoading }) {
-  const sc = STATUS_COLORS[b.status] ?? STATUS_COLORS.pending;
-  return (
-    <aside style={s.panel}>
-      <div style={s.panelHeader}>
-        <span style={s.panelTitle}>{b.requester_name}</span>
-        <button onClick={onClose} style={s.closeBtn}>✕</button>
-      </div>
-
-      <div style={s.panelBody}>
-        <Field label="Status">
-          <span style={{ ...s.statusBadge, background: sc.bg, color: sc.text, border: `1px solid ${sc.border}` }}>
-            {capitalise(b.status)}
-          </span>
-        </Field>
-        <Field label="Session">{capitalise(b.session_type.replace(/_/g, ' '))}</Field>
-        <Field label="Placement">{b.body_location}</Field>
-        {b.color && <Field label="Style">{b.color}</Field>}
-        <Field label="Design">{b.design_details}</Field>
-        {b.requester_email && <Field label="Email">{b.requester_email}</Field>}
-        {b.requester_phone && <Field label="Phone">{b.requester_phone}</Field>}
-        {b.estimated_quote && <Field label="Quote">${b.estimated_quote}</Field>}
-        {b.proposed_duration_minutes && (
-          <Field label="Duration">{Math.round(b.proposed_duration_minutes / 60 * 10) / 10} hrs</Field>
-        )}
-        {b.additional_notes && <Field label="Notes">{b.additional_notes}</Field>}
-        {b.proposed_time_primary && (
-          <Field label="Proposed">
-            {new Date(b.proposed_time_primary).toLocaleString('en-AU', {
-              dateStyle: 'medium', timeStyle: 'short',
-            })}
-          </Field>
-        )}
-        {b.chosen_time && (
-          <Field label="Confirmed">
-            {new Date(b.chosen_time).toLocaleString('en-AU', {
-              dateStyle: 'medium', timeStyle: 'short',
-            })}
-          </Field>
-        )}
-      </div>
-
-      {/* Actions */}
-      <div style={s.actions}>
-        {b.status === 'pending' && (
-          <>
-            <ActionBtn onClick={onAccept} disabled={actionLoading} variant="success">Accept</ActionBtn>
-            <ActionBtn onClick={onReject} disabled={actionLoading} variant="danger">Reject</ActionBtn>
-          </>
-        )}
-        {b.status === 'confirmed' && (
-          <ActionBtn onClick={onComplete} disabled={actionLoading} variant="success">Mark Complete</ActionBtn>
-        )}
-      </div>
-    </aside>
-  );
-}
-
-function Field({ label, children }) {
-  return (
-    <div style={s.field}>
-      <span style={s.fieldLabel}>{label}</span>
-      <span style={s.fieldVal}>{children}</span>
-    </div>
-  );
-}
-
-function ActionBtn({ onClick, disabled, variant, children }) {
-  const colors = {
-    success: { bg: 'rgba(76,201,138,0.12)', border: 'rgba(76,201,138,0.3)', text: '#4cc98a' },
-    danger:  { bg: 'rgba(232,111,111,0.1)',  border: 'rgba(232,111,111,0.25)', text: '#e86f6f' },
+function statusLabel(status) {
+  const map = {
+    pending:                      'Pending',
+    proposed:                     'Proposed',
+    modified:                     'Modified',
+    awaiting_deposit:             'Awaiting Deposit',
+    deposit_pending_confirmation: 'Dep. Pending',
+    confirmed:                    'Confirmed',
+    completed:                    'Completed',
+    no_show:                      'No Show',
+    rejected:                     'Rejected',
+    declined:                     'Declined',
+    cancelled:                    'Cancelled',
+    timed_out:                    'Timed Out',
   };
-  const c = colors[variant];
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      style={{
-        flex: 1,
-        padding: '0.55rem',
-        borderRadius: 7,
-        border: `1px solid ${c.border}`,
-        background: c.bg,
-        color: c.text,
-        fontSize: '0.8rem',
-        fontWeight: 600,
-        cursor: disabled ? 'not-allowed' : 'pointer',
-        opacity: disabled ? 0.5 : 1,
-      }}
-    >
-      {children}
-    </button>
-  );
+  return map[status] ?? capitalise(status);
 }
 
 function capitalise(str) {
@@ -259,167 +375,101 @@ function capitalise(str) {
 
 const s = {
   page: {
-    flex: 1,
-    display: 'flex',
-    flexDirection: 'column',
-    overflow: 'hidden',
-    position: 'relative',
+    flex: 1, display: 'flex', flexDirection: 'column',
+    overflow: 'hidden', position: 'relative',
   },
   header: {
     padding: '1.75rem 2rem 1.25rem',
-    borderBottom: '1px solid rgba(255,255,255,0.06)',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '1rem',
-    flexShrink: 0,
+    borderBottom: '1px solid var(--border-faint)',
+    display: 'flex', flexDirection: 'column', gap: '1rem', flexShrink: 0,
   },
   title: {
-    fontSize: '1.2rem',
-    fontWeight: 700,
-    color: '#ffffff',
-    letterSpacing: '-0.01em',
+    fontSize: '1.2rem', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.01em',
+  },
+  searchInput: {
+    width: '100%', boxSizing: 'border-box',
+    padding: '0.5rem 0.85rem', borderRadius: 8,
+    border: '1px solid var(--border-faint)',
+    background: 'var(--bg-input)', color: 'var(--text)',
+    fontSize: '0.875rem', outline: 'none',
+  },
+  filterRow: {
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem',
   },
   filters: {
-    display: 'flex',
-    gap: '0.4rem',
-    flexWrap: 'wrap',
+    display: 'flex', gap: '0.4rem', flexWrap: 'wrap',
+  },
+  sortBtn: {
+    padding: '0.3rem 0.75rem', borderRadius: 20,
+    border: '1px solid var(--border)',
+    background: 'transparent', color: 'var(--text-muted)',
+    fontSize: '0.78rem', fontWeight: 500, cursor: 'pointer',
+    whiteSpace: 'nowrap', flexShrink: 0,
   },
   filterBtn: {
-    padding: '0.3rem 0.85rem',
-    borderRadius: 20,
-    border: '1px solid rgba(255,255,255,0.1)',
-    background: 'transparent',
-    color: 'rgba(255,255,255,0.45)',
-    fontSize: '0.78rem',
-    fontWeight: 500,
-    cursor: 'pointer',
-    transition: 'all 0.12s',
+    padding: '0.3rem 0.85rem', borderRadius: 20,
+    border: '1px solid var(--border)',
+    background: 'transparent', color: 'var(--text-muted)',
+    fontSize: '0.78rem', fontWeight: 500, cursor: 'pointer',
   },
   filterActive: {
-    background: 'rgba(245,236,217,0.1)',
-    borderColor: 'rgba(245,236,217,0.3)',
-    color: '#f5ecd9',
+    background: 'var(--accent-active-tint)', borderColor: 'var(--accent-active-border)', color: 'var(--accent)',
   },
   body: {
-    flex: 1,
-    overflowY: 'auto',
-    padding: '1rem 2rem',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '0.5rem',
+    flex: 1, overflowY: 'auto', padding: '1rem 2rem',
+    display: 'flex', flexDirection: 'column', gap: '0.5rem',
   },
   msg: {
-    fontSize: '0.875rem',
-    color: 'rgba(255,255,255,0.35)',
-    padding: '1rem 0',
+    fontSize: '0.875rem', color: 'var(--text-faint)', padding: '1rem 0',
+  },
+  loadMore: {
+    alignSelf: 'center', marginTop: '0.5rem', marginBottom: '1rem',
+    padding: '0.5rem 1.5rem', borderRadius: 20,
+    border: '1px solid var(--border-strong)',
+    background: 'transparent', color: 'var(--text-muted)',
+    fontSize: '0.8rem', fontWeight: 500, cursor: 'pointer',
   },
   row: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: '0.9rem 1.1rem',
-    borderRadius: 10,
-    border: '1px solid rgba(255,255,255,0.06)',
-    cursor: 'pointer',
-    transition: 'background 0.12s, border-color 0.12s',
-    gap: '1rem',
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    padding: '0.9rem 1.1rem', borderRadius: 10,
+    border: '1px solid var(--border-faint)',
+    cursor: 'pointer', transition: 'background 0.12s, border-color 0.12s', gap: '1rem',
   },
   rowLeft: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '0.2rem',
-    minWidth: 0,
+    display: 'flex', flexDirection: 'column', gap: '0.2rem', minWidth: 0,
   },
   clientName: {
-    fontSize: '0.9rem',
-    fontWeight: 600,
-    color: '#ffffff',
+    fontSize: '0.9rem', fontWeight: 600, color: 'var(--text)',
   },
   rowMeta: {
-    fontSize: '0.78rem',
-    color: 'rgba(255,255,255,0.4)',
+    fontSize: '0.78rem', color: 'var(--text-secondary)',
+  },
+  sourceTag: {
+    fontSize: '0.65rem', fontWeight: 600, letterSpacing: '0.04em',
+    padding: '0.1rem 0.4rem', borderRadius: 4,
+    background: 'var(--bg-chip)', color: 'var(--text-ghost)',
   },
   rowRight: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'flex-end',
-    gap: '0.3rem',
-    flexShrink: 0,
+    display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.3rem', flexShrink: 0,
   },
   statusBadge: {
-    fontSize: '0.72rem',
-    fontWeight: 600,
-    padding: '0.2rem 0.55rem',
-    borderRadius: 20,
-    letterSpacing: '0.02em',
+    fontSize: '0.72rem', fontWeight: 600, padding: '0.2rem 0.55rem',
+    borderRadius: 20, letterSpacing: '0.02em',
   },
   dateText: {
-    fontSize: '0.75rem',
-    color: 'rgba(255,255,255,0.35)',
+    fontSize: '0.75rem', color: 'var(--text-faint)',
   },
-  panel: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    bottom: 0,
-    width: 320,
-    background: '#0f151e',
-    borderLeft: '1px solid rgba(255,255,255,0.08)',
-    display: 'flex',
-    flexDirection: 'column',
-    zIndex: 10,
+  toast: {
+    position: 'absolute', bottom: '1.5rem', left: '50%',
+    transform: 'translateX(-50%)',
+    background: '#1e2630', border: '1px solid rgba(76,201,138,0.3)',
+    borderRadius: 10, padding: '0.6rem 1.1rem',
+    display: 'flex', alignItems: 'center', gap: '0.5rem',
+    fontSize: '0.85rem', fontWeight: 500, color: 'var(--text)',
+    zIndex: 50, whiteSpace: 'nowrap',
+    boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
   },
-  panelHeader: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: '1.25rem 1.25rem 1rem',
-    borderBottom: '1px solid rgba(255,255,255,0.06)',
-    flexShrink: 0,
-  },
-  panelTitle: {
-    fontSize: '0.95rem',
-    fontWeight: 700,
-    color: '#ffffff',
-  },
-  closeBtn: {
-    background: 'none',
-    border: 'none',
-    color: 'rgba(255,255,255,0.35)',
-    fontSize: '0.9rem',
-    cursor: 'pointer',
-    padding: '0.25rem',
-  },
-  panelBody: {
-    flex: 1,
-    overflowY: 'auto',
-    padding: '1rem 1.25rem',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '0.75rem',
-  },
-  field: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '0.15rem',
-  },
-  fieldLabel: {
-    fontSize: '0.7rem',
-    fontWeight: 600,
-    color: 'rgba(255,255,255,0.3)',
-    textTransform: 'uppercase',
-    letterSpacing: '0.06em',
-  },
-  fieldVal: {
-    fontSize: '0.85rem',
-    color: 'rgba(255,255,255,0.85)',
-    lineHeight: 1.5,
-  },
-  actions: {
-    display: 'flex',
-    gap: '0.5rem',
-    padding: '1rem 1.25rem',
-    borderTop: '1px solid rgba(255,255,255,0.06)',
-    flexShrink: 0,
+  toastCheck: {
+    color: '#4cc98a', fontWeight: 700, fontSize: '0.9rem',
   },
 };

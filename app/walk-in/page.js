@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { getSupabase } from '@/lib/supabase';
-import { getStudioPublic, createWalkIn } from '@/lib/api';
+import { getStudioPublic, createWalkIn, walkinUploadSign } from '@/lib/api';
 
 const SESSION_TYPES = ['Tattoo', 'Piercing', 'Consultation', 'Touch-up', 'Cover-up', 'Other'];
 
@@ -108,11 +108,14 @@ function WalkInInner() {
   const [email, setEmail]           = useState('');
   const [phoneCode, setPhoneCode]   = useState(() => detectCountry());
   const [phoneNum,  setPhoneNum]    = useState('');
+  const [dob, setDob]               = useState('');
   const [artistId, setArtistId]     = useState('');
-  const [sessionType, setSessionType] = useState('');
   const [placements, setPlacements]  = useState([]);
   const [design, setDesign]         = useState('');
   const [notes, setNotes]           = useState('');
+  const [photos, setPhotos]         = useState([]); // File objects
+  const [photoPreviews, setPhotoPreviews] = useState([]);
+  const [consentAccepted, setConsentAccepted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [done, setDone]             = useState(false);
@@ -179,22 +182,48 @@ function WalkInInner() {
     }
   }
 
+  function handlePhotoChange(e) {
+    const files = Array.from(e.target.files).slice(0, 5);
+    setPhotos(files);
+    setPhotoPreviews(files.map(f => URL.createObjectURL(f)));
+  }
+
+  function removePhoto(idx) {
+    setPhotos(prev => prev.filter((_, i) => i !== idx));
+    setPhotoPreviews(prev => prev.filter((_, i) => i !== idx));
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
-    if (!artistId) { setSubmitError('Please select an artist.'); return; }
     if (placements.length === 0) { setSubmitError('Please select at least one placement.'); return; }
+    if (studio.consent_form && !consentAccepted) { setSubmitError('Please agree to the consent form.'); return; }
     setSubmitError('');
     setSubmitting(true);
     try {
+      let imagePaths = [];
+      if (photos.length > 0) {
+        const fileDescs = photos.map(f => ({ mime_type: f.type || 'image/jpeg', byte_size: f.size }));
+        const slots = await walkinUploadSign(studioId, fileDescs);
+        await Promise.all(slots.map((slot, i) =>
+          fetch(slot.upload_url, {
+            method: 'PUT',
+            headers: { 'Content-Type': photos[i].type || 'image/jpeg' },
+            body: photos[i],
+          })
+        ));
+        imagePaths = slots.map(s => s.storage_object_path);
+      }
       await createWalkIn(studioId, {
-        artist_id:     artistId,
-        name:          `${firstName} ${lastName}`.trim(),
+        artist_id:        artistId,
+        name:             `${firstName} ${lastName}`.trim(),
         email,
         phone: `${COUNTRIES.find(c => c.id === phoneCode)?.dial ?? ''} ${phoneNum}`.trim(),
-        session_type:  sessionType,
-        body_location: placements.join(', '),
-        design_details: design,
+        dob,
+        body_location:    placements.join(', '),
+        design_details:   design,
         notes,
+        image_paths:      imagePaths,
+        consent_accepted: consentAccepted,
       });
       setDone(true);
     } catch (err) {
@@ -277,6 +306,9 @@ function WalkInInner() {
               <input style={s.input} type="text" value={lastName} required onChange={e => setLastName(e.target.value)} placeholder="Last" />
             </Field>
           </div>
+          <Field label="Date of birth">
+            <input style={{ ...s.input, colorScheme: 'dark' }} type="date" value={dob} onChange={e => setDob(e.target.value)} />
+          </Field>
           <Field label="Email">
             <input style={s.input} type="email" value={email} required onChange={e => setEmail(e.target.value)} placeholder="you@example.com" />
           </Field>
@@ -302,19 +334,12 @@ function WalkInInner() {
             </div>
           </Field>
 
-          <Field label="Artist">
-            <select style={s.input} value={artistId} onChange={e => setArtistId(e.target.value)} required>
-              <option value="">Select an artist…</option>
+          <Field label="Artist (optional)">
+            <select style={s.input} value={artistId} onChange={e => setArtistId(e.target.value)}>
+              <option value="">No preference — studio will assign</option>
               {studio.artists.map(a => (
                 <option key={a.artistId} value={a.artistId}>{a.name}</option>
               ))}
-            </select>
-          </Field>
-
-          <Field label="Session type">
-            <select style={s.input} value={sessionType} onChange={e => setSessionType(e.target.value)} required>
-              <option value="">Select…</option>
-              {SESSION_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
             </select>
           </Field>
 
@@ -355,6 +380,39 @@ function WalkInInner() {
           <Field label="Additional notes (optional)">
             <textarea style={{ ...s.input, ...s.textarea }} value={notes} onChange={e => setNotes(e.target.value)} placeholder="Anything else the artist should know" />
           </Field>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+            <label style={s.label}>Reference photos (optional, up to 5)</label>
+            <label style={s.uploadLabel}>
+              <input type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={handlePhotoChange} />
+              + Add photos
+            </label>
+            {photoPreviews.length > 0 && (
+              <div style={s.photoGrid}>
+                {photoPreviews.map((url, i) => (
+                  <div key={i} style={s.photoThumb}>
+                    <img src={url} alt="" style={s.thumbImg} />
+                    <button type="button" style={s.thumbRemove} onClick={() => removePhoto(i)}>✕</button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {studio.consent_form && (
+            <div style={s.consentBox}>
+              <p style={s.consentText}>{studio.consent_form}</p>
+              <label style={s.consentCheck}>
+                <input
+                  type="checkbox"
+                  checked={consentAccepted}
+                  onChange={e => setConsentAccepted(e.target.checked)}
+                  style={{ accentColor: '#f5ecd9', flexShrink: 0 }}
+                />
+                <span>I have read and agree to the above</span>
+              </label>
+            </div>
+          )}
 
           {submitError && <p style={s.error}>{submitError}</p>}
 
@@ -496,6 +554,19 @@ const s = {
     opacity: 0.3,
     cursor: 'default',
   },
+  uploadLabel: {
+    display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
+    background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
+    borderRadius: 8, padding: '0.5rem 0.85rem', fontSize: '0.82rem',
+    color: 'rgba(255,255,255,0.55)', cursor: 'pointer', alignSelf: 'flex-start',
+  },
+  photoGrid: { display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.5rem' },
+  photoThumb: { position: 'relative', width: 72, height: 72, borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)' },
+  thumbImg: { width: '100%', height: '100%', objectFit: 'cover' },
+  thumbRemove: { position: 'absolute', top: 2, right: 2, width: 18, height: 18, borderRadius: '50%', background: 'rgba(0,0,0,0.65)', border: 'none', color: '#fff', fontSize: '0.65rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 },
+  consentBox: { background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' },
+  consentText: { fontSize: '0.8rem', color: 'rgba(255,255,255,0.55)', margin: 0, lineHeight: 1.65, maxHeight: 160, overflowY: 'auto' },
+  consentCheck: { display: 'flex', alignItems: 'flex-start', gap: '0.6rem', fontSize: '0.8rem', color: 'rgba(255,255,255,0.7)', cursor: 'pointer' },
   switchLink: {
     background: 'none', border: 'none',
     color: 'rgba(255,255,255,0.35)',

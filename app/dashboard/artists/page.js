@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback, Suspense } from 'react';
+import { useState, useEffect, useCallback, Suspense, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { getStudioArtists, approveStudioArtist, rejectStudioArtist, getStudioArtistStats } from '@/lib/api';
+import { getStudioArtists, approveStudioArtist, rejectStudioArtist, getStudioArtistStats, getStudioScheduleRange, getArtistWorkSchedule } from '@/lib/api';
 import { getCached, setCached, invalidatePrefix } from '@/lib/cache';
 
 const STATUS_COLORS = {
@@ -11,9 +11,17 @@ const STATUS_COLORS = {
   rejected: { bg: 'rgba(232,111,111,0.1)',  text: '#e86f6f', border: 'rgba(232,111,111,0.2)' },
 };
 
+function fmtHHMM(hhmm) {
+  if (!hhmm) return '';
+  const [h, m] = hhmm.split(':').map(Number);
+  const suffix = h >= 12 ? 'pm' : 'am';
+  const h12 = h % 12 || 12;
+  return m === 0 ? `${h12}${suffix}` : `${h12}:${String(m).padStart(2, '0')}${suffix}`;
+}
+
 export default function ArtistsPage() {
   return (
-    <Suspense fallback={<p style={{ padding: '2rem', fontSize: '0.875rem', color: 'rgba(255,255,255,0.35)' }}>Loading…</p>}>
+    <Suspense fallback={<p style={{ padding: '2rem', fontSize: '0.875rem', color: 'var(--text-faint)' }}>Loading…</p>}>
       <ArtistsInner />
     </Suspense>
   );
@@ -30,6 +38,7 @@ function ArtistsInner() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [actionLoading, setActionLoading] = useState(null);
+  const [rejectTarget,  setRejectTarget]  = useState(null); // id to reject
 
   const load = useCallback(async (bust = false) => {
     if (bust) invalidatePrefix('artists:');
@@ -70,10 +79,14 @@ function ArtistsInner() {
     finally { setActionLoading(null); }
   }
 
-  async function handleReject(id) {
-    const reason = prompt('Reason for rejection (optional):') ?? '';
-    setActionLoading(id);
-    try { await rejectStudioArtist(id, reason); await load(true); }
+  function handleReject(id) {
+    setRejectTarget(id);
+  }
+
+  async function confirmReject(reason) {
+    if (!rejectTarget) return;
+    setActionLoading(rejectTarget);
+    try { await rejectStudioArtist(rejectTarget, reason); setRejectTarget(null); await load(true); }
     catch (e) { alert(e.message); }
     finally { setActionLoading(null); }
   }
@@ -83,13 +96,22 @@ function ArtistsInner() {
 
   if (selectedArtist) {
     return (
-      <ArtistDetail
-        artist={selectedArtist}
-        onBack={() => router.push('/dashboard/artists')}
-        onApprove={() => handleApprove(selectedArtist.id)}
-        onReject={() => handleReject(selectedArtist.id)}
-        actionLoading={actionLoading === selectedArtist.id}
-      />
+      <>
+        {rejectTarget && (
+          <ArtistRejectModal
+            saving={!!actionLoading}
+            onConfirm={confirmReject}
+            onCancel={() => setRejectTarget(null)}
+          />
+        )}
+        <ArtistDetail
+          artist={selectedArtist}
+          onBack={() => router.push('/dashboard/artists')}
+          onApprove={() => handleApprove(selectedArtist.id)}
+          onReject={() => handleReject(selectedArtist.id)}
+          actionLoading={actionLoading === selectedArtist.id}
+        />
+      </>
     );
   }
 
@@ -97,6 +119,13 @@ function ArtistsInner() {
 
   return (
     <div style={s.page}>
+      {rejectTarget && (
+        <ArtistRejectModal
+          saving={!!actionLoading}
+          onConfirm={confirmReject}
+          onCancel={() => setRejectTarget(null)}
+        />
+      )}
       <div style={s.header}>
         <div style={s.headerLeft}>
           <h1 style={s.title}>{showPending ? 'Pending Review' : 'My Artists'}</h1>
@@ -206,9 +235,29 @@ function ArtistDetail({ artist, onBack, onApprove, onReject, actionLoading }) {
     ? artist.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
     : '?';
 
-  const [stats, setStats] = useState(null);
+  const [stats,        setStats]        = useState(null);
+  const [schedule,     setSchedule]     = useState(null); // null = loading
+  const [workSchedule, setWorkSchedule] = useState(null); // null = loading
+
   useEffect(() => {
     getStudioArtistStats(artist.id).then(setStats).catch(() => {});
+    getArtistWorkSchedule(artist.artistId)
+      .then(d => setWorkSchedule(d.schedule ?? []))
+      .catch(() => setWorkSchedule([]));
+  }, [artist.id]);
+
+  useEffect(() => {
+    const today = new Date();
+    const end   = new Date(today); end.setDate(end.getDate() + 13);
+    function toISO(d) {
+      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    }
+    getStudioScheduleRange(toISO(today), toISO(end))
+      .then(d => {
+        const entries = (d.entries ?? []).filter(e => e.artistId === artist.artistId);
+        setSchedule(entries);
+      })
+      .catch(() => setSchedule([]));
   }, [artist.id]);
 
   return (
@@ -264,6 +313,70 @@ function ArtistDetail({ artist, onBack, onApprove, onReject, actionLoading }) {
           </div>
         )}
 
+        {/* Work timetable */}
+        <div style={s.detailSection}>
+          <span style={s.sectionLabel}>Work timetable</span>
+          {workSchedule === null && (
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-ghost)', margin: '0.4rem 0 0' }}>Loading…</p>
+          )}
+          {workSchedule !== null && workSchedule.length === 0 && (
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-ghost)', margin: '0.4rem 0 0' }}>No timetable set.</p>
+          )}
+          {workSchedule !== null && workSchedule.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', marginTop: '0.5rem' }}>
+              {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((label, idx) => {
+                // day_of_week: 0=Sun,1=Mon…6=Sat → idx 0=Mon means dow 1
+                const dow = idx + 1 === 7 ? 0 : idx + 1;
+                const day = workSchedule.find(d => d.day_of_week === dow);
+                return (
+                  <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 600, color: day ? 'var(--text)' : 'var(--text-ghost)', width: 28 }}>{label}</span>
+                    {day ? (
+                      <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                        {fmtHHMM(day.start_time)} – {fmtHHMM(day.end_time)}
+                      </span>
+                    ) : (
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-ghost)' }}>Off</span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Upcoming schedule */}
+        <div style={s.detailSection}>
+          <span style={s.sectionLabel}>Upcoming (next 2 weeks)</span>
+          {schedule === null && (
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-ghost)', margin: '0.4rem 0 0' }}>Loading…</p>
+          )}
+          {schedule !== null && schedule.length === 0 && (
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-ghost)', margin: '0.4rem 0 0' }}>No upcoming bookings.</p>
+          )}
+          {schedule !== null && schedule.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.5rem' }}>
+              {schedule.map(e => (
+                <div key={e.bookingId} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem 0.75rem', background: 'var(--bg-chip)', border: '1px solid var(--border-faint)', borderRadius: 7 }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
+                    <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text)' }}>{e.clientName}</span>
+                    {e.sessionType && <span style={{ fontSize: '0.72rem', color: 'var(--text-ghost)' }}>{e.sessionType}</span>}
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block' }}>
+                      {new Date(e.chosenTime).toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' })}
+                    </span>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-ghost)' }}>
+                      {new Date(e.chosenTime).toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit', hour12: true })}
+                      {e.stationName ? ` · ${e.stationName}` : ''}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         {artist.rejectionReason && (
           <div style={{ ...s.rejectionNote, marginTop: '0.5rem' }}>
             <span style={s.rejectionLabel}>Rejection reason:</span> {artist.rejectionReason}
@@ -302,6 +415,36 @@ function StatCard({ label, value }) {
   );
 }
 
+function ArtistRejectModal({ onConfirm, onCancel, saving }) {
+  const [reason, setReason] = useState('');
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
+      onClick={e => e.target === e.currentTarget && onCancel()}>
+      <div style={{ background: 'var(--bg-modal)', border: '1px solid var(--border)', borderRadius: 16, padding: '1.5rem', width: '100%', maxWidth: 400 }}>
+        <h2 style={{ margin: '0 0 1.25rem', fontSize: '1.1rem', fontWeight: 700, color: 'var(--text)' }}>Reject artist</h2>
+        <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '0.4rem' }}>
+          Reason <span style={{ color: 'var(--text-ghost)', fontWeight: 400 }}>(optional)</span>
+        </label>
+        <textarea
+          rows={4}
+          placeholder="e.g. Not a good fit for the studio at this time…"
+          value={reason}
+          onChange={e => setReason(e.target.value)}
+          style={{ width: '100%', boxSizing: 'border-box', resize: 'vertical', background: 'var(--bg-input)', border: '1px solid var(--border-strong)', borderRadius: 8, padding: '0.65rem 0.85rem', fontSize: '0.9rem', color: 'var(--text)', outline: 'none', fontFamily: 'inherit', lineHeight: 1.5, marginBottom: '1.25rem' }}
+        />
+        <div style={{ display: 'flex', gap: '0.75rem' }}>
+          <button onClick={onCancel} disabled={saving} style={{ flex: 1, padding: '0.7rem', borderRadius: 8, border: '1px solid var(--border-strong)', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '0.9rem', fontWeight: 600 }}>
+            Back
+          </button>
+          <button onClick={() => onConfirm(reason.trim())} disabled={saving} style={{ flex: 2, padding: '0.7rem', borderRadius: 8, border: 'none', background: saving ? 'var(--bg-chip)' : 'rgba(232,111,111,0.85)', color: saving ? 'var(--text-ghost)' : '#fff', cursor: saving ? 'default' : 'pointer', fontSize: '0.9rem', fontWeight: 700 }}>
+            {saving ? 'Rejecting…' : 'Reject artist'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const s = {
   page: {
     flex: 1,
@@ -311,7 +454,7 @@ const s = {
   },
   header: {
     padding: '1.75rem 2rem 1.25rem',
-    borderBottom: '1px solid rgba(255,255,255,0.06)',
+    borderBottom: '1px solid var(--border-faint)',
     display: 'flex',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
@@ -323,14 +466,14 @@ const s = {
   title: {
     fontSize: '1.2rem',
     fontWeight: 700,
-    color: '#ffffff',
+    color: 'var(--text)',
     letterSpacing: '-0.01em',
     display: 'flex',
     alignItems: 'center',
     gap: '0.5rem',
     margin: 0,
   },
-  subtitle: { fontSize: '0.8rem', color: 'rgba(255,255,255,0.35)', margin: 0 },
+  subtitle: { fontSize: '0.8rem', color: 'var(--text-faint)', margin: 0 },
   pendingBtn: {
     display: 'flex',
     alignItems: 'center',
@@ -346,9 +489,9 @@ const s = {
     whiteSpace: 'nowrap',
   },
   pendingBtnActive: {
-    border: '1px solid rgba(255,255,255,0.12)',
-    background: 'rgba(255,255,255,0.05)',
-    color: 'rgba(255,255,255,0.6)',
+    border: '1px solid var(--border-strong)',
+    background: 'var(--bg-chip)',
+    color: 'var(--text-muted)',
   },
   pendingCount: {
     fontSize: '0.7rem',
@@ -366,12 +509,12 @@ const s = {
     flexDirection: 'column',
     gap: '0.5rem',
   },
-  msg: { fontSize: '0.875rem', color: 'rgba(255,255,255,0.35)' },
+  msg: { fontSize: '0.875rem', color: 'var(--text-faint)' },
 
   // List row
   card: {
-    background: 'rgba(255,255,255,0.025)',
-    border: '1px solid rgba(255,255,255,0.07)',
+    background: 'var(--bg-card)',
+    border: '1px solid var(--border-faint)',
     borderRadius: 10,
     padding: '0.85rem 1.1rem',
     display: 'flex',
@@ -392,8 +535,8 @@ const s = {
     flexShrink: 0,
   },
   avatarFallback: {
-    background: 'rgba(245,236,217,0.08)',
-    color: 'rgba(245,236,217,0.7)',
+    background: 'var(--accent-tint)',
+    color: 'var(--accent)',
     fontSize: '0.85rem',
     fontWeight: 700,
     display: 'flex',
@@ -402,14 +545,14 @@ const s = {
   },
   cardInfo: { flex: 1, display: 'flex', flexDirection: 'column', gap: '0.2rem', minWidth: 0 },
   nameRow: { display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' },
-  name: { fontSize: '0.9rem', fontWeight: 700, color: '#ffffff' },
+  name: { fontSize: '0.9rem', fontWeight: 700, color: 'var(--text)' },
   metaRow: { display: 'flex', alignItems: 'center', gap: '0.35rem' },
-  email: { fontSize: '0.75rem', color: 'rgba(255,255,255,0.35)' },
-  dot: { fontSize: '0.65rem', color: 'rgba(255,255,255,0.2)' },
-  instagram: { fontSize: '0.75rem', color: 'rgba(245,236,217,0.45)' },
+  email: { fontSize: '0.75rem', color: 'var(--text-faint)' },
+  dot: { fontSize: '0.65rem', color: 'var(--text-ghost)' },
+  instagram: { fontSize: '0.75rem', color: 'var(--text-muted)' },
   chevron: {
     fontSize: '1.1rem',
-    color: 'rgba(255,255,255,0.2)',
+    color: 'var(--text-ghost)',
     flexShrink: 0,
     lineHeight: 1,
   },
@@ -435,15 +578,15 @@ const s = {
   guestBadge: {
     fontSize: '0.68rem',
     fontWeight: 600,
-    color: 'rgba(255,255,255,0.4)',
-    background: 'rgba(255,255,255,0.05)',
-    border: '1px solid rgba(255,255,255,0.09)',
+    color: 'var(--text-muted)',
+    background: 'var(--bg-chip)',
+    border: '1px solid var(--border)',
     borderRadius: 20,
     padding: '0.12rem 0.45rem',
   },
   rejectionNote: {
     fontSize: '0.78rem',
-    color: 'rgba(255,255,255,0.4)',
+    color: 'var(--text-muted)',
     background: 'rgba(232,111,111,0.05)',
     border: '1px solid rgba(232,111,111,0.1)',
     borderRadius: 6,
@@ -464,13 +607,13 @@ const s = {
   // Detail view
   detailHeader: {
     padding: '1.25rem 2rem 1rem',
-    borderBottom: '1px solid rgba(255,255,255,0.06)',
+    borderBottom: '1px solid var(--border-faint)',
     flexShrink: 0,
   },
   backBtn: {
     background: 'none',
     border: 'none',
-    color: 'rgba(255,255,255,0.45)',
+    color: 'var(--text-muted)',
     fontSize: '0.85rem',
     fontWeight: 500,
     cursor: 'pointer',
@@ -498,8 +641,8 @@ const s = {
     flexShrink: 0,
   },
   detailAvatarFallback: {
-    background: 'rgba(245,236,217,0.08)',
-    color: 'rgba(245,236,217,0.7)',
+    background: 'var(--accent-tint)',
+    color: 'var(--accent)',
     fontSize: '1.5rem',
     fontWeight: 700,
     display: 'flex',
@@ -521,16 +664,16 @@ const s = {
   detailName: {
     fontSize: '1.25rem',
     fontWeight: 700,
-    color: '#ffffff',
+    color: 'var(--text)',
     letterSpacing: '-0.01em',
   },
   detailEmail: {
     fontSize: '0.85rem',
-    color: 'rgba(255,255,255,0.4)',
+    color: 'var(--text-muted)',
   },
   detailInstagram: {
     fontSize: '0.85rem',
-    color: 'rgba(245,236,217,0.5)',
+    color: 'var(--text-muted)',
   },
   detailSection: {
     display: 'flex',
@@ -540,22 +683,22 @@ const s = {
   sectionLabel: {
     fontSize: '0.7rem',
     fontWeight: 600,
-    color: 'rgba(255,255,255,0.3)',
+    color: 'var(--text-secondary)',
     textTransform: 'uppercase',
     letterSpacing: '0.06em',
   },
   bio: {
     fontSize: '0.9rem',
-    color: 'rgba(255,255,255,0.6)',
+    color: 'var(--text-muted)',
     lineHeight: 1.65,
     margin: 0,
   },
   tags: { display: 'flex', flexWrap: 'wrap', gap: '0.4rem' },
   tag: {
     fontSize: '0.75rem',
-    color: 'rgba(255,255,255,0.45)',
-    background: 'rgba(255,255,255,0.04)',
-    border: '1px solid rgba(255,255,255,0.08)',
+    color: 'var(--text-muted)',
+    background: 'var(--bg-chip)',
+    border: '1px solid var(--border)',
     borderRadius: 20,
     padding: '0.2rem 0.6rem',
   },
@@ -579,8 +722,8 @@ const s = {
     gap: '0.6rem',
   },
   statCard: {
-    background: 'rgba(255,255,255,0.03)',
-    border: '1px solid rgba(255,255,255,0.07)',
+    background: 'var(--bg-card)',
+    border: '1px solid var(--border-faint)',
     borderRadius: 10,
     padding: '0.85rem 1rem',
     display: 'flex',
@@ -590,13 +733,13 @@ const s = {
   statValue: {
     fontSize: '1.5rem',
     fontWeight: 700,
-    color: '#ffffff',
+    color: 'var(--text)',
     letterSpacing: '-0.02em',
     lineHeight: 1,
   },
   statLabel: {
     fontSize: '0.7rem',
-    color: 'rgba(255,255,255,0.3)',
+    color: 'var(--text-secondary)',
     fontWeight: 500,
   },
 };
