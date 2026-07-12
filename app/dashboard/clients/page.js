@@ -476,34 +476,31 @@ function ClientDetail({ client, onClose, consent, consentVersion, onRecordConsen
 
             {/* Pain tolerance 0-10 */}
             <div>
-              <span style={s.fieldLabel}>Pain tolerance</span>
-              <div style={{ display: 'flex', gap: '0.3rem', marginTop: '0.35rem', flexWrap: 'wrap' }}>
-                {Array.from({ length: 11 }, (_, i) => String(i)).map(n => {
-                  const active = pain === n;
-                  return (
-                    <button
-                      key={n}
-                      onMouseDown={e => e.preventDefault()}
-                      onClick={() => setPain(prev => prev === n ? '' : n)}
-                      style={{
-                        width: 30, height: 30, borderRadius: 6, flexShrink: 0,
-                        border: `1px solid ${active ? 'var(--accent-active-border)' : 'var(--border-faint)'}`,
-                        background: active ? 'var(--accent-active-tint)' : 'transparent',
-                        color: active ? 'var(--accent)' : 'var(--text-ghost)',
-                        fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer',
-                      }}
-                    >{n}</button>
-                  );
-                })}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '0.35rem' }}>
+                <span style={s.fieldLabel}>Pain tolerance</span>
+                {pain !== '' && (
+                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--accent)' }}>{pain}/10</span>
+                )}
               </div>
-              {pain !== '' && (
-                <p style={{ fontSize: '0.7rem', color: 'var(--text-ghost)', marginTop: '0.3rem' }}>
-                  {pain === '0' ? 'No tolerance — very sensitive' :
-                   pain <= '3' ? 'Low tolerance' :
-                   pain <= '6' ? 'Moderate tolerance' :
-                   pain <= '8' ? 'High tolerance' :
-                   'Very high tolerance'}
-                </p>
+              <input
+                type="range"
+                min={0}
+                max={10}
+                step={1}
+                value={pain === '' ? 5 : Number(pain)}
+                onChange={e => setPain(e.target.value)}
+                style={{ width: '100%', accentColor: 'var(--accent)', cursor: 'pointer' }}
+              />
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.2rem' }}>
+                <span style={{ fontSize: '0.65rem', color: 'var(--text-ghost)' }}>0 — very sensitive</span>
+                <span style={{ fontSize: '0.65rem', color: 'var(--text-ghost)' }}>10 — very high</span>
+              </div>
+              {pain === '' && (
+                <button
+                  onMouseDown={e => e.preventDefault()}
+                  onClick={() => setPain('5')}
+                  style={{ marginTop: '0.4rem', fontSize: '0.72rem', color: 'var(--text-ghost)', background: 'none', border: '1px dashed var(--border-faint)', borderRadius: 5, padding: '0.2rem 0.55rem', cursor: 'pointer' }}
+                >Set pain tolerance</button>
               )}
             </div>
 
