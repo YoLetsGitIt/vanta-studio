@@ -3,6 +3,12 @@
 import { useState, useEffect, useMemo, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { listStudioBookings, getStudioClients, getClientConsents, recordConsentInStudio, getNotes, addNote, deleteNote, ensureStudioClient, patchStudioClient } from '@/lib/api';
+
+const TATTOO_STYLES = [
+  'Traditional', 'Neo Traditional', 'Blackwork', 'Fine Line', 'Realism',
+  'Japanese', 'Watercolor', 'Geometric', 'Tribal', 'Dotwork',
+  'Illustrative', 'New School', 'Biomechanical', 'Lettering', 'Minimalist',
+];
 import { getCached, setCached } from '@/lib/cache';
 import { statusColors, capitalise } from '@/lib/status';
 
@@ -105,10 +111,9 @@ function ClientsInner() {
         if (!existing.dob && contact.dob) existing.dob = contact.dob;
         if (!existing.phone && contact.phone) existing.phone = contact.phone;
         existing.contactId = contact.id;
-        existing.designPreferences = contact.design_preferences ?? null;
+        existing.designPreferences = parseStyles(contact.design_preferences);
         existing.allergies = contact.allergies ?? null;
         existing.painTolerance = contact.pain_tolerance ?? null;
-        existing.customFields = Array.isArray(contact.custom_fields) ? contact.custom_fields : [];
         continue;
       }
       map.set(contact.email || contact.phone || contact.name, {
@@ -120,10 +125,9 @@ function ClientsInner() {
         lastBooking: null,
         imported: true,
         contactId: contact.id,
-        designPreferences: contact.design_preferences ?? null,
+        designPreferences: parseStyles(contact.design_preferences),
         allergies: contact.allergies ?? null,
         painTolerance: contact.pain_tolerance ?? null,
-        customFields: Array.isArray(contact.custom_fields) ? contact.custom_fields : [],
       });
     }
 
@@ -279,21 +283,21 @@ function ClientDetail({ client, onClose, consent, consentVersion, onRecordConsen
   const [noteErr,     setNoteErr]     = useState('');
 
   // Profile fields
-  const [contactId,   setContactId]   = useState(client.contactId ?? null);
-  const [dp,          setDp]          = useState(client.designPreferences ?? '');
-  const [allergies,   setAllergies]   = useState(client.allergies ?? '');
-  const [pain,        setPain]        = useState(client.painTolerance ?? '');
-  const [customFields, setCustomFields] = useState(client.customFields ?? []);
-  const [profSaving,  setProfSaving]  = useState(false);
-  const [profSaved,   setProfSaved]   = useState(false);
-  const [profErr,     setProfErr]     = useState('');
+  const [contactId,      setContactId]      = useState(client.contactId ?? null);
+  const [styles,         setStyles]         = useState(client.designPreferences ?? []);
+  const [hasAllergies,   setHasAllergies]   = useState(!!(client.allergies));
+  const [allergyDetails, setAllergyDetails] = useState(client.allergies ?? '');
+  const [pain,           setPain]           = useState(client.painTolerance ?? '');
+  const [profSaving,     setProfSaving]     = useState(false);
+  const [profSaved,      setProfSaved]      = useState(false);
+  const [profErr,        setProfErr]        = useState('');
 
   useEffect(() => {
     setContactId(client.contactId ?? null);
-    setDp(client.designPreferences ?? '');
-    setAllergies(client.allergies ?? '');
+    setStyles(client.designPreferences ?? []);
+    setHasAllergies(!!(client.allergies));
+    setAllergyDetails(client.allergies ?? '');
     setPain(client.painTolerance ?? '');
-    setCustomFields(client.customFields ?? []);
     setProfSaved(false);
     setProfErr('');
   }, [client.email]);
@@ -339,10 +343,9 @@ function ClientDetail({ client, onClose, consent, consentVersion, onRecordConsen
         setContactId(id);
       }
       await patchStudioClient(id, {
-        design_preferences: dp || null,
-        allergies: allergies || null,
-        pain_tolerance: pain || null,
-        custom_fields: customFields.filter(cf => cf.key || cf.value),
+        design_preferences: styles.length > 0 ? JSON.stringify(styles) : null,
+        allergies: hasAllergies ? (allergyDetails || null) : null,
+        pain_tolerance: pain !== '' ? pain : null,
       });
       setProfSaved(true);
       setTimeout(() => setProfSaved(false), 2500);
@@ -412,66 +415,98 @@ function ClientDetail({ client, onClose, consent, consentVersion, onRecordConsen
         {/* Profile fields */}
         <div style={{ borderTop: '1px solid var(--border-faint)', paddingTop: '1rem', marginTop: '0.25rem' }}>
           <span style={s.sectionLabel}>Client profile</span>
-          <div style={{ marginTop: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+          <div style={{ marginTop: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+
+            {/* Design preferences — multiselect pills */}
             <div>
               <span style={s.fieldLabel}>Design preferences</span>
-              <textarea
-                rows={2}
-                placeholder="Styles, themes, references, what to avoid…"
-                value={dp}
-                onChange={e => setDp(e.target.value)}
-                style={s.profileInput}
-              />
-            </div>
-            <div>
-              <span style={s.fieldLabel}>Allergies / skin conditions</span>
-              <textarea
-                rows={2}
-                placeholder="e.g. latex allergy, sensitive skin, keloid-prone…"
-                value={allergies}
-                onChange={e => setAllergies(e.target.value)}
-                style={s.profileInput}
-              />
-            </div>
-            <div>
-              <span style={s.fieldLabel}>Pain tolerance</span>
-              <input
-                type="text"
-                placeholder="e.g. high tolerance, needs breaks every 30 min…"
-                value={pain}
-                onChange={e => setPain(e.target.value)}
-                style={{ ...s.profileInput, resize: 'none' }}
-              />
-            </div>
-            <div>
-              <span style={s.fieldLabel}>Custom fields</span>
-              <div style={{ marginTop: '0.35rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                {customFields.map((cf, i) => (
-                  <div key={i} style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
-                    <input
-                      placeholder="Field"
-                      value={cf.key}
-                      onChange={e => setCustomFields(prev => prev.map((f, j) => j === i ? { ...f, key: e.target.value } : f))}
-                      style={{ ...s.profileInput, flex: 1, fontSize: '0.75rem', padding: '0.3rem 0.5rem' }}
-                    />
-                    <input
-                      placeholder="Value"
-                      value={cf.value}
-                      onChange={e => setCustomFields(prev => prev.map((f, j) => j === i ? { ...f, value: e.target.value } : f))}
-                      style={{ ...s.profileInput, flex: 2, fontSize: '0.75rem', padding: '0.3rem 0.5rem' }}
-                    />
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginTop: '0.35rem' }}>
+                {TATTOO_STYLES.map(style => {
+                  const active = styles.includes(style);
+                  return (
                     <button
-                      onClick={() => setCustomFields(prev => prev.filter((_, j) => j !== i))}
-                      style={{ color: 'var(--text-ghost)', background: 'none', border: 'none', cursor: 'pointer', padding: '0 0.15rem', fontSize: '0.8rem', flexShrink: 0 }}
-                    >✕</button>
-                  </div>
-                ))}
-                <button
-                  onClick={() => setCustomFields(prev => [...prev, { key: '', value: '' }])}
-                  style={{ fontSize: '0.73rem', color: 'var(--text-ghost)', background: 'none', border: '1px dashed var(--border-faint)', borderRadius: 5, padding: '0.28rem 0.6rem', cursor: 'pointer', alignSelf: 'flex-start', marginTop: '0.1rem' }}
-                >+ Add field</button>
+                      key={style}
+                      onMouseDown={e => e.preventDefault()}
+                      onClick={() => setStyles(prev => active ? prev.filter(s => s !== style) : [...prev, style])}
+                      style={{
+                        fontSize: '0.72rem', fontWeight: 600, padding: '0.25rem 0.6rem',
+                        borderRadius: 20, border: `1px solid ${active ? 'var(--accent-active-border)' : 'var(--border-faint)'}`,
+                        background: active ? 'var(--accent-active-tint)' : 'transparent',
+                        color: active ? 'var(--accent)' : 'var(--text-ghost)',
+                        cursor: 'pointer', transition: 'all 0.1s',
+                      }}
+                    >{style}</button>
+                  );
+                })}
               </div>
             </div>
+
+            {/* Allergies */}
+            <div>
+              <span style={s.fieldLabel}>Allergies / skin conditions</span>
+              <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.35rem' }}>
+                {['No', 'Yes'].map(opt => {
+                  const active = opt === 'Yes' ? hasAllergies : !hasAllergies;
+                  return (
+                    <button
+                      key={opt}
+                      onMouseDown={e => e.preventDefault()}
+                      onClick={() => setHasAllergies(opt === 'Yes')}
+                      style={{
+                        fontSize: '0.75rem', fontWeight: 600, padding: '0.28rem 0.85rem',
+                        borderRadius: 6, border: `1px solid ${active ? 'var(--accent-active-border)' : 'var(--border-faint)'}`,
+                        background: active ? 'var(--accent-active-tint)' : 'transparent',
+                        color: active ? 'var(--accent)' : 'var(--text-ghost)',
+                        cursor: 'pointer',
+                      }}
+                    >{opt}</button>
+                  );
+                })}
+              </div>
+              {hasAllergies && (
+                <textarea
+                  rows={2}
+                  placeholder="e.g. latex allergy, sensitive skin, keloid-prone…"
+                  value={allergyDetails}
+                  onChange={e => setAllergyDetails(e.target.value)}
+                  style={{ ...s.profileInput, marginTop: '0.4rem' }}
+                />
+              )}
+            </div>
+
+            {/* Pain tolerance 0-10 */}
+            <div>
+              <span style={s.fieldLabel}>Pain tolerance</span>
+              <div style={{ display: 'flex', gap: '0.3rem', marginTop: '0.35rem', flexWrap: 'wrap' }}>
+                {Array.from({ length: 11 }, (_, i) => String(i)).map(n => {
+                  const active = pain === n;
+                  return (
+                    <button
+                      key={n}
+                      onMouseDown={e => e.preventDefault()}
+                      onClick={() => setPain(prev => prev === n ? '' : n)}
+                      style={{
+                        width: 30, height: 30, borderRadius: 6, flexShrink: 0,
+                        border: `1px solid ${active ? 'var(--accent-active-border)' : 'var(--border-faint)'}`,
+                        background: active ? 'var(--accent-active-tint)' : 'transparent',
+                        color: active ? 'var(--accent)' : 'var(--text-ghost)',
+                        fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer',
+                      }}
+                    >{n}</button>
+                  );
+                })}
+              </div>
+              {pain !== '' && (
+                <p style={{ fontSize: '0.7rem', color: 'var(--text-ghost)', marginTop: '0.3rem' }}>
+                  {pain === '0' ? 'No tolerance — very sensitive' :
+                   pain <= '3' ? 'Low tolerance' :
+                   pain <= '6' ? 'Moderate tolerance' :
+                   pain <= '8' ? 'High tolerance' :
+                   'Very high tolerance'}
+                </p>
+              )}
+            </div>
+
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
               <button onClick={handleSaveProfile} disabled={profSaving} style={s.consentBtn}>
                 {profSaving ? 'Saving…' : profSaved ? 'Saved!' : 'Save profile'}
@@ -559,6 +594,11 @@ function Field({ label, children }) {
       <span style={{ fontSize: '0.85rem', color: 'var(--text-dim)' }}>{children}</span>
     </div>
   );
+}
+
+function parseStyles(raw) {
+  if (!raw) return [];
+  try { return JSON.parse(raw); } catch { return []; }
 }
 
 function formatDob(dob) {
