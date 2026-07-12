@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { listStudioBookings, getStudioClients, getClientConsents, recordConsentInStudio, getNotes, addNote, deleteNote } from '@/lib/api';
+import { listStudioBookings, getStudioClients, getClientConsents, recordConsentInStudio, getNotes, addNote, deleteNote, ensureStudioClient, patchStudioClient } from '@/lib/api';
 import { getCached, setCached } from '@/lib/cache';
 import { statusColors, capitalise } from '@/lib/status';
 
@@ -104,6 +104,11 @@ function ClientsInner() {
       if (existing) {
         if (!existing.dob && contact.dob) existing.dob = contact.dob;
         if (!existing.phone && contact.phone) existing.phone = contact.phone;
+        existing.contactId = contact.id;
+        existing.designPreferences = contact.design_preferences ?? null;
+        existing.allergies = contact.allergies ?? null;
+        existing.painTolerance = contact.pain_tolerance ?? null;
+        existing.customFields = Array.isArray(contact.custom_fields) ? contact.custom_fields : [];
         continue;
       }
       map.set(contact.email || contact.phone || contact.name, {
@@ -114,6 +119,11 @@ function ClientsInner() {
         bookings: [],
         lastBooking: null,
         imported: true,
+        contactId: contact.id,
+        designPreferences: contact.design_preferences ?? null,
+        allergies: contact.allergies ?? null,
+        painTolerance: contact.pain_tolerance ?? null,
+        customFields: Array.isArray(contact.custom_fields) ? contact.custom_fields : [],
       });
     }
 
@@ -268,6 +278,26 @@ function ClientDetail({ client, onClose, consent, consentVersion, onRecordConsen
   const [noteAdding,  setNoteAdding]  = useState(false);
   const [noteErr,     setNoteErr]     = useState('');
 
+  // Profile fields
+  const [contactId,   setContactId]   = useState(client.contactId ?? null);
+  const [dp,          setDp]          = useState(client.designPreferences ?? '');
+  const [allergies,   setAllergies]   = useState(client.allergies ?? '');
+  const [pain,        setPain]        = useState(client.painTolerance ?? '');
+  const [customFields, setCustomFields] = useState(client.customFields ?? []);
+  const [profSaving,  setProfSaving]  = useState(false);
+  const [profSaved,   setProfSaved]   = useState(false);
+  const [profErr,     setProfErr]     = useState('');
+
+  useEffect(() => {
+    setContactId(client.contactId ?? null);
+    setDp(client.designPreferences ?? '');
+    setAllergies(client.allergies ?? '');
+    setPain(client.painTolerance ?? '');
+    setCustomFields(client.customFields ?? []);
+    setProfSaved(false);
+    setProfErr('');
+  }, [client.email]);
+
   useEffect(() => {
     if (!client.email) { setNotes([]); return; }
     setNotes(null);
@@ -296,6 +326,31 @@ function ClientDetail({ client, onClose, consent, consentVersion, onRecordConsen
       await deleteNote(id);
       setNotes(prev => (prev ?? []).filter(n => n.id !== id));
     } catch { /* silent */ }
+  }
+
+  async function handleSaveProfile() {
+    setProfSaving(true);
+    setProfErr('');
+    try {
+      let id = contactId;
+      if (!id) {
+        const { client: c } = await ensureStudioClient(client.name, client.email ?? '', client.phone ?? '');
+        id = c.id;
+        setContactId(id);
+      }
+      await patchStudioClient(id, {
+        design_preferences: dp || null,
+        allergies: allergies || null,
+        pain_tolerance: pain || null,
+        custom_fields: customFields.filter(cf => cf.key || cf.value),
+      });
+      setProfSaved(true);
+      setTimeout(() => setProfSaved(false), 2500);
+    } catch (e) {
+      setProfErr(e.message);
+    } finally {
+      setProfSaving(false);
+    }
   }
 
   const sorted = [...client.bookings].sort(
@@ -352,6 +407,78 @@ function ClientDetail({ client, onClose, consent, consentVersion, onRecordConsen
               {recordErr && <p style={{ fontSize: '0.72rem', color: '#e86f6f', margin: '0.3rem 0 0' }}>{recordErr}</p>}
             </>
           )}
+        </div>
+
+        {/* Profile fields */}
+        <div style={{ borderTop: '1px solid var(--border-faint)', paddingTop: '1rem', marginTop: '0.25rem' }}>
+          <span style={s.sectionLabel}>Client profile</span>
+          <div style={{ marginTop: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+            <div>
+              <span style={s.fieldLabel}>Design preferences</span>
+              <textarea
+                rows={2}
+                placeholder="Styles, themes, references, what to avoid…"
+                value={dp}
+                onChange={e => setDp(e.target.value)}
+                style={s.profileInput}
+              />
+            </div>
+            <div>
+              <span style={s.fieldLabel}>Allergies / skin conditions</span>
+              <textarea
+                rows={2}
+                placeholder="e.g. latex allergy, sensitive skin, keloid-prone…"
+                value={allergies}
+                onChange={e => setAllergies(e.target.value)}
+                style={s.profileInput}
+              />
+            </div>
+            <div>
+              <span style={s.fieldLabel}>Pain tolerance</span>
+              <input
+                type="text"
+                placeholder="e.g. high tolerance, needs breaks every 30 min…"
+                value={pain}
+                onChange={e => setPain(e.target.value)}
+                style={{ ...s.profileInput, resize: 'none' }}
+              />
+            </div>
+            <div>
+              <span style={s.fieldLabel}>Custom fields</span>
+              <div style={{ marginTop: '0.35rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                {customFields.map((cf, i) => (
+                  <div key={i} style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
+                    <input
+                      placeholder="Field"
+                      value={cf.key}
+                      onChange={e => setCustomFields(prev => prev.map((f, j) => j === i ? { ...f, key: e.target.value } : f))}
+                      style={{ ...s.profileInput, flex: 1, fontSize: '0.75rem', padding: '0.3rem 0.5rem' }}
+                    />
+                    <input
+                      placeholder="Value"
+                      value={cf.value}
+                      onChange={e => setCustomFields(prev => prev.map((f, j) => j === i ? { ...f, value: e.target.value } : f))}
+                      style={{ ...s.profileInput, flex: 2, fontSize: '0.75rem', padding: '0.3rem 0.5rem' }}
+                    />
+                    <button
+                      onClick={() => setCustomFields(prev => prev.filter((_, j) => j !== i))}
+                      style={{ color: 'var(--text-ghost)', background: 'none', border: 'none', cursor: 'pointer', padding: '0 0.15rem', fontSize: '0.8rem', flexShrink: 0 }}
+                    >✕</button>
+                  </div>
+                ))}
+                <button
+                  onClick={() => setCustomFields(prev => [...prev, { key: '', value: '' }])}
+                  style={{ fontSize: '0.73rem', color: 'var(--text-ghost)', background: 'none', border: '1px dashed var(--border-faint)', borderRadius: 5, padding: '0.28rem 0.6rem', cursor: 'pointer', alignSelf: 'flex-start', marginTop: '0.1rem' }}
+                >+ Add field</button>
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+              <button onClick={handleSaveProfile} disabled={profSaving} style={s.consentBtn}>
+                {profSaving ? 'Saving…' : profSaved ? 'Saved!' : 'Save profile'}
+              </button>
+              {profErr && <span style={{ fontSize: '0.72rem', color: '#e86f6f' }}>{profErr}</span>}
+            </div>
+          </div>
         </div>
 
         {/* Notes */}
@@ -635,6 +762,29 @@ const s = {
     padding: '0.45rem 0.75rem',
     cursor: 'pointer',
     alignSelf: 'flex-start',
+  },
+  fieldLabel: {
+    display: 'block',
+    fontSize: '0.68rem',
+    fontWeight: 600,
+    color: 'var(--text-ghost)',
+    textTransform: 'uppercase',
+    letterSpacing: '0.06em',
+    marginBottom: '0.3rem',
+  },
+  profileInput: {
+    width: '100%',
+    boxSizing: 'border-box',
+    resize: 'vertical',
+    background: 'var(--bg-input)',
+    border: '1px solid var(--border-faint)',
+    borderRadius: 6,
+    padding: '0.4rem 0.6rem',
+    fontSize: '0.8rem',
+    color: 'var(--text)',
+    fontFamily: 'inherit',
+    lineHeight: 1.5,
+    outline: 'none',
   },
   historyRow: {
     display: 'flex',
