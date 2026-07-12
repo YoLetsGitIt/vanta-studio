@@ -1,29 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getAvailableStations, getClientConsents, recordConsentInStudio, saveBookingNote } from '@/lib/api';
-
-const STATUS_COLORS = {
-  pending:                      { bg: 'rgba(245,158,58,0.12)',  text: '#f59e3a', border: 'rgba(245,158,58,0.25)' },
-  proposed:                     { bg: 'rgba(111,163,232,0.12)', text: '#6fa3e8', border: 'rgba(111,163,232,0.25)' },
-  modified:                     { bg: 'rgba(167,139,250,0.12)', text: '#a78bfa', border: 'rgba(167,139,250,0.25)' },
-  awaiting_deposit:             { bg: 'rgba(251,146,60,0.12)',  text: '#fb923c', border: 'rgba(251,146,60,0.25)' },
-  deposit_pending_confirmation: { bg: 'rgba(250,204,21,0.12)',  text: '#facc15', border: 'rgba(250,204,21,0.25)' },
-  confirmed:                    { bg: 'rgba(76,201,138,0.12)',  text: '#4cc98a', border: 'rgba(76,201,138,0.25)' },
-  completed:                    { bg: 'rgba(76,201,138,0.1)',   text: '#4cc98a', border: 'rgba(76,201,138,0.2)'  },
-  no_show:                      { bg: 'rgba(232,111,111,0.08)', text: '#e86f6f', border: 'rgba(232,111,111,0.15)' },
-  rejected:                     { bg: 'rgba(232,111,111,0.1)',  text: '#e86f6f', border: 'rgba(232,111,111,0.2)'  },
-  declined:                     { bg: 'rgba(232,111,111,0.07)', text: '#e06060', border: 'rgba(232,111,111,0.15)' },
-  cancelled:                    { bg: 'var(--bg-chip)', text: 'var(--text-ghost)', border: 'var(--border-faint)' },
-  timed_out:                    { bg: 'var(--bg-chip)', text: 'var(--text-faint)', border: 'var(--border-faint)' },
-};
-
-const STATUS_LABELS = {
-  pending: 'Pending', proposed: 'Proposed', modified: 'Modified',
-  awaiting_deposit: 'Awaiting Deposit', deposit_pending_confirmation: 'Dep. Pending',
-  confirmed: 'Confirmed', completed: 'Completed', no_show: 'No Show',
-  rejected: 'Rejected', declined: 'Declined', cancelled: 'Cancelled', timed_out: 'Timed Out',
-};
+import { getAvailableStations, getClientConsents, recordConsentInStudio, saveBookingNote, getBookingConsentSubmissions } from '@/lib/api';
+import { statusColors, statusLabel, capitalise as cap } from '@/lib/status';
 
 const PAYMENT_LABELS = { cash: 'Cash', card: 'Card / POS', bank_transfer: 'Bank Transfer' };
 const CONSENT_STYLE  = {
@@ -40,7 +19,6 @@ function fmtDob(dob) {
   if (!dob) return null;
   return new Date(dob + 'T12:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
 }
-function cap(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -73,6 +51,10 @@ export default function BookingDetailPanel({
   const [consentVersion, setConsentVersion] = useState('1');
   const [recording,      setRecording]      = useState(false);
 
+  // ── Consent submissions (new template system) ──────────────────────────────
+  const [consentSubmissions, setConsentSubmissions] = useState([]);
+  const [submissionsExpanded, setSubmissionsExpanded] = useState(false);
+
   // ── Normalise fields from booking (priority) with entry as fallback ────────
   const b           = booking ?? entry ?? {};
   const bookingId   = booking?.id     ?? entry?.bookingId;
@@ -100,20 +82,21 @@ export default function BookingDetailPanel({
   const finalPrice        = booking?.final_price         ?? null;
   const paymentMethod     = booking?.payment_method      ?? null;
   const outcomeAt         = booking?.outcome_recorded_at ?? null;
+  const aftercareInstructions = booking?.aftercare_instructions ?? null;
   const cancelReason      = booking?.cancellation_reason ?? null;
   const source            = booking?.source              ?? null;
 
   const isCompleted = status === 'completed';
-  const isNoShow    = status === 'no_show';
+  const isNoShow    = status === 'completed' && booking?.outcome === 'no_show';
 
   const today      = new Date().toLocaleDateString('en-CA');
   const chosenDate = chosenTime ? chosenTime.slice(0, 10) : null;
   const isFutureConfirmed = status === 'confirmed' && chosenDate && chosenDate > today;
-  const canAcceptReject   = ['pending', 'modified', 'awaiting_deposit'].includes(status);
+  const canAcceptReject   = ['pending', 'awaiting_payment'].includes(status);
   const canComplete       = status === 'confirmed' && chosenDate && chosenDate <= today;
   const canReject         = canAcceptReject;
 
-  const sc = STATUS_COLORS[status] ?? { bg: 'var(--bg-chip)', text: 'var(--text-ghost)', border: 'var(--border-faint)' };
+  const sc = statusColors(status);
 
   // ── Sync studio note when booking changes ─────────────────────────────────
   useEffect(() => {
@@ -159,6 +142,15 @@ export default function BookingDetailPanel({
     } catch (e) { alert(e.message); }
     finally { setRecording(false); }
   }
+
+  // ── Load consent submissions ───────────────────────────────────────────────
+  useEffect(() => {
+    setConsentSubmissions([]);
+    if (!bookingId) return;
+    getBookingConsentSubmissions(bookingId)
+      .then(d => setConsentSubmissions(d.submissions ?? []))
+      .catch(() => {});
+  }, [bookingId]);
 
   // ── Station picker ─────────────────────────────────────────────────────────
   async function handleAcceptClick() {
@@ -228,6 +220,12 @@ export default function BookingDetailPanel({
                 <span style={{ fontSize: '0.82rem', color: 'var(--text-dim)' }}>{PAYMENT_LABELS[paymentMethod] ?? paymentMethod}</span>
               </div>
             )}
+            {isCompleted && aftercareInstructions && (
+              <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '0.65rem', marginTop: '0.15rem' }}>
+                <span style={{ fontSize: '0.72rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-ghost)', display: 'block', marginBottom: '0.4rem' }}>Aftercare</span>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-dim)', lineHeight: 1.6, whiteSpace: 'pre-wrap', margin: 0 }}>{aftercareInstructions}</p>
+              </div>
+            )}
           </div>
         )}
 
@@ -239,7 +237,7 @@ export default function BookingDetailPanel({
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
               <span style={{ fontSize: '0.72rem', fontWeight: 600, padding: '0.2rem 0.55rem', borderRadius: 20,
                 background: sc.bg, color: sc.text, border: `1px solid ${sc.border}` }}>
-                {STATUS_LABELS[status] ?? cap(status)}
+                {statusLabel(status)}
               </span>
               {source && (
                 <span style={{ fontSize: '0.68rem', fontWeight: 600, padding: '0.15rem 0.45rem', borderRadius: 4,
@@ -344,7 +342,7 @@ export default function BookingDetailPanel({
             </span>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
               {clientHistory.map(bk => {
-                const bsc = STATUS_COLORS[bk.status] ?? { text: 'var(--text-ghost)' };
+                const bsc = statusColors(bk.status);
                 const ds = bk.chosen_time || bk.proposed_time_primary;
                 const date = ds ? new Date(ds).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
                 const parts = [
@@ -358,7 +356,7 @@ export default function BookingDetailPanel({
                       <span style={{ fontSize: '0.72rem', color: 'var(--text-ghost)' }}>{date}</span>
                     </div>
                     <span style={{ fontSize: '0.7rem', fontWeight: 600, color: bsc.text, flexShrink: 0 }}>
-                      {STATUS_LABELS[bk.status] ?? cap(bk.status)}
+                      {statusLabel(bk.status)}
                     </span>
                   </div>
                 );
@@ -417,6 +415,91 @@ export default function BookingDetailPanel({
               {noteSaved ? 'Saved' : noteSaving ? 'Saving…' : 'Save note'}
             </button>
           </div>
+        </div>
+      )}
+
+      {/* ── Consent submissions ── */}
+      {consentSubmissions.length > 0 && (
+        <div style={{ padding: '0 1rem 0' }}>
+          <div style={p.divider} />
+          <button
+            style={{ ...p.sectionLabel, background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', gap: '0.35rem', width: '100%' }}
+            onClick={() => setSubmissionsExpanded(x => !x)}
+          >
+            <span>Consent forms ({consentSubmissions.length})</span>
+            <span style={{ marginLeft: 'auto', fontSize: '0.7rem', color: 'var(--text-ghost)' }}>{submissionsExpanded ? '▲' : '▼'}</span>
+          </button>
+          {submissionsExpanded && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', marginTop: '0.65rem' }}>
+              {consentSubmissions.map(sub => (
+                <div key={sub.id} style={{ background: 'var(--bg-chip)', border: '1px solid var(--border-faint)', borderRadius: 8, padding: '0.75rem 0.85rem', display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-dim)' }}>{sub.template_name}</span>
+                    <span style={{ fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', padding: '0.1rem 0.4rem', borderRadius: 4, background: 'var(--bg-card)', color: 'var(--text-ghost)' }}>
+                      {sub.template_type}
+                    </span>
+                    {sub.is_minor && (
+                      <span style={{ fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', padding: '0.1rem 0.4rem', borderRadius: 4, background: 'rgba(245,158,58,0.12)', color: '#f59e3a' }}>Minor</span>
+                    )}
+                  </div>
+
+                  {sub.signer_name && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ fontSize: '0.72rem', color: 'var(--text-ghost)' }}>Signed by</span>
+                      <span style={{ fontSize: '0.78rem', color: 'var(--text-dim)' }}>{sub.signer_name}</span>
+                    </div>
+                  )}
+
+                  {/* Field answers */}
+                  {sub.answers && Object.entries(sub.answers).length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                      {Object.entries(sub.answers).map(([k, v]) => v && (
+                        <div key={k} style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                          <span style={{ color: 'var(--text-ghost)' }}>{k}: </span>{v}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Client signature */}
+                  {sub.client_signature_path && (
+                    <div>
+                      <p style={{ fontSize: '0.68rem', color: 'var(--text-ghost)', margin: '0 0 0.25rem' }}>Client signature</p>
+                      <img
+                        src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/walkin-images/${sub.client_signature_path}`}
+                        alt="Client signature"
+                        style={{ maxWidth: '100%', height: 60, objectFit: 'contain', borderRadius: 4, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border-faint)', display: 'block' }}
+                      />
+                    </div>
+                  )}
+
+                  {/* Guardian info */}
+                  {sub.guardian_name && (
+                    <div style={{ borderTop: '1px solid var(--border-faint)', paddingTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                      <span style={{ fontSize: '0.68rem', fontWeight: 600, color: 'var(--text-ghost)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Guardian</span>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ fontSize: '0.72rem', color: 'var(--text-ghost)' }}>{sub.guardian_relationship ?? 'Guardian'}</span>
+                        <span style={{ fontSize: '0.78rem', color: 'var(--text-dim)' }}>{sub.guardian_name}</span>
+                      </div>
+                      {sub.guardian_email && <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{sub.guardian_email}</span>}
+                      {sub.guardian_phone && <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{sub.guardian_phone}</span>}
+                      {sub.guardian_signature_path && (
+                        <img
+                          src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/walkin-images/${sub.guardian_signature_path}`}
+                          alt="Guardian signature"
+                          style={{ maxWidth: '100%', height: 60, objectFit: 'contain', borderRadius: 4, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border-faint)', display: 'block', marginTop: '0.25rem' }}
+                        />
+                      )}
+                    </div>
+                  )}
+
+                  <span style={{ fontSize: '0.68rem', color: 'var(--text-ghost)' }}>
+                    {new Date(sub.submitted_at).toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' })}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

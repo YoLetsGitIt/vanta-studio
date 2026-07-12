@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { getSupabase } from '@/lib/supabase';
-import { getStudioPublic, createWalkIn, walkinUploadSign } from '@/lib/api';
+import { getStudioPublic, createWalkIn, walkinUploadSign, getStudioConsentTemplates } from '@/lib/api';
 
 const SESSION_TYPES = ['Tattoo', 'Piercing', 'Consultation', 'Touch-up', 'Cover-up', 'Other'];
 
@@ -115,17 +115,32 @@ function WalkInInner() {
   const [notes, setNotes]           = useState('');
   const [photos, setPhotos]         = useState([]); // File objects
   const [photoPreviews, setPhotoPreviews] = useState([]);
+  // New consent template system
+  const [consentTemplates, setConsentTemplates] = useState([]);
+  // Per-template state: { [templateId]: { answers, accepted, sigBlob, guardianSigBlob } }
+  const [templateState, setTemplateState] = useState({});
+  // Guardian info (shared across minor-flagged templates)
+  const [guardianName, setGuardianName] = useState('');
+  const [guardianRelationship, setGuardianRelationship] = useState('Parent');
+  const [guardianEmail, setGuardianEmail] = useState('');
+  const [guardianPhone, setGuardianPhone] = useState('');
+
+  // Legacy single consent (fallback if no templates)
   const [consentAccepted, setConsentAccepted] = useState(false);
+  const [signatureBlob, setSignatureBlob] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [done, setDone]             = useState(false);
 
-  // Load studio info
+  // Load studio info and consent templates
   useEffect(() => {
     if (!studioId) return;
     getStudioPublic(studioId)
       .then(setStudio)
       .catch(e => setStudioErr(e.message));
+    getStudioConsentTemplates(studioId)
+      .then(d => setConsentTemplates(d.templates ?? []))
+      .catch(() => {}); // non-fatal — falls back to studio.consent_form
   }, [studioId]);
 
   // Check existing session and pre-fill form fields from Supabase user
@@ -193,37 +208,158 @@ function WalkInInner() {
     setPhotoPreviews(prev => prev.filter((_, i) => i !== idx));
   }
 
+  // True if DOB indicates the client is under 18
+  const isMinor = (() => {
+    if (!dob) return false;
+    const birth = new Date(dob + 'T12:00:00');
+    const cutoff = new Date();
+    cutoff.setFullYear(cutoff.getFullYear() - 18);
+    return birth > cutoff;
+  })();
+
+  function setTemplateAnswer(templateId, fieldId, value) {
+    setTemplateState(prev => ({
+      ...prev,
+      [templateId]: {
+        ...prev[templateId],
+        answers: { ...(prev[templateId]?.answers ?? {}), [fieldId]: value },
+      },
+    }));
+  }
+
+  function setTemplateSigBlob(templateId, blob) {
+    setTemplateState(prev => ({
+      ...prev,
+      [templateId]: { ...prev[templateId], sigBlob: blob },
+    }));
+  }
+
+  function setTemplateGuardianSigBlob(templateId, blob) {
+    setTemplateState(prev => ({
+      ...prev,
+      [templateId]: { ...prev[templateId], guardianSigBlob: blob },
+    }));
+  }
+
+  function setTemplateAccepted(templateId, val) {
+    setTemplateState(prev => ({
+      ...prev,
+      [templateId]: { ...prev[templateId], accepted: val },
+    }));
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
     if (placements.length === 0) { setSubmitError('Please select at least one placement.'); return; }
-    if (studio.consent_form && !consentAccepted) { setSubmitError('Please agree to the consent form.'); return; }
+
+    // Validate template forms
+    if (consentTemplates.length > 0) {
+      for (const t of consentTemplates) {
+        const ts = templateState[t.id] ?? {};
+        // Validate required fields
+        for (const f of (t.fields ?? [])) {
+          if (f.required && ['text', 'textarea', 'yesno'].includes(f.type)) {
+            if (!ts.answers?.[f.id]) {
+              setSubmitError(`Please complete all required fields in "${t.name}".`);
+              return;
+            }
+          }
+          if (f.required && f.type === 'checkbox' && !ts.answers?.[f.id]) {
+            setSubmitError(`Please check all required boxes in "${t.name}".`);
+            return;
+          }
+        }
+        if (t.requires_signature && !ts.sigBlob) {
+          setSubmitError(`Please sign "${t.name}".`);
+          return;
+        }
+        if (isMinor && t.requires_minor_guardian) {
+          if (!guardianName.trim()) { setSubmitError('Please provide the guardian\'s name.'); return; }
+          if (!ts.guardianSigBlob) { setSubmitError(`Guardian signature required for "${t.name}".`); return; }
+        }
+      }
+    } else {
+      // Legacy fallback
+      if (studio.consent_form && !consentAccepted) { setSubmitError('Please agree to the consent form.'); return; }
+      if (studio.consent_form && consentAccepted && !signatureBlob) { setSubmitError('Please draw your signature above.'); return; }
+    }
+
     setSubmitError('');
     setSubmitting(true);
     try {
+      // Upload reference photos
       let imagePaths = [];
       if (photos.length > 0) {
         const fileDescs = photos.map(f => ({ mime_type: f.type || 'image/jpeg', byte_size: f.size }));
         const slots = await walkinUploadSign(studioId, fileDescs);
-        await Promise.all(slots.map((slot, i) =>
+        const uploads = await Promise.all(slots.map((slot, i) =>
           fetch(slot.upload_url, {
             method: 'PUT',
             headers: { 'Content-Type': photos[i].type || 'image/jpeg' },
             body: photos[i],
           })
         ));
+        if (uploads.some(r => !r.ok)) throw new Error('Photo upload failed — please try again or remove the photos.');
         imagePaths = slots.map(s => s.storage_object_path);
       }
+
+      // Upload legacy single signature
+      let signatureImagePath = null;
+      if (consentTemplates.length === 0 && signatureBlob) {
+        const [sigSlot] = await walkinUploadSign(studioId, [{ mime_type: 'image/png', byte_size: signatureBlob.size }]);
+        const sigResp = await fetch(sigSlot.upload_url, { method: 'PUT', headers: { 'Content-Type': 'image/png' }, body: signatureBlob });
+        if (!sigResp.ok) throw new Error('Signature upload failed — please try again.');
+        signatureImagePath = sigSlot.storage_object_path;
+      }
+
+      // Upload per-template signatures and build submissions
+      const consentSubmissions = [];
+      for (const t of consentTemplates) {
+        const ts = templateState[t.id] ?? {};
+        let clientSigPath = '';
+        let guardianSigPath = '';
+
+        if (t.requires_signature && ts.sigBlob) {
+          const [slot] = await walkinUploadSign(studioId, [{ mime_type: 'image/png', byte_size: ts.sigBlob.size }]);
+          const resp = await fetch(slot.upload_url, { method: 'PUT', headers: { 'Content-Type': 'image/png' }, body: ts.sigBlob });
+          if (!resp.ok) throw new Error(`Signature upload failed for "${t.name}".`);
+          clientSigPath = slot.storage_object_path;
+        }
+
+        if (isMinor && t.requires_minor_guardian && ts.guardianSigBlob) {
+          const [slot] = await walkinUploadSign(studioId, [{ mime_type: 'image/png', byte_size: ts.guardianSigBlob.size }]);
+          const resp = await fetch(slot.upload_url, { method: 'PUT', headers: { 'Content-Type': 'image/png' }, body: ts.guardianSigBlob });
+          if (!resp.ok) throw new Error(`Guardian signature upload failed for "${t.name}".`);
+          guardianSigPath = slot.storage_object_path;
+        }
+
+        consentSubmissions.push({
+          template_id:            t.id,
+          answers:                ts.answers ?? {},
+          is_minor:               isMinor,
+          signer_name:            `${firstName} ${lastName}`.trim(),
+          client_signature_path:  clientSigPath,
+          guardian_name:          isMinor ? guardianName : '',
+          guardian_relationship:  isMinor ? guardianRelationship : '',
+          guardian_email:         isMinor ? guardianEmail : '',
+          guardian_phone:         isMinor ? guardianPhone : '',
+          guardian_signature_path: guardianSigPath,
+        });
+      }
+
       await createWalkIn(studioId, {
-        artist_id:        artistId,
-        name:             `${firstName} ${lastName}`.trim(),
+        artist_id:            artistId,
+        name:                 `${firstName} ${lastName}`.trim(),
         email,
         phone: `${COUNTRIES.find(c => c.id === phoneCode)?.dial ?? ''} ${phoneNum}`.trim(),
         dob,
-        body_location:    placements.join(', '),
-        design_details:   design,
+        body_location:        placements.join(', '),
+        design_details:       design,
         notes,
-        image_paths:      imagePaths,
-        consent_accepted: consentAccepted,
+        image_paths:          imagePaths,
+        consent_accepted:     consentAccepted || consentSubmissions.length > 0,
+        signature_image_path: signatureImagePath,
+        consent_submissions:  consentSubmissions,
       });
       setDone(true);
     } catch (err) {
@@ -399,7 +535,82 @@ function WalkInInner() {
             )}
           </div>
 
-          {studio.consent_form && (
+          {/* ── Consent templates (new system) ── */}
+          {consentTemplates.length > 0 && consentTemplates.map(t => {
+            const ts = templateState[t.id] ?? {};
+            return (
+              <div key={t.id} style={s.consentBox}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span style={s.consentFormTitle}>{t.name}</span>
+                  <span style={{ ...s.formTypeBadge, ...(s.formTypeBadgeColors[t.type] ?? {}) }}>
+                    {t.type === 'health' ? 'Health' : t.type === 'waiver' ? 'Waiver' : 'Consent'}
+                  </span>
+                </div>
+
+                {/* Render fields */}
+                {(t.fields ?? []).map(field => (
+                  <ConsentFormField
+                    key={field.id}
+                    field={field}
+                    value={ts.answers?.[field.id] ?? ''}
+                    onChange={v => setTemplateAnswer(t.id, field.id, v)}
+                  />
+                ))}
+
+                {/* Minor guardian section */}
+                {isMinor && t.requires_minor_guardian && (
+                  <div style={s.guardianBox}>
+                    <p style={s.guardianTitle}>Parent / Guardian Consent Required</p>
+                    <p style={{ ...s.consentText, marginBottom: '0.75rem' }}>
+                      The client is under 18. A parent or legal guardian must provide their details and sign below.
+                    </p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                        <div>
+                          <label style={s.label}>Guardian name <span style={{ color: '#e86f6f' }}>*</span></label>
+                          <input style={s.input} type="text" value={guardianName} required
+                            onChange={e => setGuardianName(e.target.value)} placeholder="Full name" />
+                        </div>
+                        <div>
+                          <label style={s.label}>Relationship</label>
+                          <select style={s.input} value={guardianRelationship} onChange={e => setGuardianRelationship(e.target.value)}>
+                            <option>Parent</option>
+                            <option>Legal Guardian</option>
+                            <option>Other</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div>
+                        <label style={s.label}>Guardian email</label>
+                        <input style={s.input} type="email" value={guardianEmail}
+                          onChange={e => setGuardianEmail(e.target.value)} placeholder="guardian@example.com" />
+                      </div>
+                      <div>
+                        <label style={s.label}>Guardian phone</label>
+                        <input style={s.input} type="tel" value={guardianPhone}
+                          onChange={e => setGuardianPhone(e.target.value)} placeholder="Phone number" />
+                      </div>
+                      <div>
+                        <label style={s.label}>Guardian signature <span style={{ color: '#e86f6f' }}>*</span></label>
+                        <SignaturePad onCapture={blob => setTemplateGuardianSigBlob(t.id, blob)} />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Client signature */}
+                {t.requires_signature && (
+                  <div>
+                    <label style={s.label}>{isMinor ? 'Client signature' : 'Signature'} <span style={{ color: '#e86f6f' }}>*</span></label>
+                    <SignaturePad onCapture={blob => setTemplateSigBlob(t.id, blob)} />
+                  </div>
+                )}
+              </div>
+            );
+          })}
+
+          {/* ── Legacy fallback consent (only if no templates) ── */}
+          {consentTemplates.length === 0 && studio.consent_form && (
             <div style={s.consentBox}>
               <p style={s.consentText}>{studio.consent_form}</p>
               <label style={s.consentCheck}>
@@ -411,6 +622,9 @@ function WalkInInner() {
                 />
                 <span>I have read and agree to the above</span>
               </label>
+              {consentAccepted && (
+                <SignaturePad onCapture={setSignatureBlob} />
+              )}
             </div>
           )}
 
@@ -429,6 +643,138 @@ function WalkInInner() {
           </button>
         </form>
       )}
+    </div>
+  );
+}
+
+// Renders a single field from a consent template
+function ConsentFormField({ field, value, onChange }) {
+  const labelStyle = {
+    fontSize: '0.75rem', fontWeight: 600, color: 'rgba(255,255,255,0.5)',
+    display: 'flex', gap: '0.25rem', alignItems: 'center',
+  };
+  switch (field.type) {
+    case 'heading':
+      return <p style={{ fontSize: '0.9rem', fontWeight: 700, color: '#f5ecd9', margin: 0 }}>{field.label}</p>;
+    case 'paragraph':
+      return <p style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.55)', margin: 0, lineHeight: 1.65, maxHeight: 160, overflowY: 'auto', whiteSpace: 'pre-wrap' }}>{field.label}</p>;
+    case 'checkbox':
+      return (
+        <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6rem', cursor: 'pointer' }}>
+          <input type="checkbox" checked={!!value} onChange={e => onChange(e.target.checked ? 'true' : '')}
+            style={{ accentColor: '#f5ecd9', flexShrink: 0, marginTop: 2 }} />
+          <span style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.7)', lineHeight: 1.5 }}>
+            {field.label}{field.required && <span style={{ color: '#e86f6f', marginLeft: 2 }}>*</span>}
+          </span>
+        </label>
+      );
+    case 'yesno':
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+          <span style={labelStyle}>
+            {field.label}{field.required && <span style={{ color: '#e86f6f' }}>*</span>}
+          </span>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            {['Yes', 'No'].map(opt => (
+              <button key={opt} type="button"
+                onClick={() => onChange(opt)}
+                style={{
+                  padding: '0.45rem 1.2rem', borderRadius: 8,
+                  border: `1px solid ${value === opt ? '#f5ecd9' : 'rgba(255,255,255,0.12)'}`,
+                  background: value === opt ? 'rgba(245,236,217,0.12)' : 'rgba(255,255,255,0.04)',
+                  color: value === opt ? '#f5ecd9' : 'rgba(255,255,255,0.5)',
+                  fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+                }}>{opt}</button>
+            ))}
+          </div>
+        </div>
+      );
+    case 'textarea':
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+          <span style={labelStyle}>
+            {field.label}{field.required && <span style={{ color: '#e86f6f' }}>*</span>}
+          </span>
+          <textarea style={{ ...s.input, minHeight: 70, resize: 'vertical' }}
+            value={value} onChange={e => onChange(e.target.value)} placeholder="Your answer…" />
+        </div>
+      );
+    default: // 'text'
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+          <span style={labelStyle}>
+            {field.label}{field.required && <span style={{ color: '#e86f6f' }}>*</span>}
+          </span>
+          <input type="text" style={s.input} value={value} onChange={e => onChange(e.target.value)} placeholder="Your answer…" />
+        </div>
+      );
+  }
+}
+
+function SignaturePad({ onCapture }) {
+  const canvasRef = useRef(null);
+  const [drawing, setDrawing] = useState(false);
+  const [hasDrawn, setHasDrawn] = useState(false);
+
+  function getPos(e) {
+    const canvas = canvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+    const sx = canvas.width / rect.width;
+    const sy = canvas.height / rect.height;
+    const src = e.touches ? e.touches[0] : e;
+    return { x: (src.clientX - rect.left) * sx, y: (src.clientY - rect.top) * sy };
+  }
+
+  function startDraw(e) {
+    e.preventDefault();
+    const { x, y } = getPos(e);
+    const ctx = canvasRef.current.getContext('2d');
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    setDrawing(true);
+  }
+
+  function draw(e) {
+    if (!drawing) return;
+    e.preventDefault();
+    const { x, y } = getPos(e);
+    const ctx = canvasRef.current.getContext('2d');
+    ctx.lineTo(x, y);
+    ctx.strokeStyle = '#f5ecd9';
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.stroke();
+    setHasDrawn(true);
+  }
+
+  function endDraw() {
+    if (!drawing) return;
+    setDrawing(false);
+    if (hasDrawn) canvasRef.current.toBlob(blob => onCapture(blob), 'image/png');
+  }
+
+  function clear() {
+    const canvas = canvasRef.current;
+    canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+    setHasDrawn(false);
+    onCapture(null);
+  }
+
+  return (
+    <div style={s.sigWrap}>
+      <canvas
+        ref={canvasRef}
+        width={440}
+        height={140}
+        style={s.sigCanvas}
+        onMouseDown={startDraw} onMouseMove={draw} onMouseUp={endDraw} onMouseLeave={endDraw}
+        onTouchStart={startDraw} onTouchMove={draw} onTouchEnd={endDraw}
+      />
+      <div style={s.sigFooter}>
+        <span style={s.sigHint}>Draw your signature above</span>
+        <button type="button" onClick={clear} style={s.sigClear}>Clear</button>
+      </div>
     </div>
   );
 }
@@ -565,8 +911,25 @@ const s = {
   thumbImg: { width: '100%', height: '100%', objectFit: 'cover' },
   thumbRemove: { position: 'absolute', top: 2, right: 2, width: 18, height: 18, borderRadius: '50%', background: 'rgba(0,0,0,0.65)', border: 'none', color: '#fff', fontSize: '0.65rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 },
   consentBox: { background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' },
+  sigWrap: { display: 'flex', flexDirection: 'column', gap: '0.4rem' },
+  sigCanvas: { width: '100%', height: 140, borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.12)', display: 'block', touchAction: 'none', cursor: 'crosshair' },
+  sigFooter: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
+  sigHint: { fontSize: '0.7rem', color: 'rgba(255,255,255,0.25)' },
+  sigClear: { background: 'none', border: 'none', fontSize: '0.72rem', color: 'rgba(255,255,255,0.35)', cursor: 'pointer', padding: '0.15rem 0', fontFamily: 'inherit' },
   consentText: { fontSize: '0.8rem', color: 'rgba(255,255,255,0.55)', margin: 0, lineHeight: 1.65, maxHeight: 160, overflowY: 'auto' },
   consentCheck: { display: 'flex', alignItems: 'flex-start', gap: '0.6rem', fontSize: '0.8rem', color: 'rgba(255,255,255,0.7)', cursor: 'pointer' },
+  consentFormTitle: { fontSize: '0.9rem', fontWeight: 700, color: '#f5ecd9' },
+  formTypeBadge: { fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', padding: '0.15rem 0.5rem', borderRadius: 4 },
+  formTypeBadgeColors: {
+    consent: { background: 'rgba(245,236,217,0.1)', color: '#f5ecd9' },
+    waiver:  { background: 'rgba(232,111,111,0.12)', color: '#e86f6f' },
+    health:  { background: 'rgba(76,201,138,0.12)', color: '#4cc98a' },
+  },
+  guardianBox: {
+    background: 'rgba(245,236,217,0.04)', border: '1px solid rgba(245,236,217,0.12)',
+    borderRadius: 10, padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.65rem',
+  },
+  guardianTitle: { fontSize: '0.8rem', fontWeight: 700, color: '#f5ecd9', margin: 0 },
   switchLink: {
     background: 'none', border: 'none',
     color: 'rgba(255,255,255,0.35)',

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { adminListStudioAccounts, adminApproveStudio, adminRejectStudio } from '@/lib/api';
+import { APPROVAL_STATUS_COLORS } from '@/lib/status';
 
 const STATUS_FILTERS = [
   { value: 'pending',  label: 'Pending' },
@@ -9,12 +10,6 @@ const STATUS_FILTERS = [
   { value: 'rejected', label: 'Rejected' },
   { value: '',         label: 'All' },
 ];
-
-const STATUS_COLORS = {
-  pending:  { bg: 'rgba(245,158,58,0.12)',  text: '#f59e3a', border: 'rgba(245,158,58,0.25)' },
-  approved: { bg: 'rgba(76,201,138,0.12)',  text: '#4cc98a', border: 'rgba(76,201,138,0.25)' },
-  rejected: { bg: 'rgba(232,111,111,0.1)',  text: '#e86f6f', border: 'rgba(232,111,111,0.2)' },
-};
 
 export default function StudiosAdminPage() {
   const [filter, setFilter] = useState('pending');
@@ -101,7 +96,7 @@ export default function StudiosAdminPage() {
 }
 
 function AccountCard({ account, onApprove, onReject, actionLoading }) {
-  const sc = STATUS_COLORS[account.status] ?? STATUS_COLORS.pending;
+  const sc = APPROVAL_STATUS_COLORS[account.status] ?? APPROVAL_STATUS_COLORS.pending;
   const studio = account.studio;
   const createdAt = new Date(account.created_at).toLocaleDateString('en-AU', {
     day: 'numeric', month: 'short', year: 'numeric',

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import {
@@ -8,11 +8,20 @@ import {
   getStudioHours, updateStudioHours,
   getStations, addStation, removeStation,
   setStationUnavailability, clearStationUnavailability,
+  listConsentTemplates, createConsentTemplate, updateConsentTemplate, deleteConsentTemplate,
+  importStudioData, getStudioArtists,
 } from '@/lib/api';
 import { getSupabase } from '@/lib/supabase';
-import { invalidate } from '@/lib/cache';
+import { invalidate, invalidatePrefix } from '@/lib/cache';
 import { setDemoMode } from '@/lib/mode';
 import { getTheme, setTheme } from '@/lib/theme';
+import { parseCSV } from '@/lib/csv';
+import {
+  CLIENT_FIELDS, APPOINTMENT_FIELDS, PRESETS,
+  suggestMapping, suggestKind,
+  normalizeEmail, normalizePhone, parsePrice,
+  parseDateTime, parseDOB, normalizeStatus, parseDurationMinutes,
+} from '@/lib/importPresets';
 
 const QRCodeSVG = dynamic(() => import('qrcode.react').then(m => m.QRCodeSVG), { ssr: false });
 
@@ -122,6 +131,398 @@ function WidgetPreview({ bg, accent, studioName }) {
   );
 }
 
+const IMPORT_CHUNK = 200;
+const UNASSIGNED = '';
+
+function previewColumns(kind) {
+  if (kind === 'clients') {
+    return [
+      { key: 'name',  label: 'Name',   render: p => p.name },
+      { key: 'email', label: 'Email',  render: p => p.email || '—' },
+      { key: 'phone', label: 'Phone',  render: p => p.phone || '—' },
+      { key: 'dob',   label: 'DOB',    render: p => p.dob || '—' },
+      { key: 'notes', label: 'Notes',  render: p => p.notes || '—' },
+    ];
+  }
+  return [
+    { key: 'client', label: 'Client', render: p => p.client_name || p.client_email || p.client_phone },
+    { key: 'when',   label: 'When',   render: p => p.chosen_time ? new Date(p.chosen_time).toLocaleString('en-AU', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : '—' },
+    { key: 'status', label: 'Status', render: p => p.status },
+    { key: 'price',  label: 'Price',  render: p => p.price != null ? `$${p.price}` : '—' },
+    { key: 'design', label: 'Service', render: p => p.design_details || '—' },
+  ];
+}
+
+function ImportSection() {
+  const [step, setStep] = useState('upload');
+  const [fileName, setFileName] = useState('');
+  const [headers, setHeaders] = useState([]);
+  const [rows, setRows] = useState([]);
+  const [kind, setKind] = useState('clients');
+  const [preset, setPreset] = useState('generic');
+  const [dayFirst, setDayFirst] = useState(true);
+  const [mapping, setMapping] = useState({});
+  const [artists, setArtists] = useState([]);
+  const [artistMap, setArtistMap] = useState({});
+  const [progress, setProgress] = useState(0);
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState('');
+  const fileRef = useRef(null);
+
+  useEffect(() => {
+    getStudioArtists('approved')
+      .then(d => setArtists(d.artists ?? []))
+      .catch(() => {});
+  }, []);
+
+  const fields = kind === 'clients' ? CLIENT_FIELDS : APPOINTMENT_FIELDS;
+
+  const artistNames = useMemo(() => {
+    if (kind !== 'appointments' || !mapping.artist_name) return [];
+    return [...new Set(rows.map(r => (r[mapping.artist_name] ?? '').trim()).filter(Boolean))];
+  }, [kind, mapping.artist_name, rows]);
+
+  useEffect(() => {
+    if (artistNames.length === 0) return;
+    setArtistMap(prev => {
+      const next = { ...prev };
+      for (const raw of artistNames) {
+        if (next[raw] !== undefined) continue;
+        const lower = raw.toLowerCase();
+        const exact = artists.find(a => a.name?.toLowerCase() === lower);
+        const partial = exact ?? artists.find(a =>
+          a.name && (lower.includes(a.name.toLowerCase()) || a.name.toLowerCase().includes(lower)));
+        next[raw] = partial?.artistId ?? UNASSIGNED;
+      }
+      return next;
+    });
+  }, [artistNames, artists]);
+
+  const prepared = useMemo(() => {
+    if (step !== 'preview') return [];
+    const get = (r, k) => (mapping[k] ? (r[mapping[k]] ?? '').trim() : '');
+    return rows.map((r, idx) => {
+      const errs = [];
+      if (kind === 'clients') {
+        const name = get(r, 'name') || [get(r, 'first_name'), get(r, 'last_name')].filter(Boolean).join(' ');
+        const email = normalizeEmail(get(r, 'email'));
+        const phone = normalizePhone(get(r, 'phone'));
+        if (!name) errs.push('missing name');
+        if (email && !/^\S+@\S+\.\S+$/.test(email)) errs.push('invalid email');
+        if (!email && !phone) errs.push('needs email or phone');
+        return { line: idx + 2, errors: errs, payload: { name, email, phone, dob: parseDOB(get(r, 'dob'), dayFirst), notes: get(r, 'notes') } };
+      }
+      const name = get(r, 'client_name') || [get(r, 'client_first_name'), get(r, 'client_last_name')].filter(Boolean).join(' ');
+      const email = normalizeEmail(get(r, 'client_email'));
+      const phone = normalizePhone(get(r, 'client_phone'));
+      const chosen = parseDateTime({ datetime: get(r, 'datetime'), date: get(r, 'date'), time: get(r, 'time') }, dayFirst);
+      if (!name && !email && !phone) errs.push('needs client name, email or phone');
+      if (email && !/^\S+@\S+\.\S+$/.test(email)) errs.push('invalid email');
+      if (!chosen) errs.push('unparseable date/time');
+      const artistName = get(r, 'artist_name');
+      return {
+        line: idx + 2, errors: errs,
+        payload: {
+          client_name: name, client_email: email, client_phone: phone,
+          artist_id: artistName ? (artistMap[artistName] ?? UNASSIGNED) : UNASSIGNED,
+          chosen_time: chosen ?? '', duration_minutes: parseDurationMinutes(get(r, 'duration_minutes')),
+          design_details: get(r, 'design_details'), body_location: get(r, 'body_location'),
+          notes: get(r, 'notes'), price: parsePrice(get(r, 'price')),
+          status: normalizeStatus(get(r, 'status'), chosen),
+        },
+      };
+    });
+  }, [step, rows, mapping, kind, dayFirst, artistMap]);
+
+  const validRows = prepared.filter(p => p.errors.length === 0);
+  const invalidRows = prepared.filter(p => p.errors.length > 0);
+
+  function handleFile(file) {
+    if (!file) return;
+    setError('');
+    const reader = new FileReader();
+    reader.onload = () => {
+      const { headers: h, rows: r } = parseCSV(String(reader.result));
+      if (h.length === 0 || r.length === 0) { setError('Could not read any rows from that file.'); return; }
+      const guessedKind = suggestKind(h);
+      setFileName(file.name);
+      setHeaders(h);
+      setRows(r);
+      setKind(guessedKind);
+      setMapping(suggestMapping(h, guessedKind, 'generic'));
+      setPreset('generic');
+      setStep('map');
+    };
+    reader.readAsText(file);
+  }
+
+  function applyPreset(p, k = kind) {
+    setPreset(p);
+    setDayFirst(PRESETS[p]?.dayFirst ?? true);
+    setMapping(suggestMapping(headers, k, p));
+  }
+
+  async function runImport() {
+    setStep('importing');
+    setError('');
+    setProgress(0);
+    const total = { imported: 0, linked: 0, skipped: 0, errors: [] };
+    try {
+      for (let i = 0; i < validRows.length; i += IMPORT_CHUNK) {
+        const chunk = validRows.slice(i, i + IMPORT_CHUNK).map(p => p.payload);
+        const payload = kind === 'clients' ? { clients: chunk } : { appointments: chunk };
+        const res = await importStudioData(payload);
+        const section = kind === 'clients' ? res.clients : res.appointments;
+        total.imported += section?.imported ?? 0;
+        total.linked += section?.linked ?? 0;
+        total.skipped += section?.skipped ?? 0;
+        for (const e of res.errors ?? []) total.errors.push({ ...e, line: validRows[i + e.index]?.line });
+        setProgress(Math.min(i + IMPORT_CHUNK, validRows.length));
+      }
+      invalidatePrefix('clients:');
+      invalidatePrefix('home:');
+      setResult(total);
+      setStep('done');
+    } catch (e) {
+      setError(e.message);
+      setStep('preview');
+    }
+  }
+
+  function reset() {
+    setStep('upload');
+    setFileName('');
+    setHeaders([]);
+    setRows([]);
+    setMapping({});
+    setArtistMap({});
+    setResult(null);
+    setError('');
+    if (fileRef.current) fileRef.current.value = '';
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+      {error && <div style={imp.error}>{error}</div>}
+
+      {step === 'upload' && (
+        <div
+          style={imp.dropZone}
+          onDragOver={e => e.preventDefault()}
+          onDrop={e => { e.preventDefault(); handleFile(e.dataTransfer.files?.[0]); }}
+          onClick={() => fileRef.current?.click()}
+        >
+          <span style={imp.dropTitle}>Drop a CSV file here, or click to browse</span>
+          <span style={imp.dropSub}>Exports from Square Appointments, Acuity, Fresha or any spreadsheet saved as CSV.</span>
+          <input ref={fileRef} type="file" accept=".csv,text/csv" style={{ display: 'none' }} onChange={e => handleFile(e.target.files?.[0])} />
+        </div>
+      )}
+
+      {step === 'map' && (
+        <>
+          <div style={imp.subCard}>
+            <div style={imp.subCardTitle}>{fileName} · {rows.length} row{rows.length !== 1 ? 's' : ''}</div>
+            <div style={imp.controlRow}>
+              <div style={imp.control}>
+                <label style={imp.ctrlLabel}>This file contains</label>
+                <div style={imp.segmented}>
+                  {['clients', 'appointments'].map(k => (
+                    <button key={k} style={{ ...imp.segBtn, ...(kind === k ? imp.segBtnActive : {}) }}
+                      onClick={() => { setKind(k); setMapping(suggestMapping(headers, k, preset)); }}>
+                      {k === 'clients' ? 'Clients' : 'Appointments'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div style={imp.control}>
+                <label style={imp.ctrlLabel}>Source</label>
+                <select style={imp.select} value={preset} onChange={e => applyPreset(e.target.value)}>
+                  {Object.entries(PRESETS).map(([key, p]) => <option key={key} value={key}>{p.label}</option>)}
+                </select>
+              </div>
+              <div style={imp.control}>
+                <label style={imp.ctrlLabel}>Date format</label>
+                <div style={imp.segmented}>
+                  <button style={{ ...imp.segBtn, ...(dayFirst ? imp.segBtnActive : {}) }} onClick={() => setDayFirst(true)}>DD/MM/YYYY</button>
+                  <button style={{ ...imp.segBtn, ...(!dayFirst ? imp.segBtnActive : {}) }} onClick={() => setDayFirst(false)}>MM/DD/YYYY</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div style={imp.subCard}>
+            <div style={imp.subCardTitle}>Map columns</div>
+            <div style={imp.mapGrid}>
+              {fields.map(f => (
+                <div key={f.key} style={imp.mapRow}>
+                  <span style={imp.mapField}>{f.label}{f.hint && <span style={imp.mapHint}> — {f.hint}</span>}</span>
+                  <select style={imp.select} value={mapping[f.key] ?? ''}
+                    onChange={e => setMapping(m => ({ ...m, [f.key]: e.target.value || undefined }))}>
+                    <option value="">— not imported —</option>
+                    {headers.map(h => <option key={h} value={h}>{h}</option>)}
+                  </select>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {kind === 'appointments' && artistNames.length > 0 && (
+            <div style={imp.subCard}>
+              <div style={imp.subCardTitle}>Match artists</div>
+              <p style={imp.subCardDesc}>Match names found in the file to artists in your studio. Unmatched appointments import as unassigned.</p>
+              <div style={imp.mapGrid}>
+                {artistNames.map(raw => (
+                  <div key={raw} style={imp.mapRow}>
+                    <span style={imp.mapField}>{raw}</span>
+                    <select style={imp.select} value={artistMap[raw] ?? UNASSIGNED}
+                      onChange={e => setArtistMap(m => ({ ...m, [raw]: e.target.value }))}>
+                      <option value={UNASSIGNED}>Leave unassigned</option>
+                      {artists.map(a => <option key={a.artistId} value={a.artistId}>{a.name}</option>)}
+                    </select>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div style={imp.btnRow}>
+            <button style={imp.btnGhost} onClick={reset}>Start over</button>
+            <button style={imp.btnPrimary} onClick={() => setStep('preview')}>Preview import</button>
+          </div>
+        </>
+      )}
+
+      {step === 'preview' && (
+        <>
+          <div style={imp.statRow}>
+            <div style={imp.statCard}>
+              <span style={imp.statValue}>{validRows.length}</span>
+              <span style={imp.statLabel}>Rows ready to import</span>
+            </div>
+            <div style={imp.statCard}>
+              <span style={{ ...imp.statValue, color: invalidRows.length ? '#e86f6f' : 'var(--text)' }}>{invalidRows.length}</span>
+              <span style={imp.statLabel}>Rows with problems (skipped)</span>
+            </div>
+          </div>
+
+          {invalidRows.length > 0 && (
+            <div style={imp.subCard}>
+              <div style={imp.subCardTitle}>Problems</div>
+              <div style={imp.problemList}>
+                {invalidRows.slice(0, 20).map(p => (
+                  <div key={p.line} style={imp.problemRow}>
+                    <span style={imp.problemLine}>Line {p.line}</span>
+                    <span style={imp.problemReason}>{p.errors.join(', ')}</span>
+                  </div>
+                ))}
+                {invalidRows.length > 20 && <span style={imp.subCardDesc}>…and {invalidRows.length - 20} more</span>}
+              </div>
+            </div>
+          )}
+
+          <div style={imp.subCard}>
+            <div style={imp.subCardTitle}>Preview</div>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={imp.table}>
+                <thead><tr>{previewColumns(kind).map(c => <th key={c.key} style={imp.th}>{c.label}</th>)}</tr></thead>
+                <tbody>
+                  {validRows.slice(0, 50).map(p => (
+                    <tr key={p.line}>{previewColumns(kind).map(c => <td key={c.key} style={imp.td}>{c.render(p.payload)}</td>)}</tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {validRows.length > 50 && <span style={imp.subCardDesc}>Showing first 50 of {validRows.length}</span>}
+          </div>
+
+          <div style={imp.btnRow}>
+            <button style={imp.btnGhost} onClick={() => setStep('map')}>Back</button>
+            <button style={{ ...imp.btnPrimary, ...(validRows.length === 0 ? imp.btnDisabled : {}) }}
+              disabled={validRows.length === 0} onClick={runImport}>
+              Import {validRows.length} row{validRows.length !== 1 ? 's' : ''}
+            </button>
+          </div>
+        </>
+      )}
+
+      {step === 'importing' && (
+        <div style={imp.subCard}>
+          <div style={imp.subCardTitle}>Importing…</div>
+          <div style={imp.progressTrack}>
+            <div style={{ ...imp.progressFill, width: `${Math.round((progress / Math.max(validRows.length, 1)) * 100)}%` }} />
+          </div>
+          <span style={imp.subCardDesc}>{Math.min(progress, validRows.length)} / {validRows.length} rows</span>
+        </div>
+      )}
+
+      {step === 'done' && result && (
+        <>
+          <div style={imp.statRow}>
+            <div style={imp.statCard}><span style={{ ...imp.statValue, color: '#4cc98a' }}>{result.imported}</span><span style={imp.statLabel}>Imported</span></div>
+            <div style={imp.statCard}><span style={imp.statValue}>{result.linked}</span><span style={imp.statLabel}>Linked to existing app users</span></div>
+            <div style={imp.statCard}><span style={imp.statValue}>{result.skipped}</span><span style={imp.statLabel}>Skipped (already imported)</span></div>
+          </div>
+          {result.errors.length > 0 && (
+            <div style={imp.subCard}>
+              <div style={imp.subCardTitle}>Rows the server could not import</div>
+              <div style={imp.problemList}>
+                {result.errors.slice(0, 20).map((e, i) => (
+                  <div key={i} style={imp.problemRow}>
+                    <span style={imp.problemLine}>{e.line ? `Line ${e.line}` : `Row ${e.index + 1}`}</span>
+                    <span style={imp.problemReason}>{e.reason}</span>
+                  </div>
+                ))}
+                {result.errors.length > 20 && <span style={imp.subCardDesc}>…and {result.errors.length - 20} more</span>}
+              </div>
+            </div>
+          )}
+          <div style={imp.btnRow}>
+            <button style={imp.btnPrimary} onClick={reset}>Import another file</button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+const imp = {
+  error: { background: 'rgba(232,111,111,0.08)', border: '1px solid rgba(232,111,111,0.35)', borderRadius: 10, padding: '0.7rem 1rem', color: '#e86f6f', fontSize: '0.82rem' },
+  dropZone: { border: '1.5px dashed var(--border)', borderRadius: 12, padding: '3rem 2rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', background: 'var(--bg-base)' },
+  dropTitle: { fontSize: '0.925rem', fontWeight: 600, color: 'var(--text)' },
+  dropSub: { fontSize: '0.75rem', color: 'var(--text-faint)' },
+  subCard: { background: 'var(--bg-base)', border: '1px solid var(--border-faint)', borderRadius: 10, padding: '0.85rem 1rem', display: 'flex', flexDirection: 'column', gap: '0.65rem' },
+  subCardTitle: { fontSize: '0.78rem', fontWeight: 700, color: 'var(--text)' },
+  subCardDesc: { fontSize: '0.72rem', color: 'var(--text-faint)', margin: 0 },
+  controlRow: { display: 'flex', gap: '1.25rem', flexWrap: 'wrap' },
+  control: { display: 'flex', flexDirection: 'column', gap: '0.3rem' },
+  ctrlLabel: { fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-secondary)' },
+  segmented: { display: 'flex', gap: 3, background: 'var(--bg-chip)', borderRadius: 7, padding: 3 },
+  segBtn: { background: 'transparent', border: 'none', borderRadius: 5, padding: '0.28rem 0.65rem', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', cursor: 'pointer' },
+  segBtnActive: { background: 'var(--bg-card)', color: 'var(--text)', boxShadow: '0 1px 2px rgba(0,0,0,0.15)' },
+  select: { background: 'var(--bg-chip)', border: '1px solid var(--border)', borderRadius: 7, color: 'var(--text)', fontSize: '0.78rem', padding: '0.32rem 0.55rem', minWidth: 170 },
+  mapGrid: { display: 'flex', flexDirection: 'column', gap: '0.4rem' },
+  mapRow: { display: 'flex', alignItems: 'center', gap: '1rem', justifyContent: 'space-between' },
+  mapField: { fontSize: '0.8rem', color: 'var(--text-dim)', fontWeight: 500 },
+  mapHint: { fontSize: '0.7rem', color: 'var(--text-ghost)', fontWeight: 400 },
+  statRow: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '0.65rem' },
+  statCard: { background: 'var(--bg-base)', border: '1px solid var(--border-faint)', borderRadius: 10, padding: '1rem 1.25rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' },
+  statValue: { fontSize: '2rem', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.03em', lineHeight: 1 },
+  statLabel: { fontSize: '0.72rem', color: 'var(--text-faint)', fontWeight: 500 },
+  problemList: { display: 'flex', flexDirection: 'column', gap: '0.3rem' },
+  problemRow: { display: 'flex', gap: '0.75rem', alignItems: 'baseline' },
+  problemLine: { fontSize: '0.75rem', fontWeight: 600, color: '#e86f6f', minWidth: 64, flexShrink: 0 },
+  problemReason: { fontSize: '0.78rem', color: 'var(--text-secondary)' },
+  table: { width: '100%', borderCollapse: 'collapse' },
+  th: { textAlign: 'left', fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-secondary)', padding: '0.3rem 0.55rem', borderBottom: '1px solid var(--border-faint)', whiteSpace: 'nowrap' },
+  td: { fontSize: '0.78rem', color: 'var(--text-dim)', padding: '0.3rem 0.55rem', borderBottom: '1px solid var(--border-faint)', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  btnRow: { display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' },
+  btnGhost: { background: 'var(--bg-chip)', border: '1px solid var(--border)', borderRadius: 7, color: 'var(--text-muted)', fontSize: '0.8rem', fontWeight: 600, padding: '0.45rem 0.9rem', cursor: 'pointer' },
+  btnPrimary: { background: 'var(--accent)', border: 'none', borderRadius: 7, color: 'var(--accent-contrast, #111)', fontSize: '0.8rem', fontWeight: 700, padding: '0.45rem 1rem', cursor: 'pointer' },
+  btnDisabled: { opacity: 0.4, cursor: 'not-allowed' },
+  progressTrack: { height: 7, background: 'var(--bg-chip)', borderRadius: 4, overflow: 'hidden' },
+  progressFill: { height: '100%', background: 'var(--accent)', transition: 'width 0.2s' },
+};
+
 export default function SettingsPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -129,6 +530,7 @@ export default function SettingsPage() {
   const [address, setAddress] = useState('');
   const [email, setEmail] = useState('');
   const [consentForm, setConsentForm] = useState('');
+  const [aftercareInstructions, setAftercareInstructions] = useState('');
   const [widgetBgColor, setWidgetBgColor] = useState('#111111');
   const [widgetAccentColor, setWidgetAccentColor] = useState('#f5ecd9');
   const [studioCut, setStudioCut] = useState('0');
@@ -149,6 +551,18 @@ export default function SettingsPage() {
     setThemeState(next);
   }
 
+  // ── Consent templates ──────────────────────────────────────────────────────
+  const [consentTemplates, setConsentTemplates] = useState([]);
+  const [templateBuilderOpen, setTemplateBuilderOpen] = useState(false);
+  const [editingTemplate, setEditingTemplate] = useState(null); // null = new
+  const [templateName, setTemplateName] = useState('');
+  const [templateType, setTemplateType] = useState('consent');
+  const [templateRequiresSig, setTemplateRequiresSig] = useState(true);
+  const [templateRequiresGuardian, setTemplateRequiresGuardian] = useState(false);
+  const [templateFields, setTemplateFields] = useState([]);
+  const [templateSaving, setTemplateSaving] = useState(false);
+  const [templateError, setTemplateError] = useState('');
+
   const [hours, setHours] = useState(defaultHours());
   const [hoursSaving, setHoursSaving] = useState(false);
   const [hoursSaved, setHoursSaved] = useState(false);
@@ -161,15 +575,17 @@ export default function SettingsPage() {
   useEffect(() => {
     async function load() {
       try {
-        const [account, { data: { session } }, hoursData, stationsData] = await Promise.all([
+        const [account, { data: { session } }, hoursData, stationsData, templateData] = await Promise.all([
           getMyStudioAccount(),
           getSupabase().auth.getSession(),
           getStudioHours().catch(() => ({ hours: [] })),
           getStations().catch(() => ({ stations: [] })),
+          listConsentTemplates().catch(() => ({ templates: [] })),
         ]);
         setName(account.studio?.name ?? '');
         setAddress(account.studio?.address_string ?? '');
         setConsentForm(account.studio?.consent_form ?? '');
+        setAftercareInstructions(account.studio?.aftercare_instructions ?? '');
         setWidgetBgColor(account.studio?.widget_bg_color || '#111111');
         setWidgetAccentColor(account.studio?.widget_accent_color || '#f5ecd9');
         setStudioCut(String(account.studio?.studio_cut_percent ?? 0));
@@ -178,6 +594,7 @@ export default function SettingsPage() {
         setWalkInUrl(window.location.origin + '/walk-in?s=' + account.studio_id);
         if (hoursData.hours?.length === 7) setHours(hoursData.hours);
         setStations(stationsData.stations ?? []);
+        setConsentTemplates(templateData.templates ?? []);
       } catch {
         setProfileError('Failed to load settings.');
       } finally {
@@ -192,7 +609,7 @@ export default function SettingsPage() {
     setSaving(true); setProfileError('');
     try {
       const cut = parseFloat(studioCut);
-      await updateStudioProfile(name.trim(), address.trim(), consentForm, widgetBgColor, widgetAccentColor, isNaN(cut) ? 0 : cut);
+      await updateStudioProfile(name.trim(), address.trim(), consentForm, widgetBgColor, widgetAccentColor, isNaN(cut) ? 0 : cut, aftercareInstructions);
       invalidate('studio-account');
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
@@ -225,11 +642,18 @@ export default function SettingsPage() {
     setHours(h => h.map((d, i) => i === dayIndex ? { ...d, [field]: value } : d));
   }
 
+  async function refreshStations() {
+    const data = await getStations();
+    setStations(data.stations ?? []);
+  }
+
   async function handleAddStation() {
     setStationLoading(true);
     try {
       const station = await addStation();
       setStations(s => [...s, station]);
+    } catch (e) {
+      alert(e.message);
     } finally {
       setStationLoading(false);
     }
@@ -241,6 +665,8 @@ export default function SettingsPage() {
       await removeStation(id);
       setStations(s => s.filter(st => st.id !== id));
       if (expandedStation === id) setExpandedStation(null);
+    } catch (e) {
+      alert(e.message);
     } finally {
       setStationLoading(false);
     }
@@ -248,16 +674,116 @@ export default function SettingsPage() {
 
   async function handleSetUnavailable(stationId) {
     if (!unavailDate) return;
-    await setStationUnavailability(stationId, unavailDate);
-    setUnavailDate('');
+    try {
+      await setStationUnavailability(stationId, unavailDate);
+      setUnavailDate('');
+      await refreshStations();
+    } catch (e) {
+      alert(e.message);
+    }
   }
 
   async function handleClearUnavailable(stationId, date) {
-    const d = date.split('T')[0];
-    await clearStationUnavailability(stationId, d);
-    // refresh stations list
-    const data = await getStations();
-    setStations(data.stations ?? []);
+    try {
+      await clearStationUnavailability(stationId, date.split('T')[0]);
+      await refreshStations();
+    } catch (e) {
+      alert(e.message);
+    }
+  }
+
+  // ── Consent template helpers ──────────────────────────────────────────────
+
+  function openNewTemplate() {
+    setEditingTemplate(null);
+    setTemplateName('');
+    setTemplateType('consent');
+    setTemplateRequiresSig(true);
+    setTemplateRequiresGuardian(false);
+    setTemplateFields([]);
+    setTemplateError('');
+    setTemplateBuilderOpen(true);
+  }
+
+  function openEditTemplate(t) {
+    setEditingTemplate(t);
+    setTemplateName(t.name);
+    setTemplateType(t.type);
+    setTemplateRequiresSig(t.requires_signature);
+    setTemplateRequiresGuardian(t.requires_minor_guardian);
+    setTemplateFields(t.fields ?? []);
+    setTemplateError('');
+    setTemplateBuilderOpen(true);
+  }
+
+  function addField(type) {
+    setTemplateFields(prev => [...prev, { id: `f_${Date.now()}`, type, label: '', required: false }]);
+  }
+
+  function updateField(id, changes) {
+    setTemplateFields(prev => prev.map(f => f.id === id ? { ...f, ...changes } : f));
+  }
+
+  function removeField(id) {
+    setTemplateFields(prev => prev.filter(f => f.id !== id));
+  }
+
+  function moveField(id, dir) {
+    setTemplateFields(prev => {
+      const idx = prev.findIndex(f => f.id === id);
+      if (idx < 0) return prev;
+      const next = [...prev];
+      const swap = idx + dir;
+      if (swap < 0 || swap >= next.length) return prev;
+      [next[idx], next[swap]] = [next[swap], next[idx]];
+      return next;
+    });
+  }
+
+  async function saveTemplate() {
+    if (!templateName.trim()) { setTemplateError('Template name is required.'); return; }
+    setTemplateSaving(true);
+    setTemplateError('');
+    try {
+      const payload = {
+        name: templateName.trim(),
+        type: templateType,
+        requires_signature: templateRequiresSig,
+        requires_minor_guardian: templateRequiresGuardian,
+        fields: templateFields,
+      };
+      if (editingTemplate) {
+        const updated = await updateConsentTemplate(editingTemplate.id, payload);
+        setConsentTemplates(prev => prev.map(t => t.id === editingTemplate.id ? updated : t));
+      } else {
+        const created = await createConsentTemplate(payload);
+        setConsentTemplates(prev => [...prev, created]);
+      }
+      setTemplateBuilderOpen(false);
+    } catch (e) {
+      setTemplateError(e.message);
+    } finally {
+      setTemplateSaving(false);
+    }
+  }
+
+  async function toggleTemplateActive(t) {
+    try {
+      const updated = await updateConsentTemplate(t.id, { is_active: !t.is_active });
+      setConsentTemplates(prev => prev.map(x => x.id === t.id ? updated : x));
+    } catch (e) {
+      alert(e.message);
+    }
+  }
+
+  async function handleDeleteTemplate(t) {
+    if (!confirm(`Delete "${t.name}"? This cannot be undone.`)) return;
+    try {
+      await deleteConsentTemplate(t.id);
+      setConsentTemplates(prev => prev.filter(x => x.id !== t.id));
+    } catch (e) {
+      alert(e.message);
+    }
   }
 
   async function handleSignOut() {
@@ -380,7 +906,7 @@ export default function SettingsPage() {
 
         <section style={{ ...s.card, gridColumn: '1 / -1' }}>
           <h2 style={s.sectionTitle}>Consent Form</h2>
-          <p style={s.sectionDesc}>Clients must read and agree to this before submitting a booking request. Leave blank to disable.</p>
+          <p style={s.sectionDesc}>A simple consent text shown to clients before submitting a walk-in. Leave blank to disable. Use Consent Form Templates below for more advanced forms.</p>
           <textarea
             style={{ ...s.input, minHeight: 100, resize: 'vertical', lineHeight: 1.6 }}
             value={consentForm}
@@ -391,6 +917,151 @@ export default function SettingsPage() {
             {saving ? 'Saving…' : saved ? 'Saved!' : 'Save'}
           </button>
         </section>
+
+        <section style={{ ...s.card, gridColumn: '1 / -1' }}>
+          <h2 style={s.sectionTitle}>Aftercare Instructions</h2>
+          <p style={s.sectionDesc}>Aftercare guidance that gets attached to every completed booking. Clients can see this on their booking record after their session.</p>
+          <textarea
+            style={{ ...s.input, minHeight: 120, resize: 'vertical', lineHeight: 1.6 }}
+            value={aftercareInstructions}
+            onChange={e => setAftercareInstructions(e.target.value)}
+            placeholder="e.g. Keep the area clean and moisturised for the first 2 weeks. Avoid direct sunlight…"
+          />
+          <button onClick={saveProfile} style={s.saveBtn} disabled={saving}>
+            {saving ? 'Saving…' : saved ? 'Saved!' : 'Save'}
+          </button>
+        </section>
+
+        <section style={{ ...s.card, gridColumn: '1 / -1' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div>
+              <h2 style={s.sectionTitle}>Consent Form Templates</h2>
+              <p style={s.sectionDesc}>Create consent forms, waivers, and health questionnaires with custom fields, e-signatures, and minor / guardian support.</p>
+            </div>
+            <button onClick={openNewTemplate} style={s.addTemplateBtn}>+ New form</button>
+          </div>
+
+          {consentTemplates.length === 0 && (
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-ghost)', fontStyle: 'italic' }}>No forms yet. Click "+ New form" to create one.</p>
+          )}
+
+          {consentTemplates.map(t => (
+            <div key={t.id} style={s.templateRow}>
+              <div style={s.templateRowLeft}>
+                <span style={{ ...s.formTypeBadge, ...(s.formTypeBadgeColors[t.type] ?? {}) }}>
+                  {t.type === 'health' ? 'Health' : t.type === 'waiver' ? 'Waiver' : 'Consent'}
+                </span>
+                <span style={s.templateName}>{t.name}</span>
+                {t.requires_minor_guardian && <span style={s.guardianBadge}>Guardian</span>}
+                {!t.is_active && <span style={s.inactiveBadge}>Inactive</span>}
+                <span style={s.templateFieldCount}>{(t.fields ?? []).length} field{(t.fields ?? []).length !== 1 ? 's' : ''}</span>
+              </div>
+              <div style={s.templateRowActions}>
+                <button style={s.templateActionBtn} onClick={() => openEditTemplate(t)}>Edit</button>
+                <button style={s.templateActionBtn} onClick={() => toggleTemplateActive(t)}>
+                  {t.is_active ? 'Deactivate' : 'Activate'}
+                </button>
+                <button style={{ ...s.templateActionBtn, color: '#e86f6f' }} onClick={() => handleDeleteTemplate(t)}>Delete</button>
+              </div>
+            </div>
+          ))}
+        </section>
+
+        {/* ── Template builder modal ── */}
+        {templateBuilderOpen && (
+          <div style={s.modalOverlay} onClick={e => e.target === e.currentTarget && setTemplateBuilderOpen(false)}>
+            <div style={s.templateModal}>
+              <h2 style={{ margin: '0 0 1.25rem', fontSize: '1.05rem', fontWeight: 700, color: 'var(--text)' }}>
+                {editingTemplate ? 'Edit form' : 'New consent form'}
+              </h2>
+
+              <div style={s.field}>
+                <label style={s.label}>Form name <span style={{ color: '#e86f6f' }}>*</span></label>
+                <input style={s.input} type="text" value={templateName} onChange={e => setTemplateName(e.target.value)} placeholder="e.g. Tattoo Consent" />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div style={s.field}>
+                  <label style={s.label}>Type</label>
+                  <select style={s.input} value={templateType} onChange={e => setTemplateType(e.target.value)}>
+                    <option value="consent">Consent</option>
+                    <option value="waiver">Waiver</option>
+                    <option value="health">Health questionnaire</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <label style={s.toggleRow}>
+                  <input type="checkbox" checked={templateRequiresSig} onChange={e => setTemplateRequiresSig(e.target.checked)}
+                    style={{ accentColor: 'var(--accent)' }} />
+                  <span style={{ fontSize: '0.83rem', color: 'var(--text-secondary)' }}>Require client signature</span>
+                </label>
+                <label style={s.toggleRow}>
+                  <input type="checkbox" checked={templateRequiresGuardian} onChange={e => setTemplateRequiresGuardian(e.target.checked)}
+                    style={{ accentColor: 'var(--accent)' }} />
+                  <span style={{ fontSize: '0.83rem', color: 'var(--text-secondary)' }}>Require parent / guardian consent for minors (under 18)</span>
+                </label>
+              </div>
+
+              <div style={{ borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+                  <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Fields ({templateFields.length})</span>
+                  <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                    {[['heading','Heading'],['paragraph','Paragraph'],['checkbox','Checkbox'],['text','Text'],['textarea','Textarea'],['yesno','Yes/No']].map(([type, label]) => (
+                      <button key={type} style={s.addFieldBtn} onClick={() => addField(type)}>+ {label}</button>
+                    ))}
+                  </div>
+                </div>
+
+                {templateFields.length === 0 && (
+                  <p style={{ fontSize: '0.78rem', color: 'var(--text-ghost)', fontStyle: 'italic' }}>No fields yet. Add fields using the buttons above.</p>
+                )}
+
+                {templateFields.map((f, idx) => (
+                  <div key={f.id} style={s.fieldEditorRow}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.4rem' }}>
+                      <span style={s.fieldTypeBadge}>{f.type}</span>
+                      <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.25rem' }}>
+                        <button style={s.fieldMoveBtn} onClick={() => moveField(f.id, -1)} disabled={idx === 0}>↑</button>
+                        <button style={s.fieldMoveBtn} onClick={() => moveField(f.id, 1)} disabled={idx === templateFields.length - 1}>↓</button>
+                        <button style={{ ...s.fieldMoveBtn, color: '#e86f6f' }} onClick={() => removeField(f.id)}>✕</button>
+                      </div>
+                    </div>
+                    {['heading','paragraph','checkbox'].includes(f.type) ? (
+                      <textarea
+                        style={{ ...s.input, minHeight: f.type === 'paragraph' ? 72 : 38, resize: 'vertical', fontSize: '0.82rem' }}
+                        value={f.label}
+                        onChange={e => updateField(f.id, { label: e.target.value })}
+                        placeholder={f.type === 'heading' ? 'Section heading…' : f.type === 'paragraph' ? 'Paragraph text…' : 'Checkbox label (e.g. I agree to…)'}
+                      />
+                    ) : (
+                      <input style={{ ...s.input, fontSize: '0.82rem' }} type="text" value={f.label}
+                        onChange={e => updateField(f.id, { label: e.target.value })}
+                        placeholder="Field label…" />
+                    )}
+                    {!['heading','paragraph'].includes(f.type) && (
+                      <label style={{ ...s.toggleRow, marginTop: '0.3rem' }}>
+                        <input type="checkbox" checked={!!f.required} onChange={e => updateField(f.id, { required: e.target.checked })}
+                          style={{ accentColor: 'var(--accent)' }} />
+                        <span style={{ fontSize: '0.76rem', color: 'var(--text-ghost)' }}>Required</span>
+                      </label>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {templateError && <p style={{ fontSize: '0.8rem', color: '#e86f6f', margin: 0 }}>{templateError}</p>}
+
+              <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
+                <button style={s.cancelBtn} onClick={() => setTemplateBuilderOpen(false)}>Cancel</button>
+                <button style={{ ...s.saveBtn, flex: 2 }} onClick={saveTemplate} disabled={templateSaving}>
+                  {templateSaving ? 'Saving…' : 'Save form'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <section style={s.card}>
           <h2 style={s.sectionTitle}>Stations</h2>
@@ -513,6 +1184,15 @@ export default function SettingsPage() {
           </div>
         </section>
 
+        {/* ── Data ── */}
+        <p style={{ ...s.groupLabel, marginTop: '0.5rem' }}>Data</p>
+
+        <section style={{ ...s.card, gridColumn: '1 / -1' }}>
+          <h2 style={s.sectionTitle}>Import data</h2>
+          <p style={s.sectionDesc}>Bring clients and appointment history over from another booking system or spreadsheet.</p>
+          <ImportSection />
+        </section>
+
         {/* ── Account ── */}
         <p style={{ ...s.groupLabel, marginTop: '0.5rem' }}>Account</p>
 
@@ -603,6 +1283,31 @@ const s = {
   // Embed
   embedCard: { display: 'flex', flexDirection: 'column', gap: '0.75rem', background: 'var(--bg-card)', border: '1px solid var(--border-faint)', borderRadius: 12, padding: '1.1rem 1.25rem' },
   codeBlock: { margin: 0, fontFamily: 'ui-monospace,monospace', fontSize: '0.78rem', color: 'var(--text-dim)', lineHeight: 1.7, whiteSpace: 'pre-wrap', wordBreak: 'break-all' },
+  // Consent templates
+  addTemplateBtn: { background: 'var(--accent-tint)', border: '1px solid var(--accent-tint-border)', borderRadius: 8, padding: '0.5rem 1rem', fontSize: '0.82rem', fontWeight: 600, color: 'var(--accent)', cursor: 'pointer', flexShrink: 0 },
+  templateRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--bg-card)', border: '1px solid var(--border-faint)', borderRadius: 8, padding: '0.65rem 0.9rem', gap: '0.75rem' },
+  templateRowLeft: { display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', flex: 1, minWidth: 0 },
+  templateRowActions: { display: 'flex', gap: '0.4rem', flexShrink: 0 },
+  templateName: { fontSize: '0.87rem', fontWeight: 500, color: 'var(--text-dim)' },
+  templateFieldCount: { fontSize: '0.72rem', color: 'var(--text-ghost)' },
+  guardianBadge: { fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', padding: '0.12rem 0.45rem', borderRadius: 4, background: 'rgba(245,236,217,0.08)', color: 'var(--text-muted)' },
+  inactiveBadge: { fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', padding: '0.12rem 0.45rem', borderRadius: 4, background: 'rgba(255,255,255,0.04)', color: 'var(--text-ghost)' },
+  formTypeBadge: { fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', padding: '0.12rem 0.45rem', borderRadius: 4 },
+  formTypeBadgeColors: {
+    consent: { background: 'rgba(245,236,217,0.1)', color: 'var(--accent)' },
+    waiver:  { background: 'rgba(232,111,111,0.12)', color: '#e86f6f' },
+    health:  { background: 'rgba(76,201,138,0.12)', color: '#4cc98a' },
+  },
+  templateActionBtn: { background: 'var(--bg-chip)', border: '1px solid var(--border)', borderRadius: 6, padding: '0.25rem 0.65rem', fontSize: '0.75rem', color: 'var(--text-muted)', cursor: 'pointer' },
+  // Template builder modal
+  modalOverlay: { position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '2rem 1rem', overflowY: 'auto' },
+  templateModal: { background: 'var(--bg-modal)', border: '1px solid var(--border)', borderRadius: 16, padding: '1.75rem', width: '100%', maxWidth: 600, display: 'flex', flexDirection: 'column', gap: '1rem' },
+  toggleRow: { display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' },
+  addFieldBtn: { background: 'var(--bg-chip)', border: '1px solid var(--border)', borderRadius: 6, padding: '0.25rem 0.55rem', fontSize: '0.72rem', color: 'var(--text-muted)', cursor: 'pointer' },
+  fieldEditorRow: { background: 'var(--bg-card)', border: '1px solid var(--border-faint)', borderRadius: 8, padding: '0.65rem 0.75rem', marginBottom: '0.4rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' },
+  fieldTypeBadge: { fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', padding: '0.1rem 0.45rem', borderRadius: 4, background: 'var(--bg-chip)', color: 'var(--text-ghost)' },
+  fieldMoveBtn: { background: 'var(--bg-chip)', border: '1px solid var(--border)', borderRadius: 4, padding: '0.1rem 0.35rem', fontSize: '0.72rem', color: 'var(--text-muted)', cursor: 'pointer' },
+  cancelBtn: { flex: 1, background: 'var(--bg-chip)', border: '1px solid var(--border)', borderRadius: 8, padding: '0.6rem 1rem', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', cursor: 'pointer' },
   // Account
   signOutBtn: { alignSelf: 'flex-start', background: 'var(--bg-chip)', border: '1px solid var(--border)', borderRadius: 6, padding: '0.4rem 1rem', fontSize: '0.75rem', color: 'var(--text-faint)', cursor: 'pointer' },
   themeToggle: { background: 'none', border: 'none', cursor: 'pointer', padding: 0 },

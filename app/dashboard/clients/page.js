@@ -2,12 +2,14 @@
 
 import { useState, useEffect, useMemo, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { listStudioBookings, getClientConsents, recordConsentInStudio, getNotes, addNote, deleteNote } from '@/lib/api';
+import { listStudioBookings, getStudioClients, getClientConsents, recordConsentInStudio, getNotes, addNote, deleteNote } from '@/lib/api';
 import { getCached, setCached } from '@/lib/cache';
+import { statusColors, capitalise } from '@/lib/status';
 
 function ClientsInner() {
   const params = useSearchParams();
   const [bookings, setBookings] = useState([]);
+  const [contacts, setContacts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
@@ -24,13 +26,26 @@ function ClientsInner() {
   useEffect(() => {
     async function load() {
       const key = 'clients:all';
+      const contactsKey = 'clients:contacts';
       const cached = getCached(key);
-      if (cached) { setBookings(cached); setLoading(false); return; }
+      const cachedContacts = getCached(contactsKey);
+      if (cached && cachedContacts) {
+        setBookings(cached);
+        setContacts(cachedContacts);
+        setLoading(false);
+        return;
+      }
       try {
-        const data = await listStudioBookings('');
+        const [data, contactData] = await Promise.all([
+          listStudioBookings(''),
+          getStudioClients().catch(() => ({ clients: [] })), // contact book is optional
+        ]);
         const b = data.bookings ?? [];
+        const c = contactData.clients ?? [];
         setCached(key, b);
+        setCached(contactsKey, c);
         setBookings(b);
+        setContacts(c);
       } catch (e) {
         setError(e.message);
       } finally {
@@ -75,12 +90,39 @@ function ClientsInner() {
         client.lastBooking = date;
       }
     }
+    // Merge in imported contact-book entries (may have zero bookings).
+    const byEmail = new Map();
+    const byPhone = new Map();
+    for (const c of map.values()) {
+      if (c.email) byEmail.set(c.email.toLowerCase(), c);
+      if (c.phone) byPhone.set(c.phone.replace(/[^0-9+]/g, ''), c);
+    }
+    for (const contact of contacts) {
+      const existing =
+        (contact.email && byEmail.get(contact.email)) ||
+        (contact.phone && byPhone.get(contact.phone));
+      if (existing) {
+        if (!existing.dob && contact.dob) existing.dob = contact.dob;
+        if (!existing.phone && contact.phone) existing.phone = contact.phone;
+        continue;
+      }
+      map.set(contact.email || contact.phone || contact.name, {
+        name: contact.name,
+        email: contact.email ?? null,
+        phone: contact.phone ?? null,
+        dob: contact.dob ?? null,
+        bookings: [],
+        lastBooking: null,
+        imported: true,
+      });
+    }
+
     return Array.from(map.values()).sort((a, b) => {
       if (!a.lastBooking) return 1;
       if (!b.lastBooking) return -1;
       return new Date(b.lastBooking) - new Date(a.lastBooking);
     });
-  }, [bookings]);
+  }, [bookings, contacts]);
 
   const filtered = useMemo(() => {
     if (!search.trim()) return clients;
@@ -95,6 +137,25 @@ function ClientsInner() {
 
   const selectedClient = selected ? filtered.find(c => (c.email || c.name) === selected) : null;
 
+  function exportCSV() {
+    const rows = [
+      ['Name', 'Email', 'Phone', 'DOB', 'Total Bookings', 'Last Booking'],
+      ...clients.map(c => [
+        c.name,
+        c.email ?? '',
+        c.phone ?? '',
+        c.dob ?? '',
+        c.bookings.length,
+        c.lastBooking ? new Date(c.lastBooking).toLocaleDateString('en-AU') : '',
+      ]),
+    ];
+    const csv = rows.map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+    a.download = 'clients.csv';
+    a.click();
+  }
+
   const handleRecordConsent = useCallback(async (email) => {
     await recordConsentInStudio(email);
     setConsents(prev => ({
@@ -106,7 +167,17 @@ function ClientsInner() {
   return (
     <div style={s.page}>
       <div style={s.header}>
-        <h1 style={s.title}>Clients</h1>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <h1 style={s.title}>Clients</h1>
+          <button
+            onClick={exportCSV}
+            disabled={clients.length === 0}
+            style={s.exportBtn}
+            title="Export client list as CSV"
+          >
+            Export CSV
+          </button>
+        </div>
         <div style={s.searchWrap}>
           <input
             type="text"
@@ -147,6 +218,7 @@ function ClientsInner() {
                 </div>
                 <div style={s.clientStats}>
                   <span style={s.sessionCount}>{client.bookings.length} session{client.bookings.length !== 1 ? 's' : ''}</span>
+                  {client.imported && <span style={{ ...s.badge, ...s.badgeGrey }}>Imported</span>}
                   <ConsentBadge status={consentStatus} />
                 </div>
               </div>
@@ -245,16 +317,6 @@ function ClientDetail({ client, onClose, consent, consentVersion, onRecordConsen
     }
   }
 
-  const STATUS_COLORS = {
-    pending:   '#f59e3a',
-    proposed:  '#6fa3e8',
-    confirmed: '#4cc98a',
-    rejected:  '#e86f6f',
-    declined:  '#e86f6f',
-    cancelled: 'var(--text-ghost)',
-    timed_out: 'var(--text-ghost)',
-  };
-
   return (
     <aside style={s.panel}>
       <div style={s.panelHeader}>
@@ -349,7 +411,7 @@ function ClientDetail({ client, onClose, consent, consentVersion, onRecordConsen
                     {new Date(b.created_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
                   </span>
                 </div>
-                <span style={{ fontSize: '0.72rem', fontWeight: 600, color: STATUS_COLORS[b.status] ?? 'var(--text)' }}>
+                <span style={{ fontSize: '0.72rem', fontWeight: 600, color: statusColors(b.status).text }}>
                   {capitalise(b.outcome ?? b.status)}
                 </span>
               </div>
@@ -370,10 +432,6 @@ function Field({ label, children }) {
       <span style={{ fontSize: '0.85rem', color: 'var(--text-dim)' }}>{children}</span>
     </div>
   );
-}
-
-function capitalise(str) {
-  return str ? str.charAt(0).toUpperCase() + str.slice(1) : str;
 }
 
 function formatDob(dob) {
@@ -402,6 +460,12 @@ const s = {
     fontWeight: 700,
     color: 'var(--text)',
     letterSpacing: '-0.01em',
+  },
+  exportBtn: {
+    padding: '0.35rem 0.85rem', borderRadius: 20,
+    border: '1px solid var(--border)', background: 'transparent',
+    color: 'var(--text-muted)', fontSize: '0.78rem', fontWeight: 500,
+    cursor: 'pointer', whiteSpace: 'nowrap',
   },
   searchWrap: {
     maxWidth: 360,
@@ -507,6 +571,10 @@ const s = {
   badgeRed: {
     background: 'rgba(232,111,111,0.12)',
     color: '#e86f6f',
+  },
+  badgeGrey: {
+    background: 'var(--bg-chip)',
+    color: 'var(--text-secondary)',
   },
   panel: {
     position: 'absolute', top: 0, right: 0, bottom: 0, width: 320,

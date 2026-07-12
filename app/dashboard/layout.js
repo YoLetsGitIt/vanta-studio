@@ -20,7 +20,7 @@ const NAV = [
   { href: '/dashboard/studios',      label: 'Studios',      icon: BuildingIcon, adminOnly: true },
 ];
 
-const ADMIN_EMAIL = 'matthew.m.kwon@gmail.com';
+const ADMIN_EMAIL = process.env.NEXT_PUBLIC_ADMIN_EMAIL ?? '';
 
 export default function DashboardLayout({ children }) {
   const router = useRouter();
@@ -238,6 +238,15 @@ function RevenueIcon({ size = 16 }) {
       <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.2" />
       <path d="M8 5v1M8 10v1" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
       <path d="M6 7.5c0-.83.67-1.5 1.5-1.5h1a1.5 1.5 0 0 1 0 3h-1a1.5 1.5 0 0 0 0 3h1c.83 0 1.5-.67 1.5-1.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function ImportIcon({ size = 16 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
+      <path d="M8 1.5v8M4.5 6.5L8 10l3.5-3.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M2 11v2a1.5 1.5 0 0 0 1.5 1.5h9A1.5 1.5 0 0 0 14 13v-2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
     </svg>
   );
 }

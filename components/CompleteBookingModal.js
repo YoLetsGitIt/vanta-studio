@@ -37,6 +37,7 @@ const selectStyle = { ...inputStyle, cursor: 'pointer', colorScheme: 'auto' };
 export default function CompleteBookingModal({ outcome = 'completed', initialPrice, onConfirm, onCancel, saving }) {
   const [finalPrice, setFinalPrice] = useState(initialPrice != null ? String(initialPrice) : '');
   const [paymentMethod, setPaymentMethod] = useState('');
+  const [followUp, setFollowUp] = useState(false);
   const [error, setError] = useState('');
 
   const isNoShow = outcome === 'no_show';
@@ -44,7 +45,11 @@ export default function CompleteBookingModal({ outcome = 'completed', initialPri
   function handleSubmit() {
     if (!isNoShow && !paymentMethod) { setError('Please select a payment method.'); return; }
     setError('');
-    onConfirm(isNoShow ? null : (finalPrice === '' ? null : finalPrice), isNoShow ? null : paymentMethod);
+    onConfirm(
+      isNoShow ? null : (finalPrice === '' ? null : finalPrice),
+      isNoShow ? null : paymentMethod,
+      !isNoShow && followUp,
+    );
   }
 
   return (
@@ -88,6 +93,18 @@ export default function CompleteBookingModal({ outcome = 'completed', initialPri
               </select>
             </div>
           </>
+        )}
+
+        {!isNoShow && (
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1.25rem', cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={followUp}
+              onChange={e => setFollowUp(e.target.checked)}
+              style={{ accentColor: 'var(--accent)', width: 14, height: 14, flexShrink: 0 }}
+            />
+            <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>Book a follow-up session</span>
+          </label>
         )}
 
         {error && (

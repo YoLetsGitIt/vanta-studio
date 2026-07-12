@@ -1,38 +1,25 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { listStudioBookings, acceptBookingWithStation, rejectBooking, cancelBooking, recordOutcome } from '@/lib/api';
+import { listStudioBookings, acceptBookingWithStation, rejectBooking, cancelBooking, recordOutcome, createFollowUpBooking } from '@/lib/api';
 import { getCached, setCached, invalidatePrefix } from '@/lib/cache';
+import { statusColors, statusLabel, capitalise } from '@/lib/status';
 import CompleteBookingModal from '@/components/CompleteBookingModal';
 import RejectBookingModal from '@/components/RejectBookingModal';
 import BookingDetailPanel from '@/components/BookingDetailPanel';
 
 const STATUS_FILTERS = [
-  { value: 'pending,modified,deposit_pending_confirmation', label: 'Needs Action' },
-  { value: 'proposed,awaiting_deposit,confirmed',           label: 'Upcoming' },
-  { value: 'completed,no_show',                            label: 'Completed' },
-  { value: 'rejected,declined,cancelled,timed_out',        label: 'Closed' },
+  { value: 'pending',          label: 'Pending' },
+  { value: 'awaiting_payment', label: 'Awaiting Payment' },
+  { value: 'confirmed',        label: 'Confirmed' },
+  { value: 'completed',        label: 'Completed' },
+  { value: 'cancelled',        label: 'Cancelled' },
 ];
 
-const STATUS_COLORS = {
-  pending:                      { bg: 'rgba(245,158,58,0.12)',  text: '#f59e3a', border: 'rgba(245,158,58,0.25)' },
-  proposed:                     { bg: 'rgba(111,163,232,0.12)', text: '#6fa3e8', border: 'rgba(111,163,232,0.25)' },
-  modified:                     { bg: 'rgba(167,139,250,0.12)', text: '#a78bfa', border: 'rgba(167,139,250,0.25)' },
-  awaiting_deposit:             { bg: 'rgba(251,146,60,0.12)',  text: '#fb923c', border: 'rgba(251,146,60,0.25)' },
-  deposit_pending_confirmation: { bg: 'rgba(250,204,21,0.12)',  text: '#facc15', border: 'rgba(250,204,21,0.25)' },
-  confirmed:                    { bg: 'rgba(76,201,138,0.12)',  text: '#4cc98a', border: 'rgba(76,201,138,0.25)' },
-  completed:                    { bg: 'rgba(76,201,138,0.1)',   text: '#4cc98a', border: 'rgba(76,201,138,0.2)' },
-  no_show:                      { bg: 'rgba(232,111,111,0.08)', text: '#e86f6f', border: 'rgba(232,111,111,0.15)' },
-  rejected:                     { bg: 'rgba(232,111,111,0.1)',  text: '#e86f6f', border: 'rgba(232,111,111,0.2)' },
-  declined:                     { bg: 'rgba(232,111,111,0.07)', text: '#e06060', border: 'rgba(232,111,111,0.15)' },
-  cancelled:                    { bg: 'var(--bg-chip)', text: 'var(--text-ghost)', border: 'var(--border-faint)' },
-  timed_out:                    { bg: 'var(--bg-chip)', text: 'var(--text-faint)', border: 'var(--border-faint)' },
-};
-
-const DEFAULT_FILTER = 'pending,modified,deposit_pending_confirmation';
+const DEFAULT_FILTER = 'pending';
 
 export default function AppointmentsPage() {
-  const [activeFilters, setActiveFilters] = useState(() => new Set([DEFAULT_FILTER]));
+  const [activeFilter, setActiveFilter] = useState(DEFAULT_FILTER);
   const [sortDir, setSortDir] = useState('desc');
   const [search, setSearch] = useState('');
   const [bookings, setBookings] = useState([]);
@@ -48,21 +35,15 @@ export default function AppointmentsPage() {
   const [cancelTarget, setCancelTarget] = useState(null);
   const [toast, setToast] = useState(null);
 
-  const combinedStatus = useMemo(() => {
-    return [...activeFilters].flatMap(f => f.split(',')).join(',');
-  }, [activeFilters]);
+  const combinedStatus = activeFilter;
 
   function showToast(msg) {
     setToast(msg);
     setTimeout(() => setToast(null), 3000);
   }
 
-  function toggleFilter(value) {
-    setActiveFilters(prev => {
-      const next = new Set(prev);
-      if (next.has(value)) next.delete(value); else next.add(value);
-      return next;
-    });
+  function selectFilter(value) {
+    setActiveFilter(value);
     setSelected(null);
   }
 
@@ -136,14 +117,15 @@ export default function AppointmentsPage() {
   function handleNoShow(id) { setNoShowTarget(id); }
   function handleCancel(id) { setCancelTarget(id); }
 
-  async function confirmComplete(finalPrice, paymentMethod) {
+  async function confirmComplete(finalPrice, paymentMethod, wantsFollowUp) {
     setActionLoading(true);
     try {
       await recordOutcome(completeTarget.id, 'completed', finalPrice, paymentMethod);
+      if (wantsFollowUp) await createFollowUpBooking(completeTarget.id);
       await load(true);
       setSelected(null);
       setCompleteTarget(null);
-      showToast('Booking marked as complete');
+      showToast(wantsFollowUp ? 'Booking completed · follow-up session created' : 'Booking marked as complete');
     }
     catch (e) { alert(e.message); }
     finally { setActionLoading(false); }
@@ -238,8 +220,9 @@ export default function AppointmentsPage() {
             {STATUS_FILTERS.map(f => (
               <button
                 key={f.value}
-                onClick={() => toggleFilter(f.value)}
-                style={{ ...s.filterBtn, ...(activeFilters.has(f.value) ? s.filterActive : {}) }}
+                onMouseDown={e => e.preventDefault()}
+                onClick={() => selectFilter(f.value)}
+                style={{ ...s.filterBtn, ...(activeFilter === f.value ? s.filterActive : {}) }}
               >
                 {f.label}
               </button>
@@ -310,7 +293,7 @@ function SkeletonList() {
 }
 
 function BookingRow({ booking: b, selected, onSelect }) {
-  const sc = STATUS_COLORS[b.status] ?? { bg: 'var(--bg-chip)', text: 'var(--text-ghost)', border: 'var(--border-faint)' };
+  const sc = statusColors(b.status);
   const dateStr = b.chosen_time || b.proposed_time_primary;
   const date = dateStr
     ? new Date(dateStr).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -335,6 +318,7 @@ function BookingRow({ booking: b, selected, onSelect }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <span style={s.clientName}>{b.requester_name}</span>
           {sourceLabel && <span style={s.sourceTag}>{sourceLabel}</span>}
+          {b.parent_booking_id && <span style={s.followUpTag}>Follow-up</span>}
         </div>
         {sessionParts.length > 0 && <span style={s.rowMeta}>{sessionParts.join(' · ')}</span>}
       </div>
@@ -349,28 +333,6 @@ function BookingRow({ booking: b, selected, onSelect }) {
       </div>
     </div>
   );
-}
-
-function statusLabel(status) {
-  const map = {
-    pending:                      'Pending',
-    proposed:                     'Proposed',
-    modified:                     'Modified',
-    awaiting_deposit:             'Awaiting Deposit',
-    deposit_pending_confirmation: 'Dep. Pending',
-    confirmed:                    'Confirmed',
-    completed:                    'Completed',
-    no_show:                      'No Show',
-    rejected:                     'Rejected',
-    declined:                     'Declined',
-    cancelled:                    'Cancelled',
-    timed_out:                    'Timed Out',
-  };
-  return map[status] ?? capitalise(status);
-}
-
-function capitalise(str) {
-  return str ? str.charAt(0).toUpperCase() + str.slice(1) : str;
 }
 
 const s = {
@@ -448,6 +410,11 @@ const s = {
     fontSize: '0.65rem', fontWeight: 600, letterSpacing: '0.04em',
     padding: '0.1rem 0.4rem', borderRadius: 4,
     background: 'var(--bg-chip)', color: 'var(--text-ghost)',
+  },
+  followUpTag: {
+    fontSize: '0.65rem', fontWeight: 600, letterSpacing: '0.04em',
+    padding: '0.1rem 0.4rem', borderRadius: 4,
+    background: 'rgba(111,163,232,0.12)', color: '#6fa3e8',
   },
   rowRight: {
     display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.3rem', flexShrink: 0,

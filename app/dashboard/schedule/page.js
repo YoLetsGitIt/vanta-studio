@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { getStudioArtists, getStudioSchedule, getStudioScheduleRange, getBooking, acceptBookingWithStation, assignArtist, createManualBooking, getWalkIns, rejectBooking, recordOutcome } from '@/lib/api';
 import BookingDetailPanel from '@/components/BookingDetailPanel';
-import { getCached, setCached, invalidate } from '@/lib/cache';
+import { getCached, setCached, invalidatePrefix } from '@/lib/cache';
 import CompleteBookingModal from '@/components/CompleteBookingModal';
 import RejectBookingModal from '@/components/RejectBookingModal';
 
@@ -35,22 +35,6 @@ function addDays(d, n) { const r = new Date(d); r.setDate(r.getDate() + n); retu
 function minutesFromMidnight(iso) { const d = new Date(iso); return d.getHours()*60 + d.getMinutes(); }
 function isSameWeek(a, b) { return toISO(getMonday(a)) === toISO(getMonday(b)); }
 
-// Greedy column layout for overlapping blocks within one column
-function layoutBlocks(entries) {
-  if (!entries.length) return [];
-  const sorted = [...entries].sort((a,b) => new Date(a.chosenTime) - new Date(b.chosenTime));
-  const colEnds = [];
-  const assignments = sorted.map(entry => {
-    const start = minutesFromMidnight(entry.chosenTime);
-    const end   = start + (entry.durationMins ?? 60);
-    let col = colEnds.findIndex(e => e <= start);
-    if (col === -1) { col = colEnds.length; colEnds.push(end); } else colEnds[col] = end;
-    return { entry, col };
-  });
-  const numCols = colEnds.length;
-  return assignments.map(({ entry, col }) => ({ entry, leftFrac: col/numCols, widthFrac: 1/numCols }));
-}
-
 const WEEK_CHIP_LIMIT = 5;
 
 function fmtDuration(mins) {
@@ -68,23 +52,130 @@ function fmtTime(iso) {
   return m === 0 ? `${h12}${suffix}` : `${h12}:${String(m).padStart(2,'0')}${suffix}`;
 }
 
+// ── Shared booking-action state for Week/Day views ───────────────────────────
+
+function useBookingActions(afterChange) {
+  const [selectedEntry,  setSelectedEntry]  = useState(null);
+  const [detailBooking,  setDetailBooking]  = useState(null);
+  const [detailLoading,  setDetailLoading]  = useState(false);
+  const [actionLoading,  setActionLoading]  = useState(false);
+  const [completeTarget, setCompleteTarget] = useState(null);
+  const [noShowTarget,   setNoShowTarget]   = useState(null);
+  const [rejectTarget,   setRejectTarget]   = useState(null);
+
+  function openDetail(entry) {
+    setSelectedEntry(entry);
+    setDetailBooking(null);
+    setDetailLoading(true);
+    getBooking(entry.bookingId)
+      .then(setDetailBooking)
+      .catch(() => {}) // fall back to schedule entry data
+      .finally(() => setDetailLoading(false));
+  }
+
+  function closeDetail() {
+    setSelectedEntry(null);
+    setDetailBooking(null);
+  }
+
+  async function run(action, clearTarget) {
+    setActionLoading(true);
+    try {
+      await action();
+      clearTarget();
+      closeDetail();
+      afterChange();
+    } catch (e) { alert(e.message); }
+    finally { setActionLoading(false); }
+  }
+
+  function handleAction(action, stationId) {
+    if (!selectedEntry) return;
+    if (action === 'complete') {
+      const price = detailBooking?.final_price ?? detailBooking?.estimated_quote ?? selectedEntry?.estimatedQuote;
+      setCompleteTarget({ id: selectedEntry.bookingId, price });
+      return;
+    }
+    if (action === 'no_show') { setNoShowTarget(selectedEntry.bookingId); return; }
+    if (action === 'reject')  { setRejectTarget(selectedEntry.bookingId); return; }
+    if (action === 'accept')  run(() => acceptBookingWithStation(selectedEntry.bookingId, stationId), () => {});
+  }
+
+  const confirmComplete = (finalPrice, paymentMethod) =>
+    run(() => recordOutcome(completeTarget.id, 'completed', finalPrice, paymentMethod), () => setCompleteTarget(null));
+  const confirmNoShow = () =>
+    run(() => recordOutcome(noShowTarget, 'no_show'), () => setNoShowTarget(null));
+  const confirmReject = (reason) =>
+    run(() => rejectBooking(rejectTarget, reason), () => setRejectTarget(null));
+
+  return {
+    selectedEntry, detailBooking, detailLoading, actionLoading,
+    completeTarget, noShowTarget, rejectTarget,
+    openDetail, closeDetail, handleAction,
+    confirmComplete, confirmNoShow, confirmReject,
+    setCompleteTarget, setNoShowTarget, setRejectTarget,
+  };
+}
+
+function BookingOverlays({ actions: a }) {
+  return (
+    <>
+      {a.selectedEntry && (
+        <BookingDetailPanel
+          entry={a.selectedEntry}
+          booking={a.detailBooking}
+          loading={a.detailLoading}
+          actionLoading={a.actionLoading}
+          onClose={a.closeDetail}
+          onAccept={(stationId) => a.handleAction('accept', stationId)}
+          onReject={() => a.handleAction('reject')}
+          onComplete={() => a.handleAction('complete')}
+          onNoShow={() => a.handleAction('no_show')}
+        />
+      )}
+      {a.completeTarget && (
+        <CompleteBookingModal
+          outcome="completed"
+          initialPrice={a.completeTarget.price}
+          saving={a.actionLoading}
+          onConfirm={a.confirmComplete}
+          onCancel={() => a.setCompleteTarget(null)}
+        />
+      )}
+      {a.noShowTarget && (
+        <CompleteBookingModal
+          outcome="no_show"
+          saving={a.actionLoading}
+          onConfirm={a.confirmNoShow}
+          onCancel={() => a.setNoShowTarget(null)}
+        />
+      )}
+      {a.rejectTarget && (
+        <RejectBookingModal
+          saving={a.actionLoading}
+          onConfirm={a.confirmReject}
+          onCancel={() => a.setRejectTarget(null)}
+        />
+      )}
+    </>
+  );
+}
+
 // ── Week view ─────────────────────────────────────────────────────────────────
 
 function WeekView({ weekStart, onDayClick }) {
   const weekEnd  = addDays(weekStart, 6);
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
-  const [artists,       setArtists]       = useState([]);
-  const [entries,       setEntries]       = useState([]);
-  const [loading,       setLoading]       = useState(true);
-  const [error,         setError]         = useState('');
-  const [selectedEntry, setSelectedEntry] = useState(null);
-  const [detailBooking, setDetailBooking] = useState(null);
-  const [detailLoading, setDetailLoading] = useState(false);
-  const [actionLoading, setActionLoading] = useState(false);
-  const [completeTarget, setCompleteTarget] = useState(null);
-  const [noShowTarget, setNoShowTarget] = useState(null);
-  const [rejectTarget, setRejectTarget] = useState(null);
+  const [artists,    setArtists]    = useState([]);
+  const [entries,    setEntries]    = useState([]);
+  const [loading,    setLoading]    = useState(true);
+  const [error,      setError]      = useState('');
+  const [refreshKey, setRefreshKey] = useState(0);
+  const actions = useBookingActions(() => {
+    invalidatePrefix('schedule:');
+    setRefreshKey(k => k + 1);
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -113,73 +204,7 @@ function WeekView({ weekStart, onDayClick }) {
     }
     load();
     return () => { cancelled = true; };
-  }, [weekStart]); // eslint-disable-line
-
-  function openDetail(entry) {
-    setSelectedEntry(entry);
-    setDetailBooking(null);
-    setDetailLoading(true);
-    getBooking(entry.bookingId)
-      .then(data => setDetailBooking(data))
-      .catch(() => {})
-      .finally(() => setDetailLoading(false));
-  }
-
-  async function handleAction(action, stationId) {
-    if (!selectedEntry) return;
-    if (action === 'complete') {
-      const price = detailBooking?.final_price ?? detailBooking?.estimated_quote ?? selectedEntry?.estimatedQuote;
-      setCompleteTarget({ id: selectedEntry.bookingId, price });
-      return;
-    }
-    if (action === 'no_show') { setNoShowTarget(selectedEntry.bookingId); return; }
-    if (action === 'reject') { setRejectTarget(selectedEntry.bookingId); return; }
-    setActionLoading(true);
-    try {
-      if (action === 'accept') await acceptBookingWithStation(selectedEntry.bookingId, stationId);
-      else if (action === 'assign') await assignArtist(selectedEntry.bookingId, stationId);
-      setSelectedEntry(null);
-      setDetailBooking(null);
-      invalidate(`schedule:week:${toISO(weekStart)}`);
-    } catch (e) { alert(e.message); }
-    finally { setActionLoading(false); }
-  }
-
-  async function confirmComplete(finalPrice, paymentMethod) {
-    setActionLoading(true);
-    try {
-      await recordOutcome(completeTarget.id, 'completed', finalPrice, paymentMethod);
-      setCompleteTarget(null);
-      setSelectedEntry(null);
-      setDetailBooking(null);
-      invalidate(`schedule:week:${toISO(weekStart)}`);
-    } catch (e) { alert(e.message); }
-    finally { setActionLoading(false); }
-  }
-
-  async function confirmNoShow() {
-    setActionLoading(true);
-    try {
-      await recordOutcome(noShowTarget, 'no_show');
-      setNoShowTarget(null);
-      setSelectedEntry(null);
-      setDetailBooking(null);
-      invalidate(`schedule:week:${toISO(weekStart)}`);
-    } catch (e) { alert(e.message); }
-    finally { setActionLoading(false); }
-  }
-
-  async function confirmReject(reason) {
-    setActionLoading(true);
-    try {
-      await rejectBooking(rejectTarget, reason);
-      setRejectTarget(null);
-      setSelectedEntry(null);
-      setDetailBooking(null);
-      invalidate(`schedule:week:${toISO(weekStart)}`);
-    } catch (e) { alert(e.message); }
-    finally { setActionLoading(false); }
-  }
+  }, [weekStart, refreshKey]); // eslint-disable-line
 
   const artistColor = {};
   artists.forEach((a, i) => { artistColor[a.artistId] = PALETTE[i % PALETTE.length]; });
@@ -229,7 +254,7 @@ function WeekView({ weekStart, onDayClick }) {
                   {visible.map(b => {
                     const color = artistColor[b.artistId] ?? '#8b9dc3';
                     return (
-                      <div key={b.bookingId} style={{ ...s.chip, cursor: 'pointer' }} onClick={e => { e.stopPropagation(); openDetail(b); }}>
+                      <div key={b.bookingId} style={{ ...s.chip, cursor: 'pointer' }} onClick={e => { e.stopPropagation(); actions.openDetail(b); }}>
                         <div style={{ width: 7, height: 7, borderRadius: '50%', background: color, flexShrink: 0 }} />
                         <span style={s.chipTime}>{fmtTime(b.chosenTime)}</span>
                         <span style={s.chipClient}>{b.clientName.split(' ')[0]}</span>
@@ -264,43 +289,7 @@ function WeekView({ weekStart, onDayClick }) {
       )}
     </div>
 
-    {selectedEntry && (
-      <BookingDetailPanel
-        entry={selectedEntry}
-        booking={detailBooking}
-        loading={detailLoading}
-        actionLoading={actionLoading}
-        onClose={() => { setSelectedEntry(null); setDetailBooking(null); }}
-        onAccept={(stationId) => handleAction('accept', stationId)}
-        onReject={() => handleAction('reject')}
-        onComplete={() => handleAction('complete')}
-        onNoShow={() => handleAction('no_show')}
-      />
-    )}
-    {completeTarget && (
-      <CompleteBookingModal
-        outcome="completed"
-        initialPrice={completeTarget.price}
-        saving={actionLoading}
-        onConfirm={confirmComplete}
-        onCancel={() => setCompleteTarget(null)}
-      />
-    )}
-    {noShowTarget && (
-      <CompleteBookingModal
-        outcome="no_show"
-        saving={actionLoading}
-        onConfirm={confirmNoShow}
-        onCancel={() => setNoShowTarget(null)}
-      />
-    )}
-    {rejectTarget && (
-      <RejectBookingModal
-        saving={actionLoading}
-        onConfirm={confirmReject}
-        onCancel={() => setRejectTarget(null)}
-      />
-    )}
+    <BookingOverlays actions={actions} />
     </div>
   );
 }
@@ -308,19 +297,17 @@ function WeekView({ weekStart, onDayClick }) {
 // ── Day view ──────────────────────────────────────────────────────────────────
 
 function DayView({ date }) {
-  const [artists,       setArtists]       = useState([]);
-  const [entries,       setEntries]       = useState([]);
-  const [loading,       setLoading]       = useState(true);
-  const [error,         setError]         = useState('');
-  const [showAll,       setShowAll]       = useState(false);
-  const [selectedEntry, setSelectedEntry] = useState(null);
-  const [detailBooking, setDetailBooking] = useState(null);
-  const [detailLoading, setDetailLoading] = useState(false);
-  const [actionLoading, setActionLoading] = useState(false);
+  const [artists,        setArtists]        = useState([]);
+  const [entries,        setEntries]        = useState([]);
+  const [loading,        setLoading]        = useState(true);
+  const [error,          setError]          = useState('');
+  const [showAll,        setShowAll]        = useState(false);
   const [showNewBooking, setShowNewBooking] = useState(false);
-  const [completeTarget, setCompleteTarget] = useState(null);
-  const [noShowTarget, setNoShowTarget] = useState(null);
-  const [rejectTarget, setRejectTarget] = useState(null);
+  const [refreshKey,     setRefreshKey]     = useState(0);
+  const actions = useBookingActions(() => {
+    invalidatePrefix('schedule:');
+    setRefreshKey(k => k + 1);
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -348,77 +335,10 @@ function DayView({ date }) {
     }
     load();
     return () => { cancelled = true; };
-  }, [date]);
+  }, [date, refreshKey]);
 
   // Clear panel when date changes
-  useEffect(() => { setSelectedEntry(null); setDetailBooking(null); }, [date]);
-
-
-  function openDetail(entry) {
-    setSelectedEntry(entry);
-    setDetailBooking(null);
-    setDetailLoading(true);
-    getBooking(entry.bookingId)
-      .then(data => setDetailBooking(data))
-      .catch(() => {}) // fall back to schedule entry data
-      .finally(() => setDetailLoading(false));
-  }
-
-  async function handleAction(action, stationId) {
-    if (!selectedEntry) return;
-    if (action === 'complete') {
-      const price = detailBooking?.final_price ?? detailBooking?.estimated_quote ?? selectedEntry?.estimatedQuote;
-      setCompleteTarget({ id: selectedEntry.bookingId, price });
-      return;
-    }
-    if (action === 'no_show') { setNoShowTarget(selectedEntry.bookingId); return; }
-    if (action === 'reject') { setRejectTarget(selectedEntry.bookingId); return; }
-    setActionLoading(true);
-    try {
-      if (action === 'accept') await acceptBookingWithStation(selectedEntry.bookingId, stationId);
-      else if (action === 'assign') await assignArtist(selectedEntry.bookingId, stationId);
-      setSelectedEntry(null);
-      setDetailBooking(null);
-      invalidate(`schedule:${toISO(date)}`);
-    } catch (e) { alert(e.message); }
-    finally { setActionLoading(false); }
-  }
-
-  async function confirmComplete(finalPrice, paymentMethod) {
-    setActionLoading(true);
-    try {
-      await recordOutcome(completeTarget.id, 'completed', finalPrice, paymentMethod);
-      setCompleteTarget(null);
-      setSelectedEntry(null);
-      setDetailBooking(null);
-      invalidate(`schedule:${toISO(date)}`);
-    } catch (e) { alert(e.message); }
-    finally { setActionLoading(false); }
-  }
-
-  async function confirmNoShow() {
-    setActionLoading(true);
-    try {
-      await recordOutcome(noShowTarget, 'no_show');
-      setNoShowTarget(null);
-      setSelectedEntry(null);
-      setDetailBooking(null);
-      invalidate(`schedule:${toISO(date)}`);
-    } catch (e) { alert(e.message); }
-    finally { setActionLoading(false); }
-  }
-
-  async function confirmReject(reason) {
-    setActionLoading(true);
-    try {
-      await rejectBooking(rejectTarget, reason);
-      setRejectTarget(null);
-      setSelectedEntry(null);
-      setDetailBooking(null);
-      invalidate(`schedule:${toISO(date)}`);
-    } catch (e) { alert(e.message); }
-    finally { setActionLoading(false); }
-  }
+  useEffect(() => { actions.closeDetail(); }, [date]); // eslint-disable-line
 
   const artistColor = {};
   artists.forEach((a, i) => { artistColor[a.artistId] = PALETTE[i % PALETTE.length]; });
@@ -508,11 +428,11 @@ function DayView({ date }) {
                 const top      = (startMin - DAY_START * 60) * (HOUR_PX / 60);
                 const height   = Math.max(durMin * (HOUR_PX / 60), 24);
                 if (top < 0 || top > GRID_H) return null;
-                const isSelected = selectedEntry?.bookingId === b.bookingId;
+                const isSelected = actions.selectedEntry?.bookingId === b.bookingId;
                 return (
                   <div
                     key={b.bookingId}
-                    onClick={() => openDetail(b)}
+                    onClick={() => actions.openDetail(b)}
                     style={{ ...s.block, top, height, left: 4, right: 4, width: undefined, borderLeftColor: color, cursor: 'pointer', ...(isSelected ? s.blockSelected : {}) }}
                   >
                     <span style={s.blockClient}>{b.clientName}</span>
@@ -529,20 +449,8 @@ function DayView({ date }) {
       )}
     </div>
 
-    {/* Booking detail panel */}
-    {selectedEntry && (
-      <BookingDetailPanel
-        entry={selectedEntry}
-        booking={detailBooking}
-        loading={detailLoading}
-        actionLoading={actionLoading}
-        onClose={() => { setSelectedEntry(null); setDetailBooking(null); }}
-        onAccept={(stationId) => handleAction('accept', stationId)}
-        onReject={() => handleAction('reject')}
-        onComplete={() => handleAction('complete')}
-        onNoShow={() => handleAction('no_show')}
-      />
-    )}
+    {/* Booking detail panel + outcome modals */}
+    <BookingOverlays actions={actions} />
     {showNewBooking && (
       <ManualBookingModal
         artists={artists}
@@ -550,33 +458,9 @@ function DayView({ date }) {
         onClose={() => setShowNewBooking(false)}
         onCreated={() => {
           setShowNewBooking(false);
-          invalidate(`schedule:${toISO(date)}`);
-          setLoading(true);
+          invalidatePrefix('schedule:');
+          setRefreshKey(k => k + 1);
         }}
-      />
-    )}
-    {completeTarget && (
-      <CompleteBookingModal
-        outcome="completed"
-        initialPrice={completeTarget.price}
-        saving={actionLoading}
-        onConfirm={confirmComplete}
-        onCancel={() => setCompleteTarget(null)}
-      />
-    )}
-    {noShowTarget && (
-      <CompleteBookingModal
-        outcome="no_show"
-        saving={actionLoading}
-        onConfirm={confirmNoShow}
-        onCancel={() => setNoShowTarget(null)}
-      />
-    )}
-    {rejectTarget && (
-      <RejectBookingModal
-        saving={actionLoading}
-        onConfirm={confirmReject}
-        onCancel={() => setRejectTarget(null)}
       />
     )}
     </div>
@@ -813,26 +697,26 @@ function ManualBookingModal({ artists, defaultDate, onClose, onCreated }) {
 // ── Station utilization view ──────────────────────────────────────────────────
 
 const STATUS_COLORS_SU = {
-  confirmed:       '#4cc98a',
-  accepted:        '#4cc98a',
-  awaiting_deposit:'#fb923c',
-  completed:       '#6fa3e8',
+  confirmed:        '#4cc98a',
+  awaiting_payment: '#fb923c',
+  completed:        '#6fa3e8',
 };
 
 function StationView({ date }) {
+  const dateStr = toISO(date);
   const [entries,  setEntries]  = useState([]);
   const [loading,  setLoading]  = useState(true);
 
   useEffect(() => {
     setLoading(true);
-    const key = `schedule:${toISO(date)}`;
+    const key = `schedule:${dateStr}`;
     const cached = getCached(key);
     if (cached) { setEntries(cached); setLoading(false); }
-    getStudioSchedule(toISO(date))
+    getStudioSchedule(dateStr)
       .then(d => { const e = d.entries ?? []; setCached(key, e); setEntries(e); })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [toISO(date)]);
+  }, [dateStr]);
 
   // Separate assigned (have stationName) from unassigned
   const assigned   = entries.filter(e => e.stationName);

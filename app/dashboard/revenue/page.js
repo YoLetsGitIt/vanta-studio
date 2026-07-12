@@ -18,7 +18,10 @@ const QUICK_OPTIONS = [
   { label: 'YTD', days: null },
 ];
 
-function toDateStr(d) { return d.toISOString().slice(0, 10); }
+// Local date, not toISOString() — UTC would roll "today" back a day in AU timezones.
+function toDateStr(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
 function dateFromDaysAgo(n) { const d = new Date(); d.setDate(d.getDate() - n); return toDateStr(d); }
 function ytdStart() { return new Date().getFullYear() + '-01-01'; }
 
@@ -91,6 +94,19 @@ export default function RevenuePage() {
   function onStartChange(e) { setStartDate(e.target.value); setActiveQuick(null); }
   function onEndChange(e)   { setEndDate(e.target.value);   setActiveQuick(null); }
 
+  function exportCSV() {
+    if (!stats?.weekly?.length) return;
+    const rows = [
+      ['Week Start', 'Gross Sales', 'Deposits Collected'],
+      ...stats.weekly.map(w => [w.week_start, w.gross_sales ?? 0, w.deposits_collected ?? 0]),
+    ];
+    const csv = rows.map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+    a.download = `revenue-${startDate}-to-${endDate}.csv`;
+    a.click();
+  }
+
   function handleUnlock() {
     setUnlocked(true);
     sessionStorage.setItem('revenue_unlocked', '1');
@@ -133,6 +149,10 @@ export default function RevenuePage() {
             <span style={st.dateArrow}>→</span>
             <input type="date" value={endDate} min={startDate} max={today} onChange={onEndChange} style={st.dateInput} />
           </div>
+          <div style={st.dateSep} />
+          <button onClick={exportCSV} disabled={!stats?.weekly?.length} style={st.exportBtn} title="Export weekly stats as CSV">
+            Export CSV
+          </button>
         </div>
       </div>
 
@@ -684,6 +704,12 @@ const st = {
     color: 'var(--text-muted)', fontSize: '0.78rem', fontWeight: 500, cursor: 'pointer',
   },
   weekBtnActive: { background: 'var(--accent-tint)', borderColor: 'var(--accent-tint-border)', color: 'var(--accent)' },
+  exportBtn: {
+    padding: '0.3rem 0.75rem', borderRadius: 20,
+    border: '1px solid var(--border)', background: 'transparent',
+    color: 'var(--text-muted)', fontSize: '0.78rem', fontWeight: 500, cursor: 'pointer',
+    whiteSpace: 'nowrap',
+  },
 
   tabBar: {
     display: 'flex', alignItems: 'center', gap: '0.25rem',

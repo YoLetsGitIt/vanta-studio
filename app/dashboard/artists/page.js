@@ -4,12 +4,7 @@ import { useState, useEffect, useCallback, Suspense, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { getStudioArtists, approveStudioArtist, rejectStudioArtist, getStudioArtistStats, getStudioScheduleRange, getArtistWorkSchedule } from '@/lib/api';
 import { getCached, setCached, invalidatePrefix } from '@/lib/cache';
-
-const STATUS_COLORS = {
-  pending:  { bg: 'rgba(245,158,58,0.12)',  text: '#f59e3a', border: 'rgba(245,158,58,0.25)' },
-  approved: { bg: 'rgba(76,201,138,0.12)',  text: '#4cc98a', border: 'rgba(76,201,138,0.25)' },
-  rejected: { bg: 'rgba(232,111,111,0.1)',  text: '#e86f6f', border: 'rgba(232,111,111,0.2)' },
-};
+import { APPROVAL_STATUS_COLORS } from '@/lib/status';
 
 function fmtHHMM(hhmm) {
   if (!hhmm) return '';
@@ -168,7 +163,7 @@ function ArtistsInner() {
 }
 
 function ArtistRow({ artist, onClick, onApprove, onReject, actionLoading }) {
-  const sc = STATUS_COLORS[artist.status] ?? STATUS_COLORS.approved;
+  const sc = APPROVAL_STATUS_COLORS[artist.status] ?? APPROVAL_STATUS_COLORS.approved;
   const initials = artist.name
     ? artist.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
     : '?';
@@ -230,7 +225,7 @@ function ArtistRow({ artist, onClick, onApprove, onReject, actionLoading }) {
 }
 
 function ArtistDetail({ artist, onBack, onApprove, onReject, actionLoading }) {
-  const sc = STATUS_COLORS[artist.status] ?? STATUS_COLORS.approved;
+  const sc = APPROVAL_STATUS_COLORS[artist.status] ?? APPROVAL_STATUS_COLORS.approved;
   const initials = artist.name
     ? artist.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
     : '?';
