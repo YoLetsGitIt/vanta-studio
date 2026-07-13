@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { getAvailableStations, getClientConsents, recordConsentInStudio, getNotes, addNote, deleteNote, getBookingConsentSubmissions, getStudioClients } from '@/lib/api';
 import { statusColors, statusLabel, capitalise as cap } from '@/lib/status';
 import { formatDob as fmtDob } from '@/lib/format';
@@ -51,6 +52,8 @@ export default function BookingDetailPanel({
   onComplete,   // optional fn()
   onNoShow,     // optional fn()
 }) {
+  const router = useRouter();
+
   // ── Station picker state ───────────────────────────────────────────────────
   const [stationStep,       setStationStep]       = useState(false);
   const [availableStations, setAvailableStations] = useState([]);
@@ -362,7 +365,21 @@ export default function BookingDetailPanel({
 
         {/* ── Client info ── */}
         <div style={p.divider} />
-        <span style={p.sectionLabel}>Client information</span>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span style={p.sectionLabel}>Client information</span>
+          {(email || (clientName && clientName !== '—')) && (
+            <button
+              onClick={() => {
+                const key = email || clientName;
+                onClose?.();
+                router.push(`/dashboard/clients?client=${encodeURIComponent(key)}`);
+              }}
+              style={{ background: 'none', border: 'none', padding: 0, color: 'var(--accent)', fontSize: '0.72rem', fontWeight: 600, cursor: 'pointer' }}
+            >
+              View client →
+            </button>
+          )}
+        </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
           <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text)' }}>{clientName}</span>
