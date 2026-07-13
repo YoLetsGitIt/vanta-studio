@@ -40,11 +40,11 @@
 
 [data-theme="light"] {
   --text:           #111008;
-  --text-dim:       rgba(17,16,8,0.82);
-  --text-muted:     rgba(17,16,8,0.5);
-  --text-secondary: rgba(17,16,8,0.42);
-  --text-faint:     rgba(17,16,8,0.35);
-  --text-ghost:     rgba(17,16,8,0.2);
+  --text-dim:       rgba(17,16,8,0.86);
+  --text-muted:     rgba(17,16,8,0.66);
+  --text-secondary: rgba(17,16,8,0.58);
+  --text-faint:     rgba(17,16,8,0.5);
+  --text-ghost:     rgba(17,16,8,0.42);
 
   --bg-base:        #f0ede8;
   --bg-sidebar:     #e8e4de;
@@ -66,8 +66,8 @@
   --accent-active-border: rgba(26,21,16,0.22);
   --nav-active-bg:        rgba(26,21,16,0.07);
 
-  --status-completed: rgba(0,0,0,0.35);
-  --status-cancelled: rgba(0,0,0,0.2);
+  --status-completed: rgba(0,0,0,0.5);
+  --status-cancelled: rgba(0,0,0,0.4);
 }
 
 * {

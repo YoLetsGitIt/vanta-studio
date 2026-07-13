@@ -31,10 +31,11 @@ function getMonday(d) {
   return r;
 }
 function addDays(d, n) { const r = new Date(d); r.setDate(r.getDate() + n); return r; }
+function getMonthStart(d) { const r = new Date(d.getFullYear(), d.getMonth(), 1); r.setHours(0, 0, 0, 0); return r; }
 function minutesFromMidnight(iso) { const d = new Date(iso); return d.getHours()*60 + d.getMinutes(); }
-function isSameWeek(a, b) { return toISO(getMonday(a)) === toISO(getMonday(b)); }
+function isSameMonth(a, b) { return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth(); }
 
-const WEEK_CHIP_LIMIT = 5;
+const MONTH_CHIP_LIMIT = 3;
 
 function fmtDuration(mins) {
   if (!mins) return '';
@@ -165,9 +166,13 @@ function BookingOverlays({ actions: a }) {
 
 // ── Week view ─────────────────────────────────────────────────────────────────
 
-function WeekView({ weekStart, onDayClick }) {
-  const weekEnd  = addDays(weekStart, 6);
-  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+function MonthView({ monthStart, onDayClick }) {
+  const monthEnd  = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0);
+  const gridStart = getMonday(monthStart);
+  const gridEnd   = addDays(getMonday(monthEnd), 6);
+  const numDays   = Math.round((gridEnd - gridStart) / 86400000) + 1;
+  const monthDays = Array.from({ length: numDays }, (_, i) => addDays(gridStart, i));
+  const curMonth  = monthStart.getMonth();
 
   const [artists,    setArtists]    = useState([]);
   const [entries,    setEntries]    = useState([]);
@@ -182,10 +187,10 @@ function WeekView({ weekStart, onDayClick }) {
   useEffect(() => {
     let cancelled = false;
     async function load() {
-      const start = toISO(weekStart);
-      const end   = toISO(weekEnd);
+      const start = toISO(gridStart);
+      const end   = toISO(gridEnd);
       const ak = 'artists:approved';
-      const sk = `schedule:week:${start}`;
+      const sk = `schedule:month:${start}`;
       const ca = getCached(ak), cs = getCached(sk);
       if (ca && cs) {
         if (!cancelled) { setArtists(ca); setEntries(cs); setLoading(false); }
@@ -206,7 +211,7 @@ function WeekView({ weekStart, onDayClick }) {
     }
     load();
     return () => { cancelled = true; };
-  }, [weekStart, refreshKey]); // eslint-disable-line
+  }, [toISO(monthStart), refreshKey]); // eslint-disable-line
 
   const artistColor = {};
   artists.forEach((a, i) => { artistColor[a.artistId] = PALETTE[i % PALETTE.length]; });
@@ -231,33 +236,39 @@ function WeekView({ weekStart, onDayClick }) {
   return (
     <div style={{ display: 'flex', flex: 1, overflow: 'hidden', position: 'relative' }}>
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+      <div style={s.monthWeekdays}>
+        {DAY_NAMES.map(d => <div key={d} style={s.monthWeekday}>{d}</div>)}
+      </div>
       <div style={s.calWrap}>
-        <div style={s.weekGrid}>
-          {weekDays.map((day, i) => {
+        <div style={{ ...s.monthGrid, gridTemplateRows: `repeat(${numDays / 7}, minmax(94px, 1fr))` }}>
+          {monthDays.map((day, i) => {
             const iso      = toISO(day);
             const isToday  = iso === today;
+            const outside  = day.getMonth() !== curMonth;
             const dayEnts  = [...(byDate[iso] ?? [])].sort((a,b) => new Date(a.chosenTime) - new Date(b.chosenTime));
-            const visible  = dayEnts.slice(0, WEEK_CHIP_LIMIT);
+            const visible  = dayEnts.slice(0, MONTH_CHIP_LIMIT);
             const more     = dayEnts.length - visible.length;
 
             return (
-              <div key={i} style={{ ...s.weekDayCol, ...(isToday ? s.weekDayColToday : {}), cursor: 'pointer' }} onClick={() => onDayClick(day)}>
-                {/* Day header — click to open day view */}
-                <div style={s.weekDayHeader} onClick={e => { e.stopPropagation(); onDayClick(day); }}>
-                  <span style={s.dayName}>{DAY_NAMES[i]}</span>
-                  <span style={{ ...s.dayNum, ...(isToday ? s.dayNumToday : {}) }}>{day.getDate()}</span>
+              <div
+                key={i}
+                style={{ ...s.monthCell, ...(isToday ? s.monthCellToday : {}), ...(outside ? s.monthCellOutside : {}), cursor: 'pointer' }}
+                onClick={() => onDayClick(day)}
+              >
+                <div style={s.monthCellHead}>
+                  <span style={{ ...s.monthDayNum, ...(isToday ? s.dayNumToday : {}) }}>{day.getDate()}</span>
                   {dayEnts.length > 0 && (
                     <span style={s.weekDayCount}>{dayEnts.length}</span>
                   )}
                 </div>
 
                 {/* Booking chips */}
-                <div style={s.chipList}>
+                <div style={s.monthChipList}>
                   {visible.map(b => {
                     const color = artistColor[b.artistId] ?? '#8b9dc3';
                     return (
                       <div key={b.bookingId} style={{ ...s.chip, cursor: 'pointer' }} onClick={e => { e.stopPropagation(); actions.openDetail(b); }}>
-                        <div style={{ width: 7, height: 7, borderRadius: '50%', background: color, flexShrink: 0 }} />
+                        <div style={{ width: 6, height: 6, borderRadius: '50%', background: color, flexShrink: 0 }} />
                         <span style={s.chipTime}>{fmtTime(b.chosenTime)}</span>
                         <span style={s.chipClient}>{b.clientName.split(' ')[0]}</span>
                       </div>
@@ -267,9 +278,6 @@ function WeekView({ weekStart, onDayClick }) {
                     <button style={s.moreBtn} onClick={e => { e.stopPropagation(); onDayClick(day); }}>
                       +{more} more
                     </button>
-                  )}
-                  {dayEnts.length === 0 && (
-                    <span style={s.emptyDay}>—</span>
                   )}
                 </div>
               </div>
@@ -674,24 +682,19 @@ function StationView({ date }) {
 // ── Page shell ────────────────────────────────────────────────────────────────
 
 export default function SchedulePage() {
-  const [view,      setView]      = useState('week'); // 'week' | 'day' | 'stations'
-  const [weekStart, setWeekStart] = useState(() => getMonday(new Date()));
-  const [dayDate,   setDayDate]   = useState(() => new Date());
+  const [view,       setView]       = useState('month'); // 'month' | 'day' | 'station'
+  const [monthStart, setMonthStart] = useState(() => getMonthStart(new Date()));
+  const [dayDate,    setDayDate]    = useState(() => new Date());
 
-  const today        = new Date();
-  const isCurrentWk  = isSameWeek(weekStart, today);
-  const weekEnd      = addDays(weekStart, 6);
+  const today          = new Date();
+  const isCurrentMonth = isSameMonth(monthStart, today);
 
   function goToDayView(day) {
     setDayDate(day);
     setView('day');
   }
 
-  const weekLabel = (() => {
-    const o = { day: 'numeric', month: 'short' };
-    return `${weekStart.toLocaleDateString('en-AU', o)} – ${weekEnd.toLocaleDateString('en-AU', o)}`;
-  })();
-
+  const monthLabel = monthStart.toLocaleDateString('en-AU', { month: 'long', year: 'numeric' });
   const dayLabel = dayDate.toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long' });
 
   return (
@@ -702,10 +705,10 @@ export default function SchedulePage() {
           {/* View toggle */}
           <div style={s.viewToggle}>
             <button
-              onClick={() => setView('week')}
-              style={{ ...s.toggleBtn, ...(view === 'week' ? s.toggleActive : {}) }}
+              onClick={() => setView('month')}
+              style={{ ...s.toggleBtn, ...(view === 'month' ? s.toggleActive : {}) }}
             >
-              Week
+              Month
             </button>
             <button
               onClick={() => setView('day')}
@@ -714,22 +717,22 @@ export default function SchedulePage() {
               Day
             </button>
             <button
-              onClick={() => setView('stations')}
-              style={{ ...s.toggleBtn, ...(view === 'stations' ? s.toggleActive : {}) }}
+              onClick={() => setView('station')}
+              style={{ ...s.toggleBtn, ...(view === 'station' ? s.toggleActive : {}) }}
             >
-              Stations
+              Station
             </button>
           </div>
         </div>
 
         <div style={s.nav}>
-          {view === 'week' ? (
+          {view === 'month' ? (
             <>
-              <button onClick={() => setWeekStart(d => addDays(d, -7))} style={s.navBtn}>←</button>
-              <span style={s.navLabel}>{weekLabel}</span>
-              <button onClick={() => setWeekStart(d => addDays(d, 7))}  style={s.navBtn}>→</button>
-              {!isCurrentWk && (
-                <button onClick={() => setWeekStart(getMonday(today))} style={s.todayBtn}>Today</button>
+              <button onClick={() => setMonthStart(d => getMonthStart(new Date(d.getFullYear(), d.getMonth() - 1, 1)))} style={s.navBtn}>←</button>
+              <span style={s.navLabel}>{monthLabel}</span>
+              <button onClick={() => setMonthStart(d => getMonthStart(new Date(d.getFullYear(), d.getMonth() + 1, 1)))} style={s.navBtn}>→</button>
+              {!isCurrentMonth && (
+                <button onClick={() => setMonthStart(getMonthStart(today))} style={s.todayBtn}>Today</button>
               )}
             </>
           ) : (
@@ -745,9 +748,9 @@ export default function SchedulePage() {
         </div>
       </div>
 
-      {view === 'week'    && <WeekView weekStart={weekStart} onDayClick={goToDayView} />}
+      {view === 'month'   && <MonthView monthStart={monthStart} onDayClick={goToDayView} />}
       {view === 'day'     && <DayView  date={dayDate} />}
-      {view === 'stations' && <StationView date={dayDate} />}
+      {view === 'station' && <StationView date={dayDate} />}
     </div>
   );
 }
@@ -837,35 +840,51 @@ const s = {
 
   calWrap: { flex: 1, overflow: 'auto' },
 
-  // ── Week view ──────────────────────────────────────────────────────────────
-  weekGrid: {
+  // ── Month view ─────────────────────────────────────────────────────────────
+  monthWeekdays: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(7, minmax(120px, 1fr))',
+    gridTemplateColumns: 'repeat(7, minmax(0, 1fr))',
     minWidth: 700,
     borderBottom: '1px solid var(--border-faint)',
   },
-  weekDayCol: {
+  monthWeekday: {
+    padding: '0.5rem 0.6rem',
+    fontSize: '0.68rem', fontWeight: 600,
+    textTransform: 'uppercase', letterSpacing: '0.06em',
+    color: 'var(--text-ghost)',
     borderRight: '1px solid var(--border-faint)',
-    display: 'flex', flexDirection: 'column',
-    minHeight: 220,
   },
-  weekDayColToday: { background: 'var(--bg-row-active)' },
-  weekDayHeader: {
-    display: 'flex', alignItems: 'center', gap: '0.4rem',
-    padding: '0.65rem 0.75rem 0.5rem',
+  monthGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(7, minmax(0, 1fr))',
+    minWidth: 700,
+  },
+  monthCell: {
+    borderRight: '1px solid var(--border-faint)',
     borderBottom: '1px solid var(--border-faint)',
-    cursor: 'pointer',
+    display: 'flex', flexDirection: 'column',
+    padding: '0.35rem 0.4rem 0.45rem',
+    overflow: 'hidden',
   },
+  monthCellToday: { background: 'var(--bg-row-active)' },
+  monthCellOutside: { opacity: 0.4 },
+  monthCellHead: {
+    display: 'flex', alignItems: 'center', gap: '0.35rem',
+    marginBottom: '0.3rem',
+  },
+  monthDayNum: { fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-muted)', lineHeight: 1 },
+  monthChipList: {
+    display: 'flex', flexDirection: 'column', gap: '0.18rem',
+    overflow: 'hidden',
+  },
+
+  // ── Calendar chips ─────────────────────────────────────────────────────────
   weekDayCount: {
     marginLeft: 'auto',
     fontSize: '0.68rem', fontWeight: 600,
     color: 'var(--text-ghost)',
     background: 'var(--bg-chip)',
     borderRadius: 20, padding: '0.05rem 0.4rem',
-  },
-  chipList: {
-    display: 'flex', flexDirection: 'column', gap: '0.2rem',
-    padding: '0.5rem 0.6rem', flex: 1,
   },
   chip: {
     display: 'flex', alignItems: 'center', gap: '0.35rem',
@@ -886,9 +905,6 @@ const s = {
     color: 'var(--text-secondary)', fontSize: '0.68rem', fontWeight: 500,
     cursor: 'pointer', padding: '0.1rem 0.35rem', textAlign: 'left',
   },
-  emptyDay: {
-    fontSize: '0.72rem', color: 'var(--text-ghost)', paddingLeft: '0.35rem',
-  },
   legend: {
     display: 'flex', flexWrap: 'wrap', gap: '0.5rem 1.25rem',
     padding: '0.75rem 1.5rem',
@@ -899,12 +915,6 @@ const s = {
   legendName: { fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 500 },
 
   // ── Shared label styles ────────────────────────────────────────────────────
-  dayName: {
-    fontSize: '0.65rem', fontWeight: 600,
-    color: 'var(--text-secondary)',
-    textTransform: 'uppercase', letterSpacing: '0.06em',
-  },
-  dayNum: { fontSize: '1rem', fontWeight: 700, color: 'var(--text-muted)', lineHeight: 1 },
   dayNumToday: { color: 'var(--accent)' },
 
   // ── Day view grid ──────────────────────────────────────────────────────────

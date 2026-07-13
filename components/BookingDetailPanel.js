@@ -216,10 +216,16 @@ export default function BookingDetailPanel({
   // ── Station picker ─────────────────────────────────────────────────────────
   async function handleAcceptClick() {
     if (!onAccept) return;
+    // A pending booking has no chosen_time yet — accepting confirms the client's
+    // primary requested time, so check station availability against that date.
+    const dateStr = ((chosenTime ?? proposedTime) ?? '').split('T')[0];
+    if (!dateStr) {
+      setStationError('This booking has no requested time to accept.');
+      return;
+    }
     setStationsLoading(true);
     setStationError('');
     try {
-      const dateStr = (chosenTime ?? '').split('T')[0];
       const data = await getAvailableStations(dateStr, bookingId);
       const stations = data.stations ?? [];
       if (stations.length === 0) {
@@ -241,6 +247,22 @@ export default function BookingDetailPanel({
   const durationLabel = duration
     ? `${Math.round((duration / 60) * 10) / 10} hrs`
     : null;
+
+  // While the full booking is fetching, show only the header + a loading state —
+  // keep the detail sections hidden rather than rendering them from partial data.
+  if (loading) {
+    return (
+      <aside style={p.panel}>
+        <div style={p.header}>
+          <span style={p.title}>{clientName}</span>
+          <button onClick={onClose} style={p.closeBtn}>✕</button>
+        </div>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Loading…</span>
+        </div>
+      </aside>
+    );
+  }
 
   return (
     <aside style={p.panel}>
@@ -291,8 +313,6 @@ export default function BookingDetailPanel({
         )}
 
         {/* ── Booking info ── */}
-        {loading && <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Loading…</p>}
-
         {status && (
           <Row label="Status">
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
