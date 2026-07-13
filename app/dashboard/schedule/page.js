@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getStudioArtists, getStudioSchedule, getStudioScheduleRange, getStudioBooking, acceptBookingWithStation, assignArtist, createManualBooking, createFollowUpBooking, getWalkIns, rejectBooking, recordOutcome } from '@/lib/api';
+import { getStudioArtists, getStudioSchedule, getStudioScheduleRange, getStudioBooking, acceptBookingWithStation, createManualBooking, createFollowUpBooking, rejectBooking, recordOutcome } from '@/lib/api';
 import BookingDetailPanel from '@/components/BookingDetailPanel';
 import { getCached, setCached, invalidatePrefix } from '@/lib/cache';
 import CompleteBookingModal from '@/components/CompleteBookingModal';
@@ -469,146 +469,6 @@ function DayView({ date }) {
   );
 }
 
-// ── Pending walk-in panel ─────────────────────────────────────────────────────
-
-function PendingWalkIns({ onAssigned }) {
-  const [items,     setItems]     = useState([]);
-  const [artists,   setArtists]   = useState([]);
-  const [loading,   setLoading]   = useState(true);
-  const [open,      setOpen]      = useState(true);
-  const [assigning, setAssigning] = useState(null);
-  const [pick,      setPick]      = useState(null); // { bookingId, artistId, date, time }
-  const [error,     setError]     = useState('');
-
-  useEffect(() => {
-    let cancelled = false;
-    const cached = getCached('artists:approved');
-    Promise.all([
-      getWalkIns(),
-      cached ? Promise.resolve({ artists: cached }) : getStudioArtists('approved'),
-    ]).then(([walkins, artistData]) => {
-      if (cancelled) return;
-      const a = artistData.artists ?? [];
-      setCached('artists:approved', a);
-      setArtists(a);
-      setItems(walkins.walkins ?? []);
-      setLoading(false);
-    }).catch(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
-  }, []);
-
-  async function handleAssign() {
-    if (!pick?.artistId || !pick?.date || !pick?.time) return;
-    setAssigning(pick.bookingId);
-    setError('');
-    try {
-      const chosenTime = new Date(`${pick.date}T${pick.time}:00`).toISOString();
-      await assignArtist(pick.bookingId, pick.artistId, chosenTime);
-      setItems(prev => prev.filter(w => w.id !== pick.bookingId));
-      setPick(null);
-      if (onAssigned) onAssigned();
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setAssigning(null);
-    }
-  }
-
-  if (loading || items.length === 0) return null;
-
-  const wipInp = {
-    background: 'var(--bg-input)',
-    border: '1px solid var(--border)',
-    borderRadius: 6, color: 'var(--text)',
-    fontSize: '0.75rem', padding: '0.3rem 0.5rem',
-    outline: 'none',
-  };
-
-  return (
-    <div style={s.wip}>
-      <button style={s.wipHeader} onClick={() => setOpen(o => !o)}>
-        <span style={s.wipTitle}>Walk-in requests</span>
-        <span style={s.wipCount}>{items.length}</span>
-        <span style={{ marginLeft: 'auto', fontSize: '0.7rem', color: 'var(--text-secondary)' }}>{open ? '▲' : '▼'}</span>
-      </button>
-
-      {open && (
-        <div style={s.wipList}>
-          {items.map(w => {
-            const isPickingThis = pick?.bookingId === w.id;
-            return (
-              <div key={w.id} style={{ ...s.wipCard, ...(isPickingThis ? { flexDirection: 'column', alignItems: 'stretch', gap: '0.6rem' } : {}) }}>
-                <div style={s.wipCardMain}>
-                  <span style={s.wipName}>{w.requester_name}</span>
-                  {w.session_type && <span style={s.wipTag}>{w.session_type.replace('_', ' ')}</span>}
-                  {(w.requester_email || w.requester_phone) && (
-                    <span style={s.wipContact}>{w.requester_email || w.requester_phone}</span>
-                  )}
-                  {w.additional_notes && (
-                    <span style={s.wipNotes}>{w.additional_notes}</span>
-                  )}
-                </div>
-
-                {isPickingThis ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    {/* Artist selection */}
-                    <div style={s.wipPicker}>
-                      {artists.map(a => (
-                        <button
-                          key={a.artistId}
-                          onClick={() => setPick(prev => ({ ...prev, artistId: a.artistId }))}
-                          style={{ ...s.wipPickerBtn, ...(pick.artistId === a.artistId ? { background: 'rgba(76,201,138,0.25)', border: '1px solid rgba(76,201,138,0.5)' } : {}) }}
-                        >
-                          {a.name}
-                        </button>
-                      ))}
-                    </div>
-                    {/* Date + time */}
-                    <div style={{ display: 'flex', gap: '0.4rem' }}>
-                      <input
-                        type="date"
-                        value={pick.date}
-                        onChange={e => setPick(prev => ({ ...prev, date: e.target.value }))}
-                        style={{ ...wipInp, flex: 1 }}
-                      />
-                      <input
-                        type="time"
-                        value={pick.time}
-                        onChange={e => setPick(prev => ({ ...prev, time: e.target.value }))}
-                        style={{ ...wipInp, width: 90 }}
-                      />
-                    </div>
-                    {/* Confirm / Cancel */}
-                    <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
-                      <button
-                        onClick={handleAssign}
-                        disabled={!pick.artistId || !pick.date || !pick.time || assigning === w.id}
-                        style={{ ...s.wipPickerBtn, opacity: (!pick.artistId || !pick.date || !pick.time) ? 0.4 : 1 }}
-                      >
-                        {assigning === w.id ? 'Assigning…' : 'Confirm'}
-                      </button>
-                      <button onClick={() => setPick(null)} style={s.wipCancelBtn}>Cancel</button>
-                    </div>
-                  </div>
-                ) : (
-                  <button
-                    disabled={!!assigning}
-                    onClick={() => setPick({ bookingId: w.id, artistId: '', date: '', time: '10:00' })}
-                    style={s.wipAssignBtn}
-                  >
-                    Assign artist
-                  </button>
-                )}
-              </div>
-            );
-          })}
-          {error && <p style={{ ...s.stationError, padding: '0 0.5rem 0.5rem' }}>{error}</p>}
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ── Manual booking modal ──────────────────────────────────────────────────────
 
 function ManualBookingModal({ artists, defaultDate, onClose, onCreated }) {
@@ -817,7 +677,6 @@ export default function SchedulePage() {
   const [view,      setView]      = useState('week'); // 'week' | 'day' | 'stations'
   const [weekStart, setWeekStart] = useState(() => getMonday(new Date()));
   const [dayDate,   setDayDate]   = useState(() => new Date());
-  const [wipKey,    setWipKey]    = useState(0);
 
   const today        = new Date();
   const isCurrentWk  = isSameWeek(weekStart, today);
@@ -885,8 +744,6 @@ export default function SchedulePage() {
           )}
         </div>
       </div>
-
-      <PendingWalkIns key={wipKey} onAssigned={() => setWipKey(k => k + 1)} />
 
       {view === 'week'    && <WeekView weekStart={weekStart} onDayClick={goToDayView} />}
       {view === 'day'     && <DayView  date={dayDate} />}
