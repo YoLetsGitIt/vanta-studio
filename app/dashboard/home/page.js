@@ -3,13 +3,10 @@
 import { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { getStudioArtists, getStudioSchedule, getMyStudioAccount } from '@/lib/api';
+import { initials, toISODate } from '@/lib/format';
 import { getCached, setCached } from '@/lib/cache';
 
 const QRCodeSVG = dynamic(() => import('qrcode.react').then(m => m.QRCodeSVG), { ssr: false });
-
-function toISODate(d) {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
 
 function formatTime(iso) {
   return new Date(iso).toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit', hour12: true });
@@ -121,9 +118,7 @@ export default function HomePage() {
         {!loading && workingToday.map(artist => {
           const bookings = (byArtist[artist.artistId] ?? [])
             .sort((a, b) => new Date(a.chosenTime) - new Date(b.chosenTime));
-          const initials = artist.name
-            ? artist.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
-            : '?';
+          const artistInitials = initials(artist.name);
 
           return (
             <div key={artist.id} style={s.card}>
@@ -131,7 +126,7 @@ export default function HomePage() {
                 {artist.profileImage ? (
                   <img src={artist.profileImage} alt={artist.name} style={s.avatar} />
                 ) : (
-                  <div style={{ ...s.avatar, ...s.avatarFallback }}>{initials}</div>
+                  <div style={{ ...s.avatar, ...s.avatarFallback }}>{artistInitials}</div>
                 )}
                 <div style={s.artistMeta}>
                   <span style={s.artistName}>{artist.name}</span>

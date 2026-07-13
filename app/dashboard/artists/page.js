@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { getStudioArtists, approveStudioArtist, rejectStudioArtist, getStudioArtistStats, getStudioScheduleRange, getArtistWorkSchedule } from '@/lib/api';
 import { getCached, setCached, invalidatePrefix } from '@/lib/cache';
 import { APPROVAL_STATUS_COLORS } from '@/lib/status';
+import { initials } from '@/lib/format';
 
 function fmtHHMM(hhmm) {
   if (!hhmm) return '';
@@ -164,9 +165,7 @@ function ArtistsInner() {
 
 function ArtistRow({ artist, onClick, onApprove, onReject, actionLoading }) {
   const sc = APPROVAL_STATUS_COLORS[artist.status] ?? APPROVAL_STATUS_COLORS.approved;
-  const initials = artist.name
-    ? artist.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
-    : '?';
+  const artistInitials = initials(artist.name);
 
   return (
     <div style={s.card} onClick={onClick}>
@@ -174,7 +173,7 @@ function ArtistRow({ artist, onClick, onApprove, onReject, actionLoading }) {
         {artist.profileImage ? (
           <img src={artist.profileImage} alt={artist.name} style={s.avatar} />
         ) : (
-          <div style={{ ...s.avatar, ...s.avatarFallback }}>{initials}</div>
+          <div style={{ ...s.avatar, ...s.avatarFallback }}>{artistInitials}</div>
         )}
 
         <div style={s.cardInfo}>
@@ -226,9 +225,7 @@ function ArtistRow({ artist, onClick, onApprove, onReject, actionLoading }) {
 
 function ArtistDetail({ artist, onBack, onApprove, onReject, actionLoading }) {
   const sc = APPROVAL_STATUS_COLORS[artist.status] ?? APPROVAL_STATUS_COLORS.approved;
-  const initials = artist.name
-    ? artist.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
-    : '?';
+  const artistInitials = initials(artist.name);
 
   const [stats,        setStats]        = useState(null);
   const [schedule,     setSchedule]     = useState(null); // null = loading
@@ -266,7 +263,7 @@ function ArtistDetail({ artist, onBack, onApprove, onReject, actionLoading }) {
           {artist.profileImage ? (
             <img src={artist.profileImage} alt={artist.name} style={s.detailAvatar} />
           ) : (
-            <div style={{ ...s.detailAvatar, ...s.detailAvatarFallback }}>{initials}</div>
+            <div style={{ ...s.detailAvatar, ...s.detailAvatarFallback }}>{artistInitials}</div>
           )}
           <div style={s.detailMeta}>
             <div style={s.detailNameRow}>

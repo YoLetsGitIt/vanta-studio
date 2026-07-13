@@ -1,8 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getAvailableStations, getClientConsents, recordConsentInStudio, saveBookingNote, getBookingConsentSubmissions } from '@/lib/api';
+import { getAvailableStations, getClientConsents, recordConsentInStudio, getNotes, addNote, deleteNote, getBookingConsentSubmissions, getStudioClients } from '@/lib/api';
 import { statusColors, statusLabel, capitalise as cap } from '@/lib/status';
+import { formatDob as fmtDob } from '@/lib/format';
+import { getCached, setCached } from '@/lib/cache';
 
 const PAYMENT_LABELS = { cash: 'Cash', card: 'Card / POS', bank_transfer: 'Bank Transfer' };
 const CONSENT_STYLE  = {
@@ -15,9 +17,23 @@ function fmtDate(iso) {
   if (!iso) return null;
   return new Date(iso).toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' });
 }
-function fmtDob(dob) {
+
+// Age in whole years from a YYYY-MM-DD date of birth.
+function ageFromDob(dob) {
   if (!dob) return null;
-  return new Date(dob + 'T12:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
+  const birth = new Date(dob + 'T00:00:00');
+  if (isNaN(birth)) return null;
+  const now = new Date();
+  let age = now.getFullYear() - birth.getFullYear();
+  const m = now.getMonth() - birth.getMonth();
+  if (m < 0 || (m === 0 && now.getDate() < birth.getDate())) age--;
+  return age >= 0 && age < 130 ? age : null;
+}
+
+function parseStyles(raw) {
+  if (!raw) return [];
+  try { const v = JSON.parse(raw); return Array.isArray(v) ? v : []; }
+  catch { return []; }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -41,15 +57,18 @@ export default function BookingDetailPanel({
   const [stationsLoading,   setStationsLoading]   = useState(false);
   const [stationError,      setStationError]      = useState('');
 
-  // ── Studio notes state ────────────────────────────────────────────────────
-  const [noteText,    setNoteText]    = useState('');
-  const [noteSaving,  setNoteSaving]  = useState(false);
-  const [noteSaved,   setNoteSaved]   = useState(false);
+  // ── Studio notes state (notes table, entity_type='booking') ────────────────
+  const [studioNotes, setStudioNotes] = useState(null); // null = loading
+  const [noteInput,   setNoteInput]   = useState('');
+  const [noteAdding,  setNoteAdding]  = useState(false);
 
   // ── Consent state ──────────────────────────────────────────────────────────
   const [consent,        setConsent]        = useState(null);
   const [consentVersion, setConsentVersion] = useState('1');
   const [recording,      setRecording]      = useState(false);
+
+  // ── Contact-book profile (allergies / preferences / pain tolerance) ─────────
+  const [clientProfile, setClientProfile] = useState(null);
 
   // ── Consent submissions (new template system) ──────────────────────────────
   const [consentSubmissions, setConsentSubmissions] = useState([]);
@@ -86,8 +105,11 @@ export default function BookingDetailPanel({
   const cancelReason      = booking?.cancellation_reason ?? null;
   const source            = booking?.source              ?? null;
 
-  const isCompleted = status === 'completed';
-  const isNoShow    = status === 'completed' && booking?.outcome === 'no_show';
+  // Under the 5-status model a no-show is stored as status='completed' with
+  // outcome='no_show', so "completed" visuals must exclude no-shows explicitly.
+  const isNoShow      = status === 'completed' && booking?.outcome === 'no_show';
+  const isCompleted   = status === 'completed';
+  const showCompleted = isCompleted && !isNoShow;
 
   const today      = new Date().toLocaleDateString('en-CA');
   const chosenDate = chosenTime ? chosenTime.slice(0, 10) : null;
@@ -96,23 +118,34 @@ export default function BookingDetailPanel({
   const canComplete       = status === 'confirmed' && chosenDate && chosenDate <= today;
   const canReject         = canAcceptReject;
 
-  const sc = statusColors(status);
+  const displayStatus = isNoShow ? 'no_show' : status;
+  const sc = statusColors(displayStatus);
 
-  // ── Sync studio note when booking changes ─────────────────────────────────
+  // ── Load studio notes for this booking ─────────────────────────────────────
   useEffect(() => {
-    setNoteText(booking?.studio_note ?? '');
-    setNoteSaved(false);
-  }, [bookingId, booking?.studio_note]);
+    if (!bookingId) { setStudioNotes([]); return; }
+    setStudioNotes(null);
+    getNotes('booking', bookingId)
+      .then(d => setStudioNotes(d.notes ?? []))
+      .catch(() => setStudioNotes([]));
+  }, [bookingId]);
 
-  async function handleSaveNote() {
-    if (!bookingId) return;
-    setNoteSaving(true);
+  async function handleAddNote() {
+    if (!noteInput.trim() || !bookingId) return;
+    setNoteAdding(true);
     try {
-      await saveBookingNote(bookingId, noteText);
-      setNoteSaved(true);
-      setTimeout(() => setNoteSaved(false), 2000);
+      const d = await addNote('booking', bookingId, noteInput.trim());
+      setStudioNotes(prev => [d.note, ...(prev ?? [])]);
+      setNoteInput('');
     } catch { /* silent */ }
-    finally { setNoteSaving(false); }
+    finally { setNoteAdding(false); }
+  }
+
+  async function handleDeleteNote(id) {
+    try {
+      await deleteNote(id);
+      setStudioNotes(prev => (prev ?? []).filter(n => n.id !== id));
+    } catch { /* silent */ }
   }
 
   // ── Consent ────────────────────────────────────────────────────────────────
@@ -132,6 +165,31 @@ export default function BookingDetailPanel({
     : consent.consent_version === consentVersion ? 'current' : 'outdated';
   const cs = CONSENT_STYLE[consentStatus];
   const consentLabel = { current: 'Consented', outdated: 'Outdated', none: 'No consent' }[consentStatus];
+
+  // Match this booking's client against the contact book for their saved profile.
+  useEffect(() => {
+    setClientProfile(null);
+    if (!email && !phone) return;
+    const emailKey = email ? email.toLowerCase() : null;
+    const phoneKey = phone ? phone.replace(/[^0-9+]/g, '') : null;
+    const apply = (clients) => {
+      const match = (clients ?? []).find(c =>
+        (emailKey && c.email && c.email.toLowerCase() === emailKey) ||
+        (phoneKey && c.phone && c.phone.replace(/[^0-9+]/g, '') === phoneKey)
+      );
+      setClientProfile(match ?? null);
+    };
+    const cached = getCached('clients:contacts');
+    if (cached) { apply(cached); return; }
+    getStudioClients()
+      .then(d => { const c = d.clients ?? []; setCached('clients:contacts', c); apply(c); })
+      .catch(() => {});
+  }, [email, phone]);
+
+  const clientAge         = ageFromDob(dob);
+  const designPreferences = parseStyles(clientProfile?.design_preferences);
+  const allergies         = clientProfile?.allergies || null;
+  const painTolerance     = clientProfile?.pain_tolerance || null;
 
   async function handleRecordConsent() {
     if (!email) return;
@@ -191,16 +249,16 @@ export default function BookingDetailPanel({
 
       <div style={p.body}>
         {/* ── Outcome card ── */}
-        {(isCompleted || isNoShow) && (
+        {isCompleted && (
           <div style={{
-            background: isCompleted ? 'rgba(76,201,138,0.07)' : 'rgba(232,111,111,0.06)',
-            border: `1px solid ${isCompleted ? 'rgba(76,201,138,0.2)' : 'rgba(232,111,111,0.15)'}`,
+            background: showCompleted ? 'rgba(76,201,138,0.07)' : 'rgba(232,111,111,0.06)',
+            border: `1px solid ${showCompleted ? 'rgba(76,201,138,0.2)' : 'rgba(232,111,111,0.15)'}`,
             borderRadius: 10, padding: '0.85rem 1rem',
             display: 'flex', flexDirection: 'column', gap: '0.5rem',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <span style={{ fontSize: '0.85rem', fontWeight: 700, color: isCompleted ? '#4cc98a' : '#e86f6f' }}>
-                {isCompleted ? '✓ Completed' : '✗ No Show'}
+              <span style={{ fontSize: '0.85rem', fontWeight: 700, color: showCompleted ? '#4cc98a' : '#e86f6f' }}>
+                {showCompleted ? '✓ Completed' : '✗ No Show'}
               </span>
               {outcomeAt && (
                 <span style={{ fontSize: '0.72rem', color: 'var(--text-ghost)', marginLeft: 'auto' }}>
@@ -208,19 +266,19 @@ export default function BookingDetailPanel({
                 </span>
               )}
             </div>
-            {isCompleted && finalPrice != null && (
+            {showCompleted && finalPrice != null && (
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ fontSize: '0.78rem', color: 'var(--text-ghost)' }}>Final price</span>
                 <span style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text)' }}>${finalPrice}</span>
               </div>
             )}
-            {isCompleted && paymentMethod && (
+            {showCompleted && paymentMethod && (
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ fontSize: '0.78rem', color: 'var(--text-ghost)' }}>Payment</span>
                 <span style={{ fontSize: '0.82rem', color: 'var(--text-dim)' }}>{PAYMENT_LABELS[paymentMethod] ?? paymentMethod}</span>
               </div>
             )}
-            {isCompleted && aftercareInstructions && (
+            {showCompleted && aftercareInstructions && (
               <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '0.65rem', marginTop: '0.15rem' }}>
                 <span style={{ fontSize: '0.72rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-ghost)', display: 'block', marginBottom: '0.4rem' }}>Aftercare</span>
                 <p style={{ fontSize: '0.8rem', color: 'var(--text-dim)', lineHeight: 1.6, whiteSpace: 'pre-wrap', margin: 0 }}>{aftercareInstructions}</p>
@@ -237,7 +295,7 @@ export default function BookingDetailPanel({
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
               <span style={{ fontSize: '0.72rem', fontWeight: 600, padding: '0.2rem 0.55rem', borderRadius: 20,
                 background: sc.bg, color: sc.text, border: `1px solid ${sc.border}` }}>
-                {statusLabel(status)}
+                {statusLabel(displayStatus)}
               </span>
               {source && (
                 <span style={{ fontSize: '0.68rem', fontWeight: 600, padding: '0.15rem 0.45rem', borderRadius: 4,
@@ -310,8 +368,38 @@ export default function BookingDetailPanel({
           <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text)' }}>{clientName}</span>
           {email && <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{email}</span>}
           {phone && <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{phone}</span>}
-          {dob   && <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{fmtDob(dob)}</span>}
+          {dob && (
+            <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+              {fmtDob(dob)}{clientAge != null && ` · ${clientAge} yrs`}
+              {clientAge != null && clientAge < 18 && (
+                <span style={{ marginLeft: '0.4rem', fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.04em', padding: '0.05rem 0.35rem', borderRadius: 4, background: 'rgba(245,158,58,0.15)', color: '#f59e3a' }}>MINOR</span>
+              )}
+            </span>
+          )}
         </div>
+
+        {/* Contact-book profile — allergies flagged for safety */}
+        {(allergies || designPreferences.length > 0 || painTolerance) && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            {allergies && (
+              <div style={{ background: 'rgba(232,111,111,0.08)', border: '1px solid rgba(232,111,111,0.2)', borderRadius: 6, padding: '0.45rem 0.6rem' }}>
+                <span style={{ fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#e86f6f' }}>⚠ Allergies</span>
+                <p style={{ margin: '0.15rem 0 0', fontSize: '0.8rem', color: 'var(--text-dim)', lineHeight: 1.4 }}>{allergies}</p>
+              </div>
+            )}
+            {designPreferences.length > 0 && (
+              <div>
+                <span style={p.label}>Design preferences</span>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem', marginTop: '0.3rem' }}>
+                  {designPreferences.map(s => (
+                    <span key={s} style={{ fontSize: '0.7rem', fontWeight: 500, padding: '0.15rem 0.5rem', borderRadius: 20, background: 'var(--bg-chip)', color: 'var(--text-muted)', border: '1px solid var(--border-faint)' }}>{s}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {painTolerance && <Row label="Pain tolerance" value={cap(painTolerance)} />}
+          </div>
+        )}
 
         {email && (
           <div>
@@ -389,10 +477,11 @@ export default function BookingDetailPanel({
           <div style={p.divider} />
           <span style={p.sectionLabel}>Studio notes</span>
           <textarea
-            value={noteText}
-            onChange={e => { setNoteText(e.target.value); setNoteSaved(false); }}
+            value={noteInput}
+            onChange={e => setNoteInput(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleAddNote(); }}
             placeholder="Internal note — not visible to client…"
-            rows={3}
+            rows={2}
             style={{
               width: '100%', marginTop: '0.4rem', resize: 'vertical',
               background: 'var(--bg-chip)', border: '1px solid var(--border-faint)',
@@ -403,17 +492,32 @@ export default function BookingDetailPanel({
           />
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.35rem' }}>
             <button
-              onClick={handleSaveNote}
-              disabled={noteSaving}
+              onClick={handleAddNote}
+              disabled={noteAdding || !noteInput.trim()}
               style={{
                 fontSize: '0.75rem', fontWeight: 600, padding: '0.25rem 0.75rem',
                 borderRadius: 5, border: '1px solid var(--border-faint)',
-                background: noteSaved ? 'rgba(76,201,138,0.12)' : 'var(--bg-chip)',
-                color: noteSaved ? '#4cc98a' : 'var(--text-dim)', cursor: 'pointer',
+                background: 'var(--bg-chip)', color: 'var(--text-dim)', cursor: 'pointer',
+                opacity: (!noteInput.trim() || noteAdding) ? 0.45 : 1,
               }}
             >
-              {noteSaved ? 'Saved' : noteSaving ? 'Saving…' : 'Save note'}
+              {noteAdding ? 'Saving…' : 'Add note'}
             </button>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.5rem' }}>
+            {studioNotes !== null && studioNotes.map(n => (
+              <div key={n.id} style={{ background: 'var(--bg-chip)', border: '1px solid var(--border-faint)', borderRadius: 6, padding: '0.5rem 0.6rem' }}>
+                <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text)', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{n.content}</p>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.3rem' }}>
+                  <span style={{ fontSize: '0.68rem', color: 'var(--text-ghost)' }}>
+                    {new Date(n.created_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  </span>
+                  <button onClick={() => handleDeleteNote(n.id)} style={{ fontSize: '0.68rem', color: '#e86f6f', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                    Delete
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}
@@ -462,11 +566,11 @@ export default function BookingDetailPanel({
                   )}
 
                   {/* Client signature */}
-                  {sub.client_signature_path && (
+                  {sub.client_signature_url && (
                     <div>
                       <p style={{ fontSize: '0.68rem', color: 'var(--text-ghost)', margin: '0 0 0.25rem' }}>Client signature</p>
                       <img
-                        src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/walkin-images/${sub.client_signature_path}`}
+                        src={sub.client_signature_url}
                         alt="Client signature"
                         style={{ maxWidth: '100%', height: 60, objectFit: 'contain', borderRadius: 4, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border-faint)', display: 'block' }}
                       />
@@ -483,9 +587,9 @@ export default function BookingDetailPanel({
                       </div>
                       {sub.guardian_email && <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{sub.guardian_email}</span>}
                       {sub.guardian_phone && <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{sub.guardian_phone}</span>}
-                      {sub.guardian_signature_path && (
+                      {sub.guardian_signature_url && (
                         <img
-                          src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/walkin-images/${sub.guardian_signature_path}`}
+                          src={sub.guardian_signature_url}
                           alt="Guardian signature"
                           style={{ maxWidth: '100%', height: 60, objectFit: 'contain', borderRadius: 4, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border-faint)', display: 'block', marginTop: '0.25rem' }}
                         />

@@ -1,11 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getStudioArtists, getStudioSchedule, getStudioScheduleRange, getBooking, acceptBookingWithStation, assignArtist, createManualBooking, getWalkIns, rejectBooking, recordOutcome } from '@/lib/api';
+import { getStudioArtists, getStudioSchedule, getStudioScheduleRange, getStudioBooking, acceptBookingWithStation, assignArtist, createManualBooking, createFollowUpBooking, getWalkIns, rejectBooking, recordOutcome } from '@/lib/api';
 import BookingDetailPanel from '@/components/BookingDetailPanel';
 import { getCached, setCached, invalidatePrefix } from '@/lib/cache';
 import CompleteBookingModal from '@/components/CompleteBookingModal';
 import RejectBookingModal from '@/components/RejectBookingModal';
+import { initials, toISODate } from '@/lib/format';
 
 const HOUR_PX   = 64;
 const DAY_START = 8;
@@ -21,9 +22,7 @@ const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
-function toISO(d) {
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-}
+const toISO = toISODate; // local alias; the many call sites below read cleaner as toISO
 function getMonday(d) {
   const r = new Date(d);
   const dow = r.getDay();
@@ -67,7 +66,7 @@ function useBookingActions(afterChange) {
     setSelectedEntry(entry);
     setDetailBooking(null);
     setDetailLoading(true);
-    getBooking(entry.bookingId)
+    getStudioBooking(entry.bookingId)
       .then(setDetailBooking)
       .catch(() => {}) // fall back to schedule entry data
       .finally(() => setDetailLoading(false));
@@ -101,8 +100,11 @@ function useBookingActions(afterChange) {
     if (action === 'accept')  run(() => acceptBookingWithStation(selectedEntry.bookingId, stationId), () => {});
   }
 
-  const confirmComplete = (finalPrice, paymentMethod) =>
-    run(() => recordOutcome(completeTarget.id, 'completed', finalPrice, paymentMethod), () => setCompleteTarget(null));
+  const confirmComplete = (finalPrice, paymentMethod, wantsFollowUp) =>
+    run(async () => {
+      await recordOutcome(completeTarget.id, 'completed', finalPrice, paymentMethod);
+      if (wantsFollowUp) await createFollowUpBooking(completeTarget.id);
+    }, () => setCompleteTarget(null));
   const confirmNoShow = () =>
     run(() => recordOutcome(noShowTarget, 'no_show'), () => setNoShowTarget(null));
   const confirmReject = (reason) =>
@@ -396,12 +398,12 @@ function DayView({ date }) {
 
         {cols.map(artist => {
           const color    = artistColor[artist.artistId] ?? '#8b9dc3';
-          const initials = artist.name ? artist.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase() : '?';
+          const artistInitials = initials(artist.name);
           return (
             <div key={artist.id} style={s.artistHeader}>
               {artist.profileImage
                 ? <img src={artist.profileImage} alt={artist.name} style={s.artistAvatar} />
-                : <div style={{ ...s.artistAvatar, ...s.artistAvatarFallback, borderColor: color }}>{initials}</div>
+                : <div style={{ ...s.artistAvatar, ...s.artistAvatarFallback, borderColor: color }}>{artistInitials}</div>
               }
               <span style={{ ...s.artistName, color }}>{artist.name}</span>
             </div>

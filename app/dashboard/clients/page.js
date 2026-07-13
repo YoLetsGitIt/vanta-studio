@@ -11,6 +11,7 @@ const TATTOO_STYLES = [
 ];
 import { getCached, setCached } from '@/lib/cache';
 import { statusColors, capitalise } from '@/lib/status';
+import { formatDob } from '@/lib/format';
 
 function ClientsInner() {
   const params = useSearchParams();
@@ -151,24 +152,25 @@ function ClientsInner() {
 
   const selectedClient = selected ? filtered.find(c => (c.email || c.name) === selected) : null;
 
-  function exportCSV() {
-    const rows = [
-      ['Name', 'Email', 'Phone', 'DOB', 'Total Bookings', 'Last Booking'],
-      ...clients.map(c => [
-        c.name,
-        c.email ?? '',
-        c.phone ?? '',
-        c.dob ?? '',
-        c.bookings.length,
-        c.lastBooking ? new Date(c.lastBooking).toLocaleDateString('en-AU') : '',
-      ]),
-    ];
-    const csv = rows.map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
-    a.download = 'clients.csv';
-    a.click();
-  }
+  // Client data export disabled for now — re-enable when the export flow is finalised.
+  // function exportCSV() {
+  //   const rows = [
+  //     ['Name', 'Email', 'Phone', 'DOB', 'Total Bookings', 'Last Booking'],
+  //     ...clients.map(c => [
+  //       c.name,
+  //       c.email ?? '',
+  //       c.phone ?? '',
+  //       c.dob ?? '',
+  //       c.bookings.length,
+  //       c.lastBooking ? new Date(c.lastBooking).toLocaleDateString('en-AU') : '',
+  //     ]),
+  //   ];
+  //   const csv = rows.map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
+  //   const a = document.createElement('a');
+  //   a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+  //   a.download = 'clients.csv';
+  //   a.click();
+  // }
 
   const handleRecordConsent = useCallback(async (email) => {
     await recordConsentInStudio(email);
@@ -183,6 +185,7 @@ function ClientsInner() {
       <div style={s.header}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <h1 style={s.title}>Clients</h1>
+          {/* Client data export disabled for now — re-enable when the export flow is finalised.
           <button
             onClick={exportCSV}
             disabled={clients.length === 0}
@@ -191,6 +194,7 @@ function ClientsInner() {
           >
             Export CSV
           </button>
+          */}
         </div>
         <div style={s.searchWrap}>
           <input
@@ -598,10 +602,6 @@ function parseStyles(raw) {
   try { return JSON.parse(raw); } catch { return []; }
 }
 
-function formatDob(dob) {
-  if (!dob) return null;
-  return new Date(dob + 'T12:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
-}
 
 const s = {
   page: {

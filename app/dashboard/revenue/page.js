@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { getStudioRevenueStats, getPayoutSummaries, createPayout, getArtistPayoutHistory } from '@/lib/api';
 import { getSupabase } from '@/lib/supabase';
+import { toISODate } from '@/lib/format';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
   PieChart, Pie, Cell, Legend,
@@ -18,10 +19,8 @@ const QUICK_OPTIONS = [
   { label: 'YTD', days: null },
 ];
 
-// Local date, not toISOString() — UTC would roll "today" back a day in AU timezones.
-function toDateStr(d) {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
+// Local date (toISODate), not toISOString() — UTC would roll "today" back a day in AU timezones.
+const toDateStr = toISODate;
 function dateFromDaysAgo(n) { const d = new Date(); d.setDate(d.getDate() - n); return toDateStr(d); }
 function ytdStart() { return new Date().getFullYear() + '-01-01'; }
 
@@ -30,7 +29,7 @@ function fmt(n) {
   return '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 function fmtHours(h) { return h ? Number(h).toFixed(1) + 'h' : '—'; }
-function formatSource(s) { return ({ app: 'App', walkin: 'Walk-in', personal: 'Manual' })[s] ?? s; }
+function formatSource(s) { return ({ app: 'App', walkin: 'Walk-in', personal: 'Manual', import: 'Imported' })[s] ?? s; }
 function formatDate(d) {
   if (!d) return '—';
   return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });

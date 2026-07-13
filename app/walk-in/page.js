@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { getSupabase } from '@/lib/supabase';
-import { getStudioPublic, createWalkIn, walkinUploadSign, getStudioConsentTemplates } from '@/lib/api';
+import { getStudioPublic, createWalkIn, walkinUploadSign, signatureUploadSign, getStudioConsentTemplates } from '@/lib/api';
 
 const SESSION_TYPES = ['Tattoo', 'Piercing', 'Consultation', 'Touch-up', 'Cover-up', 'Other'];
 
@@ -125,9 +125,6 @@ function WalkInInner() {
   const [guardianEmail, setGuardianEmail] = useState('');
   const [guardianPhone, setGuardianPhone] = useState('');
 
-  // Legacy single consent (fallback if no templates)
-  const [consentAccepted, setConsentAccepted] = useState(false);
-  const [signatureBlob, setSignatureBlob] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [done, setDone]             = useState(false);
@@ -140,7 +137,7 @@ function WalkInInner() {
       .catch(e => setStudioErr(e.message));
     getStudioConsentTemplates(studioId)
       .then(d => setConsentTemplates(d.templates ?? []))
-      .catch(() => {}); // non-fatal — falls back to studio.consent_form
+      .catch(() => {}); // non-fatal — studio may have no consent forms
   }, [studioId]);
 
   // Check existing session and pre-fill form fields from Supabase user
@@ -252,42 +249,35 @@ function WalkInInner() {
     e.preventDefault();
     if (placements.length === 0) { setSubmitError('Please select at least one placement.'); return; }
 
-    // Validate template forms
-    if (consentTemplates.length > 0) {
-      for (const t of consentTemplates) {
-        const ts = templateState[t.id] ?? {};
-        // Validate required fields
-        for (const f of (t.fields ?? [])) {
-          if (f.required && ['text', 'textarea', 'yesno'].includes(f.type)) {
-            if (!ts.answers?.[f.id]) {
-              setSubmitError(`Please complete all required fields in "${t.name}".`);
-              return;
-            }
-          }
-          if (f.required && f.type === 'checkbox' && !ts.answers?.[f.id]) {
-            setSubmitError(`Please check all required boxes in "${t.name}".`);
+    // Validate consent form templates
+    for (const t of consentTemplates) {
+      const ts = templateState[t.id] ?? {};
+      for (const f of (t.fields ?? [])) {
+        if (f.required && ['text', 'textarea', 'yesno'].includes(f.type)) {
+          if (!ts.answers?.[f.id]) {
+            setSubmitError(`Please complete all required fields in "${t.name}".`);
             return;
           }
         }
-        if (t.requires_signature && !ts.sigBlob) {
-          setSubmitError(`Please sign "${t.name}".`);
+        if (f.required && f.type === 'checkbox' && !ts.answers?.[f.id]) {
+          setSubmitError(`Please check all required boxes in "${t.name}".`);
           return;
         }
-        if (isMinor && t.requires_minor_guardian) {
-          if (!guardianName.trim()) { setSubmitError('Please provide the guardian\'s name.'); return; }
-          if (!ts.guardianSigBlob) { setSubmitError(`Guardian signature required for "${t.name}".`); return; }
-        }
       }
-    } else {
-      // Legacy fallback
-      if (studio.consent_form && !consentAccepted) { setSubmitError('Please agree to the consent form.'); return; }
-      if (studio.consent_form && consentAccepted && !signatureBlob) { setSubmitError('Please draw your signature above.'); return; }
+      if (t.requires_signature && !ts.sigBlob) {
+        setSubmitError(`Please sign "${t.name}".`);
+        return;
+      }
+      if (isMinor && t.requires_minor_guardian) {
+        if (!guardianName.trim()) { setSubmitError('Please provide the guardian\'s name.'); return; }
+        if (!ts.guardianSigBlob) { setSubmitError(`Guardian signature required for "${t.name}".`); return; }
+      }
     }
 
     setSubmitError('');
     setSubmitting(true);
     try {
-      // Upload reference photos
+      // Upload reference photos → public walkin-images bucket
       let imagePaths = [];
       if (photos.length > 0) {
         const fileDescs = photos.map(f => ({ mime_type: f.type || 'image/jpeg', byte_size: f.size }));
@@ -303,13 +293,12 @@ function WalkInInner() {
         imagePaths = slots.map(s => s.storage_object_path);
       }
 
-      // Upload legacy single signature
-      let signatureImagePath = null;
-      if (consentTemplates.length === 0 && signatureBlob) {
-        const [sigSlot] = await walkinUploadSign(studioId, [{ mime_type: 'image/png', byte_size: signatureBlob.size }]);
-        const sigResp = await fetch(sigSlot.upload_url, { method: 'PUT', headers: { 'Content-Type': 'image/png' }, body: signatureBlob });
-        if (!sigResp.ok) throw new Error('Signature upload failed — please try again.');
-        signatureImagePath = sigSlot.storage_object_path;
+      // Upload signature PNG → private consent-signatures bucket
+      async function uploadSignature(blob, label) {
+        const [slot] = await signatureUploadSign(studioId, [{ mime_type: 'image/png', byte_size: blob.size }]);
+        const resp = await fetch(slot.upload_url, { method: 'PUT', headers: { 'Content-Type': 'image/png' }, body: blob });
+        if (!resp.ok) throw new Error(`${label} upload failed — please try again.`);
+        return slot.storage_object_path;
       }
 
       // Upload per-template signatures and build submissions
@@ -320,17 +309,10 @@ function WalkInInner() {
         let guardianSigPath = '';
 
         if (t.requires_signature && ts.sigBlob) {
-          const [slot] = await walkinUploadSign(studioId, [{ mime_type: 'image/png', byte_size: ts.sigBlob.size }]);
-          const resp = await fetch(slot.upload_url, { method: 'PUT', headers: { 'Content-Type': 'image/png' }, body: ts.sigBlob });
-          if (!resp.ok) throw new Error(`Signature upload failed for "${t.name}".`);
-          clientSigPath = slot.storage_object_path;
+          clientSigPath = await uploadSignature(ts.sigBlob, `Signature for "${t.name}"`);
         }
-
         if (isMinor && t.requires_minor_guardian && ts.guardianSigBlob) {
-          const [slot] = await walkinUploadSign(studioId, [{ mime_type: 'image/png', byte_size: ts.guardianSigBlob.size }]);
-          const resp = await fetch(slot.upload_url, { method: 'PUT', headers: { 'Content-Type': 'image/png' }, body: ts.guardianSigBlob });
-          if (!resp.ok) throw new Error(`Guardian signature upload failed for "${t.name}".`);
-          guardianSigPath = slot.storage_object_path;
+          guardianSigPath = await uploadSignature(ts.guardianSigBlob, `Guardian signature for "${t.name}"`);
         }
 
         consentSubmissions.push({
@@ -357,8 +339,7 @@ function WalkInInner() {
         design_details:       design,
         notes,
         image_paths:          imagePaths,
-        consent_accepted:     consentAccepted || consentSubmissions.length > 0,
-        signature_image_path: signatureImagePath,
+        consent_accepted:     consentSubmissions.length > 0,
         consent_submissions:  consentSubmissions,
       });
       setDone(true);
@@ -608,25 +589,6 @@ function WalkInInner() {
               </div>
             );
           })}
-
-          {/* ── Legacy fallback consent (only if no templates) ── */}
-          {consentTemplates.length === 0 && studio.consent_form && (
-            <div style={s.consentBox}>
-              <p style={s.consentText}>{studio.consent_form}</p>
-              <label style={s.consentCheck}>
-                <input
-                  type="checkbox"
-                  checked={consentAccepted}
-                  onChange={e => setConsentAccepted(e.target.checked)}
-                  style={{ accentColor: '#f5ecd9', flexShrink: 0 }}
-                />
-                <span>I have read and agree to the above</span>
-              </label>
-              {consentAccepted && (
-                <SignaturePad onCapture={setSignatureBlob} />
-              )}
-            </div>
-          )}
 
           {submitError && <p style={s.error}>{submitError}</p>}
 

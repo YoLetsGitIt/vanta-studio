@@ -10,6 +10,7 @@ import {
   createManualBooking,
 } from '@/lib/api';
 import { invalidatePrefix } from '@/lib/cache';
+import { formatDob } from '@/lib/format';
 
 const DURATION_OPTIONS = [
   { label: '30 min', value: 30 },
@@ -28,10 +29,6 @@ function todayStr() {
   return new Date().toLocaleDateString('en-CA');
 }
 
-function formatDob(dob) {
-  if (!dob) return null;
-  return new Date(dob + 'T12:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
-}
 
 function nextHalfHour() {
   const d = new Date();

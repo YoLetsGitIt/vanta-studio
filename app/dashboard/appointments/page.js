@@ -293,7 +293,9 @@ function SkeletonList() {
 }
 
 function BookingRow({ booking: b, selected, onSelect }) {
-  const sc = statusColors(b.status);
+  // No-shows are stored as status='completed' + outcome='no_show'; badge them distinctly.
+  const displayStatus = b.status === 'completed' && b.outcome === 'no_show' ? 'no_show' : b.status;
+  const sc = statusColors(displayStatus);
   const dateStr = b.chosen_time || b.proposed_time_primary;
   const date = dateStr
     ? new Date(dateStr).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -302,7 +304,7 @@ function BookingRow({ booking: b, selected, onSelect }) {
     b.session_type ? capitalise(b.session_type.replace(/_/g, ' ')) : null,
     b.body_location || null,
   ].filter(Boolean);
-  const SOURCE_LABELS = { walkin: 'Walk-in', personal: 'Manual', app: 'App' };
+  const SOURCE_LABELS = { walkin: 'Walk-in', personal: 'Manual', app: 'App', import: 'Imported' };
   const sourceLabel = SOURCE_LABELS[b.source] ?? null;
 
   return (
@@ -324,7 +326,7 @@ function BookingRow({ booking: b, selected, onSelect }) {
       </div>
       <div style={s.rowRight}>
         <span style={{ ...s.statusBadge, background: sc.bg, color: sc.text, border: `1px solid ${sc.border}` }}>
-          {statusLabel(b.status)}
+          {statusLabel(displayStatus)}
         </span>
         {date
           ? <span style={s.dateText}>{date}</span>

@@ -529,7 +529,6 @@ export default function SettingsPage() {
   const [name, setName] = useState('');
   const [address, setAddress] = useState('');
   const [email, setEmail] = useState('');
-  const [consentForm, setConsentForm] = useState('');
   const [aftercareInstructions, setAftercareInstructions] = useState('');
   const [widgetBgColor, setWidgetBgColor] = useState('#111111');
   const [widgetAccentColor, setWidgetAccentColor] = useState('#f5ecd9');
@@ -584,7 +583,6 @@ export default function SettingsPage() {
         ]);
         setName(account.studio?.name ?? '');
         setAddress(account.studio?.address_string ?? '');
-        setConsentForm(account.studio?.consent_form ?? '');
         setAftercareInstructions(account.studio?.aftercare_instructions ?? '');
         setWidgetBgColor(account.studio?.widget_bg_color || '#111111');
         setWidgetAccentColor(account.studio?.widget_accent_color || '#f5ecd9');
@@ -609,7 +607,7 @@ export default function SettingsPage() {
     setSaving(true); setProfileError('');
     try {
       const cut = parseFloat(studioCut);
-      await updateStudioProfile(name.trim(), address.trim(), consentForm, widgetBgColor, widgetAccentColor, isNaN(cut) ? 0 : cut, aftercareInstructions);
+      await updateStudioProfile(name.trim(), address.trim(), widgetBgColor, widgetAccentColor, isNaN(cut) ? 0 : cut, aftercareInstructions);
       invalidate('studio-account');
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
@@ -903,20 +901,6 @@ export default function SettingsPage() {
 
         {/* ── Bookings ── */}
         <p style={{ ...s.groupLabel, marginTop: '0.5rem' }}>Bookings</p>
-
-        <section style={{ ...s.card, gridColumn: '1 / -1' }}>
-          <h2 style={s.sectionTitle}>Consent Form</h2>
-          <p style={s.sectionDesc}>A simple consent text shown to clients before submitting a walk-in. Leave blank to disable. Use Consent Form Templates below for more advanced forms.</p>
-          <textarea
-            style={{ ...s.input, minHeight: 100, resize: 'vertical', lineHeight: 1.6 }}
-            value={consentForm}
-            onChange={e => setConsentForm(e.target.value)}
-            placeholder="e.g. By submitting this form you confirm you are 18+ and consent to receive a tattoo…"
-          />
-          <button onClick={saveProfile} style={s.saveBtn} disabled={saving}>
-            {saving ? 'Saving…' : saved ? 'Saved!' : 'Save'}
-          </button>
-        </section>
 
         <section style={{ ...s.card, gridColumn: '1 / -1' }}>
           <h2 style={s.sectionTitle}>Aftercare Instructions</h2>
