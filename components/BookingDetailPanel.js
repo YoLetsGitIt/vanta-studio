@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { getAvailableStations, getClientConsents, recordConsentInStudio, getNotes, addNote, deleteNote, getBookingConsentSubmissions, getStudioClients } from '@/lib/api';
+import { getAvailableStations, getStations, getClientConsents, recordConsentInStudio, getNotes, addNote, deleteNote, getBookingConsentSubmissions, getStudioClients } from '@/lib/api';
 import { statusColors, statusLabel, capitalise as cap } from '@/lib/status';
 import { formatDob as fmtDob } from '@/lib/format';
 import { getCached, setCached } from '@/lib/cache';
@@ -72,6 +72,7 @@ export default function BookingDetailPanel({
 
   // ── Contact-book profile (allergies / preferences / pain tolerance) ─────────
   const [clientProfile, setClientProfile] = useState(null);
+  const [stationName,   setStationName]   = useState(null);
 
   // ── Consent submissions (new template system) ──────────────────────────────
   const [consentSubmissions, setConsentSubmissions] = useState([]);
@@ -107,6 +108,7 @@ export default function BookingDetailPanel({
   const aftercareInstructions = booking?.aftercare_instructions ?? null;
   const cancelReason      = booking?.cancellation_reason ?? null;
   const source            = booking?.source              ?? null;
+  const stationId         = booking?.station_id          ?? entry?.stationId   ?? null;
 
   // Under the 5-status model a no-show is stored as status='completed' with
   // outcome='no_show', so "completed" visuals must exclude no-shows explicitly.
@@ -188,6 +190,22 @@ export default function BookingDetailPanel({
       .then(d => { const c = d.clients ?? []; setCached('clients:contacts', c); apply(c); })
       .catch(() => {});
   }, [email, phone]);
+
+  // ── Resolve assigned station name from its id ──────────────────────────────
+  useEffect(() => {
+    setStationName(entry?.stationName ?? null);
+    if (!stationId) return;
+    if (entry?.stationName) return;
+    const apply = (stations) => {
+      const st = (stations ?? []).find(s => s.id === stationId);
+      if (st) setStationName(st.name);
+    };
+    const cached = getCached('stations:all');
+    if (cached) { apply(cached); return; }
+    getStations()
+      .then(d => { const s = d.stations ?? []; setCached('stations:all', s); apply(s); })
+      .catch(() => {});
+  }, [stationId, entry?.stationName]);
 
   const clientAge         = ageFromDob(dob);
   const designPreferences = parseStyles(clientProfile?.design_preferences);
@@ -381,6 +399,7 @@ export default function BookingDetailPanel({
 
         {proposedTime && <Row label="Proposed" value={fmtDate(proposedTime)} />}
         {chosenTime   && <Row label="Appointment" value={fmtDate(chosenTime)} />}
+        {stationName  && <Row label="Station" value={stationName} />}
         {cancelReason && <Row label="Cancelled" value={cancelReason} />}
 
         {/* ── Client info ── */}
