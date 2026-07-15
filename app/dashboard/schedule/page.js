@@ -22,7 +22,7 @@ const SOURCE_STYLE = {
   personal: { bg: 'rgba(167,139,250,0.12)', border: '#a78bfa', tag: 'Personal', tagColor: '#a78bfa', dot: '#a78bfa' },
 };
 function srcStyle(source) {
-  return source === 'walkin' ? SOURCE_STYLE.studio : SOURCE_STYLE.personal;
+  return (source === 'walkin' || source === 'web') ? SOURCE_STYLE.studio : SOURCE_STYLE.personal;
 }
 
 // ── helpers ──────────────────────────────────────────────────────────────────

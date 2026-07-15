@@ -304,7 +304,7 @@ function BookingRow({ booking: b, selected, onSelect }) {
     b.session_type ? capitalise(b.session_type.replace(/_/g, ' ')) : null,
     b.body_location || null,
   ].filter(Boolean);
-  const sourceLabel = b.source === 'walkin' ? 'Studio' : 'Personal';
+  const sourceLabel = (b.source === 'walkin' || b.source === 'web') ? 'Studio' : 'Personal';
 
   return (
     <div
