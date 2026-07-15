@@ -20,6 +20,12 @@ const PALETTE = [
 ];
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
+// Source-based visual treatment for calendar blocks
+const SOURCE_STYLE = {
+  walkin:   { bg: 'rgba(245,158,58,0.1)',  tag: 'Walk-in', tagColor: '#f59e3a', dot: '#f59e3a' },
+  personal: { bg: 'rgba(167,139,250,0.1)', tag: 'Manual',  tagColor: '#a78bfa', dot: '#a78bfa' },
+};
+
 // ── helpers ──────────────────────────────────────────────────────────────────
 
 const toISO = toISODate; // local alias; the many call sites below read cleaner as toISO
@@ -265,10 +271,13 @@ function MonthView({ monthStart, onDayClick }) {
                 {/* Booking chips */}
                 <div style={s.monthChipList}>
                   {visible.map(b => {
-                    const color = artistColor[b.artistId] ?? '#8b9dc3';
+                    const artistCol = artistColor[b.artistId] ?? '#8b9dc3';
+                    const src = SOURCE_STYLE[b.source];
+                    const dotColor = src ? src.dot : artistCol;
+                    const dotShape = src ? '2px' : '50%';
                     return (
-                      <div key={b.bookingId} style={{ ...s.chip, cursor: 'pointer' }} onClick={e => { e.stopPropagation(); actions.openDetail(b); }}>
-                        <div style={{ width: 6, height: 6, borderRadius: '50%', background: color, flexShrink: 0 }} />
+                      <div key={b.bookingId} style={{ ...s.chip, cursor: 'pointer', background: src ? src.bg : 'var(--bg-card)' }} onClick={e => { e.stopPropagation(); actions.openDetail(b); }}>
+                        <div style={{ width: 6, height: 6, borderRadius: dotShape, background: dotColor, flexShrink: 0 }} />
                         <span style={s.chipTime}>{fmtTime(b.chosenTime)}</span>
                         <span style={s.chipClient}>{b.clientName.split(' ')[0]}</span>
                       </div>
@@ -286,17 +295,24 @@ function MonthView({ monthStart, onDayClick }) {
         </div>
       </div>
 
-      {/* Artist colour legend */}
-      {workingArtists.length > 0 && (
-        <div style={s.legend}>
-          {workingArtists.map((a, i) => (
-            <div key={a.artistId} style={s.legendItem}>
-              <div style={{ width: 8, height: 8, borderRadius: '50%', background: artistColor[a.artistId], flexShrink: 0 }} />
-              <span style={s.legendName}>{a.name}</span>
-            </div>
-          ))}
+      {/* Legend */}
+      <div style={s.legend}>
+        {workingArtists.map(a => (
+          <div key={a.artistId} style={s.legendItem}>
+            <div style={{ width: 8, height: 8, borderRadius: '50%', background: artistColor[a.artistId], flexShrink: 0 }} />
+            <span style={s.legendName}>{a.name}</span>
+          </div>
+        ))}
+        {workingArtists.length > 0 && <div style={{ width: 1, height: 14, background: 'var(--border-faint)', alignSelf: 'center', margin: '0 0.25rem' }} />}
+        <div style={s.legendItem}>
+          <div style={{ width: 8, height: 2, borderRadius: 1, background: SOURCE_STYLE.walkin.dot, flexShrink: 0 }} />
+          <span style={{ ...s.legendName, color: SOURCE_STYLE.walkin.tagColor }}>Walk-in</span>
         </div>
-      )}
+        <div style={s.legendItem}>
+          <div style={{ width: 8, height: 2, borderRadius: 1, background: SOURCE_STYLE.personal.dot, flexShrink: 0 }} />
+          <span style={{ ...s.legendName, color: SOURCE_STYLE.personal.tagColor }}>Manual</span>
+        </div>
+      </div>
     </div>
 
     <BookingOverlays actions={actions} />
@@ -439,15 +455,19 @@ function DayView({ date }) {
                 const height   = Math.max(durMin * (HOUR_PX / 60), 24);
                 if (top < 0 || top > GRID_H) return null;
                 const isSelected = actions.selectedEntry?.bookingId === b.bookingId;
+                const src = SOURCE_STYLE[b.source];
                 return (
                   <div
                     key={b.bookingId}
                     onClick={() => actions.openDetail(b)}
-                    style={{ ...s.block, top, height, left: 4, right: 4, width: undefined, borderLeftColor: color, cursor: 'pointer', ...(isSelected ? s.blockSelected : {}) }}
+                    style={{ ...s.block, top, height, left: 4, right: 4, width: undefined, borderLeftColor: color, background: src ? src.bg : 'var(--bg-chip)', cursor: 'pointer', ...(isSelected ? s.blockSelected : {}) }}
                   >
                     <span style={s.blockClient}>{b.clientName}</span>
-                    {height >= 36 && b.sessionType && <span style={s.blockMeta}>{b.sessionType}</span>}
-                    {height >= 52 && durMin && <span style={s.blockMeta}>{fmtDuration(durMin)}</span>}
+                    {height >= 28 && src && (
+                      <span style={{ fontSize: '0.6rem', fontWeight: 700, color: src.tagColor, lineHeight: 1, letterSpacing: '0.03em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{src.tag}</span>
+                    )}
+                    {height >= 44 && b.sessionType && <span style={s.blockMeta}>{b.sessionType}</span>}
+                    {height >= 56 && durMin && <span style={s.blockMeta}>{fmtDuration(durMin)}</span>}
                   </div>
                 );
               })}
@@ -633,6 +653,7 @@ function StationView({ date }) {
                       const durMins  = e.durationMins ?? 60;
                       const heightPx = Math.max((durMins / 60) * HOUR_PX, 24);
                       const color    = STATUS_COLORS_SU[e.status] ?? 'var(--text-ghost)';
+                      const src      = SOURCE_STYLE[e.source];
                       return (
                         <div key={e.bookingId} style={{
                           position: 'absolute', top: topPx, left: 6, right: 6, height: heightPx,
@@ -642,6 +663,7 @@ function StationView({ date }) {
                         }}>
                           <div style={{ fontSize: '0.72rem', fontWeight: 700, color, lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                             {e.clientName}
+                            {src && <span style={{ marginLeft: '0.35rem', fontSize: '0.6rem', fontWeight: 700, color: src.tagColor }}>{src.tag}</span>}
                           </div>
                           {durMins >= 45 && (
                             <div style={{ fontSize: '0.65rem', color: 'var(--text-ghost)', marginTop: 2 }}>
