@@ -532,7 +532,8 @@ export default function SettingsPage() {
   const [aftercareInstructions, setAftercareInstructions] = useState('');
   const [widgetBgColor, setWidgetBgColor] = useState('#111111');
   const [widgetAccentColor, setWidgetAccentColor] = useState('#f5ecd9');
-  const [studioCut, setStudioCut] = useState('0');
+  const [walkinCut, setWalkinCut] = useState('0');
+  const [personalCut, setPersonalCut] = useState('0');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [profileError, setProfileError] = useState('');
@@ -586,7 +587,8 @@ export default function SettingsPage() {
         setAftercareInstructions(account.studio?.aftercare_instructions ?? '');
         setWidgetBgColor(account.studio?.widget_bg_color || '#111111');
         setWidgetAccentColor(account.studio?.widget_accent_color || '#f5ecd9');
-        setStudioCut(String(account.studio?.studio_cut_percent ?? 0));
+        setWalkinCut(String(account.studio?.walkin_cut_percent ?? account.studio?.studio_cut_percent ?? 0));
+        setPersonalCut(String(account.studio?.personal_cut_percent ?? account.studio?.studio_cut_percent ?? 0));
         setEmail(session?.user?.email ?? '');
         setStudioId(account.studio_id);
         setWalkInUrl(window.location.origin + '/walk-in?s=' + account.studio_id);
@@ -606,8 +608,9 @@ export default function SettingsPage() {
     if (!name.trim()) { setProfileError('Studio name is required.'); return; }
     setSaving(true); setProfileError('');
     try {
-      const cut = parseFloat(studioCut);
-      await updateStudioProfile(name.trim(), address.trim(), widgetBgColor, widgetAccentColor, isNaN(cut) ? 0 : cut, aftercareInstructions);
+      const wc = parseFloat(walkinCut);
+      const pc = parseFloat(personalCut);
+      await updateStudioProfile(name.trim(), address.trim(), widgetBgColor, widgetAccentColor, isNaN(wc) ? 0 : wc, isNaN(pc) ? 0 : pc, aftercareInstructions);
       invalidate('studio-account');
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
@@ -831,23 +834,31 @@ export default function SettingsPage() {
               <input style={s.input} value={address} onChange={e => setAddress(e.target.value)} placeholder="Studio address" />
             </div>
             <div style={s.field}>
-              <label style={s.label}>Studio cut (%)</label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <input
-                  style={{ ...s.input, width: 90 }}
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="0.5"
-                  value={studioCut}
-                  onChange={e => setStudioCut(e.target.value)}
-                  placeholder="0"
-                />
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                  {studioCut && !isNaN(parseFloat(studioCut)) && parseFloat(studioCut) > 0
-                    ? `Artist keeps ${(100 - parseFloat(studioCut)).toFixed(1)}%`
-                    : 'No cut taken'}
-                </span>
+              <label style={s.label}>Studio commission (%)</label>
+              <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: '0 0 0.5rem' }}>
+                The studio&apos;s cut of a completed booking. Walk-ins and personal commissions can differ.
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                {[
+                  { label: 'Walk-in', value: walkinCut, set: setWalkinCut, hint: 'Studio-sourced walk-in clients' },
+                  { label: 'Personal', value: personalCut, set: setPersonalCut, hint: 'App, manual & imported bookings' },
+                ].map(({ label, value, set, hint }) => (
+                  <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                    <span style={{ width: 68, fontSize: '0.82rem', color: 'var(--text)', fontWeight: 500 }}>{label}</span>
+                    <input
+                      style={{ ...s.input, width: 90 }}
+                      type="number" min="0" max="100" step="0.5"
+                      value={value}
+                      onChange={e => set(e.target.value)}
+                      placeholder="0"
+                    />
+                    <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                      {value && !isNaN(parseFloat(value)) && parseFloat(value) > 0
+                        ? `Artist keeps ${(100 - parseFloat(value)).toFixed(1)}% · ${hint}`
+                        : `No cut · ${hint}`}
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
             {profileError && <p style={s.errorText}>{profileError}</p>}
