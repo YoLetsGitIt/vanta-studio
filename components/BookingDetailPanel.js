@@ -88,6 +88,7 @@ export default function BookingDetailPanel({
   const artistName  = entry?.artistName          ?? null;
   const sessionType = booking?.session_type      ?? entry?.sessionType    ?? null;
   const placement   = booking?.body_location     ?? entry?.placement      ?? null;
+  const size        = booking?.size              ?? entry?.size           ?? null;
   const color       = booking?.color             ?? null;
   const design      = booking?.design_details    ?? entry?.designDetails  ?? null;
   const notes       = booking?.additional_notes  ?? entry?.notes          ?? null;
@@ -351,6 +352,7 @@ export default function BookingDetailPanel({
         {artistName && <Row label="Artist" value={artistName} />}
         {sessionType && <Row label="Session" value={cap(sessionType.replace(/_/g, ' '))} />}
         {placement   && <Row label="Placement" value={placement} />}
+        {size        && <Row label="Size" value={size} />}
         {color       && <Row label="Style" value={color} />}
         {design      && <Row label="Design" value={design} />}
         {notes       && <Row label="Notes" value={notes} />}

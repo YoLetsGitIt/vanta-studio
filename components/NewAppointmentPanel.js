@@ -113,6 +113,10 @@ export default function NewAppointmentPanel({ open, onClose, onCreated }) {
   const [durationMins, setDurationMins] = useState(60);
   const [stationId, setStationId] = useState('');
 
+  // ── Details
+  const [size, setSize] = useState('');
+  const [retouch, setRetouch] = useState(false);
+
   // ── Pricing
   const [finalPrice, setFinalPrice] = useState('');
   const [depositAmount, setDepositAmount] = useState('');
@@ -257,6 +261,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated }) {
     setStartTime(nextHalfHour());
     setDurationMins(60);
     setStationId('');
+    setSize(''); setRetouch(false);
     setFinalPrice(''); setDepositAmount('');
     setNotes(''); setError('');
     setAvailableStations(null);
@@ -274,7 +279,8 @@ export default function NewAppointmentPanel({ open, onClose, onCreated }) {
     try {
       const chosenTime = new Date(`${bookingDate}T${startTime}:00`).toISOString();
       const fp = parseFloat(finalPrice) || 0;
-      const da = parseFloat(depositAmount) || 0;
+      // Retouch bookings never take a deposit.
+      const da = retouch ? 0 : (parseFloat(depositAmount) || 0);
       const body = {
         artist_id: artistId,
         requester_name: clientName,
@@ -282,6 +288,8 @@ export default function NewAppointmentPanel({ open, onClose, onCreated }) {
         duration_minutes: durationMins,
         deposit_required: da > 0,
       };
+      if (retouch) body.session_type = 'retouch';
+      if (size.trim()) body.size = `${size.trim()}cm`;
       if (clientEmail.trim()) body.requester_email = clientEmail.trim();
       if (clientPhone.trim()) body.requester_phone = clientPhone.trim();
       if (clientDob.trim()) body.dob = clientDob.trim();
@@ -522,6 +530,28 @@ export default function NewAppointmentPanel({ open, onClose, onCreated }) {
               </div>
             )}
 
+            {/* ── DETAILS ── */}
+            <div style={bd.section}>
+              <p style={bd.sectionLabel}>Details</p>
+              <label style={bd.checkRow}>
+                <input type="checkbox" checked={retouch} onChange={e => setRetouch(e.target.checked)} style={bd.checkbox} />
+                <span>Retouch <span style={{ color: 'var(--text-ghost)', fontWeight: 400 }}>· no deposit</span></span>
+              </label>
+              <div style={bd.field}>
+                <label style={bd.label}>Size</label>
+                <div style={bd.prefixWrap}>
+                  <input
+                    style={bd.input}
+                    type="number" min="0" step="0.1"
+                    value={size}
+                    onChange={e => setSize(e.target.value)}
+                    placeholder="e.g. 10"
+                  />
+                  <span style={bd.suffix}>cm</span>
+                </div>
+              </div>
+            </div>
+
             {/* ── PRICING ── */}
             <div style={bd.section}>
               <p style={bd.sectionLabel}>Pricing</p>
@@ -544,11 +574,12 @@ export default function NewAppointmentPanel({ open, onClose, onCreated }) {
                   <div style={bd.prefixWrap}>
                     <span style={bd.prefix}>$</span>
                     <input
-                      style={{ ...bd.input, paddingLeft: '1.75rem' }}
+                      style={{ ...bd.input, paddingLeft: '1.75rem', opacity: retouch ? 0.4 : 1 }}
                       type="number" min="0" step="0.01"
-                      value={depositAmount}
+                      value={retouch ? '' : depositAmount}
                       onChange={e => setDepositAmount(e.target.value)}
-                      placeholder="0.00"
+                      placeholder={retouch ? 'N/A for retouch' : '0.00'}
+                      disabled={retouch}
                     />
                   </div>
                 </div>
@@ -703,6 +734,16 @@ const bd = {
     position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)',
     fontSize: '0.875rem', color: 'var(--text-secondary)', pointerEvents: 'none',
   },
+  suffix: {
+    position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)',
+    fontSize: '0.875rem', color: 'var(--text-secondary)', pointerEvents: 'none',
+  },
+  checkRow: {
+    display: 'flex', alignItems: 'center', gap: '0.5rem',
+    fontSize: '0.85rem', fontWeight: 500, color: 'var(--text)',
+    cursor: 'pointer', marginBottom: '0.85rem',
+  },
+  checkbox: { width: 16, height: 16, accentColor: 'var(--accent)', cursor: 'pointer' },
   linkBtn: {
     background: 'none', border: 'none',
     color: 'var(--accent)', fontSize: '0.8rem', cursor: 'pointer', padding: 0,

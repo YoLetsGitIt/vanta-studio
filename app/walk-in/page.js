@@ -112,6 +112,8 @@ function WalkInInner() {
   const [artistId, setArtistId]     = useState('');
   const [placements, setPlacements]  = useState([]);
   const [design, setDesign]         = useState('');
+  const [size, setSize]             = useState('');
+  const [retouch, setRetouch]       = useState(false);
   const [notes, setNotes]           = useState('');
   const [photos, setPhotos]         = useState([]); // File objects
   const [photoPreviews, setPhotoPreviews] = useState([]);
@@ -335,8 +337,10 @@ function WalkInInner() {
         email,
         phone: `${COUNTRIES.find(c => c.id === phoneCode)?.dial ?? ''} ${phoneNum}`.trim(),
         dob,
+        session_type:         retouch ? 'retouch' : '',
         body_location:        placements.join(', '),
         design_details:       design,
+        size:                 size.trim() ? `${size.trim()}cm` : '',
         notes,
         image_paths:          imagePaths,
         consent_accepted:     consentSubmissions.length > 0,
@@ -493,6 +497,24 @@ function WalkInInner() {
           <Field label="Design description">
             <textarea style={{ ...s.input, ...s.textarea }} value={design} required onChange={e => setDesign(e.target.value)} placeholder="Describe what you'd like…" />
           </Field>
+
+          <Field label="Size (optional)">
+            <div style={{ position: 'relative' }}>
+              <input
+                style={s.input}
+                type="number" min="0" step="0.1"
+                value={size}
+                onChange={e => setSize(e.target.value)}
+                placeholder="e.g. 10"
+              />
+              <span style={{ position: 'absolute', right: '0.85rem', top: '50%', transform: 'translateY(-50%)', color: 'rgba(255,255,255,0.4)', fontSize: '0.85rem', pointerEvents: 'none' }}>cm</span>
+            </div>
+          </Field>
+
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: 'rgba(255,255,255,0.8)', cursor: 'pointer' }}>
+            <input type="checkbox" checked={retouch} onChange={e => setRetouch(e.target.checked)} style={{ width: 16, height: 16, accentColor: '#f5ecd9', cursor: 'pointer' }} />
+            This is a retouch / touch-up
+          </label>
 
           <Field label="Additional notes (optional)">
             <textarea style={{ ...s.input, ...s.textarea }} value={notes} onChange={e => setNotes(e.target.value)} placeholder="Anything else the artist should know" />
