@@ -448,7 +448,7 @@
         };
         if (artistEl && artistEl.value) body.artist_id = artistEl.value;
 
-        return fetch(API + '/studios/' + studioId + '/walkin', {
+        return fetch(API + '/studios/' + studioId + '/studio-booking', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
