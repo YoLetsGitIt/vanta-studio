@@ -18,11 +18,12 @@ const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 // All block colours are source-based — no per-artist palette.
 const SOURCE_STYLE = {
-  walkin:   { bg: 'rgba(245,158,58,0.12)',  border: '#f59e3a', tag: 'Walk-in', tagColor: '#f59e3a', dot: '#f59e3a' },
-  personal: { bg: 'rgba(167,139,250,0.12)', border: '#a78bfa', tag: 'Manual',  tagColor: '#a78bfa', dot: '#a78bfa' },
-  default:  { bg: 'var(--bg-chip)',          border: 'rgba(255,255,255,0.2)', tag: null, tagColor: null, dot: 'var(--text-ghost)' },
+  studio:   { bg: 'rgba(245,158,58,0.12)',  border: '#f59e3a', tag: 'Studio',   tagColor: '#f59e3a', dot: '#f59e3a' },
+  personal: { bg: 'rgba(167,139,250,0.12)', border: '#a78bfa', tag: 'Personal', tagColor: '#a78bfa', dot: '#a78bfa' },
 };
-function srcStyle(source) { return SOURCE_STYLE[source] ?? SOURCE_STYLE.default; }
+function srcStyle(source) {
+  return source === 'walkin' ? SOURCE_STYLE.studio : SOURCE_STYLE.personal;
+}
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -265,7 +266,7 @@ function MonthView({ monthStart, onDayClick }) {
                     const ss = srcStyle(b.source);
                     return (
                       <div key={b.bookingId} style={{ ...s.chip, cursor: 'pointer', background: ss.bg }} onClick={e => { e.stopPropagation(); actions.openDetail(b); }}>
-                        <div style={{ width: 6, height: 6, borderRadius: b.source === 'walkin' || b.source === 'personal' ? '2px' : '50%', background: ss.dot, flexShrink: 0 }} />
+                        <div style={{ width: 6, height: 6, borderRadius: 2, background: ss.dot, flexShrink: 0 }} />
                         <span style={s.chipTime}>{fmtTime(b.chosenTime)}</span>
                         <span style={s.chipClient}>{b.clientName.split(' ')[0]}</span>
                       </div>
@@ -285,16 +286,12 @@ function MonthView({ monthStart, onDayClick }) {
 
       <div style={s.legend}>
         <div style={s.legendItem}>
-          <div style={{ width: 8, height: 8, borderRadius: '50%', background: SOURCE_STYLE.default.border, flexShrink: 0 }} />
-          <span style={s.legendName}>Online</span>
-        </div>
-        <div style={s.legendItem}>
-          <div style={{ width: 8, height: 8, borderRadius: 2, background: SOURCE_STYLE.walkin.dot, flexShrink: 0 }} />
-          <span style={{ ...s.legendName, color: SOURCE_STYLE.walkin.tagColor }}>Walk-in</span>
+          <div style={{ width: 8, height: 8, borderRadius: 2, background: SOURCE_STYLE.studio.dot, flexShrink: 0 }} />
+          <span style={{ ...s.legendName, color: SOURCE_STYLE.studio.tagColor }}>Studio</span>
         </div>
         <div style={s.legendItem}>
           <div style={{ width: 8, height: 8, borderRadius: 2, background: SOURCE_STYLE.personal.dot, flexShrink: 0 }} />
-          <span style={{ ...s.legendName, color: SOURCE_STYLE.personal.tagColor }}>Manual</span>
+          <span style={{ ...s.legendName, color: SOURCE_STYLE.personal.tagColor }}>Personal</span>
         </div>
       </div>
     </div>

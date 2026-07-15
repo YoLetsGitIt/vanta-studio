@@ -343,7 +343,7 @@ export default function BookingDetailPanel({
               {source && (
                 <span style={{ fontSize: '0.68rem', fontWeight: 600, padding: '0.15rem 0.45rem', borderRadius: 4,
                   background: 'var(--bg-chip)', color: 'var(--text-ghost)', border: '1px solid var(--border-faint)' }}>
-                  {source === 'walkin' ? 'Walk-in' : source === 'personal' ? 'Manual' : source}
+                  {source === 'walkin' ? 'Studio' : 'Personal'}
                 </span>
               )}
             </div>
