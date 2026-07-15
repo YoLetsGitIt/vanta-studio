@@ -519,7 +519,14 @@ function PayoutsSection({ payouts, onPay }) {
             {payouts.map(p => (
               <tr key={p.artist_id} style={st.tr}>
                 <td style={{ ...st.td, color: 'var(--text)', fontWeight: 500 }}>{p.artist_name}</td>
-                <td style={st.td}>{fmt(p.total_earned)}</td>
+                <td style={st.td}>
+                  {fmt(p.total_earned)}
+                  {p.earned_walkin > 0 && p.earned_personal > 0 && (
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: 2 }}>
+                      Walk-in {fmt(p.earned_walkin)} · Personal {fmt(p.earned_personal)}
+                    </div>
+                  )}
+                </td>
                 {hasCut && (
                   <td style={{ ...st.td, fontWeight: 600, color: '#4cc98a' }}>{fmt(p.artist_payout)}</td>
                 )}
