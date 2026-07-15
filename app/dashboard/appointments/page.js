@@ -323,6 +323,9 @@ function BookingRow({ booking: b, selected, onSelect }) {
           {b.parent_booking_id && <span style={s.followUpTag}>Follow-up</span>}
         </div>
         {sessionParts.length > 0 && <span style={s.rowMeta}>{sessionParts.join(' · ')}</span>}
+        {b.status === 'pending' && b.created_at && (
+          <span style={s.rowMeta}>Requested {new Date(b.created_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}</span>
+        )}
       </div>
       <div style={s.rowRight}>
         <span style={{ ...s.statusBadge, background: sc.bg, color: sc.text, border: `1px solid ${sc.border}` }}>

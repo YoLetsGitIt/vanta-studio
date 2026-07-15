@@ -109,6 +109,7 @@ export default function BookingDetailPanel({
   const cancelReason      = booking?.cancellation_reason ?? null;
   const source            = booking?.source              ?? null;
   const stationId         = booking?.station_id          ?? entry?.stationId   ?? null;
+  const createdAt         = booking?.created_at          ?? entry?.createdAt   ?? null;
 
   // Under the 5-status model a no-show is stored as status='completed' with
   // outcome='no_show', so "completed" visuals must exclude no-shows explicitly.
@@ -397,6 +398,7 @@ export default function BookingDetailPanel({
           </div>
         )}
 
+        {canAcceptReject && createdAt && <Row label="Requested" value={fmtDate(createdAt)} />}
         {proposedTime && <Row label="Proposed" value={fmtDate(proposedTime)} />}
         {chosenTime   && <Row label="Appointment" value={fmtDate(chosenTime)} />}
         {stationName  && <Row label="Station" value={stationName} />}
