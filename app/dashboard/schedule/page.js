@@ -14,17 +14,15 @@ const DAY_END   = 20;
 const HOURS     = Array.from({ length: DAY_END - DAY_START }, (_, i) => DAY_START + i);
 const GRID_H    = (DAY_END - DAY_START) * HOUR_PX;
 
-const PALETTE = [
-  '#6fa3e8', '#4cc98a', '#f59e3a', '#a78bfa',
-  '#f472b6', '#34d399', '#fb923c', '#e86f6f',
-];
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-// Source-based visual treatment for calendar blocks
+// All block colours are source-based — no per-artist palette.
 const SOURCE_STYLE = {
-  walkin:   { bg: 'rgba(245,158,58,0.1)',  tag: 'Walk-in', tagColor: '#f59e3a', dot: '#f59e3a' },
-  personal: { bg: 'rgba(167,139,250,0.1)', tag: 'Manual',  tagColor: '#a78bfa', dot: '#a78bfa' },
+  walkin:   { bg: 'rgba(245,158,58,0.12)',  border: '#f59e3a', tag: 'Walk-in', tagColor: '#f59e3a', dot: '#f59e3a' },
+  personal: { bg: 'rgba(167,139,250,0.12)', border: '#a78bfa', tag: 'Manual',  tagColor: '#a78bfa', dot: '#a78bfa' },
+  default:  { bg: 'var(--bg-chip)',          border: 'rgba(255,255,255,0.2)', tag: null, tagColor: null, dot: 'var(--text-ghost)' },
 };
+function srcStyle(source) { return SOURCE_STYLE[source] ?? SOURCE_STYLE.default; }
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -219,9 +217,6 @@ function MonthView({ monthStart, onDayClick }) {
     return () => { cancelled = true; };
   }, [toISO(monthStart), refreshKey]); // eslint-disable-line
 
-  const artistColor = {};
-  artists.forEach((a, i) => { artistColor[a.artistId] = PALETTE[i % PALETTE.length]; });
-
   const byDate = {};
   for (const e of entries) {
     const d = e.date ?? toISO(new Date(e.chosenTime));
@@ -231,10 +226,6 @@ function MonthView({ monthStart, onDayClick }) {
 
   const today = toISO(new Date());
 
-  // Artist legend — shown below the grid
-  const workingArtists = artists.filter(a =>
-    Object.values(byDate).some(day => day.some(e => e.artistId === a.artistId))
-  );
 
   if (loading) return <p style={s.msg}>Loading…</p>;
   if (error)   return <p style={{ ...s.msg, color: '#e86f6f' }}>{error}</p>;
@@ -271,13 +262,10 @@ function MonthView({ monthStart, onDayClick }) {
                 {/* Booking chips */}
                 <div style={s.monthChipList}>
                   {visible.map(b => {
-                    const artistCol = artistColor[b.artistId] ?? '#8b9dc3';
-                    const src = SOURCE_STYLE[b.source];
-                    const dotColor = src ? src.dot : artistCol;
-                    const dotShape = src ? '2px' : '50%';
+                    const ss = srcStyle(b.source);
                     return (
-                      <div key={b.bookingId} style={{ ...s.chip, cursor: 'pointer', background: src ? src.bg : 'var(--bg-card)' }} onClick={e => { e.stopPropagation(); actions.openDetail(b); }}>
-                        <div style={{ width: 6, height: 6, borderRadius: dotShape, background: dotColor, flexShrink: 0 }} />
+                      <div key={b.bookingId} style={{ ...s.chip, cursor: 'pointer', background: ss.bg }} onClick={e => { e.stopPropagation(); actions.openDetail(b); }}>
+                        <div style={{ width: 6, height: 6, borderRadius: b.source === 'walkin' || b.source === 'personal' ? '2px' : '50%', background: ss.dot, flexShrink: 0 }} />
                         <span style={s.chipTime}>{fmtTime(b.chosenTime)}</span>
                         <span style={s.chipClient}>{b.clientName.split(' ')[0]}</span>
                       </div>
@@ -295,21 +283,17 @@ function MonthView({ monthStart, onDayClick }) {
         </div>
       </div>
 
-      {/* Legend */}
       <div style={s.legend}>
-        {workingArtists.map(a => (
-          <div key={a.artistId} style={s.legendItem}>
-            <div style={{ width: 8, height: 8, borderRadius: '50%', background: artistColor[a.artistId], flexShrink: 0 }} />
-            <span style={s.legendName}>{a.name}</span>
-          </div>
-        ))}
-        {workingArtists.length > 0 && <div style={{ width: 1, height: 14, background: 'var(--border-faint)', alignSelf: 'center', margin: '0 0.25rem' }} />}
         <div style={s.legendItem}>
-          <div style={{ width: 8, height: 2, borderRadius: 1, background: SOURCE_STYLE.walkin.dot, flexShrink: 0 }} />
+          <div style={{ width: 8, height: 8, borderRadius: '50%', background: SOURCE_STYLE.default.border, flexShrink: 0 }} />
+          <span style={s.legendName}>Online</span>
+        </div>
+        <div style={s.legendItem}>
+          <div style={{ width: 8, height: 8, borderRadius: 2, background: SOURCE_STYLE.walkin.dot, flexShrink: 0 }} />
           <span style={{ ...s.legendName, color: SOURCE_STYLE.walkin.tagColor }}>Walk-in</span>
         </div>
         <div style={s.legendItem}>
-          <div style={{ width: 8, height: 2, borderRadius: 1, background: SOURCE_STYLE.personal.dot, flexShrink: 0 }} />
+          <div style={{ width: 8, height: 8, borderRadius: 2, background: SOURCE_STYLE.personal.dot, flexShrink: 0 }} />
           <span style={{ ...s.legendName, color: SOURCE_STYLE.personal.tagColor }}>Manual</span>
         </div>
       </div>
@@ -366,9 +350,6 @@ function DayView({ date }) {
   // Clear panel when date changes
   useEffect(() => { actions.closeDetail(); }, [date]); // eslint-disable-line
 
-  const artistColor = {};
-  artists.forEach((a, i) => { artistColor[a.artistId] = PALETTE[i % PALETTE.length]; });
-
   const byArtist = {};
   for (const e of entries) {
     if (!e.artistId) continue;
@@ -420,19 +401,15 @@ function DayView({ date }) {
       <div style={{ ...s.grid, gridTemplateColumns: `52px repeat(${cols.length}, minmax(160px, 1fr))` }}>
         <div style={s.cornerCell} />
 
-        {cols.map(artist => {
-          const color    = artistColor[artist.artistId] ?? '#8b9dc3';
-          const artistInitials = initials(artist.name);
-          return (
-            <div key={artist.id} style={s.artistHeader}>
-              {artist.profileImage
-                ? <img src={artist.profileImage} alt={artist.name} style={s.artistAvatar} />
-                : <div style={{ ...s.artistAvatar, ...s.artistAvatarFallback, borderColor: color }}>{artistInitials}</div>
-              }
-              <span style={{ ...s.artistName, color }}>{artist.name}</span>
-            </div>
-          );
-        })}
+        {cols.map(artist => (
+          <div key={artist.id} style={s.artistHeader}>
+            {artist.profileImage
+              ? <img src={artist.profileImage} alt={artist.name} style={s.artistAvatar} />
+              : <div style={{ ...s.artistAvatar, ...s.artistAvatarFallback }}>{initials(artist.name)}</div>
+            }
+            <span style={s.artistName}>{artist.name}</span>
+          </div>
+        ))}
 
         <div style={{ ...s.gutterCol, height: GRID_H }}>
           {HOURS.map(h => (
@@ -443,7 +420,6 @@ function DayView({ date }) {
         </div>
 
         {cols.map(artist => {
-          const color    = artistColor[artist.artistId] ?? '#8b9dc3';
           const bookings = byArtist[artist.artistId] ?? [];
           return (
             <div key={artist.id} style={{ ...s.dayCol, height: GRID_H }}>
@@ -455,16 +431,16 @@ function DayView({ date }) {
                 const height   = Math.max(durMin * (HOUR_PX / 60), 24);
                 if (top < 0 || top > GRID_H) return null;
                 const isSelected = actions.selectedEntry?.bookingId === b.bookingId;
-                const src = SOURCE_STYLE[b.source];
+                const ss = srcStyle(b.source);
                 return (
                   <div
                     key={b.bookingId}
                     onClick={() => actions.openDetail(b)}
-                    style={{ ...s.block, top, height, left: 4, right: 4, width: undefined, borderLeftColor: color, background: src ? src.bg : 'var(--bg-chip)', cursor: 'pointer', ...(isSelected ? s.blockSelected : {}) }}
+                    style={{ ...s.block, top, height, left: 4, right: 4, width: undefined, borderLeftColor: ss.border, background: ss.bg, cursor: 'pointer', ...(isSelected ? s.blockSelected : {}) }}
                   >
                     <span style={s.blockClient}>{b.clientName}</span>
-                    {height >= 28 && src && (
-                      <span style={{ fontSize: '0.6rem', fontWeight: 700, color: src.tagColor, lineHeight: 1, letterSpacing: '0.03em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{src.tag}</span>
+                    {height >= 28 && ss.tag && (
+                      <span style={{ fontSize: '0.6rem', fontWeight: 700, color: ss.tagColor, lineHeight: 1, letterSpacing: '0.03em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ss.tag}</span>
                     )}
                     {height >= 44 && b.sessionType && <span style={s.blockMeta}>{b.sessionType}</span>}
                     {height >= 56 && durMin && <span style={s.blockMeta}>{fmtDuration(durMin)}</span>}
@@ -652,18 +628,17 @@ function StationView({ date }) {
                       const topPx    = ((startMin - DAY_START * 60) / 60) * HOUR_PX;
                       const durMins  = e.durationMins ?? 60;
                       const heightPx = Math.max((durMins / 60) * HOUR_PX, 24);
-                      const color    = STATUS_COLORS_SU[e.status] ?? 'var(--text-ghost)';
-                      const src      = SOURCE_STYLE[e.source];
+                      const statusColor = STATUS_COLORS_SU[e.status] ?? 'var(--text-ghost)';
+                      const ss = srcStyle(e.source);
                       return (
                         <div key={e.bookingId} style={{
                           position: 'absolute', top: topPx, left: 6, right: 6, height: heightPx,
-                          background: color + '20', border: `1px solid ${color}55`,
-                          borderLeft: `3px solid ${color}`, borderRadius: 5,
+                          background: ss.bg, border: `1px solid ${ss.border}55`,
+                          borderLeft: `3px solid ${ss.border}`, borderRadius: 5,
                           padding: '0.2rem 0.4rem', overflow: 'hidden',
                         }}>
-                          <div style={{ fontSize: '0.72rem', fontWeight: 700, color, lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          <div style={{ fontSize: '0.72rem', fontWeight: 700, color: ss.tagColor ?? statusColor, lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                             {e.clientName}
-                            {src && <span style={{ marginLeft: '0.35rem', fontSize: '0.6rem', fontWeight: 700, color: src.tagColor }}>{src.tag}</span>}
                           </div>
                           {durMins >= 45 && (
                             <div style={{ fontSize: '0.65rem', color: 'var(--text-ghost)', marginTop: 2 }}>
