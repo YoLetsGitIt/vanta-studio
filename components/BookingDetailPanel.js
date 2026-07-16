@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { getAvailableStations, getStations, getClientConsents, recordConsentInStudio, getNotes, addNote, deleteNote, getBookingConsentSubmissions, getStudioClients } from '@/lib/api';
+import { getAvailableStations, getStations, getClientConsents, getNotes, addNote, deleteNote, getBookingConsentSubmissions, getStudioClients, generateConsentLink } from '@/lib/api';
 import { statusColors, statusLabel, capitalise as cap } from '@/lib/status';
 import { formatDob as fmtDob } from '@/lib/format';
 import { getCached, setCached } from '@/lib/cache';
@@ -51,6 +51,9 @@ export default function BookingDetailPanel({
   onCancel,     // optional fn()
   onComplete,   // optional fn()
   onNoShow,     // optional fn()
+  onSendLink,   // optional fn() — for pending bookings
+  onConfirm,    // optional fn() — for requires_confirmation bookings
+  onReassign,   // optional fn() — for requires_confirmation bookings
 }) {
   const router = useRouter();
 
@@ -66,9 +69,11 @@ export default function BookingDetailPanel({
   const [noteAdding,  setNoteAdding]  = useState(false);
 
   // ── Consent state ──────────────────────────────────────────────────────────
-  const [consent,        setConsent]        = useState(null);
-  const [consentVersion, setConsentVersion] = useState('1');
-  const [recording,      setRecording]      = useState(false);
+  const [consent,         setConsent]         = useState(null);
+  const [consentVersion,  setConsentVersion]  = useState('1');
+  const [consentLoading,  setConsentLoading]  = useState(false);
+  const [linkGenerating,  setLinkGenerating]  = useState(false);
+  const [linkCopied,      setLinkCopied]      = useState(false);
 
   // ── Contact-book profile (allergies / preferences / pain tolerance) ─────────
   const [clientProfile, setClientProfile] = useState(null);
@@ -88,7 +93,10 @@ export default function BookingDetailPanel({
   const artistName  = entry?.artistName          ?? null;
   const sessionType = booking?.session_type      ?? entry?.sessionType    ?? null;
   const placement   = booking?.body_location     ?? entry?.placement      ?? null;
-  const size        = booking?.size              ?? entry?.size           ?? null;
+  const sizeRaw     = booking?.size              ?? entry?.size           ?? null;
+  const sizeUnit    = booking?.size_unit         ?? null;
+  // Old entries store combined "10cm"; new entries store numeric size + separate size_unit.
+  const size        = sizeRaw && sizeUnit && /^[\d.]+$/.test(sizeRaw) ? `${sizeRaw} ${sizeUnit}` : sizeRaw;
   const color       = booking?.color             ?? null;
   const design      = booking?.design_details    ?? entry?.designDetails  ?? null;
   const notes       = booking?.additional_notes  ?? entry?.notes          ?? null;
@@ -111,6 +119,7 @@ export default function BookingDetailPanel({
   const source            = booking?.source              ?? null;
   const stationId         = booking?.station_id          ?? entry?.stationId   ?? null;
   const createdAt         = booking?.created_at          ?? entry?.createdAt   ?? null;
+  const holdExpiresAt     = booking?.hold_expires_at     ?? null;
 
   // Under the 5-status model a no-show is stored as status='completed' with
   // outcome='no_show', so "completed" visuals must exclude no-shows explicitly.
@@ -124,6 +133,8 @@ export default function BookingDetailPanel({
   const canAcceptReject   = ['pending', 'awaiting_payment'].includes(status);
   const canComplete       = status === 'confirmed' && chosenDate && chosenDate <= today;
   const canReject         = canAcceptReject;
+  const canSendLink       = status === 'pending';
+  const canConfirm        = status === 'requires_confirmation';
 
   const displayStatus = isNoShow ? 'no_show' : status;
   const sc = statusColors(displayStatus);
@@ -160,12 +171,14 @@ export default function BookingDetailPanel({
     setConsent(null);
     setConsentVersion('1');
     if (!email) return;
+    setConsentLoading(true);
     getClientConsents([email])
       .then(data => {
         setConsent((data.consents ?? {})[email] ?? null);
         setConsentVersion(data.current_version ?? '1');
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setConsentLoading(false));
   }, [email]);
 
   const consentStatus = !consent ? 'none'
@@ -214,14 +227,15 @@ export default function BookingDetailPanel({
   const allergies         = clientProfile?.allergies || null;
   const painTolerance     = clientProfile?.pain_tolerance || null;
 
-  async function handleRecordConsent() {
+  async function handleSendConsentLink() {
     if (!email) return;
-    setRecording(true);
+    setLinkGenerating(true);
     try {
-      await recordConsentInStudio(email);
-      setConsent({ consent_version: consentVersion, agreed_at: new Date().toISOString(), source: 'in_studio' });
+      await generateConsentLink(email);
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 3000);
     } catch (e) { alert(e.message); }
-    finally { setRecording(false); }
+    finally { setLinkGenerating(false); }
   }
 
   // ── Load consent submissions ───────────────────────────────────────────────
@@ -343,7 +357,7 @@ export default function BookingDetailPanel({
               {source && (
                 <span style={{ fontSize: '0.68rem', fontWeight: 600, padding: '0.15rem 0.45rem', borderRadius: 4,
                   background: 'var(--bg-chip)', color: 'var(--text-ghost)', border: '1px solid var(--border-faint)' }}>
-                  {(source === 'walkin' || source === 'web') ? 'Studio' : 'Personal'}
+                  {{ walkin: 'Walk-in', web: 'Web', app: 'App', personal: 'Manual', import: 'Imported' }[source] ?? source}
                 </span>
               )}
             </div>
@@ -405,6 +419,12 @@ export default function BookingDetailPanel({
         {chosenTime   && <Row label="Appointment" value={fmtDate(chosenTime)} />}
         {stationName  && <Row label="Station" value={stationName} />}
         {cancelReason && <Row label="Cancelled" value={cancelReason} />}
+        {holdExpiresAt && canConfirm && (
+          <div style={{ background: 'rgba(111,163,232,0.07)', border: '1px solid rgba(111,163,232,0.2)', borderRadius: 8, padding: '0.55rem 0.75rem' }}>
+            <span style={{ fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#6fa3e8', display: 'block', marginBottom: '0.15rem' }}>Client hold expires</span>
+            <span style={{ fontSize: '0.82rem', color: 'var(--text-dim)' }}>{fmtDate(holdExpiresAt)}</span>
+          </div>
+        )}
 
         {/* ── Client info ── */}
         <div style={p.divider} />
@@ -424,21 +444,76 @@ export default function BookingDetailPanel({
           )}
         </div>
 
+        {/* Name + DOB */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
-          <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text)' }}>{clientName}</span>
-          {email && <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{email}</span>}
-          {phone && <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{phone}</span>}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <span style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text)' }}>{clientName}</span>
+            {clientAge != null && clientAge < 18 && (
+              <span style={{ fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.04em', padding: '0.05rem 0.35rem', borderRadius: 4, background: 'rgba(245,158,58,0.15)', color: '#f59e3a' }}>MINOR</span>
+            )}
+          </div>
           {dob && (
-            <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+            <span style={{ fontSize: '0.78rem', color: 'var(--text-ghost)' }}>
               {fmtDob(dob)}{clientAge != null && ` · ${clientAge} yrs`}
-              {clientAge != null && clientAge < 18 && (
-                <span style={{ marginLeft: '0.4rem', fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.04em', padding: '0.05rem 0.35rem', borderRadius: 4, background: 'rgba(245,158,58,0.15)', color: '#f59e3a' }}>MINOR</span>
-              )}
             </span>
           )}
         </div>
 
-        {/* Contact-book profile — allergies flagged for safety */}
+        {/* Contact rows */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+          <span style={{ fontSize: '0.82rem', color: email ? 'var(--text-secondary)' : 'var(--text-ghost)' }}>
+            {email || 'No email on file'}
+          </span>
+          {phone ? (
+            <button
+              onClick={() => { const a = document.createElement('a'); a.href = `sms:${phone}`; a.click(); }}
+              style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem', width: 'fit-content' }}
+            >
+              <span style={{ fontSize: '0.82rem', color: 'var(--accent)', fontWeight: 500 }}>{phone}</span>
+              <span style={{ fontSize: '0.68rem', color: 'var(--text-ghost)' }}>↗</span>
+            </button>
+          ) : (
+            <span style={{ fontSize: '0.82rem', color: 'var(--text-ghost)' }}>No phone on file</span>
+          )}
+        </div>
+
+        {/* Consent */}
+        {email && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <span style={p.label}>Consent</span>
+            {consentLoading ? (
+              <span style={{ fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.04em',
+                padding: '0.1rem 0.4rem', borderRadius: 4,
+                background: 'var(--bg-chip)', color: 'var(--text-ghost)', opacity: 0.5 }}>
+                —
+              </span>
+            ) : (
+              <>
+                <span style={{ fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.04em',
+                  padding: '0.1rem 0.4rem', borderRadius: 4, background: cs.bg, color: cs.text }}>
+                  {consentLabel}
+                </span>
+                {consent && (
+                  <span style={{ fontSize: '0.72rem', color: 'var(--text-ghost)' }}>
+                    v{consent.consent_version} · {new Date(consent.agreed_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  </span>
+                )}
+                {(consentStatus === 'none' || consentStatus === 'outdated') && (
+                  <button
+                    onClick={handleSendConsentLink}
+                    disabled={linkGenerating}
+                    style={{ ...p.linkBtn, color: linkCopied ? '#4cc98a' : 'var(--accent)',
+                      borderColor: linkCopied ? '#4cc98a' : 'var(--accent)' }}
+                  >
+                    {linkCopied ? 'Email sent ✓' : linkGenerating ? 'Sending…' : 'Send consent link →'}
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Profile — allergies flagged for safety */}
         {(allergies || designPreferences.length > 0 || painTolerance) && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             {allergies && (
@@ -458,28 +533,6 @@ export default function BookingDetailPanel({
               </div>
             )}
             {painTolerance && <Row label="Pain tolerance" value={cap(painTolerance)} />}
-          </div>
-        )}
-
-        {email && (
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-              <span style={p.label}>Consent</span>
-              <span style={{ fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.04em',
-                padding: '0.1rem 0.4rem', borderRadius: 4, background: cs.bg, color: cs.text }}>
-                {consentLabel}
-              </span>
-              {consent && (
-                <span style={{ fontSize: '0.72rem', color: 'var(--text-ghost)' }}>
-                  v{consent.consent_version} · {new Date(consent.agreed_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
-                </span>
-              )}
-            </div>
-            {(consentStatus === 'none' || consentStatus === 'outdated') && (
-              <button onClick={handleRecordConsent} disabled={recording} style={p.linkBtn}>
-                {recording ? 'Recording…' : consentStatus === 'outdated' ? 'Record updated consent →' : 'Record consent →'}
-              </button>
-            )}
           </div>
         )}
 
@@ -525,7 +578,11 @@ export default function BookingDetailPanel({
                 </button>
               ))}
             </div>
-            <button onClick={() => setStationStep(false)} style={p.linkBtn}>Cancel</button>
+            <button onClick={() => setStationStep(false)}
+              style={{ background: 'none', border: 'none', padding: 0, fontSize: '0.78rem',
+                color: 'var(--text-muted)', cursor: 'pointer', fontFamily: 'inherit' }}>
+              Cancel
+            </button>
           </div>
         )}
         {stationError && <p style={{ fontSize: '0.78rem', color: '#e86f6f' }}>{stationError}</p>}
@@ -668,8 +725,13 @@ export default function BookingDetailPanel({
       )}
 
       {/* ── Actions ── */}
-      {!stationStep && (canAcceptReject || canComplete || isFutureConfirmed) && (
+      {!stationStep && (canAcceptReject || canComplete || isFutureConfirmed || canSendLink || canConfirm) && (
         <div style={p.actions}>
+          {/* New workflow: pending → send selection link */}
+          {canSendLink && onSendLink && (
+            <Btn onClick={onSendLink} disabled={actionLoading} variant="primary">Send Link</Btn>
+          )}
+          {/* Old workflow: accept / reject */}
           {canAcceptReject && onAccept && (
             <Btn onClick={handleAcceptClick} disabled={actionLoading || stationsLoading} variant="success">
               {stationsLoading ? 'Loading…' : 'Accept'}
@@ -677,6 +739,13 @@ export default function BookingDetailPanel({
           )}
           {canAcceptReject && onReject && (
             <Btn onClick={onReject} disabled={actionLoading} variant="danger">Reject</Btn>
+          )}
+          {/* requires_confirmation: confirm or reassign */}
+          {canConfirm && onConfirm && (
+            <Btn onClick={onConfirm} disabled={actionLoading} variant="success">Confirm</Btn>
+          )}
+          {canConfirm && onReassign && (
+            <Btn onClick={onReassign} disabled={actionLoading} variant="neutral">Reassign</Btn>
           )}
           {isFutureConfirmed && onCancel && (
             <Btn onClick={onCancel} disabled={actionLoading} variant="danger">Cancel</Btn>
@@ -708,8 +777,9 @@ function Row({ label, value, children }) {
 }
 
 function Btn({ onClick, disabled, variant, children }) {
-  const c = variant === 'success'
-    ? { bg: 'rgba(76,201,138,0.12)', border: 'rgba(76,201,138,0.3)', text: '#4cc98a' }
+  const c = variant === 'success' ? { bg: 'rgba(76,201,138,0.12)', border: 'rgba(76,201,138,0.3)', text: '#4cc98a' }
+    : variant === 'primary'  ? { bg: 'rgba(111,163,232,0.12)', border: 'rgba(111,163,232,0.3)', text: '#6fa3e8' }
+    : variant === 'neutral'  ? { bg: 'var(--bg-chip)', border: 'var(--border)', text: 'var(--text-muted)' }
     : { bg: 'rgba(232,111,111,0.1)', border: 'rgba(232,111,111,0.25)', text: '#e86f6f' };
   return (
     <button onClick={onClick} disabled={disabled} style={{
@@ -772,9 +842,38 @@ const p = {
     padding: '1rem 1.25rem', borderTop: '1px solid var(--border-faint)', flexShrink: 0,
   },
   linkBtn: {
-    background: 'none', border: 'none', padding: 0, marginTop: '0.5rem', display: 'block',
-    color: 'var(--text-muted)', fontSize: '0.78rem', fontWeight: 500, cursor: 'pointer',
+    background: 'none',
+    border: '1px solid var(--accent)',
+    borderRadius: 6,
+    padding: '0.1rem 0.55rem',
+    display: 'inline-flex', alignItems: 'center',
+    color: 'var(--accent)', fontSize: '0.72rem', fontWeight: 600,
+    cursor: 'pointer', fontFamily: 'inherit', letterSpacing: '0.01em',
   },
+  contactRowStatic: {
+    display: 'flex', alignItems: 'center', gap: '0.5rem',
+    padding: '0.5rem 0.75rem',
+    background: 'var(--bg-input)', border: '1px solid var(--border)',
+    borderRadius: 8,
+  },
+  contactValueStatic: {
+    fontSize: '0.82rem', color: 'var(--text-secondary)', fontWeight: 500,
+    flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+  },
+  contactRow: {
+    display: 'flex', alignItems: 'center', gap: '0.5rem',
+    background: 'var(--bg-input)', border: '1px solid var(--border)',
+    borderRadius: 8, padding: '0.5rem 0.75rem',
+    cursor: 'pointer', width: '100%', textAlign: 'left',
+  },
+  contactRowMissing: {
+    display: 'flex', alignItems: 'center', gap: '0.5rem',
+    padding: '0.5rem 0.75rem',
+    fontSize: '0.78rem', color: 'var(--text-ghost)',
+  },
+  contactIcon: { fontSize: '0.85rem', color: 'var(--text-ghost)', flexShrink: 0, width: 16, textAlign: 'center' },
+  contactValue: { fontSize: '0.82rem', color: 'var(--accent)', fontWeight: 500, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  contactArrow: { fontSize: '0.7rem', color: 'var(--text-ghost)', flexShrink: 0 },
   stationPicker: {
     background: 'var(--bg-chip)', border: '1px solid var(--border)',
     borderRadius: 8, padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.6rem',

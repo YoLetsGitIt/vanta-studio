@@ -1,19 +1,21 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { listStudioBookings, acceptBookingWithStation, rejectBooking, cancelBooking, recordOutcome, createFollowUpBooking } from '@/lib/api';
+import { listStudioBookings, acceptBookingWithStation, rejectBooking, cancelBooking, recordOutcome, createFollowUpBooking, sendSelectionLink, confirmBooking, reassignArtist, getStudioArtists } from '@/lib/api';
 import { getCached, setCached, invalidatePrefix } from '@/lib/cache';
 import { statusColors, statusLabel, capitalise } from '@/lib/status';
+import { getBookingType } from '@/lib/bookingType';
 import CompleteBookingModal from '@/components/CompleteBookingModal';
 import RejectBookingModal from '@/components/RejectBookingModal';
 import BookingDetailPanel from '@/components/BookingDetailPanel';
 
 const STATUS_FILTERS = [
-  { value: 'pending',          label: 'Pending' },
-  { value: 'awaiting_payment', label: 'Awaiting Payment' },
-  { value: 'confirmed',        label: 'Confirmed' },
-  { value: 'completed',        label: 'Completed' },
-  { value: 'cancelled',        label: 'Cancelled' },
+  { value: 'pending',               label: 'Pending' },
+  { value: 'requires_confirmation', label: 'Needs Confirmation' },
+  { value: 'awaiting_payment',      label: 'Awaiting Payment' },
+  { value: 'confirmed',             label: 'Confirmed' },
+  { value: 'completed',             label: 'Completed' },
+  { value: 'cancelled',             label: 'Cancelled' },
 ];
 
 const DEFAULT_FILTER = 'pending';
@@ -34,6 +36,16 @@ export default function AppointmentsPage() {
   const [rejectTarget, setRejectTarget] = useState(null);
   const [cancelTarget, setCancelTarget] = useState(null);
   const [toast, setToast] = useState(null);
+  const [sendLinkTarget, setSendLinkTarget] = useState(null); // booking id
+  const [sendLinkHours, setSendLinkHours] = useState(168);
+  const [sendLinkDeposit, setSendLinkDeposit] = useState(false);
+  const [sendLinkAmount, setSendLinkAmount] = useState('');
+  const [sendLinkSaving, setSendLinkSaving] = useState(false);
+  const [reassignTarget, setReassignTarget] = useState(null); // booking id
+  const [reassignArtistId, setReassignArtistId] = useState('');
+  const [reassignResend, setReassignResend] = useState(true);
+  const [reassignSaving, setReassignSaving] = useState(false);
+  const [studioArtists, setStudioArtists] = useState([]);
 
   const combinedStatus = activeFilter;
 
@@ -151,6 +163,57 @@ export default function AppointmentsPage() {
     finally { setActionLoading(false); }
   }
 
+  function handleSendLink(id) {
+    setSendLinkTarget(id);
+    setSendLinkHours(168);
+    setSendLinkDeposit(false);
+    setSendLinkAmount('');
+  }
+
+  async function confirmSendLink() {
+    setSendLinkSaving(true);
+    try {
+      const amount = sendLinkDeposit && sendLinkAmount ? parseFloat(sendLinkAmount) : null;
+      await sendSelectionLink(sendLinkTarget, sendLinkHours, sendLinkDeposit, amount);
+      await load(true);
+      setSendLinkTarget(null);
+      showToast('Selection link sent to client');
+    } catch (e) { alert(e.message); }
+    finally { setSendLinkSaving(false); }
+  }
+
+  async function handleConfirm(id) {
+    setActionLoading(true);
+    try {
+      await confirmBooking(id);
+      await load(true);
+      setSelected(null);
+      showToast('Booking confirmed');
+    } catch (e) { alert(e.message); }
+    finally { setActionLoading(false); }
+  }
+
+  function openReassign(id) {
+    setReassignTarget(id);
+    setReassignArtistId('');
+    setReassignResend(true);
+    if (studioArtists.length === 0) {
+      getStudioArtists('approved').then(d => setStudioArtists(d.artists ?? [])).catch(() => {});
+    }
+  }
+
+  async function confirmReassign() {
+    if (!reassignArtistId) return;
+    setReassignSaving(true);
+    try {
+      await reassignArtist(reassignTarget, reassignArtistId, reassignResend);
+      await load(true);
+      setReassignTarget(null);
+      showToast(reassignResend ? 'Artist reassigned · new link sent' : 'Artist reassigned');
+    } catch (e) { alert(e.message); }
+    finally { setReassignSaving(false); }
+  }
+
   const filteredBookings = useMemo(() => {
     if (!search.trim()) return bookings;
     const q = search.trim().toLowerCase();
@@ -204,6 +267,68 @@ export default function AppointmentsPage() {
           onConfirm={confirmCancel}
           onCancel={() => setCancelTarget(null)}
         />
+      )}
+
+      {sendLinkTarget && (
+        <div style={s.modalOverlay} onClick={() => setSendLinkTarget(null)}>
+          <div style={s.modal} onClick={e => e.stopPropagation()}>
+            <h3 style={s.modalTitle}>Send selection link</h3>
+            <p style={s.modalSub}>The client will receive an email with a link to choose their artist and time.</p>
+            <label style={s.modalLabel}>Link expires after</label>
+            <select value={sendLinkHours} onChange={e => setSendLinkHours(Number(e.target.value))} style={s.modalSelect}>
+              <option value={24}>24 hours</option>
+              <option value={48}>48 hours</option>
+              <option value={72}>72 hours</option>
+              <option value={168}>7 days</option>
+              <option value={336}>14 days</option>
+            </select>
+            <label style={s.modalCheckRow}>
+              <input type="checkbox" checked={sendLinkDeposit} onChange={e => setSendLinkDeposit(e.target.checked)} style={{ accentColor: 'var(--accent)' }} />
+              <span style={{ fontSize: '0.85rem', color: 'var(--text-dim)' }}>Require deposit</span>
+            </label>
+            {sendLinkDeposit && (
+              <input
+                type="number"
+                placeholder="Deposit amount ($)"
+                value={sendLinkAmount}
+                onChange={e => setSendLinkAmount(e.target.value)}
+                style={s.modalInput}
+                min="0"
+              />
+            )}
+            <div style={s.modalActions}>
+              <button style={s.modalCancel} onClick={() => setSendLinkTarget(null)}>Cancel</button>
+              <button style={{ ...s.modalConfirm, opacity: sendLinkSaving ? 0.5 : 1 }} onClick={confirmSendLink} disabled={sendLinkSaving}>
+                {sendLinkSaving ? 'Sending…' : 'Send link'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {reassignTarget && (
+        <div style={s.modalOverlay} onClick={() => setReassignTarget(null)}>
+          <div style={s.modal} onClick={e => e.stopPropagation()}>
+            <h3 style={s.modalTitle}>Reassign artist</h3>
+            <label style={s.modalLabel}>New artist</label>
+            <select value={reassignArtistId} onChange={e => setReassignArtistId(e.target.value)} style={s.modalSelect}>
+              <option value="">Select artist…</option>
+              {studioArtists.map(a => (
+                <option key={a.artistId ?? a.id} value={a.artistId ?? a.id}>{a.name}</option>
+              ))}
+            </select>
+            <label style={s.modalCheckRow}>
+              <input type="checkbox" checked={reassignResend} onChange={e => setReassignResend(e.target.checked)} style={{ accentColor: 'var(--accent)' }} />
+              <span style={{ fontSize: '0.85rem', color: 'var(--text-dim)' }}>Send new selection link to client</span>
+            </label>
+            <div style={s.modalActions}>
+              <button style={s.modalCancel} onClick={() => setReassignTarget(null)}>Cancel</button>
+              <button style={{ ...s.modalConfirm, opacity: (!reassignArtistId || reassignSaving) ? 0.5 : 1 }} onClick={confirmReassign} disabled={!reassignArtistId || reassignSaving}>
+                {reassignSaving ? 'Saving…' : 'Reassign'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       <div style={s.header}>
@@ -265,6 +390,9 @@ export default function AppointmentsPage() {
           onCancel={() => handleCancel(selectedBooking.id)}
           onComplete={() => handleComplete(selectedBooking.id, selectedBooking.estimated_quote ?? selectedBooking.final_price)}
           onNoShow={() => handleNoShow(selectedBooking.id)}
+          onSendLink={() => handleSendLink(selectedBooking.id)}
+          onConfirm={() => handleConfirm(selectedBooking.id)}
+          onReassign={() => openReassign(selectedBooking.id)}
           actionLoading={actionLoading}
         />
       )}
@@ -278,13 +406,17 @@ function SkeletonList() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
       {widths.map((w, i) => (
         <div key={i} className="skeleton" style={{ ...s.row, cursor: 'default', pointerEvents: 'none' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+          <div style={{ ...s.dateBlock, gap: '0.3rem' }}>
+            <div style={{ width: 24, height: 9, borderRadius: 3, background: 'var(--bg-chip)' }} />
+            <div style={{ width: 28, height: 22, borderRadius: 4, background: 'var(--bg-chip)' }} />
+            <div style={{ width: 32, height: 9, borderRadius: 3, background: 'var(--bg-chip)', opacity: 0.6 }} />
+          </div>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
             <div style={{ width: w, height: 13, borderRadius: 4, background: 'var(--bg-chip)' }} />
             <div style={{ width: w * 0.6, height: 11, borderRadius: 4, background: 'var(--bg-chip)', opacity: 0.7 }} />
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.35rem' }}>
-            <div style={{ width: 64, height: 20, borderRadius: 20, background: 'var(--bg-chip)' }} />
-            <div style={{ width: 76, height: 11, borderRadius: 4, background: 'var(--bg-chip)', opacity: 0.7 }} />
+            <div style={{ width: 72, height: 22, borderRadius: 20, background: 'var(--bg-chip)' }} />
           </div>
         </div>
       ))}
@@ -293,18 +425,21 @@ function SkeletonList() {
 }
 
 function BookingRow({ booking: b, selected, onSelect }) {
-  // No-shows are stored as status='completed' + outcome='no_show'; badge them distinctly.
   const displayStatus = b.status === 'completed' && b.outcome === 'no_show' ? 'no_show' : b.status;
   const sc = statusColors(displayStatus);
   const dateStr = b.chosen_time || b.proposed_time_primary;
-  const date = dateStr
-    ? new Date(dateStr).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })
-    : null;
+  const d = dateStr ? new Date(dateStr) : null;
+  const month = d ? d.toLocaleDateString('en-AU', { month: 'short' }).toUpperCase() : null;
+  const day   = d ? d.getDate() : null;
+  const time  = d ? d.toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit', hour12: true }).toLowerCase() : null;
+
   const sessionParts = [
     b.session_type ? capitalise(b.session_type.replace(/_/g, ' ')) : null,
     b.body_location || null,
   ].filter(Boolean);
-  const sourceLabel = (b.source === 'walkin' || b.source === 'web') ? 'Studio' : 'Personal';
+
+  const bookingType = getBookingType(b.source);
+  const price = b.estimated_quote > 0 ? `$${Number(b.estimated_quote).toLocaleString()}` : null;
 
   return (
     <div
@@ -315,25 +450,44 @@ function BookingRow({ booking: b, selected, onSelect }) {
         borderColor: selected ? 'var(--border-strong)' : 'var(--border-faint)',
       }}
     >
-      <div style={s.rowLeft}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <span style={s.clientName}>{b.requester_name}</span>
-          {sourceLabel && <span style={s.sourceTag}>{sourceLabel}</span>}
-          {b.parent_booking_id && <span style={s.followUpTag}>Follow-up</span>}
-        </div>
-        {sessionParts.length > 0 && <span style={s.rowMeta}>{sessionParts.join(' · ')}</span>}
-        {b.status === 'pending' && b.created_at && (
-          <span style={s.rowMeta}>Requested {new Date(b.created_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}</span>
+      {/* Date block */}
+      <div style={s.dateBlock}>
+        {d ? (
+          <>
+            <span style={s.dateMonth}>{month}</span>
+            <span style={s.dateDay}>{day}</span>
+            <span style={s.dateTime}>{time}</span>
+          </>
+        ) : (
+          <>
+            <span style={s.dateMonth}>—</span>
+            <span style={{ ...s.dateDay, fontSize: '0.72rem', color: 'var(--text-ghost)' }}>TBD</span>
+          </>
         )}
       </div>
+
+      {/* Main content */}
+      <div style={s.rowMain}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+          <span style={s.clientName}>{b.requester_name}</span>
+          {b.parent_booking_id && <span style={s.followUpTag}>Follow-up</span>}
+        </div>
+        {sessionParts.length > 0 && (
+          <span style={s.rowMeta}>{sessionParts.join(' · ')}</span>
+        )}
+        <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', marginTop: '0.1rem' }}>
+          <span style={{ ...s.sourceTag, background: bookingType === 'studio' ? 'rgba(245,158,58,0.1)' : 'rgba(167,139,250,0.1)', color: bookingType === 'studio' ? '#f59e3a' : '#a78bfa', borderColor: bookingType === 'studio' ? 'rgba(245,158,58,0.25)' : 'rgba(167,139,250,0.25)' }}>
+            {bookingType === 'studio' ? 'Studio' : 'Personal'}
+          </span>
+        </div>
+      </div>
+
+      {/* Right */}
       <div style={s.rowRight}>
         <span style={{ ...s.statusBadge, background: sc.bg, color: sc.text, border: `1px solid ${sc.border}` }}>
           {statusLabel(displayStatus)}
         </span>
-        {date
-          ? <span style={s.dateText}>{date}</span>
-          : <span style={{ ...s.dateText, opacity: 0.35 }}>No date</span>
-        }
+        {price && <span style={s.priceText}>{price}</span>}
       </div>
     </div>
   );
@@ -396,27 +550,41 @@ const s = {
     fontSize: '0.8rem', fontWeight: 500, cursor: 'pointer',
   },
   row: {
-    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    padding: '0.9rem 1.1rem', borderRadius: 10,
+    display: 'flex', alignItems: 'center',
+    padding: '0.85rem 1rem', borderRadius: 10,
     border: '1px solid var(--border-faint)',
-    cursor: 'pointer', transition: 'background 0.12s, border-color 0.12s', gap: '1rem',
+    cursor: 'pointer', transition: 'background 0.12s, border-color 0.12s', gap: '0.85rem',
   },
-  rowLeft: {
-    display: 'flex', flexDirection: 'column', gap: '0.2rem', minWidth: 0,
+  dateBlock: {
+    display: 'flex', flexDirection: 'column', alignItems: 'center',
+    flexShrink: 0, width: 44,
+    borderRight: '1px solid var(--border-faint)', paddingRight: '0.85rem',
+  },
+  dateMonth: {
+    fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.08em',
+    color: 'var(--text-ghost)', lineHeight: 1,
+  },
+  dateDay: {
+    fontSize: '1.45rem', fontWeight: 700, color: 'var(--text)', lineHeight: 1.1,
+  },
+  dateTime: {
+    fontSize: '0.62rem', color: 'var(--text-ghost)', marginTop: '0.1rem', whiteSpace: 'nowrap',
+  },
+  rowMain: {
+    display: 'flex', flexDirection: 'column', gap: '0.18rem', flex: 1, minWidth: 0,
   },
   clientName: {
     fontSize: '0.9rem', fontWeight: 600, color: 'var(--text)',
   },
   rowMeta: {
-    fontSize: '0.78rem', color: 'var(--text-secondary)',
+    fontSize: '0.76rem', color: 'var(--text-secondary)',
   },
   sourceTag: {
-    fontSize: '0.65rem', fontWeight: 600, letterSpacing: '0.04em',
-    padding: '0.1rem 0.4rem', borderRadius: 4,
-    background: 'var(--bg-chip)', color: 'var(--text-ghost)',
+    fontSize: '0.62rem', fontWeight: 600, letterSpacing: '0.04em',
+    padding: '0.1rem 0.4rem', borderRadius: 4, border: '1px solid transparent',
   },
   followUpTag: {
-    fontSize: '0.65rem', fontWeight: 600, letterSpacing: '0.04em',
+    fontSize: '0.62rem', fontWeight: 600, letterSpacing: '0.04em',
     padding: '0.1rem 0.4rem', borderRadius: 4,
     background: 'rgba(111,163,232,0.12)', color: '#6fa3e8',
   },
@@ -425,10 +593,10 @@ const s = {
   },
   statusBadge: {
     fontSize: '0.72rem', fontWeight: 600, padding: '0.2rem 0.55rem',
-    borderRadius: 20, letterSpacing: '0.02em',
+    borderRadius: 20, letterSpacing: '0.02em', whiteSpace: 'nowrap',
   },
-  dateText: {
-    fontSize: '0.75rem', color: 'var(--text-faint)',
+  priceText: {
+    fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-muted)',
   },
   toast: {
     position: 'absolute', bottom: '1.5rem', left: '50%',
@@ -442,5 +610,51 @@ const s = {
   },
   toastCheck: {
     color: '#4cc98a', fontWeight: 700, fontSize: '0.9rem',
+  },
+  modalOverlay: {
+    position: 'absolute', inset: 0,
+    background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(2px)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 60,
+  },
+  modal: {
+    background: 'var(--bg-panel)', border: '1px solid var(--border)',
+    borderRadius: 12, padding: '1.5rem', width: 340,
+    display: 'flex', flexDirection: 'column', gap: '0.85rem',
+  },
+  modalTitle: {
+    fontSize: '0.95rem', fontWeight: 700, color: 'var(--text)', margin: 0,
+  },
+  modalSub: {
+    fontSize: '0.8rem', color: 'var(--text-ghost)', lineHeight: 1.5, margin: 0,
+  },
+  modalLabel: {
+    fontSize: '0.72rem', fontWeight: 600, textTransform: 'uppercase',
+    letterSpacing: '0.06em', color: 'var(--text-ghost)',
+  },
+  modalSelect: {
+    width: '100%', padding: '0.5rem 0.75rem', borderRadius: 8,
+    border: '1px solid var(--border)', background: 'var(--bg-input)',
+    color: 'var(--text)', fontSize: '0.875rem', outline: 'none',
+  },
+  modalInput: {
+    width: '100%', boxSizing: 'border-box', padding: '0.5rem 0.75rem', borderRadius: 8,
+    border: '1px solid var(--border)', background: 'var(--bg-input)',
+    color: 'var(--text)', fontSize: '0.875rem', outline: 'none',
+  },
+  modalCheckRow: {
+    display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer',
+  },
+  modalActions: {
+    display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '0.25rem',
+  },
+  modalCancel: {
+    padding: '0.45rem 1rem', borderRadius: 7,
+    border: '1px solid var(--border-faint)', background: 'transparent',
+    color: 'var(--text-muted)', fontSize: '0.82rem', fontWeight: 500, cursor: 'pointer',
+  },
+  modalConfirm: {
+    padding: '0.45rem 1.1rem', borderRadius: 7,
+    border: '1px solid rgba(76,201,138,0.35)', background: 'rgba(76,201,138,0.12)',
+    color: '#4cc98a', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer',
   },
 };
