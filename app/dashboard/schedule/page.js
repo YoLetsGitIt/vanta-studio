@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getStudioArtists, getStudioSchedule, getStudioScheduleRange, getStudioBooking, acceptBookingWithStation, createManualBooking, createFollowUpBooking, rejectBooking, recordOutcome } from '@/lib/api';
+import { getStudioArtists, getStudioSchedule, getStudioScheduleRange, getStudioBooking, acceptBookingWithStation, createManualBooking, createFollowUpBooking, rejectBooking, recordOutcome, getStations } from '@/lib/api';
 import { getBookingStyle, TYPE_STYLE } from '@/lib/bookingType';
 import BookingDetailPanel from '@/components/BookingDetailPanel';
 import { getCached, setCached, invalidatePrefix } from '@/lib/cache';
@@ -425,14 +425,25 @@ function DayView({ date }) {
                 if (top < 0 || top > GRID_H) return null;
                 const isSelected = actions.selectedEntry?.bookingId === b.bookingId;
                 const ss = srcStyle(b.source);
+                const unconfirmed = b.status === 'requires_confirmation' || b.status === 'awaiting_payment';
+                const blockBorder = unconfirmed ? 'rgba(255,255,255,0.18)' : ss.border;
+                const blockBg     = unconfirmed ? 'rgba(255,255,255,0.04)' : ss.bg;
+                const nameColor   = unconfirmed ? 'rgba(255,255,255,0.4)'  : 'var(--text-dim)';
                 return (
                   <div
                     key={b.bookingId}
                     onClick={() => actions.openDetail(b)}
-                    style={{ ...s.block, top, height, left: 4, right: 4, width: undefined, borderLeftColor: ss.border, background: ss.bg, cursor: 'pointer', ...(isSelected ? s.blockSelected : {}) }}
+                    style={{
+                      ...s.block, top, height, left: 4, right: 4, width: undefined,
+                      background: blockBg,
+                      border: `1px ${unconfirmed ? 'dashed' : 'solid'} ${blockBorder}55`,
+                      borderLeft: `3px ${unconfirmed ? 'dashed' : 'solid'} ${blockBorder}`,
+                      cursor: 'pointer',
+                      ...(isSelected ? s.blockSelected : {}),
+                    }}
                   >
-                    <span style={s.blockClient}>{b.clientName}</span>
-                    {height >= 28 && ss.tag && (
+                    <span style={{ ...s.blockClient, color: nameColor }}>{b.clientName}</span>
+                    {height >= 28 && ss.tag && !unconfirmed && (
                       <span style={{ fontSize: '0.6rem', fontWeight: 700, color: ss.tagColor, lineHeight: 1, letterSpacing: '0.03em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ss.tag}</span>
                     )}
                     {height >= 44 && b.sessionType && <span style={s.blockMeta}>{b.sessionType}</span>}
@@ -678,16 +689,24 @@ function StationMonthView({ monthStart, onDayClick }) {
 
 function StationView({ date }) {
   const dateStr = toISO(date);
-  const [entries,  setEntries]  = useState([]);
-  const [loading,  setLoading]  = useState(true);
+  const [entries,      setEntries]      = useState([]);
+  const [allStations,  setAllStations]  = useState([]);
+  const [loading,      setLoading]      = useState(true);
 
   useEffect(() => {
     setLoading(true);
     const key = `schedule:${dateStr}`;
     const cached = getCached(key);
     if (cached) { setEntries(cached); setLoading(false); }
-    getStudioSchedule(dateStr)
-      .then(d => { const e = d.entries ?? []; setCached(key, e); setEntries(e); })
+    Promise.all([
+      getStudioSchedule(dateStr).then(d => d.entries ?? []),
+      getStations().then(d => d.stations ?? []),
+    ])
+      .then(([e, st]) => {
+        setCached(key, e);
+        setEntries(e);
+        setAllStations(st.filter(s => s.is_active !== false));
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [dateStr]);
@@ -696,12 +715,13 @@ function StationView({ date }) {
   const assigned   = entries.filter(e => e.stationName);
   const unassigned = entries.filter(e => !e.stationName);
 
-  // Unique stations, preserving encounter order
-  const stations = [...new Map(assigned.map(e => [e.stationId, e.stationName])).entries()]
-    .map(([id, name]) => ({ id, name }));
+  // Always show all active stations (even those with no bookings today)
+  const stations = allStations.length > 0
+    ? allStations.map(s => ({ id: s.id, name: s.name }))
+    : [...new Map(assigned.map(e => [e.stationId, e.stationName])).entries()].map(([id, name]) => ({ id, name }));
 
   if (loading) return <p style={{ padding: '2rem', fontSize: '0.875rem', color: 'var(--text-faint)' }}>Loading…</p>;
-  if (!entries.length) return <p style={{ padding: '2rem', fontSize: '0.875rem', color: 'var(--text-faint)' }}>No bookings on this day.</p>;
+  if (!stations.length) return <p style={{ padding: '2rem', fontSize: '0.875rem', color: 'var(--text-faint)' }}>No stations configured.</p>;
 
   const hourToY = (h) => (h - DAY_START) * HOUR_PX;
 
