@@ -643,11 +643,13 @@ function PayoutPanel({ artist, onClose, onPaid }) {
                 <span style={st.currencySign}>$</span>
                 <input
                   type="number"
+                  inputMode="decimal"
                   min="0.01"
                   max={artist.outstanding}
                   step="0.01"
                   value={custom}
                   onChange={e => setCustom(e.target.value)}
+                  onKeyDown={e => ['e','E','+','-'].includes(e.key) && e.preventDefault()}
                   placeholder="0.00"
                   style={st.customInput}
                   autoFocus

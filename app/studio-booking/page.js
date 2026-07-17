@@ -510,8 +510,10 @@ function WalkInInner() {
                 <input
                   style={{ ...s.input, flex: 1 }}
                   type="number" min="0" step="0.1"
+                  inputMode="decimal"
                   value={size}
                   onChange={e => { const v = e.target.value; if (v === '' || /^\d*\.?\d*$/.test(v)) setSize(v); }}
+                  onKeyDown={e => ['e','E','+','-'].includes(e.key) && e.preventDefault()}
                   placeholder="e.g. 10"
                 />
                 <div style={{ display: 'flex', background: 'rgba(255,255,255,0.06)', borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)', flexShrink: 0 }}>

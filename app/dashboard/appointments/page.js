@@ -40,6 +40,7 @@ export default function AppointmentsPage() {
   const [sendLinkDuration, setSendLinkDuration] = useState(60);
   const [sendLinkDeposit,  setSendLinkDeposit]  = useState(false);
   const [sendLinkAmount,   setSendLinkAmount]   = useState('');
+  const [sendLinkQuote,    setSendLinkQuote]    = useState('');
   const [sendLinkSaving,   setSendLinkSaving]   = useState(false);
   const [reassignTarget, setReassignTarget] = useState(null); // booking id
   const [reassignArtistId, setReassignArtistId] = useState('');
@@ -169,6 +170,7 @@ export default function AppointmentsPage() {
     setSendLinkDuration(60);
     setSendLinkDeposit(false);
     setSendLinkAmount('');
+    setSendLinkQuote('');
   }
 
   async function confirmSendLink() {
@@ -176,7 +178,8 @@ export default function AppointmentsPage() {
     try {
       const amount   = sendLinkDeposit && sendLinkAmount ? parseFloat(sendLinkAmount) : null;
       const duration = sendLinkDuration ? Number(sendLinkDuration) : null;
-      await sendSelectionLink(sendLinkTarget, sendLinkHours, sendLinkDeposit, amount, duration);
+      const quote    = sendLinkQuote ? parseFloat(sendLinkQuote) : null;
+      await sendSelectionLink(sendLinkTarget, sendLinkHours, sendLinkDeposit, amount, duration, quote);
       await load(true);
       setSendLinkTarget(null);
       showToast('Selection link sent to client');
@@ -287,6 +290,17 @@ export default function AppointmentsPage() {
               <option value={360}>6 hours</option>
               <option value={480}>Full day (8 hrs)</option>
             </select>
+            <label style={s.modalLabel}>Estimated quote ($)</label>
+            <input
+              type="number"
+              inputMode="numeric"
+              placeholder="e.g. 350"
+              value={sendLinkQuote}
+              onChange={e => setSendLinkQuote(e.target.value)}
+              onKeyDown={e => ['e','E','+','-','.'].includes(e.key) && e.preventDefault()}
+              style={s.modalInput}
+              min="0"
+            />
             <label style={s.modalLabel}>Link expires after</label>
             <select value={sendLinkHours} onChange={e => setSendLinkHours(Number(e.target.value))} style={s.modalSelect}>
               <option value={24}>24 hours</option>
@@ -302,9 +316,11 @@ export default function AppointmentsPage() {
             {sendLinkDeposit && (
               <input
                 type="number"
+                inputMode="decimal"
                 placeholder="Deposit amount ($)"
                 value={sendLinkAmount}
                 onChange={e => setSendLinkAmount(e.target.value)}
+                onKeyDown={e => ['e','E','+','-'].includes(e.key) && e.preventDefault()}
                 style={s.modalInput}
                 min="0"
               />

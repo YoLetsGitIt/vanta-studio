@@ -889,8 +889,10 @@ export default function SettingsPage() {
                     <input
                       style={{ ...s.input, width: 90 }}
                       type="number" min="0" max="100" step="0.5"
+                      inputMode="decimal"
                       value={value}
                       onChange={e => set(e.target.value)}
+                      onKeyDown={e => ['e','E','+','-'].includes(e.key) && e.preventDefault()}
                       placeholder="0"
                     />
                     <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>

@@ -676,9 +676,10 @@ function StationMonthView({ monthStart, onDayClick }) {
 // ── Station utilization view ──────────────────────────────────────────────────
 
 const STATUS_COLORS_SU = {
-  confirmed:        '#4cc98a',
-  awaiting_payment: '#fb923c',
-  completed:        '#6fa3e8',
+  confirmed:             '#4cc98a',
+  requires_confirmation: '#a78bfa',
+  awaiting_payment:      '#fb923c',
+  completed:             '#6fa3e8',
 };
 
 function StationView({ date }) {
