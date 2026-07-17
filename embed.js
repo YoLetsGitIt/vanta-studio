@@ -217,7 +217,7 @@
     // ── Header ────────────────────────────────────────────────────────────────
     var header = mk('div', 'vb-header');
     var eyebrow = mk('span', 'vb-eyebrow');
-    eyebrow.textContent = 'Walk-in booking';
+    eyebrow.textContent = 'Studio booking';
     var title = mk('h2', 'vb-title');
     title.textContent = studio.name || 'Book a session';
     header.appendChild(eyebrow);
@@ -407,7 +407,7 @@
 
     var btn = mk('button', 'vb-btn');
     btn.type = 'submit';
-    btn.textContent = 'Request walk-in';
+    btn.textContent = 'Request booking';
     form.appendChild(btn);
 
     form.addEventListener('submit', function (e) {
@@ -476,7 +476,7 @@
           errEl.textContent = err.message;
           errEl.style.display = 'block';
           btn.disabled = false;
-          btn.textContent = 'Request walk-in';
+          btn.textContent = 'Request booking';
         });
     });
   }
