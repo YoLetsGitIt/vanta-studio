@@ -29,7 +29,7 @@ function fmt(n) {
   return '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 function fmtHours(h) { return h ? Number(h).toFixed(1) + 'h' : '—'; }
-function formatSource(s) { return ({ app: 'App', walkin: 'Studio', personal: 'Manual', import: 'Imported' })[s] ?? s; }
+function formatSource(s) { return ({ app: 'App', studio: 'Studio', personal: 'Manual', import: 'Imported' })[s] ?? s; }
 function formatDate(d) {
   if (!d) return '—';
   return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -424,7 +424,7 @@ function PasswordGate({ email, onUnlock }) {
 
 // ── Small components ──────────────────────────────────────────────────────────
 
-const SOURCE_COLORS = { app: '#6fa3e8', walkin: '#4cc98a', personal: '#f59e3a' };
+const SOURCE_COLORS = { app: '#6fa3e8', studio: '#4cc98a', personal: '#f59e3a' };
 
 function SourceBreakdown({ data }) {
   const total = data.reduce((s, d) => s + d.count, 0);
@@ -532,9 +532,9 @@ function PayoutsSection({ payouts, onPay, onViewEarnings }) {
                 </td>
                 <td style={st.td}>
                   {fmt(p.total_earned)}
-                  {p.earned_walkin > 0 && p.earned_personal > 0 && (
+                  {p.earned_studio > 0 && p.earned_personal > 0 && (
                     <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: 2 }}>
-                      Studio {fmt(p.earned_walkin)} · Personal {fmt(p.earned_personal)}
+                      Studio {fmt(p.earned_studio)} · Personal {fmt(p.earned_personal)}
                     </div>
                   )}
                 </td>
@@ -721,7 +721,7 @@ function EarningsPanel({ artist, onClose }) {
     return new Date(iso).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
   }
   function fmtSource(s) {
-    return ({ app: 'App', walkin: 'Studio', manual: 'Manual', import: 'Import' })[s] ?? s;
+    return ({ app: 'App', studio: 'Studio', manual: 'Manual', import: 'Import' })[s] ?? s;
   }
 
   const total = entries ? entries.reduce((s, e) => s + (e.artist_cut ?? 0), 0) : null;

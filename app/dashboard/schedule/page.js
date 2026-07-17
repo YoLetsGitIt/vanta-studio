@@ -260,11 +260,12 @@ function MonthView({ monthStart, onDayClick }) {
                 <div style={s.monthChipList}>
                   {visible.map(b => {
                     const ss = srcStyle(b.source);
+                    const unconfirmed = b.status === 'requires_confirmation' || b.status === 'awaiting_payment';
                     return (
-                      <div key={b.bookingId} style={{ ...s.chip, cursor: 'pointer', background: ss.bg }} onClick={e => { e.stopPropagation(); actions.openDetail(b); }}>
-                        <div style={{ width: 6, height: 6, borderRadius: 2, background: ss.dot, flexShrink: 0 }} />
-                        <span style={s.chipTime}>{fmtTime(b.chosenTime)}</span>
-                        <span style={s.chipClient}>{b.clientName.split(' ')[0]}</span>
+                      <div key={b.bookingId} style={{ ...s.chip, cursor: 'pointer', background: unconfirmed ? 'rgba(255,255,255,0.04)' : ss.bg, border: unconfirmed ? '1px dashed rgba(255,255,255,0.18)' : undefined }} onClick={e => { e.stopPropagation(); actions.openDetail(b); }}>
+                        <div style={{ width: 6, height: 6, borderRadius: 2, background: unconfirmed ? 'rgba(255,255,255,0.2)' : ss.dot, flexShrink: 0 }} />
+                        <span style={{ ...s.chipTime, color: unconfirmed ? 'rgba(255,255,255,0.3)' : undefined }}>{fmtTime(b.chosenTime)}</span>
+                        <span style={{ ...s.chipClient, color: unconfirmed ? 'rgba(255,255,255,0.3)' : undefined }}>{b.clientName.split(' ')[0]}</span>
                       </div>
                     );
                   })}
@@ -628,8 +629,9 @@ function StationMonthView({ monthStart, onDayClick }) {
             // Aggregate by station
             const stationMap = {};
             for (const e of assigned) {
-              if (!stationMap[e.stationId]) stationMap[e.stationId] = { name: e.stationName, count: 0 };
+              if (!stationMap[e.stationId]) stationMap[e.stationId] = { name: e.stationName, count: 0, unconfirmedCount: 0 };
               stationMap[e.stationId].count++;
+              if (e.status === 'requires_confirmation' || e.status === 'awaiting_payment') stationMap[e.stationId].unconfirmedCount++;
             }
             const usedStations = Object.values(stationMap);
             const visibleStations = usedStations.slice(0, 2);
@@ -647,13 +649,16 @@ function StationMonthView({ monthStart, onDayClick }) {
                 </div>
 
                 <div style={s.monthChipList}>
-                  {visibleStations.map(st => (
-                    <div key={st.name} style={{ ...s.chip, background: 'rgba(111,163,232,0.1)' }}>
-                      <div style={{ width: 6, height: 6, borderRadius: 2, background: '#6fa3e8', flexShrink: 0 }} />
-                      <span style={s.chipClient}>{st.name}</span>
-                      <span style={{ fontSize: '0.65rem', color: 'var(--text-ghost)', flexShrink: 0 }}>{st.count}</span>
-                    </div>
-                  ))}
+                  {visibleStations.map(st => {
+                    const allUnconfirmed = st.unconfirmedCount === st.count;
+                    return (
+                      <div key={st.name} style={{ ...s.chip, background: allUnconfirmed ? 'rgba(255,255,255,0.04)' : 'rgba(111,163,232,0.1)', border: allUnconfirmed ? '1px dashed rgba(255,255,255,0.18)' : undefined }}>
+                        <div style={{ width: 6, height: 6, borderRadius: 2, background: allUnconfirmed ? 'rgba(255,255,255,0.2)' : '#6fa3e8', flexShrink: 0 }} />
+                        <span style={{ ...s.chipClient, color: allUnconfirmed ? 'rgba(255,255,255,0.3)' : undefined }}>{st.name}</span>
+                        <span style={{ fontSize: '0.65rem', color: allUnconfirmed ? 'rgba(255,255,255,0.2)' : 'var(--text-ghost)', flexShrink: 0 }}>{st.count}</span>
+                      </div>
+                    );
+                  })}
                   {unassigned.length > 0 && (
                     <div style={{ ...s.chip, background: 'rgba(245,158,58,0.08)' }}>
                       <div style={{ width: 6, height: 6, borderRadius: 2, background: '#f59e3a', flexShrink: 0 }} />

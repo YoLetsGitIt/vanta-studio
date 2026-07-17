@@ -588,7 +588,7 @@ function ClientDetail({ client, onClose, consent, consentVersion, onSendConsentL
               <div key={b.id} style={s.historyRow}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
                   <span style={{ fontSize: '0.82rem', color: 'var(--text)', fontWeight: 600 }}>
-                    {[b.session_type ? capitalise(b.session_type.replace(/_/g, ' ')) : null, b.body_location || null].filter(Boolean).join(' · ') || '—'}
+                    {[b.session_type ? capitalise(b.session_type.replace(/_/g, ' ')) : null, b.artist_name || null].filter(Boolean).join(' · ') || '—'}
                   </span>
                   <span style={{ fontSize: '0.73rem', color: 'var(--text-faint)' }}>
                     {new Date(b.created_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
