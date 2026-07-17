@@ -11,11 +11,10 @@ import BookingDetailPanel from '@/components/BookingDetailPanel';
 
 const STATUS_FILTERS = [
   { value: 'pending',               label: 'Pending' },
-  { value: 'requires_confirmation', label: 'Needs Confirmation' },
   { value: 'awaiting_payment',      label: 'Awaiting Payment' },
+  { value: 'requires_confirmation', label: 'Needs Confirmation' },
   { value: 'confirmed',             label: 'Confirmed' },
-  { value: 'completed',             label: 'Completed' },
-  { value: 'cancelled',             label: 'Cancelled' },
+  { value: 'completed,cancelled',   label: 'Completed' },
 ];
 
 const DEFAULT_FILTER = 'pending';
@@ -36,11 +35,12 @@ export default function AppointmentsPage() {
   const [rejectTarget, setRejectTarget] = useState(null);
   const [cancelTarget, setCancelTarget] = useState(null);
   const [toast, setToast] = useState(null);
-  const [sendLinkTarget, setSendLinkTarget] = useState(null); // booking id
-  const [sendLinkHours, setSendLinkHours] = useState(168);
-  const [sendLinkDeposit, setSendLinkDeposit] = useState(false);
-  const [sendLinkAmount, setSendLinkAmount] = useState('');
-  const [sendLinkSaving, setSendLinkSaving] = useState(false);
+  const [sendLinkTarget,   setSendLinkTarget]   = useState(null);
+  const [sendLinkHours,    setSendLinkHours]    = useState(168);
+  const [sendLinkDuration, setSendLinkDuration] = useState(60);
+  const [sendLinkDeposit,  setSendLinkDeposit]  = useState(false);
+  const [sendLinkAmount,   setSendLinkAmount]   = useState('');
+  const [sendLinkSaving,   setSendLinkSaving]   = useState(false);
   const [reassignTarget, setReassignTarget] = useState(null); // booking id
   const [reassignArtistId, setReassignArtistId] = useState('');
   const [reassignResend, setReassignResend] = useState(true);
@@ -166,6 +166,7 @@ export default function AppointmentsPage() {
   function handleSendLink(id) {
     setSendLinkTarget(id);
     setSendLinkHours(168);
+    setSendLinkDuration(60);
     setSendLinkDeposit(false);
     setSendLinkAmount('');
   }
@@ -173,8 +174,9 @@ export default function AppointmentsPage() {
   async function confirmSendLink() {
     setSendLinkSaving(true);
     try {
-      const amount = sendLinkDeposit && sendLinkAmount ? parseFloat(sendLinkAmount) : null;
-      await sendSelectionLink(sendLinkTarget, sendLinkHours, sendLinkDeposit, amount);
+      const amount   = sendLinkDeposit && sendLinkAmount ? parseFloat(sendLinkAmount) : null;
+      const duration = sendLinkDuration ? Number(sendLinkDuration) : null;
+      await sendSelectionLink(sendLinkTarget, sendLinkHours, sendLinkDeposit, amount, duration);
       await load(true);
       setSendLinkTarget(null);
       showToast('Selection link sent to client');
@@ -274,6 +276,17 @@ export default function AppointmentsPage() {
           <div style={s.modal} onClick={e => e.stopPropagation()}>
             <h3 style={s.modalTitle}>Send selection link</h3>
             <p style={s.modalSub}>The client will receive an email with a link to choose their artist and time.</p>
+            <label style={s.modalLabel}>Appointment duration</label>
+            <select value={sendLinkDuration} onChange={e => setSendLinkDuration(Number(e.target.value))} style={s.modalSelect}>
+              <option value={60}>1 hour</option>
+              <option value={90}>1.5 hours</option>
+              <option value={120}>2 hours</option>
+              <option value={180}>3 hours</option>
+              <option value={240}>4 hours</option>
+              <option value={300}>5 hours</option>
+              <option value={360}>6 hours</option>
+              <option value={480}>Full day (8 hrs)</option>
+            </select>
             <label style={s.modalLabel}>Link expires after</label>
             <select value={sendLinkHours} onChange={e => setSendLinkHours(Number(e.target.value))} style={s.modalSelect}>
               <option value={24}>24 hours</option>
@@ -432,6 +445,9 @@ function BookingRow({ booking: b, selected, onSelect }) {
   const month = d ? d.toLocaleDateString('en-AU', { month: 'short' }).toUpperCase() : null;
   const day   = d ? d.getDate() : null;
   const time  = d ? d.toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit', hour12: true }).toLowerCase() : null;
+  const createdAt = b.created_at ? new Date(b.created_at) : null;
+  const reqMonth = createdAt ? createdAt.toLocaleDateString('en-AU', { month: 'short' }).toUpperCase() : null;
+  const reqDay   = createdAt ? createdAt.getDate() : null;
 
   const sessionParts = [
     b.session_type ? capitalise(b.session_type.replace(/_/g, ' ')) : null,
@@ -457,6 +473,12 @@ function BookingRow({ booking: b, selected, onSelect }) {
             <span style={s.dateMonth}>{month}</span>
             <span style={s.dateDay}>{day}</span>
             <span style={s.dateTime}>{time}</span>
+          </>
+        ) : createdAt ? (
+          <>
+            <span style={s.dateMonth}>{reqMonth}</span>
+            <span style={s.dateDay}>{reqDay}</span>
+            <span style={s.dateTime}>requested</span>
           </>
         ) : (
           <>

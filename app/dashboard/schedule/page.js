@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { getStudioArtists, getStudioSchedule, getStudioScheduleRange, getStudioBooking, acceptBookingWithStation, createManualBooking, createFollowUpBooking, rejectBooking, recordOutcome } from '@/lib/api';
+import { getBookingStyle, TYPE_STYLE } from '@/lib/bookingType';
 import BookingDetailPanel from '@/components/BookingDetailPanel';
 import { getCached, setCached, invalidatePrefix } from '@/lib/cache';
 import CompleteBookingModal from '@/components/CompleteBookingModal';
@@ -16,14 +17,9 @@ const GRID_H    = (DAY_END - DAY_START) * HOUR_PX;
 
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-// All block colours are source-based — no per-artist palette.
-const SOURCE_STYLE = {
-  studio:   { bg: 'rgba(245,158,58,0.12)',  border: '#f59e3a', tag: 'Studio',   tagColor: '#f59e3a', dot: '#f59e3a' },
-  personal: { bg: 'rgba(167,139,250,0.12)', border: '#a78bfa', tag: 'Personal', tagColor: '#a78bfa', dot: '#a78bfa' },
-};
-function srcStyle(source) {
-  return (source === 'walkin' || source === 'web') ? SOURCE_STYLE.studio : SOURCE_STYLE.personal;
-}
+// All block colours are type-based — no per-artist palette.
+const SOURCE_STYLE = TYPE_STYLE;
+function srcStyle(source) { return getBookingStyle(source); }
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -557,6 +553,126 @@ function ManualBookingModal({ artists, defaultDate, onClose, onCreated }) {
   );
 }
 
+// ── Station month view ────────────────────────────────────────────────────────
+
+function StationMonthView({ monthStart, onDayClick }) {
+  const monthEnd  = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0);
+  const gridStart = getMonday(monthStart);
+  const gridEnd   = addDays(getMonday(monthEnd), 6);
+  const numDays   = Math.round((gridEnd - gridStart) / 86400000) + 1;
+  const monthDays = Array.from({ length: numDays }, (_, i) => addDays(gridStart, i));
+  const curMonth  = monthStart.getMonth();
+
+  const [entries,    setEntries]    = useState([]);
+  const [loading,    setLoading]    = useState(true);
+  const [error,      setError]      = useState('');
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    const start = toISO(gridStart);
+    const end   = toISO(gridEnd);
+    const key   = `schedule:month:${start}`;
+    const cached = getCached(key);
+    if (cached) { setEntries(cached); setLoading(false); }
+    setLoading(true);
+    getStudioScheduleRange(start, end)
+      .then(d => { const e = d.entries ?? []; setCached(key, e); if (!cancelled) { setEntries(e); setLoading(false); } })
+      .catch(e => { if (!cancelled) { setError(e.message); setLoading(false); } });
+    return () => { cancelled = true; };
+  }, [toISO(monthStart), refreshKey]); // eslint-disable-line
+
+  // Group entries by date
+  const byDate = {};
+  for (const e of entries) {
+    const d = e.date ?? toISO(new Date(e.chosenTime));
+    if (!byDate[d]) byDate[d] = [];
+    byDate[d].push(e);
+  }
+
+  // All stations seen this month (for the legend)
+  const allStationNames = [...new Set(entries.filter(e => e.stationName).map(e => e.stationName))];
+
+  const today = toISO(new Date());
+
+  if (loading) return <p style={s.msg}>Loading…</p>;
+  if (error)   return <p style={{ ...s.msg, color: '#e86f6f' }}>{error}</p>;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+      <div style={s.monthWeekdays}>
+        {DAY_NAMES.map(d => <div key={d} style={s.monthWeekday}>{d}</div>)}
+      </div>
+      <div style={s.calWrap}>
+        <div style={{ ...s.monthGrid, gridTemplateRows: `repeat(${numDays / 7}, minmax(94px, 1fr))` }}>
+          {monthDays.map((day, i) => {
+            const iso     = toISO(day);
+            const isToday = iso === today;
+            const outside = day.getMonth() !== curMonth;
+            const dayEnts = byDate[iso] ?? [];
+
+            const assigned   = dayEnts.filter(e => e.stationId);
+            const unassigned = dayEnts.filter(e => !e.stationId);
+
+            // Aggregate by station
+            const stationMap = {};
+            for (const e of assigned) {
+              if (!stationMap[e.stationId]) stationMap[e.stationId] = { name: e.stationName, count: 0 };
+              stationMap[e.stationId].count++;
+            }
+            const usedStations = Object.values(stationMap);
+            const visibleStations = usedStations.slice(0, 2);
+            const moreStations   = usedStations.length - visibleStations.length;
+
+            return (
+              <div
+                key={i}
+                style={{ ...s.monthCell, ...(isToday ? s.monthCellToday : {}), ...(outside ? s.monthCellOutside : {}), cursor: 'pointer' }}
+                onClick={() => onDayClick(day)}
+              >
+                <div style={s.monthCellHead}>
+                  <span style={{ ...s.monthDayNum, ...(isToday ? s.dayNumToday : {}) }}>{day.getDate()}</span>
+                  {dayEnts.length > 0 && <span style={s.weekDayCount}>{dayEnts.length}</span>}
+                </div>
+
+                <div style={s.monthChipList}>
+                  {visibleStations.map(st => (
+                    <div key={st.name} style={{ ...s.chip, background: 'rgba(111,163,232,0.1)' }}>
+                      <div style={{ width: 6, height: 6, borderRadius: 2, background: '#6fa3e8', flexShrink: 0 }} />
+                      <span style={s.chipClient}>{st.name}</span>
+                      <span style={{ fontSize: '0.65rem', color: 'var(--text-ghost)', flexShrink: 0 }}>{st.count}</span>
+                    </div>
+                  ))}
+                  {unassigned.length > 0 && (
+                    <div style={{ ...s.chip, background: 'rgba(245,158,58,0.08)' }}>
+                      <div style={{ width: 6, height: 6, borderRadius: 2, background: '#f59e3a', flexShrink: 0 }} />
+                      <span style={{ ...s.chipClient, color: 'var(--text-ghost)' }}>{unassigned.length} unassigned</span>
+                    </div>
+                  )}
+                  {moreStations > 0 && (
+                    <button style={s.moreBtn}>+{moreStations} stations</button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div style={s.legend}>
+        <div style={s.legendItem}>
+          <div style={{ width: 8, height: 8, borderRadius: 2, background: '#6fa3e8', flexShrink: 0 }} />
+          <span style={s.legendName}>Station assigned</span>
+        </div>
+        <div style={s.legendItem}>
+          <div style={{ width: 8, height: 8, borderRadius: 2, background: '#f59e3a', flexShrink: 0 }} />
+          <span style={s.legendName}>Unassigned</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Station utilization view ──────────────────────────────────────────────────
 
 const STATUS_COLORS_SU = {
@@ -676,7 +792,8 @@ function StationView({ date }) {
 // ── Page shell ────────────────────────────────────────────────────────────────
 
 export default function SchedulePage() {
-  const [view,       setView]       = useState('month'); // 'month' | 'day' | 'station'
+  const [view,      setView]      = useState('month');  // 'month' | 'day'
+  const [lens,      setLens]      = useState('artist'); // 'artist' | 'station'
   const [monthStart, setMonthStart] = useState(() => getMonthStart(new Date()));
   const [dayDate,    setDayDate]    = useState(() => new Date());
 
@@ -689,33 +806,20 @@ export default function SchedulePage() {
   }
 
   const monthLabel = monthStart.toLocaleDateString('en-AU', { month: 'long', year: 'numeric' });
-  const dayLabel = dayDate.toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long' });
+  const dayLabel   = dayDate.toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long' });
 
   return (
     <div style={s.page}>
       <div style={s.header}>
         <div style={s.headerLeft}>
           <h1 style={s.title}>Schedule</h1>
-          {/* View toggle */}
           <div style={s.viewToggle}>
-            <button
-              onClick={() => setView('month')}
-              style={{ ...s.toggleBtn, ...(view === 'month' ? s.toggleActive : {}) }}
-            >
-              Month
-            </button>
-            <button
-              onClick={() => setView('day')}
-              style={{ ...s.toggleBtn, ...(view === 'day' ? s.toggleActive : {}) }}
-            >
-              Day
-            </button>
-            <button
-              onClick={() => setView('station')}
-              style={{ ...s.toggleBtn, ...(view === 'station' ? s.toggleActive : {}) }}
-            >
-              Station
-            </button>
+            <button onClick={() => setView('month')} style={{ ...s.toggleBtn, ...(view === 'month' ? s.toggleActive : {}) }}>Month</button>
+            <button onClick={() => setView('day')}   style={{ ...s.toggleBtn, ...(view === 'day'   ? s.toggleActive : {}) }}>Day</button>
+          </div>
+          <div style={{ ...s.viewToggle, marginLeft: '0.25rem' }}>
+            <button onClick={() => setLens('artist')}  style={{ ...s.toggleBtn, ...(lens === 'artist'  ? s.toggleActive : {}) }}>Artist</button>
+            <button onClick={() => setLens('station')} style={{ ...s.toggleBtn, ...(lens === 'station' ? s.toggleActive : {}) }}>Station</button>
           </div>
         </div>
 
@@ -742,9 +846,10 @@ export default function SchedulePage() {
         </div>
       </div>
 
-      {view === 'month'   && <MonthView monthStart={monthStart} onDayClick={goToDayView} />}
-      {view === 'day'     && <DayView  date={dayDate} />}
-      {view === 'station' && <StationView date={dayDate} />}
+      {view === 'month' && lens === 'artist'  && <MonthView        monthStart={monthStart} onDayClick={goToDayView} />}
+      {view === 'month' && lens === 'station' && <StationMonthView monthStart={monthStart} onDayClick={day => { goToDayView(day); setLens('station'); }} />}
+      {view === 'day'   && lens === 'artist'  && <DayView          date={dayDate} />}
+      {view === 'day'   && lens === 'station' && <StationView      date={dayDate} />}
     </div>
   );
 }

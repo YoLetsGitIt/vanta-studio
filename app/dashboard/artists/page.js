@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, Suspense, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { getStudioArtists, approveStudioArtist, rejectStudioArtist, getStudioArtistStats, getStudioScheduleRange, getArtistWorkSchedule } from '@/lib/api';
+import { getStudioArtists, approveStudioArtist, rejectStudioArtist, getStudioArtistStats, getStudioScheduleRange, getArtistWorkSchedule, updateArtistWorkSchedule } from '@/lib/api';
 import { getCached, setCached, invalidatePrefix } from '@/lib/cache';
 import { APPROVAL_STATUS_COLORS } from '@/lib/status';
 import { initials } from '@/lib/format';
@@ -230,6 +230,50 @@ function ArtistDetail({ artist, onBack, onApprove, onReject, actionLoading }) {
   const [stats,        setStats]        = useState(null);
   const [schedule,     setSchedule]     = useState(null); // null = loading
   const [workSchedule, setWorkSchedule] = useState(null); // null = loading
+  const [editingSchedule, setEditingSchedule] = useState(false);
+  const [scheduleEdits,   setScheduleEdits]   = useState({}); // { dow: { start, end, on } }
+  const [scheduleSaving,  setScheduleSaving]  = useState(false);
+  const [scheduleError,   setScheduleError]   = useState('');
+
+  // Day labels and their Sunday-indexed dow values
+  const SCHED_DAYS = [
+    { label: 'Mon', dow: 1 }, { label: 'Tue', dow: 2 }, { label: 'Wed', dow: 3 },
+    { label: 'Thu', dow: 4 }, { label: 'Fri', dow: 5 }, { label: 'Sat', dow: 6 },
+    { label: 'Sun', dow: 0 },
+  ];
+
+  function openScheduleEdit() {
+    const edits = {};
+    SCHED_DAYS.forEach(({ dow }) => {
+      const day = (workSchedule || []).find(d => d.day_of_week === dow);
+      edits[dow] = day
+        ? { on: true, start: day.start_time.slice(0, 5), end: day.end_time.slice(0, 5) }
+        : { on: false, start: '10:00', end: '18:00' };
+    });
+    setScheduleEdits(edits);
+    setScheduleError('');
+    setEditingSchedule(true);
+  }
+
+  async function saveSchedule() {
+    setScheduleSaving(true);
+    setScheduleError('');
+    try {
+      const days = SCHED_DAYS.map(({ dow }) => {
+        const e = scheduleEdits[dow];
+        return e.on
+          ? { day_of_week: dow, start_time: e.start, end_time: e.end }
+          : { day_of_week: dow, start_time: '', end_time: '' };
+      });
+      const data = await updateArtistWorkSchedule(artist.artistId, days);
+      setWorkSchedule(data.schedule ?? []);
+      setEditingSchedule(false);
+    } catch (err) {
+      setScheduleError(err.message);
+    } finally {
+      setScheduleSaving(false);
+    }
+  }
 
   useEffect(() => {
     getStudioArtistStats(artist.id).then(setStats).catch(() => {});
@@ -307,32 +351,87 @@ function ArtistDetail({ artist, onBack, onApprove, onReject, actionLoading }) {
 
         {/* Work timetable */}
         <div style={s.detailSection}>
-          <span style={s.sectionLabel}>Work timetable</span>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={s.sectionLabel}>Work timetable</span>
+            {!editingSchedule && workSchedule !== null && (
+              <button onClick={openScheduleEdit} style={s.editSchedBtn}>Edit</button>
+            )}
+          </div>
+
           {workSchedule === null && (
             <p style={{ fontSize: '0.8rem', color: 'var(--text-ghost)', margin: '0.4rem 0 0' }}>Loading…</p>
           )}
-          {workSchedule !== null && workSchedule.length === 0 && (
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-ghost)', margin: '0.4rem 0 0' }}>No timetable set.</p>
+
+          {/* Read-only view */}
+          {!editingSchedule && workSchedule !== null && (
+            workSchedule.length === 0 ? (
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-ghost)', margin: '0.4rem 0 0' }}>No timetable set. Click Edit to add one.</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', marginTop: '0.5rem' }}>
+                {SCHED_DAYS.map(({ label, dow }) => {
+                  const day = workSchedule.find(d => d.day_of_week === dow);
+                  return (
+                    <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 600, color: day ? 'var(--text)' : 'var(--text-ghost)', width: 28 }}>{label}</span>
+                      {day ? (
+                        <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                          {fmtHHMM(day.start_time)} – {fmtHHMM(day.end_time)}
+                        </span>
+                      ) : (
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-ghost)' }}>Off</span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )
           )}
-          {workSchedule !== null && workSchedule.length > 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', marginTop: '0.5rem' }}>
-              {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((label, idx) => {
-                // day_of_week: 0=Sun,1=Mon…6=Sat → idx 0=Mon means dow 1
-                const dow = idx + 1 === 7 ? 0 : idx + 1;
-                const day = workSchedule.find(d => d.day_of_week === dow);
+
+          {/* Edit mode */}
+          {editingSchedule && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.75rem' }}>
+              {SCHED_DAYS.map(({ label, dow }) => {
+                const e = scheduleEdits[dow] || { on: false, start: '10:00', end: '18:00' };
                 return (
-                  <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                    <span style={{ fontSize: '0.75rem', fontWeight: 600, color: day ? 'var(--text)' : 'var(--text-ghost)', width: 28 }}>{label}</span>
-                    {day ? (
-                      <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-                        {fmtHHMM(day.start_time)} – {fmtHHMM(day.end_time)}
-                      </span>
+                  <div key={dow} style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer', width: 52 }}>
+                      <input
+                        type="checkbox"
+                        checked={e.on}
+                        onChange={ev => setScheduleEdits(prev => ({ ...prev, [dow]: { ...prev[dow], on: ev.target.checked } }))}
+                        style={{ accentColor: 'var(--accent)', width: 13, height: 13 }}
+                      />
+                      <span style={{ fontSize: '0.75rem', fontWeight: 600, color: e.on ? 'var(--text)' : 'var(--text-ghost)' }}>{label}</span>
+                    </label>
+                    {e.on ? (
+                      <>
+                        <input
+                          type="time"
+                          value={e.start}
+                          onChange={ev => setScheduleEdits(prev => ({ ...prev, [dow]: { ...prev[dow], start: ev.target.value } }))}
+                          style={s.schedTimeInput}
+                        />
+                        <span style={{ fontSize: '0.72rem', color: 'var(--text-ghost)' }}>–</span>
+                        <input
+                          type="time"
+                          value={e.end}
+                          onChange={ev => setScheduleEdits(prev => ({ ...prev, [dow]: { ...prev[dow], end: ev.target.value } }))}
+                          style={s.schedTimeInput}
+                        />
+                      </>
                     ) : (
                       <span style={{ fontSize: '0.75rem', color: 'var(--text-ghost)' }}>Off</span>
                     )}
                   </div>
                 );
               })}
+              {scheduleError && <p style={{ fontSize: '0.75rem', color: 'var(--error)', margin: 0 }}>{scheduleError}</p>}
+              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem' }}>
+                <button onClick={saveSchedule} disabled={scheduleSaving} style={s.schedSaveBtn}>
+                  {scheduleSaving ? 'Saving…' : 'Save'}
+                </button>
+                <button onClick={() => setEditingSchedule(false)} style={s.schedCancelBtn}>Cancel</button>
+              </div>
             </div>
           )}
         </div>
@@ -438,6 +537,26 @@ function ArtistRejectModal({ onConfirm, onCancel, saving }) {
 }
 
 const s = {
+  editSchedBtn: {
+    background: 'none', border: '1px solid var(--border)', borderRadius: 6,
+    color: 'var(--text-muted)', fontSize: '0.72rem', fontWeight: 600,
+    padding: '0.2rem 0.6rem', cursor: 'pointer', fontFamily: 'inherit',
+  },
+  schedTimeInput: {
+    background: 'var(--surface-2)', border: '1px solid var(--border)',
+    borderRadius: 6, color: 'var(--text)', fontSize: '0.78rem',
+    padding: '0.2rem 0.4rem', colorScheme: 'dark', fontFamily: 'inherit',
+  },
+  schedSaveBtn: {
+    background: 'var(--accent)', border: 'none', borderRadius: 7,
+    color: '#0e0e0e', fontSize: '0.8rem', fontWeight: 700,
+    padding: '0.4rem 0.9rem', cursor: 'pointer', fontFamily: 'inherit',
+  },
+  schedCancelBtn: {
+    background: 'none', border: '1px solid var(--border)', borderRadius: 7,
+    color: 'var(--text-muted)', fontSize: '0.8rem',
+    padding: '0.4rem 0.9rem', cursor: 'pointer', fontFamily: 'inherit',
+  },
   page: {
     flex: 1,
     display: 'flex',

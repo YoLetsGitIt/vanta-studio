@@ -37,7 +37,7 @@ export default function HomePage() {
         setArtists(a);
         setEntries(e);
         if (accountData?.studio_id) {
-          setWalkInUrl(`${window.location.origin}/walk-in?s=${accountData.studio_id}`);
+          setWalkInUrl(`${window.location.origin}/studio-booking?s=${accountData.studio_id}`);
         }
       } catch {
         // show empty
@@ -76,7 +76,7 @@ export default function HomePage() {
         {walkInUrl && (
           <div style={s.walkInCard}>
             <div style={s.walkInLeft}>
-              <span style={s.walkInTitle}>Walk-in link</span>
+              <span style={s.walkInTitle}>Studio booking link</span>
               <span style={s.walkInSub}>Share this link or QR code for on-the-spot bookings</span>
               <div style={s.walkInUrlRow}>
                 <span style={s.walkInUrlText}>{walkInUrl}</span>

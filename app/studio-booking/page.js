@@ -113,6 +113,7 @@ function WalkInInner() {
   const [placements, setPlacements]  = useState([]);
   const [design, setDesign]         = useState('');
   const [size, setSize]             = useState('');
+  const [sizeUnit, setSizeUnit]     = useState('cm');
   const [retouch, setRetouch]       = useState(false);
   const [notes, setNotes]           = useState('');
   const [photos, setPhotos]         = useState([]); // File objects
@@ -340,7 +341,7 @@ function WalkInInner() {
         session_type:         retouch ? 'retouch' : '',
         body_location:        placements.join(', '),
         design_details:       design,
-        size:                 size.trim() ? `${size.trim()}cm` : '',
+        size:                 size.trim() ? `${size.trim()}${sizeUnit}` : '',
         notes,
         image_paths:          imagePaths,
         consent_accepted:     consentSubmissions.length > 0,
@@ -363,7 +364,7 @@ function WalkInInner() {
       <div style={s.card}>
         <div style={s.successIcon}>✓</div>
         <h2 style={s.successTitle}>You're on the list!</h2>
-        <p style={s.successSub}>Your walk-in request has been sent to {studio.name}. They'll confirm your spot shortly.</p>
+        <p style={s.successSub}>Your booking request has been sent to {studio.name}. They'll confirm your spot shortly.</p>
       </div>
     );
   }
@@ -371,14 +372,14 @@ function WalkInInner() {
   return (
     <div style={s.card}>
       <div style={s.studioHeader}>
-        <span style={s.studioLabel}>Walk-in booking</span>
+        <span style={s.studioLabel}>Studio booking</span>
         <h1 style={s.studioName}>{studio.name}</h1>
       </div>
 
       {!session ? (
         <form onSubmit={handleAuth} style={s.form}>
           <p style={s.authIntro}>
-            {authMode === 'login' ? 'Log in to book your walk-in' : 'Create an account to book your walk-in'}
+            {authMode === 'login' ? 'Log in to continue' : 'Create an account to continue'}
           </p>
 
           {authMode === 'signup' && (
@@ -419,109 +420,132 @@ function WalkInInner() {
         </form>
       ) : (
         <form onSubmit={handleSubmit} style={s.form}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-            <Field label="First name">
-              <input style={s.input} type="text" value={firstName} required onChange={e => setFirstName(e.target.value)} placeholder="First" />
+
+          {/* ── About you ── */}
+          <Section title="About you" first>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+              <Field label="First name">
+                <input style={s.input} type="text" value={firstName} required onChange={e => setFirstName(e.target.value)} placeholder="First" />
+              </Field>
+              <Field label="Last name">
+                <input style={s.input} type="text" value={lastName} required onChange={e => setLastName(e.target.value)} placeholder="Last" />
+              </Field>
+            </div>
+            <Field label="Date of birth">
+              <input style={{ ...s.input, colorScheme: 'dark' }} type="date" value={dob} onChange={e => setDob(e.target.value)} />
             </Field>
-            <Field label="Last name">
-              <input style={s.input} type="text" value={lastName} required onChange={e => setLastName(e.target.value)} placeholder="Last" />
+            <Field label="Email">
+              <input style={s.input} type="email" value={email} required onChange={e => setEmail(e.target.value)} placeholder="you@example.com" />
             </Field>
-          </div>
-          <Field label="Date of birth">
-            <input style={{ ...s.input, colorScheme: 'dark' }} type="date" value={dob} onChange={e => setDob(e.target.value)} />
-          </Field>
-          <Field label="Email">
-            <input style={s.input} type="email" value={email} required onChange={e => setEmail(e.target.value)} placeholder="you@example.com" />
-          </Field>
-          <Field label="Phone">
-            <div style={s.phoneRow}>
-              <select
-                style={{ ...s.input, ...s.phoneCodeSelect }}
-                value={phoneCode}
-                onChange={e => setPhoneCode(e.target.value)}
-              >
-                {COUNTRIES.map(c => (
-                  <option key={c.id} value={c.id}>{c.flag} {c.dial}</option>
+            <Field label="Phone">
+              <div style={s.phoneRow}>
+                <select
+                  style={{ ...s.input, ...s.phoneCodeSelect }}
+                  value={phoneCode}
+                  onChange={e => setPhoneCode(e.target.value)}
+                >
+                  {COUNTRIES.map(c => (
+                    <option key={c.id} value={c.id}>{c.flag} {c.dial}</option>
+                  ))}
+                </select>
+                <input
+                  style={{ ...s.input, flex: 1 }}
+                  type="tel"
+                  value={phoneNum}
+                  required
+                  onChange={e => setPhoneNum(e.target.value)}
+                  placeholder="555 0100"
+                />
+              </div>
+            </Field>
+          </Section>
+
+          {/* ── Your tattoo ── */}
+          <Section title="Your tattoo">
+            <Field label="Artist (optional)">
+              <select style={s.input} value={artistId} onChange={e => setArtistId(e.target.value)}>
+                <option value="">No preference — studio will assign</option>
+                {studio.artists.map(a => (
+                  <option key={a.artistId} value={a.artistId}>{a.name}</option>
                 ))}
               </select>
-              <input
-                style={{ ...s.input, flex: 1 }}
-                type="tel"
-                value={phoneNum}
-                required
-                onChange={e => setPhoneNum(e.target.value)}
-                placeholder="555 0100"
-              />
+            </Field>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+              <label style={s.label}>
+                Placement
+                <span style={{ color: 'rgba(255,255,255,0.2)', fontWeight: 400, marginLeft: 6 }}>
+                  {placements.length}/3
+                </span>
+              </label>
+              <div style={s.chipGrid}>
+                {PLACEMENTS.map(p => {
+                  const active = placements.includes(p);
+                  return (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => {
+                        if (active) {
+                          setPlacements(prev => prev.filter(x => x !== p));
+                        } else if (placements.length < 3) {
+                          setPlacements(prev => [...prev, p]);
+                        }
+                      }}
+                      style={{ ...s.placementChip, ...(active ? s.placementChipActive : {}), ...(!active && placements.length >= 3 ? s.placementChipDisabled : {}) }}
+                    >
+                      {p}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-          </Field>
 
-          <Field label="Artist (optional)">
-            <select style={s.input} value={artistId} onChange={e => setArtistId(e.target.value)}>
-              <option value="">No preference — studio will assign</option>
-              {studio.artists.map(a => (
-                <option key={a.artistId} value={a.artistId}>{a.name}</option>
-              ))}
-            </select>
-          </Field>
+            <Field label="Design description">
+              <textarea style={{ ...s.input, ...s.textarea }} value={design} required onChange={e => setDesign(e.target.value)} placeholder="Describe what you'd like…" />
+            </Field>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-            <label style={s.label}>
-              Placement
-              <span style={{ color: 'rgba(255,255,255,0.2)', fontWeight: 400, marginLeft: 6 }}>
-                {placements.length}/3
-              </span>
+            <Field label="Size (optional)">
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                <input
+                  style={{ ...s.input, flex: 1 }}
+                  type="number" min="0" step="0.1"
+                  value={size}
+                  onChange={e => { const v = e.target.value; if (v === '' || /^\d*\.?\d*$/.test(v)) setSize(v); }}
+                  placeholder="e.g. 10"
+                />
+                <div style={{ display: 'flex', background: 'rgba(255,255,255,0.06)', borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)', flexShrink: 0 }}>
+                  {['cm', 'in'].map(u => (
+                    <button
+                      key={u} type="button"
+                      onClick={() => setSizeUnit(u)}
+                      style={{
+                        padding: '0.55rem 0.75rem', border: 'none', cursor: 'pointer',
+                        fontSize: '0.82rem', fontWeight: 600, fontFamily: 'inherit',
+                        background: sizeUnit === u ? 'rgba(255,255,255,0.15)' : 'transparent',
+                        color: sizeUnit === u ? '#fff' : 'rgba(255,255,255,0.4)',
+                      }}
+                    >
+                      {u}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </Field>
+
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: 'rgba(255,255,255,0.7)', cursor: 'pointer' }}>
+              <input type="checkbox" checked={retouch} onChange={e => setRetouch(e.target.checked)} style={{ width: 16, height: 16, accentColor: '#f5ecd9', cursor: 'pointer' }} />
+              This is a retouch / touch-up
             </label>
-            <div style={s.chipGrid}>
-              {PLACEMENTS.map(p => {
-                const active = placements.includes(p);
-                return (
-                  <button
-                    key={p}
-                    type="button"
-                    onClick={() => {
-                      if (active) {
-                        setPlacements(prev => prev.filter(x => x !== p));
-                      } else if (placements.length < 3) {
-                        setPlacements(prev => [...prev, p]);
-                      }
-                    }}
-                    style={{ ...s.placementChip, ...(active ? s.placementChipActive : {}), ...(!active && placements.length >= 3 ? s.placementChipDisabled : {}) }}
-                  >
-                    {p}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
 
-          <Field label="Design description">
-            <textarea style={{ ...s.input, ...s.textarea }} value={design} required onChange={e => setDesign(e.target.value)} placeholder="Describe what you'd like…" />
-          </Field>
+            <Field label="Additional notes (optional)">
+              <textarea style={{ ...s.input, ...s.textarea }} value={notes} onChange={e => setNotes(e.target.value)} placeholder="Anything else the artist should know" />
+            </Field>
+          </Section>
 
-          <Field label="Size (optional)">
-            <div style={{ position: 'relative' }}>
-              <input
-                style={s.input}
-                type="number" min="0" step="0.1"
-                value={size}
-                onChange={e => setSize(e.target.value)}
-                placeholder="e.g. 10"
-              />
-              <span style={{ position: 'absolute', right: '0.85rem', top: '50%', transform: 'translateY(-50%)', color: 'rgba(255,255,255,0.4)', fontSize: '0.85rem', pointerEvents: 'none' }}>cm</span>
-            </div>
-          </Field>
-
-          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: 'rgba(255,255,255,0.8)', cursor: 'pointer' }}>
-            <input type="checkbox" checked={retouch} onChange={e => setRetouch(e.target.checked)} style={{ width: 16, height: 16, accentColor: '#f5ecd9', cursor: 'pointer' }} />
-            This is a retouch / touch-up
-          </label>
-
-          <Field label="Additional notes (optional)">
-            <textarea style={{ ...s.input, ...s.textarea }} value={notes} onChange={e => setNotes(e.target.value)} placeholder="Anything else the artist should know" />
-          </Field>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-            <label style={s.label}>Reference photos (optional, up to 5)</label>
+          {/* ── Reference photos ── */}
+          <Section title="Reference photos">
+            <p style={s.sectionHint}>Optional — up to 5 images</p>
             <label style={s.uploadLabel}>
               <input type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={handlePhotoChange} />
               + Add photos
@@ -536,95 +560,98 @@ function WalkInInner() {
                 ))}
               </div>
             )}
+          </Section>
+
+          {/* ── Consent forms ── */}
+          {consentTemplates.length > 0 && (
+            <Section title="Consent forms">
+              {consentTemplates.map(t => {
+                const ts = templateState[t.id] ?? {};
+                return (
+                  <div key={t.id} style={s.consentBox}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <span style={s.consentFormTitle}>{t.name}</span>
+                      <span style={{ ...s.formTypeBadge, ...(s.formTypeBadgeColors[t.type] ?? {}) }}>
+                        {t.type === 'health' ? 'Health' : t.type === 'waiver' ? 'Waiver' : 'Consent'}
+                      </span>
+                    </div>
+
+                    {(t.fields ?? []).map(field => (
+                      <ConsentFormField
+                        key={field.id}
+                        field={field}
+                        value={ts.answers?.[field.id] ?? ''}
+                        onChange={v => setTemplateAnswer(t.id, field.id, v)}
+                      />
+                    ))}
+
+                    {isMinor && t.requires_minor_guardian && (
+                      <div style={s.guardianBox}>
+                        <p style={s.guardianTitle}>Parent / Guardian Consent Required</p>
+                        <p style={{ ...s.consentText, marginBottom: '0.75rem' }}>
+                          The client is under 18. A parent or legal guardian must provide their details and sign below.
+                        </p>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                            <div>
+                              <label style={s.label}>Guardian name <span style={{ color: '#e86f6f' }}>*</span></label>
+                              <input style={s.input} type="text" value={guardianName} required
+                                onChange={e => setGuardianName(e.target.value)} placeholder="Full name" />
+                            </div>
+                            <div>
+                              <label style={s.label}>Relationship</label>
+                              <select style={s.input} value={guardianRelationship} onChange={e => setGuardianRelationship(e.target.value)}>
+                                <option>Parent</option>
+                                <option>Legal Guardian</option>
+                                <option>Other</option>
+                              </select>
+                            </div>
+                          </div>
+                          <div>
+                            <label style={s.label}>Guardian email</label>
+                            <input style={s.input} type="email" value={guardianEmail}
+                              onChange={e => setGuardianEmail(e.target.value)} placeholder="guardian@example.com" />
+                          </div>
+                          <div>
+                            <label style={s.label}>Guardian phone</label>
+                            <input style={s.input} type="tel" value={guardianPhone}
+                              onChange={e => setGuardianPhone(e.target.value)} placeholder="Phone number" />
+                          </div>
+                          <div>
+                            <label style={s.label}>Guardian signature <span style={{ color: '#e86f6f' }}>*</span></label>
+                            <SignaturePad onCapture={blob => setTemplateGuardianSigBlob(t.id, blob)} />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {t.requires_signature && (
+                      <div>
+                        <label style={s.label}>{isMinor ? 'Client signature' : 'Signature'} <span style={{ color: '#e86f6f' }}>*</span></label>
+                        <SignaturePad onCapture={blob => setTemplateSigBlob(t.id, blob)} />
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </Section>
+          )}
+
+          {/* ── Submit ── */}
+          <div style={s.submitSection}>
+            {submitError && <p style={s.error}>{submitError}</p>}
+            <button type="submit" disabled={submitting} style={s.submitBtn}>
+              {submitting ? 'Submitting…' : 'Request booking'}
+            </button>
+            <button
+              type="button"
+              style={s.switchLink}
+              onClick={() => getSupabase().auth.signOut()}
+            >
+              Sign out
+            </button>
           </div>
 
-          {/* ── Consent templates (new system) ── */}
-          {consentTemplates.length > 0 && consentTemplates.map(t => {
-            const ts = templateState[t.id] ?? {};
-            return (
-              <div key={t.id} style={s.consentBox}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <span style={s.consentFormTitle}>{t.name}</span>
-                  <span style={{ ...s.formTypeBadge, ...(s.formTypeBadgeColors[t.type] ?? {}) }}>
-                    {t.type === 'health' ? 'Health' : t.type === 'waiver' ? 'Waiver' : 'Consent'}
-                  </span>
-                </div>
-
-                {/* Render fields */}
-                {(t.fields ?? []).map(field => (
-                  <ConsentFormField
-                    key={field.id}
-                    field={field}
-                    value={ts.answers?.[field.id] ?? ''}
-                    onChange={v => setTemplateAnswer(t.id, field.id, v)}
-                  />
-                ))}
-
-                {/* Minor guardian section */}
-                {isMinor && t.requires_minor_guardian && (
-                  <div style={s.guardianBox}>
-                    <p style={s.guardianTitle}>Parent / Guardian Consent Required</p>
-                    <p style={{ ...s.consentText, marginBottom: '0.75rem' }}>
-                      The client is under 18. A parent or legal guardian must provide their details and sign below.
-                    </p>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-                        <div>
-                          <label style={s.label}>Guardian name <span style={{ color: '#e86f6f' }}>*</span></label>
-                          <input style={s.input} type="text" value={guardianName} required
-                            onChange={e => setGuardianName(e.target.value)} placeholder="Full name" />
-                        </div>
-                        <div>
-                          <label style={s.label}>Relationship</label>
-                          <select style={s.input} value={guardianRelationship} onChange={e => setGuardianRelationship(e.target.value)}>
-                            <option>Parent</option>
-                            <option>Legal Guardian</option>
-                            <option>Other</option>
-                          </select>
-                        </div>
-                      </div>
-                      <div>
-                        <label style={s.label}>Guardian email</label>
-                        <input style={s.input} type="email" value={guardianEmail}
-                          onChange={e => setGuardianEmail(e.target.value)} placeholder="guardian@example.com" />
-                      </div>
-                      <div>
-                        <label style={s.label}>Guardian phone</label>
-                        <input style={s.input} type="tel" value={guardianPhone}
-                          onChange={e => setGuardianPhone(e.target.value)} placeholder="Phone number" />
-                      </div>
-                      <div>
-                        <label style={s.label}>Guardian signature <span style={{ color: '#e86f6f' }}>*</span></label>
-                        <SignaturePad onCapture={blob => setTemplateGuardianSigBlob(t.id, blob)} />
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Client signature */}
-                {t.requires_signature && (
-                  <div>
-                    <label style={s.label}>{isMinor ? 'Client signature' : 'Signature'} <span style={{ color: '#e86f6f' }}>*</span></label>
-                    <SignaturePad onCapture={blob => setTemplateSigBlob(t.id, blob)} />
-                  </div>
-                )}
-              </div>
-            );
-          })}
-
-          {submitError && <p style={s.error}>{submitError}</p>}
-
-          <button type="submit" disabled={submitting} style={s.submitBtn}>
-            {submitting ? 'Submitting…' : 'Request walk-in'}
-          </button>
-
-          <button
-            type="button"
-            style={s.switchLink}
-            onClick={() => getSupabase().auth.signOut()}
-          >
-            Sign out
-          </button>
         </form>
       )}
     </div>
@@ -763,6 +790,19 @@ function SignaturePad({ onCapture }) {
   );
 }
 
+function Section({ title, children, first = false }) {
+  return (
+    <div style={{
+      display: 'flex', flexDirection: 'column', gap: '0.9rem',
+      borderTop: first ? 'none' : '1px solid rgba(255,255,255,0.06)',
+      paddingTop: first ? 0 : '1.5rem',
+    }}>
+      <span style={s.sectionTitle}>{title}</span>
+      {children}
+    </div>
+  );
+}
+
 function Field({ label, children }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
@@ -823,7 +863,18 @@ const s = {
     fontSize: '0.85rem', color: 'rgba(255,255,255,0.55)', margin: 0,
   },
   form: {
-    display: 'flex', flexDirection: 'column', gap: '1rem',
+    display: 'flex', flexDirection: 'column', gap: '1.5rem',
+  },
+  sectionTitle: {
+    fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.12em',
+    textTransform: 'uppercase', color: 'rgba(255,255,255,0.22)',
+  },
+  sectionHint: {
+    fontSize: '0.78rem', color: 'rgba(255,255,255,0.3)', margin: 0,
+  },
+  submitSection: {
+    display: 'flex', flexDirection: 'column', gap: '0.75rem',
+    borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '1.5rem',
   },
   label: {
     fontSize: '0.72rem', fontWeight: 600, color: 'rgba(255,255,255,0.45)',

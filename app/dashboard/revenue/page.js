@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { getStudioRevenueStats, getPayoutSummaries, createPayout, getArtistPayoutHistory } from '@/lib/api';
+import { getStudioRevenueStats, getPayoutSummaries, createPayout, getArtistPayoutHistory, getArtistEarningsBreakdown } from '@/lib/api';
 import { getSupabase } from '@/lib/supabase';
 import { toISODate } from '@/lib/format';
 import {
@@ -29,7 +29,7 @@ function fmt(n) {
   return '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 function fmtHours(h) { return h ? Number(h).toFixed(1) + 'h' : '—'; }
-function formatSource(s) { return ({ app: 'App', walkin: 'Walk-in', personal: 'Manual', import: 'Imported' })[s] ?? s; }
+function formatSource(s) { return ({ app: 'App', walkin: 'Studio', personal: 'Manual', import: 'Imported' })[s] ?? s; }
 function formatDate(d) {
   if (!d) return '—';
   return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -48,8 +48,9 @@ export default function RevenuePage() {
   const [stats,       setStats]       = useState(null);
   const [loading,     setLoading]     = useState(true);
   const [error,       setError]       = useState('');
-  const [payouts,     setPayouts]     = useState([]);
-  const [payTarget,   setPayTarget]   = useState(null); // ArtistPayoutSummary being paid
+  const [payouts,      setPayouts]      = useState([]);
+  const [payTarget,    setPayTarget]    = useState(null); // ArtistPayoutSummary being paid
+  const [earningsTarget, setEarningsTarget] = useState(null); // { artist_id, artist_name } for earnings breakdown
   const [isLight,     setIsLight]     = useState(false);
   useEffect(() => {
     const check = () => setIsLight(document.documentElement.getAttribute('data-theme') === 'light');
@@ -185,6 +186,14 @@ export default function RevenuePage() {
         />
       )}
 
+      {/* ── Earnings breakdown panel ────────────────────────────────────────── */}
+      {earningsTarget && (
+        <EarningsPanel
+          artist={earningsTarget}
+          onClose={() => setEarningsTarget(null)}
+        />
+      )}
+
       {/* ── Body ───────────────────────────────────────────────────────────── */}
       <div style={st.body}>
         {loading && <p style={st.msg}>Loading…</p>}
@@ -251,7 +260,7 @@ export default function RevenuePage() {
               unlocked
                 ? <>
                     <FinancialContent s={s} weeklyChart={weeklyChart} byArtist={stats.by_artist} startDate={startDate} endDate={endDate} isLight={isLight} />
-                    <PayoutsSection payouts={payouts} onPay={setPayTarget} />
+                    <PayoutsSection payouts={payouts} onPay={setPayTarget} onViewEarnings={setEarningsTarget} />
                   </>
                 : <PasswordGate email={userEmail} onUnlock={handleUnlock} />
             )}
@@ -502,7 +511,7 @@ function LockIcon({ locked }) {
 
 // ── Payouts section ───────────────────────────────────────────────────────────
 
-function PayoutsSection({ payouts, onPay }) {
+function PayoutsSection({ payouts, onPay, onViewEarnings }) {
   if (!payouts?.length) return null;
   const hasCut = payouts.some(p => p.artist_payout != null && p.artist_payout !== p.total_earned);
   const headers = hasCut
@@ -517,13 +526,15 @@ function PayoutsSection({ payouts, onPay }) {
           </thead>
           <tbody>
             {payouts.map(p => (
-              <tr key={p.artist_id} style={st.tr}>
-                <td style={{ ...st.td, color: 'var(--text)', fontWeight: 500 }}>{p.artist_name}</td>
+              <tr key={p.artist_id} style={st.trClickable} onClick={() => onPay(p)} title="View payout history">
+                <td style={{ ...st.td, color: 'var(--text)', fontWeight: 500 }}>
+                  <span style={st.artistLink}>{p.artist_name}</span>
+                </td>
                 <td style={st.td}>
                   {fmt(p.total_earned)}
                   {p.earned_walkin > 0 && p.earned_personal > 0 && (
                     <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: 2 }}>
-                      Walk-in {fmt(p.earned_walkin)} · Personal {fmt(p.earned_personal)}
+                      Studio {fmt(p.earned_walkin)} · Personal {fmt(p.earned_personal)}
                     </div>
                   )}
                 </td>
@@ -536,12 +547,16 @@ function PayoutsSection({ payouts, onPay }) {
                   color: p.outstanding > 0 ? 'var(--accent)' : 'var(--text-secondary)',
                   fontWeight: 600,
                 }}>
-                  {fmt(p.outstanding)}
+                  {p.outstanding > 0
+                    ? <span onClick={e => { e.stopPropagation(); onViewEarnings(p); }} style={st.earningsLink} title="View breakdown">{fmt(p.outstanding)}</span>
+                    : fmt(p.outstanding)
+                  }
                 </td>
                 <td style={{ ...st.td, textAlign: 'right' }}>
-                  {p.outstanding > 0 && (
-                    <button onClick={() => onPay(p)} style={st.payBtn}>Pay out</button>
-                  )}
+                  {p.outstanding > 0
+                    ? <button onClick={e => { e.stopPropagation(); onPay(p); }} style={st.payBtn}>Pay out</button>
+                    : <span style={st.historyHint}>History ›</span>
+                  }
                 </td>
               </tr>
             ))}
@@ -593,8 +608,12 @@ function PayoutPanel({ artist, onClose, onPaid }) {
       <div style={{ ...st.panel, maxHeight: '90vh', overflow: 'auto' }}>
         <div style={st.panelHeader}>
           <div>
-            <p style={st.panelTitle}>Pay out · {artist.artist_name}</p>
-            <p style={st.panelSub}>Outstanding: {fmt(artist.outstanding)}</p>
+            <p style={st.panelTitle}>{artist.artist_name}</p>
+            <p style={st.panelSub}>
+              {artist.outstanding > 0
+                ? `Outstanding: ${fmt(artist.outstanding)}`
+                : 'All paid out'}
+            </p>
           </div>
           <button onClick={onClose} style={st.closeBtn}>✕</button>
         </div>
@@ -665,7 +684,7 @@ function PayoutPanel({ artist, onClose, onPaid }) {
               <p style={{ fontSize: '0.8rem', color: 'var(--text-ghost)' }}>No payouts recorded yet.</p>
             )}
             {history !== null && history.length > 0 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '260px', overflowY: 'auto', paddingRight: '0.25rem' }}>
                 {history.map(p => (
                   <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '0.5rem 0.65rem', background: 'var(--bg-chip)', borderRadius: 7, border: '1px solid var(--border-faint)' }}>
                     <div>
@@ -678,6 +697,79 @@ function PayoutPanel({ artist, onClose, onPaid }) {
               </div>
             )}
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Earnings breakdown panel ──────────────────────────────────────────────────
+
+function EarningsPanel({ artist, onClose }) {
+  const [entries, setEntries] = useState(null);
+
+  useEffect(() => {
+    getArtistEarningsBreakdown(artist.artist_id)
+      .then(d => setEntries(d.entries ?? []))
+      .catch(() => setEntries([]));
+  }, [artist.artist_id]);
+
+  function fmtDate(iso) {
+    if (!iso) return '—';
+    return new Date(iso).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
+  }
+  function fmtSource(s) {
+    return ({ app: 'App', walkin: 'Studio', manual: 'Manual', import: 'Import' })[s] ?? s;
+  }
+
+  const total = entries ? entries.reduce((s, e) => s + (e.artist_cut ?? 0), 0) : null;
+
+  return (
+    <div style={st.overlay} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div style={{ ...st.panel, maxWidth: 520, maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        <div style={st.panelHeader}>
+          <div>
+            <p style={st.panelTitle}>Earnings breakdown · {artist.artist_name}</p>
+            <p style={st.panelSub}>All completed bookings contributing to artist payout</p>
+          </div>
+          <button onClick={onClose} style={st.closeBtn}>✕</button>
+        </div>
+
+        <div style={{ overflowY: 'auto', flex: 1 }}>
+          {entries === null && (
+            <p style={{ padding: '1.5rem', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Loading…</p>
+          )}
+          {entries !== null && entries.length === 0 && (
+            <p style={{ padding: '1.5rem', fontSize: '0.85rem', color: 'var(--text-ghost)' }}>No completed bookings found.</p>
+          )}
+          {entries !== null && entries.length > 0 && (
+            <>
+              <table style={{ ...st.table, borderRadius: 0, border: 'none', borderBottom: '1px solid var(--border-faint)' }}>
+                <thead>
+                  <tr>
+                    {['Date', 'Client', 'Source', 'Gross', 'Artist cut'].map(h => (
+                      <th key={h} style={st.th}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {entries.map(e => (
+                    <tr key={e.booking_id} style={st.tr}>
+                      <td style={{ ...st.td, whiteSpace: 'nowrap' }}>{fmtDate(e.chosen_time)}</td>
+                      <td style={{ ...st.td, color: 'var(--text)', fontWeight: 500 }}>{e.client_name}</td>
+                      <td style={st.td}>{fmtSource(e.source)}</td>
+                      <td style={st.td}>{fmt(e.gross)}</td>
+                      <td style={{ ...st.td, fontWeight: 600, color: '#4cc98a' }}>{fmt(e.artist_cut)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <div style={{ padding: '0.85rem 1rem', display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', borderTop: '1px solid var(--border-faint)' }}>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 500 }}>Total artist payout</span>
+                <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#4cc98a' }}>{fmt(total)}</span>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>
@@ -778,6 +870,7 @@ const st = {
     borderBottom: '1px solid var(--border-faint)',
   },
   tr: { borderBottom: '1px solid var(--border-faint)' },
+  trClickable: { borderBottom: '1px solid var(--border-faint)', cursor: 'pointer' },
   td: { padding: '0.75rem 1rem', fontSize: '0.875rem', color: 'var(--text-muted)', fontWeight: 500, verticalAlign: 'top' },
   emailSub: { display: 'block', fontSize: '0.72rem', color: 'var(--text-ghost)', marginTop: '0.15rem' },
   note: { fontSize: '0.72rem', color: 'var(--text-ghost)', fontStyle: 'italic' },
@@ -786,6 +879,15 @@ const st = {
     padding: '0.3rem 0.75rem', borderRadius: 6,
     border: '1px solid var(--accent-tint-border)', background: 'var(--accent-tint)',
     color: 'var(--accent)', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer',
+  },
+  artistLink: {
+    cursor: 'pointer', borderBottom: '1px dashed var(--border)', paddingBottom: 1,
+  },
+  earningsLink: {
+    cursor: 'pointer', borderBottom: '1px dashed var(--accent)', paddingBottom: 1,
+  },
+  historyHint: {
+    fontSize: '0.75rem', color: 'var(--text-ghost)', fontWeight: 500,
   },
 
   overlay: {

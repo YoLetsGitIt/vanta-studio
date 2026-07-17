@@ -72,7 +72,7 @@ function WidgetPreview({ bg, accent, studioName }) {
 
         {/* Header */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4, paddingBottom: '1rem', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-          <span style={{ fontSize: '0.62rem', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)' }}>Walk-in booking</span>
+          <span style={{ fontSize: '0.62rem', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)' }}>Studio booking</span>
           <span style={{ fontSize: '1.2rem', fontWeight: 700, color: '#fff', letterSpacing: '-0.02em' }}>{studioName}</span>
         </div>
 
@@ -124,7 +124,7 @@ function WidgetPreview({ bg, accent, studioName }) {
 
         {/* Button */}
         <div style={{ padding: '0.75rem', background: accent, borderRadius: 9, fontSize: '0.85rem', fontWeight: 700, color: light ? '#0e0e0e' : '#ffffff', textAlign: 'center' }}>
-          Request walk-in
+          Request booking
         </div>
       </div>
     </div>
@@ -532,6 +532,7 @@ export default function SettingsPage() {
   const [aftercareInstructions, setAftercareInstructions] = useState('');
   const [widgetBgColor, setWidgetBgColor] = useState('#111111');
   const [widgetAccentColor, setWidgetAccentColor] = useState('#f5ecd9');
+  const [timezone, setTimezone] = useState('Australia/Sydney');
   const [walkinCut, setWalkinCut] = useState('0');
   const [personalCut, setPersonalCut] = useState('0');
   const [saving, setSaving] = useState(false);
@@ -587,11 +588,12 @@ export default function SettingsPage() {
         setAftercareInstructions(account.studio?.aftercare_instructions ?? '');
         setWidgetBgColor(account.studio?.widget_bg_color || '#111111');
         setWidgetAccentColor(account.studio?.widget_accent_color || '#f5ecd9');
+        setTimezone(account.studio?.timezone || 'Australia/Sydney');
         setWalkinCut(String(account.studio?.walkin_cut_percent ?? account.studio?.studio_cut_percent ?? 0));
         setPersonalCut(String(account.studio?.personal_cut_percent ?? account.studio?.studio_cut_percent ?? 0));
         setEmail(session?.user?.email ?? '');
         setStudioId(account.studio_id);
-        setWalkInUrl(window.location.origin + '/walk-in?s=' + account.studio_id);
+        setWalkInUrl(window.location.origin + '/studio-booking?s=' + account.studio_id);
         if (hoursData.hours?.length === 7) setHours(hoursData.hours);
         setStations(stationsData.stations ?? []);
         setConsentTemplates(templateData.templates ?? []);
@@ -610,7 +612,7 @@ export default function SettingsPage() {
     try {
       const wc = parseFloat(walkinCut);
       const pc = parseFloat(personalCut);
-      await updateStudioProfile(name.trim(), address.trim(), widgetBgColor, widgetAccentColor, isNaN(wc) ? 0 : wc, isNaN(pc) ? 0 : pc, aftercareInstructions);
+      await updateStudioProfile(name.trim(), address.trim(), widgetBgColor, widgetAccentColor, isNaN(wc) ? 0 : wc, isNaN(pc) ? 0 : pc, aftercareInstructions, timezone);
       invalidate('studio-account');
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
@@ -834,13 +836,52 @@ export default function SettingsPage() {
               <input style={s.input} value={address} onChange={e => setAddress(e.target.value)} placeholder="Studio address" />
             </div>
             <div style={s.field}>
+              <label style={s.label}>Timezone</label>
+              <select style={s.input} value={timezone} onChange={e => setTimezone(e.target.value)}>
+                <optgroup label="Australia">
+                  <option value="Australia/Sydney">Sydney / Melbourne (AEST/AEDT)</option>
+                  <option value="Australia/Brisbane">Brisbane (AEST, no DST)</option>
+                  <option value="Australia/Adelaide">Adelaide (ACST/ACDT)</option>
+                  <option value="Australia/Perth">Perth (AWST)</option>
+                  <option value="Australia/Darwin">Darwin (ACST, no DST)</option>
+                  <option value="Australia/Hobart">Hobart (AEST/AEDT)</option>
+                </optgroup>
+                <optgroup label="New Zealand">
+                  <option value="Pacific/Auckland">Auckland (NZST/NZDT)</option>
+                </optgroup>
+                <optgroup label="Asia">
+                  <option value="Asia/Singapore">Singapore (SGT)</option>
+                  <option value="Asia/Tokyo">Tokyo (JST)</option>
+                  <option value="Asia/Seoul">Seoul (KST)</option>
+                  <option value="Asia/Bangkok">Bangkok (ICT)</option>
+                  <option value="Asia/Dubai">Dubai (GST)</option>
+                </optgroup>
+                <optgroup label="Europe">
+                  <option value="Europe/London">London (GMT/BST)</option>
+                  <option value="Europe/Paris">Paris / Berlin (CET/CEST)</option>
+                  <option value="Europe/Helsinki">Helsinki (EET/EEST)</option>
+                </optgroup>
+                <optgroup label="Americas">
+                  <option value="America/New_York">New York (EST/EDT)</option>
+                  <option value="America/Chicago">Chicago (CST/CDT)</option>
+                  <option value="America/Denver">Denver (MST/MDT)</option>
+                  <option value="America/Los_Angeles">Los Angeles (PST/PDT)</option>
+                  <option value="America/Toronto">Toronto (EST/EDT)</option>
+                  <option value="America/Vancouver">Vancouver (PST/PDT)</option>
+                </optgroup>
+                <optgroup label="Other">
+                  <option value="UTC">UTC</option>
+                </optgroup>
+              </select>
+            </div>
+            <div style={s.field}>
               <label style={s.label}>Studio commission (%)</label>
               <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: '0 0 0.5rem' }}>
-                The studio&apos;s cut of a completed booking. Walk-ins and personal commissions can differ.
+                The studio&apos;s cut of a completed booking. Studio and personal commissions can differ.
               </p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
                 {[
-                  { label: 'Walk-in', value: walkinCut, set: setWalkinCut, hint: 'Studio-sourced walk-in clients' },
+                  { label: 'Studio', value: walkinCut, set: setWalkinCut, hint: 'Studio-sourced clients' },
                   { label: 'Personal', value: personalCut, set: setPersonalCut, hint: 'App, manual & imported bookings' },
                 ].map(({ label, value, set, hint }) => (
                   <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
@@ -1120,8 +1161,8 @@ export default function SettingsPage() {
         </section>
 
         <section style={s.card}>
-          <h2 style={s.sectionTitle}>Walk-in Link</h2>
-          <p style={s.sectionDesc}>Share this link or QR code so clients can submit walk-in requests.</p>
+          <h2 style={s.sectionTitle}>Studio Booking Link</h2>
+          <p style={s.sectionDesc}>Share this link or QR code so clients can submit booking requests.</p>
           <div style={s.walkInCard}>
             <div style={s.walkInLeft}>
               <span style={s.walkInUrl}>{walkInUrl}</span>

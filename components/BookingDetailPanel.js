@@ -80,7 +80,8 @@ export default function BookingDetailPanel({
   const [stationName,   setStationName]   = useState(null);
 
   // ── Consent submissions (new template system) ──────────────────────────────
-  const [consentSubmissions, setConsentSubmissions] = useState([]);
+  const [consentSubmissions,  setConsentSubmissions]  = useState([]);
+  const [submissionsLoading,  setSubmissionsLoading]  = useState(false);
   const [submissionsExpanded, setSubmissionsExpanded] = useState(false);
 
   // ── Normalise fields from booking (priority) with entry as fallback ────────
@@ -118,8 +119,10 @@ export default function BookingDetailPanel({
   const cancelReason      = booking?.cancellation_reason ?? null;
   const source            = booking?.source              ?? null;
   const stationId         = booking?.station_id          ?? entry?.stationId   ?? null;
-  const createdAt         = booking?.created_at          ?? entry?.createdAt   ?? null;
-  const holdExpiresAt     = booking?.hold_expires_at     ?? null;
+  const createdAt              = booking?.created_at                   ?? entry?.createdAt ?? null;
+  const updatedAt              = booking?.updated_at                   ?? null;
+  const holdExpiresAt          = booking?.hold_expires_at              ?? null;
+  const selectionTokenExpiresAt = booking?.selection_token_expires_at  ?? null;
 
   // Under the 5-status model a no-show is stored as status='completed' with
   // outcome='no_show', so "completed" visuals must exclude no-shows explicitly.
@@ -130,10 +133,11 @@ export default function BookingDetailPanel({
   const today      = new Date().toLocaleDateString('en-CA');
   const chosenDate = chosenTime ? chosenTime.slice(0, 10) : null;
   const isFutureConfirmed = status === 'confirmed' && chosenDate && chosenDate > today;
-  const canAcceptReject   = ['pending', 'awaiting_payment'].includes(status);
+  const canAccept         = false; // Accept removed for pending/awaiting_payment — use Send Link flow
   const canComplete       = status === 'confirmed' && chosenDate && chosenDate <= today;
-  const canReject         = canAcceptReject;
-  const canSendLink       = status === 'pending';
+  const canReject         = status === 'pending' || status === 'awaiting_payment';
+  const canSendLink       = status === 'pending' || status === 'awaiting_payment';
+  const canAcceptReject   = canAccept || canReject; // kept for layout gate
   const canConfirm        = status === 'requires_confirmation';
 
   const displayStatus = isNoShow ? 'no_show' : status;
@@ -242,9 +246,11 @@ export default function BookingDetailPanel({
   useEffect(() => {
     setConsentSubmissions([]);
     if (!bookingId) return;
+    setSubmissionsLoading(true);
     getBookingConsentSubmissions(bookingId)
       .then(d => setConsentSubmissions(d.submissions ?? []))
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setSubmissionsLoading(false));
   }, [bookingId]);
 
   // ── Station picker ─────────────────────────────────────────────────────────
@@ -357,7 +363,7 @@ export default function BookingDetailPanel({
               {source && (
                 <span style={{ fontSize: '0.68rem', fontWeight: 600, padding: '0.15rem 0.45rem', borderRadius: 4,
                   background: 'var(--bg-chip)', color: 'var(--text-ghost)', border: '1px solid var(--border-faint)' }}>
-                  {{ walkin: 'Walk-in', web: 'Web', app: 'App', personal: 'Manual', import: 'Imported' }[source] ?? source}
+                  {{ walkin: 'Studio', web: 'Web', app: 'App', personal: 'Manual', import: 'Imported' }[source] ?? source}
                 </span>
               )}
             </div>
@@ -414,7 +420,9 @@ export default function BookingDetailPanel({
           </div>
         )}
 
-        {canAcceptReject && createdAt && <Row label="Requested" value={fmtDate(createdAt)} />}
+        {createdAt && <Row label="Requested" value={fmtDate(createdAt)} />}
+        {status === 'awaiting_payment' && updatedAt && <Row label="Link sent" value={fmtDate(updatedAt)} />}
+        {status === 'awaiting_payment' && selectionTokenExpiresAt && <Row label="Link expires" value={fmtDate(selectionTokenExpiresAt)} />}
         {proposedTime && <Row label="Proposed" value={fmtDate(proposedTime)} />}
         {chosenTime   && <Row label="Appointment" value={fmtDate(chosenTime)} />}
         {stationName  && <Row label="Station" value={stationName} />}
@@ -481,11 +489,11 @@ export default function BookingDetailPanel({
         {email && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
             <span style={p.label}>Consent</span>
-            {consentLoading ? (
+            {consentLoading || submissionsLoading ? (
               <span style={{ fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.04em',
                 padding: '0.1rem 0.4rem', borderRadius: 4,
                 background: 'var(--bg-chip)', color: 'var(--text-ghost)', opacity: 0.5 }}>
-                —
+                Loading…
               </span>
             ) : (
               <>
@@ -640,7 +648,13 @@ export default function BookingDetailPanel({
       )}
 
       {/* ── Consent submissions ── */}
-      {consentSubmissions.length > 0 && (
+      {submissionsLoading && (
+        <div style={{ padding: '0 1rem' }}>
+          <div style={p.divider} />
+          <span style={{ fontSize: '0.72rem', color: 'var(--text-ghost)' }}>Loading consent forms…</span>
+        </div>
+      )}
+      {!submissionsLoading && consentSubmissions.length > 0 && (
         <div style={{ padding: '0 1rem 0' }}>
           <div style={p.divider} />
           <button
@@ -674,7 +688,7 @@ export default function BookingDetailPanel({
                   {/* Field answers */}
                   {sub.answers && Object.entries(sub.answers).length > 0 && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                      {Object.entries(sub.answers).map(([k, v]) => v && (
+                      {Object.entries(sub.answers).map(([k, v]) => v && v !== true && v !== 'true' && (
                         <div key={k} style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
                           <span style={{ color: 'var(--text-ghost)' }}>{k}: </span>{v}
                         </div>
@@ -727,17 +741,12 @@ export default function BookingDetailPanel({
       {/* ── Actions ── */}
       {!stationStep && (canAcceptReject || canComplete || isFutureConfirmed || canSendLink || canConfirm) && (
         <div style={p.actions}>
-          {/* New workflow: pending → send selection link */}
           {canSendLink && onSendLink && (
-            <Btn onClick={onSendLink} disabled={actionLoading} variant="primary">Send Link</Btn>
-          )}
-          {/* Old workflow: accept / reject */}
-          {canAcceptReject && onAccept && (
-            <Btn onClick={handleAcceptClick} disabled={actionLoading || stationsLoading} variant="success">
-              {stationsLoading ? 'Loading…' : 'Accept'}
+            <Btn onClick={onSendLink} disabled={actionLoading} variant="primary">
+              {status === 'awaiting_payment' ? 'Resend Link' : 'Send Link'}
             </Btn>
           )}
-          {canAcceptReject && onReject && (
+          {canReject && onReject && (
             <Btn onClick={onReject} disabled={actionLoading} variant="danger">Reject</Btn>
           )}
           {/* requires_confirmation: confirm or reassign */}

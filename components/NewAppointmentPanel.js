@@ -115,11 +115,21 @@ export default function NewAppointmentPanel({ open, onClose, onCreated }) {
 
   // ── Details
   const [size, setSize] = useState('');
+  const [sizeUnit, setSizeUnit] = useState(() => {
+    if (typeof navigator === 'undefined') return 'cm';
+    try {
+      const region = new Intl.Locale(navigator.language).region ?? '';
+      return ['US', 'LR', 'MM'].includes(region) ? 'in' : 'cm';
+    } catch { return 'cm'; }
+  });
   const [retouch, setRetouch] = useState(false);
 
   // ── Pricing
   const [finalPrice, setFinalPrice] = useState('');
   const [depositAmount, setDepositAmount] = useState('');
+
+  // ── Booking type (Studio = walkin, Personal = personal)
+  const [bookingType, setBookingType] = useState('personal');
 
   // ── Notes
   const [notes, setNotes] = useState('');
@@ -261,8 +271,9 @@ export default function NewAppointmentPanel({ open, onClose, onCreated }) {
     setStartTime(nextHalfHour());
     setDurationMins(60);
     setStationId('');
-    setSize(''); setRetouch(false);
+    setSize(''); setSizeUnit('cm'); setRetouch(false);
     setFinalPrice(''); setDepositAmount('');
+    setBookingType('personal');
     setNotes(''); setError('');
     setAvailableStations(null);
   }
@@ -279,8 +290,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated }) {
     try {
       const chosenTime = new Date(`${bookingDate}T${startTime}:00`).toISOString();
       const fp = parseFloat(finalPrice) || 0;
-      // Retouch bookings never take a deposit.
-      const da = retouch ? 0 : (parseFloat(depositAmount) || 0);
+      const da = parseFloat(depositAmount) || 0;
       const body = {
         artist_id: artistId,
         requester_name: clientName,
@@ -289,7 +299,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated }) {
         deposit_required: da > 0,
       };
       if (retouch) body.session_type = 'retouch';
-      if (size.trim()) body.size = `${size.trim()}cm`;
+      if (size.trim()) { body.size = size.trim(); body.size_unit = sizeUnit; }
       if (clientEmail.trim()) body.requester_email = clientEmail.trim();
       if (clientPhone.trim()) body.requester_phone = clientPhone.trim();
       if (clientDob.trim()) body.dob = clientDob.trim();
@@ -297,6 +307,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated }) {
       if (fp > 0) body.estimated_quote = fp;
       if (da > 0) body.deposit_amount = da;
       if (notes.trim()) body.notes = notes.trim();
+      body.source = bookingType === 'studio' ? 'walkin' : 'personal';
       await createManualBooking(body);
       invalidatePrefix('bookings:');
       setSaved(true);
@@ -330,6 +341,27 @@ export default function NewAppointmentPanel({ open, onClose, onCreated }) {
           <div style={bd.loadingWrap}><div style={bd.loadingDot} /></div>
         ) : (
           <form onSubmit={handleSubmit} style={bd.form}>
+
+            {/* ── BOOKING TYPE ── */}
+            <div style={bd.section}>
+              <p style={bd.sectionLabel}>Booking Type</p>
+              <div style={bd.modeTabs}>
+                <button
+                  type="button"
+                  style={{ ...bd.modeTab, ...(bookingType === 'personal' ? bd.modeTabActive : {}) }}
+                  onClick={() => setBookingType('personal')}
+                >
+                  Personal
+                </button>
+                <button
+                  type="button"
+                  style={{ ...bd.modeTab, ...(bookingType === 'studio' ? bd.modeTabActive : {}) }}
+                  onClick={() => setBookingType('studio')}
+                >
+                  Studio
+                </button>
+              </div>
+            </div>
 
             {/* ── ARTIST ── */}
             {artists.length > 0 && (
@@ -535,19 +567,29 @@ export default function NewAppointmentPanel({ open, onClose, onCreated }) {
               <p style={bd.sectionLabel}>Details</p>
               <label style={bd.checkRow}>
                 <input type="checkbox" checked={retouch} onChange={e => setRetouch(e.target.checked)} style={bd.checkbox} />
-                <span>Retouch <span style={{ color: 'var(--text-ghost)', fontWeight: 400 }}>· no deposit</span></span>
+                <span>Retouch</span>
               </label>
               <div style={bd.field}>
                 <label style={bd.label}>Size</label>
-                <div style={bd.prefixWrap}>
+                <div style={{ display: 'flex', gap: '0.4rem' }}>
                   <input
-                    style={bd.input}
+                    style={{ ...bd.input, flex: 1 }}
                     type="number" min="0" step="0.1"
                     value={size}
                     onChange={e => setSize(e.target.value)}
                     placeholder="e.g. 10"
                   />
-                  <span style={bd.suffix}>cm</span>
+                  <div style={bd.unitToggle}>
+                    {['cm', 'in'].map(u => (
+                      <button
+                        key={u} type="button"
+                        style={{ ...bd.unitBtn, ...(sizeUnit === u ? bd.unitBtnActive : {}) }}
+                        onClick={() => setSizeUnit(u)}
+                      >
+                        {u}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
@@ -574,12 +616,11 @@ export default function NewAppointmentPanel({ open, onClose, onCreated }) {
                   <div style={bd.prefixWrap}>
                     <span style={bd.prefix}>$</span>
                     <input
-                      style={{ ...bd.input, paddingLeft: '1.75rem', opacity: retouch ? 0.4 : 1 }}
+                      style={{ ...bd.input, paddingLeft: '1.75rem' }}
                       type="number" min="0" step="0.01"
-                      value={retouch ? '' : depositAmount}
+                      value={depositAmount}
                       onChange={e => setDepositAmount(e.target.value)}
-                      placeholder={retouch ? 'N/A for retouch' : '0.00'}
-                      disabled={retouch}
+                      placeholder="0.00"
                     />
                   </div>
                 </div>
@@ -747,6 +788,19 @@ const bd = {
   linkBtn: {
     background: 'none', border: 'none',
     color: 'var(--accent)', fontSize: '0.8rem', cursor: 'pointer', padding: 0,
+  },
+  unitToggle: {
+    display: 'flex', flexShrink: 0,
+    background: 'var(--bg-input)', border: '1px solid var(--border)',
+    borderRadius: 8, padding: 3, gap: 2,
+  },
+  unitBtn: {
+    background: 'none', border: 'none', borderRadius: 6,
+    padding: '0.3rem 0.55rem', fontSize: '0.78rem', fontWeight: 500,
+    color: 'var(--text-faint)', cursor: 'pointer',
+  },
+  unitBtnActive: {
+    background: 'var(--bg-chip)', color: 'var(--text)', fontWeight: 600,
   },
   errorText: { margin: '0.5rem 0 0', fontSize: '0.8rem', color: '#ff6b6b' },
   submitBtn: {

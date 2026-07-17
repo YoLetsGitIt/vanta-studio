@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { listStudioBookings, getStudioClients, getClientConsents, recordConsentInStudio, getNotes, addNote, deleteNote, ensureStudioClient, patchStudioClient } from '@/lib/api';
+import { listStudioBookings, getStudioClients, getClientConsents, getNotes, addNote, deleteNote, ensureStudioClient, patchStudioClient, generateConsentLink } from '@/lib/api';
 
 const TATTOO_STYLES = [
   'Traditional', 'Neo Traditional', 'Blackwork', 'Fine Line', 'Realism',
@@ -172,13 +172,9 @@ function ClientsInner() {
   //   a.click();
   // }
 
-  const handleRecordConsent = useCallback(async (email) => {
-    await recordConsentInStudio(email);
-    setConsents(prev => ({
-      ...prev,
-      [email]: { consent_version: consentVersion, agreed_at: new Date().toISOString(), source: 'in_studio' },
-    }));
-  }, [consentVersion]);
+  const handleSendConsentLink = useCallback(async (email) => {
+    await generateConsentLink(email);
+  }, []);
 
   return (
     <div style={s.page}>
@@ -250,7 +246,7 @@ function ClientsInner() {
             onClose={() => setSelected(null)}
             consent={selectedClient.email ? consents[selectedClient.email] : null}
             consentVersion={consentVersion}
-            onRecordConsent={handleRecordConsent}
+            onSendConsentLink={handleSendConsentLink}
           />
         )}
       </div>
@@ -278,9 +274,10 @@ function ConsentBadge({ status }) {
   return <span style={{ ...s.badge, ...s.badgeRed }}>No consent</span>;
 }
 
-function ClientDetail({ client, onClose, consent, consentVersion, onRecordConsent }) {
-  const [recording,   setRecording]   = useState(false);
-  const [recordErr,   setRecordErr]   = useState('');
+function ClientDetail({ client, onClose, consent, consentVersion, onSendConsentLink }) {
+  const [linkGenerating, setLinkGenerating] = useState(false);
+  const [linkCopied,     setLinkCopied]     = useState(false);
+  const [linkErr,        setLinkErr]        = useState('');
   const [notes,       setNotes]       = useState(null); // null = loading
   const [noteInput,   setNoteInput]   = useState('');
   const [noteAdding,  setNoteAdding]  = useState(false);
@@ -366,16 +363,18 @@ function ClientDetail({ client, onClose, consent, consentVersion, onRecordConsen
 
   const consentStatus = getConsentStatus(consent, consentVersion);
 
-  async function handleRecord() {
+  async function handleSendLink() {
     if (!client.email) return;
-    setRecording(true);
-    setRecordErr('');
+    setLinkGenerating(true);
+    setLinkErr('');
     try {
-      await onRecordConsent(client.email);
+      await onSendConsentLink(client.email);
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 3000);
     } catch (e) {
-      setRecordErr(e.message);
+      setLinkErr(e.message);
     } finally {
-      setRecording(false);
+      setLinkGenerating(false);
     }
   }
 
@@ -386,34 +385,55 @@ function ClientDetail({ client, onClose, consent, consentVersion, onRecordConsen
         <button onClick={onClose} style={s.closeBtn}>✕</button>
       </div>
       <div style={s.panelBody}>
-        {client.email && <Field label="Email">{client.email}</Field>}
-        {client.phone && <Field label="Phone">{client.phone}</Field>}
+        {client.email ? (
+          <a href={`mailto:${client.email}`} style={s.contactRow}>
+            <span style={s.contactIcon}>✉</span>
+            <span style={s.contactValue}>{client.email}</span>
+            <span style={s.contactArrow}>↗</span>
+          </a>
+        ) : (
+          <div style={s.contactRowMissing}><span style={s.contactIcon}>✉</span><span>No email on file</span></div>
+        )}
+        {client.phone ? (
+          <button onClick={() => { const a = document.createElement('a'); a.href = `sms:${client.phone}`; a.click(); }} style={s.contactRow}>
+            <span style={s.contactIcon}>✆</span>
+            <span style={s.contactValue}>{client.phone}</span>
+            <span style={s.contactArrow}>↗</span>
+          </button>
+        ) : (
+          <div style={s.contactRowMissing}><span style={s.contactIcon}>✆</span><span>No phone on file</span></div>
+        )}
         {client.dob && <Field label="Date of birth">{formatDob(client.dob)}</Field>}
         <Field label="Total sessions">{client.bookings.length}</Field>
         <Field label="Completed">{client.bookings.filter(b => b.outcome === 'completed').length}</Field>
 
         <div style={s.consentSection}>
           <span style={s.sectionLabel}>Consent form</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginTop: '0.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
             <ConsentBadge status={consentStatus} />
             {consent && (
               <span style={{ fontSize: '0.72rem', color: 'var(--text-ghost)' }}>
                 v{consent.consent_version} · {new Date(consent.agreed_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
               </span>
             )}
-          </div>
-          {(consentStatus === 'none' || consentStatus === 'outdated') && client.email && (
-            <>
+            {(consentStatus === 'none' || consentStatus === 'outdated') && client.email && (
               <button
-                onClick={handleRecord}
-                disabled={recording}
-                style={{ ...s.consentBtn, marginTop: '0.6rem' }}
+                onClick={handleSendLink}
+                disabled={linkGenerating}
+                style={{
+                  background: 'none',
+                  border: `1px solid ${linkCopied ? '#4cc98a' : 'var(--accent)'}`,
+                  borderRadius: 6, padding: '0.1rem 0.55rem',
+                  color: linkCopied ? '#4cc98a' : 'var(--accent)',
+                  fontSize: '0.72rem', fontWeight: 600,
+                  cursor: 'pointer', fontFamily: 'inherit', letterSpacing: '0.01em',
+                }}
               >
-                {recording ? 'Recording…' : consentStatus === 'outdated' ? 'Record updated consent' : 'Record consent'}
+                {linkCopied ? 'Email sent ✓' : linkGenerating ? 'Sending…' : 'Send consent link →'}
               </button>
-              {recordErr && <p style={{ fontSize: '0.72rem', color: '#e86f6f', margin: '0.3rem 0 0' }}>{recordErr}</p>}
-            </>
-          )}
+            )}
+          </div>
+          {linkErr && <p style={{ fontSize: '0.72rem', color: '#e86f6f', margin: '0.3rem 0 0' }}>{linkErr}</p>}
         </div>
 
         {/* Profile fields */}
@@ -800,6 +820,20 @@ const s = {
     cursor: 'pointer',
     alignSelf: 'flex-start',
   },
+  contactRow: {
+    display: 'flex', alignItems: 'center', gap: '0.5rem',
+    background: 'var(--bg-input)', border: '1px solid var(--border)',
+    borderRadius: 8, padding: '0.5rem 0.75rem',
+    cursor: 'pointer', width: '100%', textAlign: 'left', marginBottom: '0.35rem',
+  },
+  contactRowMissing: {
+    display: 'flex', alignItems: 'center', gap: '0.5rem',
+    padding: '0.5rem 0.75rem', marginBottom: '0.35rem',
+    fontSize: '0.78rem', color: 'var(--text-ghost)',
+  },
+  contactIcon: { fontSize: '0.85rem', color: 'var(--text-ghost)', flexShrink: 0, width: 16, textAlign: 'center' },
+  contactValue: { fontSize: '0.82rem', color: 'var(--accent)', fontWeight: 500, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  contactArrow: { fontSize: '0.7rem', color: 'var(--text-ghost)', flexShrink: 0 },
   fieldLabel: {
     display: 'block',
     fontSize: '0.68rem',
