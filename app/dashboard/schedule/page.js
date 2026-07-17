@@ -675,12 +675,6 @@ function StationMonthView({ monthStart, onDayClick }) {
 
 // ── Station utilization view ──────────────────────────────────────────────────
 
-const STATUS_COLORS_SU = {
-  confirmed:             '#4cc98a',
-  requires_confirmation: '#a78bfa',
-  awaiting_payment:      '#fb923c',
-  completed:             '#6fa3e8',
-};
 
 function StationView({ date }) {
   const dateStr = toISO(date);
@@ -742,16 +736,21 @@ function StationView({ date }) {
                       const topPx    = ((startMin - DAY_START * 60) / 60) * HOUR_PX;
                       const durMins  = e.durationMins ?? 60;
                       const heightPx = Math.max((durMins / 60) * HOUR_PX, 24);
-                      const statusColor = STATUS_COLORS_SU[e.status] ?? 'var(--text-ghost)';
                       const ss = srcStyle(e.source);
+                      const unconfirmed = e.status === 'requires_confirmation' || e.status === 'awaiting_payment';
+                      const blockBg     = unconfirmed ? 'rgba(255,255,255,0.04)' : ss.bg;
+                      const blockBorder = unconfirmed ? 'rgba(255,255,255,0.18)' : ss.border;
+                      const nameColor   = unconfirmed ? 'rgba(255,255,255,0.45)' : (ss.tagColor ?? 'var(--text)');
                       return (
                         <div key={e.bookingId} style={{
                           position: 'absolute', top: topPx, left: 6, right: 6, height: heightPx,
-                          background: ss.bg, border: `1px solid ${ss.border}55`,
-                          borderLeft: `3px solid ${ss.border}`, borderRadius: 5,
+                          background: blockBg,
+                          border: `1px ${unconfirmed ? 'dashed' : 'solid'} ${blockBorder}`,
+                          borderLeft: `3px ${unconfirmed ? 'dashed' : 'solid'} ${blockBorder}`,
+                          borderRadius: 5,
                           padding: '0.2rem 0.4rem', overflow: 'hidden',
                         }}>
-                          <div style={{ fontSize: '0.72rem', fontWeight: 700, color: ss.tagColor ?? statusColor, lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          <div style={{ fontSize: '0.72rem', fontWeight: 700, color: nameColor, lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                             {e.clientName}
                           </div>
                           {durMins >= 45 && (
