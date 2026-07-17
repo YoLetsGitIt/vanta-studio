@@ -10,6 +10,7 @@ import {
   setStationUnavailability, clearStationUnavailability,
   listConsentTemplates, createConsentTemplate, updateConsentTemplate, deleteConsentTemplate,
   importStudioData, getStudioArtists,
+  getStripeStatus, startStripeOnboarding, disconnectStripe,
 } from '@/lib/api';
 import { getSupabase } from '@/lib/supabase';
 import { invalidate, invalidatePrefix } from '@/lib/cache';
@@ -564,6 +565,10 @@ export default function SettingsPage() {
   const [templateSaving, setTemplateSaving] = useState(false);
   const [templateError, setTemplateError] = useState('');
 
+  const [stripeStatus, setStripeStatus] = useState(null); // null = loading
+  const [stripeConnecting, setStripeConnecting] = useState(false);
+  const [stripeError, setStripeError] = useState('');
+
   const [hours, setHours] = useState(defaultHours());
   const [hoursSaving, setHoursSaving] = useState(false);
   const [hoursSaved, setHoursSaved] = useState(false);
@@ -576,12 +581,13 @@ export default function SettingsPage() {
   useEffect(() => {
     async function load() {
       try {
-        const [account, { data: { session } }, hoursData, stationsData, templateData] = await Promise.all([
+        const [account, { data: { session } }, hoursData, stationsData, templateData, stripeData] = await Promise.all([
           getMyStudioAccount(),
           getSupabase().auth.getSession(),
           getStudioHours().catch(() => ({ hours: [] })),
           getStations().catch(() => ({ stations: [] })),
           listConsentTemplates().catch(() => ({ templates: [] })),
+          getStripeStatus().catch(() => null),
         ]);
         setName(account.studio?.name ?? '');
         setAddress(account.studio?.address_string ?? '');
@@ -597,6 +603,31 @@ export default function SettingsPage() {
         if (hoursData.hours?.length === 7) setHours(hoursData.hours);
         setStations(stationsData.stations ?? []);
         setConsentTemplates(templateData.templates ?? []);
+        setStripeStatus(stripeData ?? { connected: false, charges_enabled: false });
+
+        // Handle return from Stripe onboarding.
+        const params = new URLSearchParams(window.location.search);
+        const stripeParam = params.get('stripe');
+        if (stripeParam === 'return' || stripeParam === 'refresh') {
+          params.delete('stripe');
+          const newSearch = params.toString();
+          window.history.replaceState({}, '', window.location.pathname + (newSearch ? '?' + newSearch : ''));
+          if (stripeParam === 'refresh') {
+            // Account link expired — re-trigger onboarding automatically.
+            setStripeConnecting(true);
+            try {
+              const returnTo = window.location.href;
+              const result = await startStripeOnboarding(returnTo);
+              window.location.href = result.onboarding_url;
+            } catch (e) {
+              setStripeError(e.message);
+              setStripeConnecting(false);
+            }
+          } else {
+            // Returned from completed onboarding — re-fetch Stripe status.
+            getStripeStatus().then(setStripeStatus).catch(() => {});
+          }
+        }
       } catch {
         setProfileError('Failed to load settings.');
       } finally {
@@ -789,6 +820,30 @@ export default function SettingsPage() {
     }
   }
 
+  async function handleStripeConnect() {
+    setStripeConnecting(true);
+    setStripeError('');
+    try {
+      const returnTo = window.location.href.split('?')[0];
+      const result = await startStripeOnboarding(returnTo);
+      window.location.href = result.onboarding_url;
+    } catch (e) {
+      setStripeError(e.message);
+      setStripeConnecting(false);
+    }
+  }
+
+  async function handleStripeDisconnect() {
+    if (!confirm('Disconnect Stripe? Deposits will no longer be collected for new bookings.')) return;
+    setStripeError('');
+    try {
+      await disconnectStripe();
+      setStripeStatus({ connected: false, charges_enabled: false, details_submitted: false, payouts_enabled: false });
+    } catch (e) {
+      setStripeError(e.message);
+    }
+  }
+
   async function handleSignOut() {
     await getSupabase().auth.signOut();
     setDemoMode(false);
@@ -951,6 +1006,55 @@ export default function SettingsPage() {
           <button onClick={handleSaveHours} style={s.saveBtn} disabled={hoursSaving}>
             {hoursSaving ? 'Saving…' : hoursSaved ? 'Saved!' : 'Save hours'}
           </button>
+        </section>
+
+        {/* ── Payments ── */}
+        <p style={{ ...s.groupLabel, marginTop: '0.5rem' }}>Payments</p>
+
+        <section style={{ ...s.card, gridColumn: '1 / -1' }}>
+          <h2 style={s.sectionTitle}>Stripe Connect</h2>
+          <p style={s.sectionDesc}>
+            Connect your Stripe account to collect deposits from clients when sending selection links.
+            Payments go directly to your Stripe account minus the platform fee.
+          </p>
+
+          {stripeStatus === null ? (
+            <div style={s.loadingDot} />
+          ) : stripeStatus.connected ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <div style={s.stripeStatusRow}>
+                <div style={s.stripeStatusDot(stripeStatus.charges_enabled)} />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <span style={{ fontSize: '0.87rem', fontWeight: 600, color: 'var(--text)' }}>
+                    {stripeStatus.charges_enabled ? 'Active' : 'Onboarding incomplete'}
+                  </span>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                    {stripeStatus.charges_enabled
+                      ? 'Deposits can be collected from clients.'
+                      : 'Finish Stripe onboarding to start accepting payments.'}
+                  </span>
+                </div>
+                <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.5rem' }}>
+                  {!stripeStatus.charges_enabled && (
+                    <button style={s.saveBtn} onClick={handleStripeConnect} disabled={stripeConnecting}>
+                      {stripeConnecting ? 'Redirecting…' : 'Continue setup'}
+                    </button>
+                  )}
+                  <button style={s.stripeDisconnectBtn} onClick={handleStripeDisconnect}>
+                    Disconnect
+                  </button>
+                </div>
+              </div>
+              {stripeError && <p style={s.errorText}>{stripeError}</p>}
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <button style={s.stripeConnectBtn} onClick={handleStripeConnect} disabled={stripeConnecting}>
+                {stripeConnecting ? 'Redirecting to Stripe…' : 'Connect Stripe account'}
+              </button>
+              {stripeError && <p style={s.errorText}>{stripeError}</p>}
+            </div>
+          )}
         </section>
 
         {/* ── Bookings ── */}
@@ -1346,6 +1450,11 @@ const s = {
   fieldTypeBadge: { fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', padding: '0.1rem 0.45rem', borderRadius: 4, background: 'var(--bg-chip)', color: 'var(--text-ghost)' },
   fieldMoveBtn: { background: 'var(--bg-chip)', border: '1px solid var(--border)', borderRadius: 4, padding: '0.1rem 0.35rem', fontSize: '0.72rem', color: 'var(--text-muted)', cursor: 'pointer' },
   cancelBtn: { flex: 1, background: 'var(--bg-chip)', border: '1px solid var(--border)', borderRadius: 8, padding: '0.6rem 1rem', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', cursor: 'pointer' },
+  // Stripe
+  stripeConnectBtn: { alignSelf: 'flex-start', background: 'var(--accent)', border: 'none', borderRadius: 8, padding: '0.65rem 1.4rem', fontSize: '0.88rem', fontWeight: 700, color: 'var(--accent-contrast, #111)', cursor: 'pointer' },
+  stripeDisconnectBtn: { alignSelf: 'flex-start', background: 'transparent', border: '1px solid rgba(255,80,80,0.2)', borderRadius: 6, padding: '0.35rem 0.85rem', fontSize: '0.78rem', color: 'rgba(255,100,100,0.65)', cursor: 'pointer' },
+  stripeStatusRow: { display: 'flex', alignItems: 'center', gap: '0.85rem', background: 'var(--bg-base)', border: '1px solid var(--border-faint)', borderRadius: 10, padding: '0.9rem 1rem' },
+  stripeStatusDot: (active) => ({ width: 10, height: 10, borderRadius: '50%', flexShrink: 0, background: active ? '#4cc98a' : 'rgba(255,180,0,0.8)', boxShadow: active ? '0 0 6px rgba(76,201,138,0.5)' : '0 0 6px rgba(255,180,0,0.4)' }),
   // Account
   signOutBtn: { alignSelf: 'flex-start', background: 'var(--bg-chip)', border: '1px solid var(--border)', borderRadius: 6, padding: '0.4rem 1rem', fontSize: '0.75rem', color: 'var(--text-faint)', cursor: 'pointer' },
   themeToggle: { background: 'none', border: 'none', cursor: 'pointer', padding: 0 },
