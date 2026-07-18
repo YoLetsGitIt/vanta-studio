@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { getStudioRevenueStats, getPayoutSummaries, createPayout, getArtistPayoutHistory, getArtistEarningsBreakdown } from '@/lib/api';
+import { getStudioRevenueStats, getPayoutSummaries, createPayout, getArtistPayoutHistory, getArtistEarningsBreakdown, getReimbursements, reviewReimbursement } from '@/lib/api';
 import { getSupabase } from '@/lib/supabase';
 import { toISODate } from '@/lib/format';
 import {
@@ -49,6 +49,8 @@ export default function RevenuePage() {
   const [loading,     setLoading]     = useState(true);
   const [error,       setError]       = useState('');
   const [payouts,      setPayouts]      = useState([]);
+  const [reimbursements, setReimbursements] = useState([]);
+  const [reviewingReimbursement, setReviewingReimbursement] = useState(null); // id being reviewed
   const [payTarget,    setPayTarget]    = useState(null); // ArtistPayoutSummary being paid
   const [earningsTarget, setEarningsTarget] = useState(null); // { artist_id, artist_name } for earnings breakdown
   const [isLight,     setIsLight]     = useState(false);
@@ -70,11 +72,26 @@ export default function RevenuePage() {
     });
   }, []);
 
-  // Load payout summaries once unlocked.
+  // Load payout summaries + reimbursement requests once unlocked.
   useEffect(() => {
     if (!unlocked) return;
     getPayoutSummaries().then(d => setPayouts(d.payouts ?? [])).catch(() => {});
+    getReimbursements().then(d => setReimbursements(d.reimbursements ?? [])).catch(() => {});
   }, [unlocked]);
+
+  async function handleReviewReimbursement(id, action) {
+    setReviewingReimbursement(id);
+    try {
+      await reviewReimbursement(id, action);
+      const [r, p] = await Promise.all([getReimbursements(), getPayoutSummaries()]);
+      setReimbursements(r.reimbursements ?? []);
+      setPayouts(p.payouts ?? []); // approved claims change outstanding amounts
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setReviewingReimbursement(null);
+    }
+  }
 
   useEffect(() => {
     if (!startDate || !endDate || startDate > endDate) return;
@@ -261,6 +278,11 @@ export default function RevenuePage() {
                 ? <>
                     <FinancialContent s={s} weeklyChart={weeklyChart} byArtist={stats.by_artist} startDate={startDate} endDate={endDate} isLight={isLight} />
                     <PayoutsSection payouts={payouts} onPay={setPayTarget} onViewEarnings={setEarningsTarget} />
+                    <ReimbursementsSection
+                      reimbursements={reimbursements}
+                      reviewingId={reviewingReimbursement}
+                      onReview={handleReviewReimbursement}
+                    />
                   </>
                 : <PasswordGate email={userEmail} onUnlock={handleUnlock} />
             )}
@@ -510,6 +532,76 @@ function LockIcon({ locked }) {
 }
 
 // ── Payouts section ───────────────────────────────────────────────────────────
+
+// ── Reimbursements section ────────────────────────────────────────────────────
+
+const REIMB_STATUS_STYLE = {
+  pending:  { color: '#f59e3a', bg: 'rgba(245,158,58,0.12)',  label: 'Pending'  },
+  approved: { color: '#4cc98a', bg: 'rgba(76,201,138,0.12)',  label: 'Approved' },
+  rejected: { color: '#e86f6f', bg: 'rgba(232,111,111,0.12)', label: 'Rejected' },
+};
+
+function ReimbursementsSection({ reimbursements, reviewingId, onReview }) {
+  if (!reimbursements?.length) return null;
+  return (
+    <Section title="Reimbursement requests">
+      <div style={st.tableScroll}>
+        <table style={st.table}>
+          <thead>
+            <tr>{['Artist', 'Requested', 'Description', 'Amount', ''].map(h => <th key={h} style={st.th}>{h}</th>)}</tr>
+          </thead>
+          <tbody>
+            {reimbursements.map(rb => {
+              const sc = REIMB_STATUS_STYLE[rb.status] ?? REIMB_STATUS_STYLE.pending;
+              const busy = reviewingId === rb.id;
+              return (
+                <tr key={rb.id} style={{ borderBottom: '1px solid var(--border-faint)' }}>
+                  <td style={{ ...st.td, color: 'var(--text)', fontWeight: 500 }}>{rb.artist_name}</td>
+                  <td style={st.td}>{new Date(rb.created_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}</td>
+                  <td style={{ ...st.td, maxWidth: 320, whiteSpace: 'normal' }}>{rb.description}</td>
+                  <td style={{ ...st.td, fontWeight: 600, color: 'var(--text)' }}>{fmt(rb.amount)}</td>
+                  <td style={{ ...st.td, textAlign: 'right', whiteSpace: 'nowrap' }}>
+                    {rb.status === 'pending' ? (
+                      <span style={{ display: 'inline-flex', gap: '0.4rem' }}>
+                        <button
+                          onClick={() => onReview(rb.id, 'approve')}
+                          disabled={busy}
+                          style={{ ...st.payBtn, opacity: busy ? 0.5 : 1 }}
+                        >
+                          Approve
+                        </button>
+                        <button
+                          onClick={() => onReview(rb.id, 'reject')}
+                          disabled={busy}
+                          style={{
+                            ...st.payBtn,
+                            background: 'rgba(232,111,111,0.12)',
+                            border: '1px solid rgba(232,111,111,0.3)',
+                            color: '#e86f6f',
+                            opacity: busy ? 0.5 : 1,
+                          }}
+                        >
+                          Reject
+                        </button>
+                      </span>
+                    ) : (
+                      <span style={{
+                        fontSize: '0.72rem', fontWeight: 600, padding: '0.2rem 0.55rem',
+                        borderRadius: 20, background: sc.bg, color: sc.color,
+                      }}>
+                        {sc.label}
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </Section>
+  );
+}
 
 function PayoutsSection({ payouts, onPay, onViewEarnings }) {
   if (!payouts?.length) return null;
