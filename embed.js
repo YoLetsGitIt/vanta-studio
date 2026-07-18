@@ -276,7 +276,7 @@
       artists.forEach(function (a) {
         var opt = document.createElement('option');
         opt.value = a.artistId || a.artist_id || '';
-        opt.textContent = a.name || '';
+        opt.textContent = (a.name || '') + (a.studioType === 'guest' ? ' (Guest)' : '');
         artistEl.appendChild(opt);
       });
       form.appendChild(field('Artist (optional)', artistEl));
