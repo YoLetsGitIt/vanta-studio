@@ -466,7 +466,9 @@ function WalkInInner() {
               <select style={s.input} value={artistId} onChange={e => setArtistId(e.target.value)}>
                 <option value="">No preference — studio will assign</option>
                 {studio.artists.map(a => (
-                  <option key={a.artistId} value={a.artistId}>{a.name}</option>
+                  <option key={a.artistId} value={a.artistId}>
+                    {a.name}{a.studioType === 'guest' ? ' (Guest)' : ''}
+                  </option>
                 ))}
               </select>
             </Field>

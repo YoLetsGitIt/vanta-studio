@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef, useMemo } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import {
@@ -9,20 +9,12 @@ import {
   getStations, addStation, removeStation,
   setStationUnavailability, clearStationUnavailability,
   listConsentTemplates, createConsentTemplate, updateConsentTemplate, deleteConsentTemplate,
-  importStudioData, getStudioArtists,
   getStripeStatus, startStripeOnboarding, disconnectStripe,
 } from '@/lib/api';
 import { getSupabase } from '@/lib/supabase';
-import { invalidate, invalidatePrefix } from '@/lib/cache';
+import { invalidate } from '@/lib/cache';
 import { setDemoMode } from '@/lib/mode';
 import { getTheme, setTheme } from '@/lib/theme';
-import { parseCSV } from '@/lib/csv';
-import {
-  CLIENT_FIELDS, APPOINTMENT_FIELDS, PRESETS,
-  suggestMapping, suggestKind,
-  normalizeEmail, normalizePhone, parsePrice,
-  parseDateTime, parseDOB, normalizeStatus, parseDurationMinutes,
-} from '@/lib/importPresets';
 
 const QRCodeSVG = dynamic(() => import('qrcode.react').then(m => m.QRCodeSVG), { ssr: false });
 
@@ -59,6 +51,142 @@ function hexToRgbaStr(hex, alpha) {
     : hex.slice(1);
   const r = parseInt(h.slice(0,2),16), g = parseInt(h.slice(2,4),16), b = parseInt(h.slice(4,6),16);
   return `rgba(${r},${g},${b},${alpha})`;
+}
+
+function AddressAutocomplete({ value, onChange, onSelect, inputStyle }) {
+  const [suggestions, setSuggestions] = useState([]);
+  const [open, setOpen] = useState(false);
+  const mapkitRef = useRef(null);
+  const searchRef = useRef(null);
+  const debounceRef = useRef(null);
+  const containerRef = useRef(null);
+  const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL;
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (window.mapkit && mapkitRef.current) return;
+    if (window.mapkit) { initMapKit(window.mapkit); return; }
+
+    const script = document.createElement('script');
+    script.src = 'https://cdn.apple-mapkit.com/mk/5.x.x/mapkit.js';
+    script.crossOrigin = 'anonymous';
+    script.async = true;
+    script.onerror = () => console.error('[MapKit] Failed to load MapKit JS script');
+    script.onload = () => initMapKit(window.mapkit);
+    document.head.appendChild(script);
+  }, []);
+
+  function initMapKit(mk) {
+    if (!mk || mapkitRef.current) return;
+    mapkitRef.current = mk;
+    mk.init({
+      authorizationCallback: (done) => {
+        fetch(`${BACKEND}/api/mapkit-token`)
+          .then(r => { if (!r.ok) throw new Error(`token endpoint ${r.status}`); return r.json(); })
+          .then(d => { done(d.token); })
+          .catch(() => { done(''); });
+      },
+    });
+    try {
+      searchRef.current = new mk.Search({ language: 'en-GB', getsUserLocation: false });
+    } catch (e) {
+      console.error('[MapKit] Search init error:', e);
+    }
+  }
+
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  function handleInput(e) {
+    const q = e.target.value;
+    onChange(q);
+    clearTimeout(debounceRef.current);
+    if (!q.trim() || q.length < 3) { setSuggestions([]); setOpen(false); return; }
+    debounceRef.current = setTimeout(() => runAutocomplete(q), 300);
+  }
+
+  function runAutocomplete(q) {
+    if (!searchRef.current) return;
+    searchRef.current.autocomplete(q, (err, data) => {
+      if (err) { setSuggestions([]); setOpen(false); return; }
+      if (!data?.results?.length) { setSuggestions([]); setOpen(false); return; }
+      setSuggestions(data.results.slice(0, 5));
+      setOpen(true);
+    });
+  }
+
+  function handleSelect(result) {
+    setOpen(false);
+    setSuggestions([]);
+    const label = result.displayLines?.join(', ') ?? result.completionDescription ?? '';
+    onChange(label);
+    if (!searchRef.current) { onSelect(label, null, null); return; }
+    searchRef.current.search(result, (err, data) => {
+      if (!err && data?.places?.length) {
+        const place = data.places[0];
+        const addr = place.formattedAddress ?? label;
+        onSelect(addr, place.coordinate?.latitude ?? null, place.coordinate?.longitude ?? null);
+      } else {
+        onSelect(label, null, null);
+      }
+    });
+  }
+
+  return (
+    <div ref={containerRef} style={{ position: 'relative' }}>
+      <input
+        style={inputStyle}
+        value={value}
+        onChange={handleInput}
+        onFocus={() => suggestions.length > 0 && setOpen(true)}
+        placeholder="Search address"
+        autoComplete="off"
+      />
+      {open && suggestions.length > 0 && (
+        <div style={{
+          position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, zIndex: 300,
+          background: 'color-mix(in srgb, var(--bg-base) 88%, white 12%)',
+          border: '1px solid var(--border-faint)',
+          borderRadius: 10,
+          overflow: 'hidden',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.55)',
+        }}>
+          {suggestions.map((s, i) => (
+            <button
+              key={i}
+              type="button"
+              onMouseDown={() => handleSelect(s)}
+              style={{
+                display: 'block', width: '100%', textAlign: 'left',
+                padding: '0.55rem 0.9rem',
+                background: 'none', border: 'none',
+                borderBottom: i < suggestions.length - 1 ? '1px solid var(--border-faint)' : 'none',
+                cursor: 'pointer', color: 'var(--text)',
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.04)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'none'}
+            >
+              <span style={{ fontSize: '0.82rem', fontWeight: 500, display: 'block', lineHeight: 1.3 }}>
+                {s.displayLines?.[0] ?? s.completionDescription}
+              </span>
+              {s.displayLines?.[1] && (
+                <span style={{ display: 'block', fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: 2, lineHeight: 1.3 }}>
+                  {s.displayLines[1]}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function WidgetPreview({ bg, accent, studioName }) {
@@ -132,403 +260,14 @@ function WidgetPreview({ bg, accent, studioName }) {
   );
 }
 
-const IMPORT_CHUNK = 200;
-const UNASSIGNED = '';
-
-function previewColumns(kind) {
-  if (kind === 'clients') {
-    return [
-      { key: 'name',  label: 'Name',   render: p => p.name },
-      { key: 'email', label: 'Email',  render: p => p.email || '—' },
-      { key: 'phone', label: 'Phone',  render: p => p.phone || '—' },
-      { key: 'dob',   label: 'DOB',    render: p => p.dob || '—' },
-      { key: 'notes', label: 'Notes',  render: p => p.notes || '—' },
-    ];
-  }
-  return [
-    { key: 'client', label: 'Client', render: p => p.client_name || p.client_email || p.client_phone },
-    { key: 'when',   label: 'When',   render: p => p.chosen_time ? new Date(p.chosen_time).toLocaleString('en-AU', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : '—' },
-    { key: 'status', label: 'Status', render: p => p.status },
-    { key: 'price',  label: 'Price',  render: p => p.price != null ? `$${p.price}` : '—' },
-    { key: 'design', label: 'Service', render: p => p.design_details || '—' },
-  ];
-}
-
-function ImportSection() {
-  const [step, setStep] = useState('upload');
-  const [fileName, setFileName] = useState('');
-  const [headers, setHeaders] = useState([]);
-  const [rows, setRows] = useState([]);
-  const [kind, setKind] = useState('clients');
-  const [preset, setPreset] = useState('generic');
-  const [dayFirst, setDayFirst] = useState(true);
-  const [mapping, setMapping] = useState({});
-  const [artists, setArtists] = useState([]);
-  const [artistMap, setArtistMap] = useState({});
-  const [progress, setProgress] = useState(0);
-  const [result, setResult] = useState(null);
-  const [error, setError] = useState('');
-  const fileRef = useRef(null);
-
-  useEffect(() => {
-    getStudioArtists('approved')
-      .then(d => setArtists(d.artists ?? []))
-      .catch(() => {});
-  }, []);
-
-  const fields = kind === 'clients' ? CLIENT_FIELDS : APPOINTMENT_FIELDS;
-
-  const artistNames = useMemo(() => {
-    if (kind !== 'appointments' || !mapping.artist_name) return [];
-    return [...new Set(rows.map(r => (r[mapping.artist_name] ?? '').trim()).filter(Boolean))];
-  }, [kind, mapping.artist_name, rows]);
-
-  useEffect(() => {
-    if (artistNames.length === 0) return;
-    setArtistMap(prev => {
-      const next = { ...prev };
-      for (const raw of artistNames) {
-        if (next[raw] !== undefined) continue;
-        const lower = raw.toLowerCase();
-        const exact = artists.find(a => a.name?.toLowerCase() === lower);
-        const partial = exact ?? artists.find(a =>
-          a.name && (lower.includes(a.name.toLowerCase()) || a.name.toLowerCase().includes(lower)));
-        next[raw] = partial?.artistId ?? UNASSIGNED;
-      }
-      return next;
-    });
-  }, [artistNames, artists]);
-
-  const prepared = useMemo(() => {
-    if (step !== 'preview') return [];
-    const get = (r, k) => (mapping[k] ? (r[mapping[k]] ?? '').trim() : '');
-    return rows.map((r, idx) => {
-      const errs = [];
-      if (kind === 'clients') {
-        const name = get(r, 'name') || [get(r, 'first_name'), get(r, 'last_name')].filter(Boolean).join(' ');
-        const email = normalizeEmail(get(r, 'email'));
-        const phone = normalizePhone(get(r, 'phone'));
-        if (!name) errs.push('missing name');
-        if (email && !/^\S+@\S+\.\S+$/.test(email)) errs.push('invalid email');
-        if (!email && !phone) errs.push('needs email or phone');
-        return { line: idx + 2, errors: errs, payload: { name, email, phone, dob: parseDOB(get(r, 'dob'), dayFirst), notes: get(r, 'notes') } };
-      }
-      const name = get(r, 'client_name') || [get(r, 'client_first_name'), get(r, 'client_last_name')].filter(Boolean).join(' ');
-      const email = normalizeEmail(get(r, 'client_email'));
-      const phone = normalizePhone(get(r, 'client_phone'));
-      const chosen = parseDateTime({ datetime: get(r, 'datetime'), date: get(r, 'date'), time: get(r, 'time') }, dayFirst);
-      if (!name && !email && !phone) errs.push('needs client name, email or phone');
-      if (email && !/^\S+@\S+\.\S+$/.test(email)) errs.push('invalid email');
-      if (!chosen) errs.push('unparseable date/time');
-      const artistName = get(r, 'artist_name');
-      return {
-        line: idx + 2, errors: errs,
-        payload: {
-          client_name: name, client_email: email, client_phone: phone,
-          artist_id: artistName ? (artistMap[artistName] ?? UNASSIGNED) : UNASSIGNED,
-          chosen_time: chosen ?? '', duration_minutes: parseDurationMinutes(get(r, 'duration_minutes')),
-          design_details: get(r, 'design_details'), body_location: get(r, 'body_location'),
-          notes: get(r, 'notes'), price: parsePrice(get(r, 'price')),
-          status: normalizeStatus(get(r, 'status'), chosen),
-        },
-      };
-    });
-  }, [step, rows, mapping, kind, dayFirst, artistMap]);
-
-  const validRows = prepared.filter(p => p.errors.length === 0);
-  const invalidRows = prepared.filter(p => p.errors.length > 0);
-
-  function handleFile(file) {
-    if (!file) return;
-    setError('');
-    const reader = new FileReader();
-    reader.onload = () => {
-      const { headers: h, rows: r } = parseCSV(String(reader.result));
-      if (h.length === 0 || r.length === 0) { setError('Could not read any rows from that file.'); return; }
-      const guessedKind = suggestKind(h);
-      setFileName(file.name);
-      setHeaders(h);
-      setRows(r);
-      setKind(guessedKind);
-      setMapping(suggestMapping(h, guessedKind, 'generic'));
-      setPreset('generic');
-      setStep('map');
-    };
-    reader.readAsText(file);
-  }
-
-  function applyPreset(p, k = kind) {
-    setPreset(p);
-    setDayFirst(PRESETS[p]?.dayFirst ?? true);
-    setMapping(suggestMapping(headers, k, p));
-  }
-
-  async function runImport() {
-    setStep('importing');
-    setError('');
-    setProgress(0);
-    const total = { imported: 0, linked: 0, skipped: 0, errors: [] };
-    try {
-      for (let i = 0; i < validRows.length; i += IMPORT_CHUNK) {
-        const chunk = validRows.slice(i, i + IMPORT_CHUNK).map(p => p.payload);
-        const payload = kind === 'clients' ? { clients: chunk } : { appointments: chunk };
-        const res = await importStudioData(payload);
-        const section = kind === 'clients' ? res.clients : res.appointments;
-        total.imported += section?.imported ?? 0;
-        total.linked += section?.linked ?? 0;
-        total.skipped += section?.skipped ?? 0;
-        for (const e of res.errors ?? []) total.errors.push({ ...e, line: validRows[i + e.index]?.line });
-        setProgress(Math.min(i + IMPORT_CHUNK, validRows.length));
-      }
-      invalidatePrefix('clients:');
-      invalidatePrefix('home:');
-      setResult(total);
-      setStep('done');
-    } catch (e) {
-      setError(e.message);
-      setStep('preview');
-    }
-  }
-
-  function reset() {
-    setStep('upload');
-    setFileName('');
-    setHeaders([]);
-    setRows([]);
-    setMapping({});
-    setArtistMap({});
-    setResult(null);
-    setError('');
-    if (fileRef.current) fileRef.current.value = '';
-  }
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-      {error && <div style={imp.error}>{error}</div>}
-
-      {step === 'upload' && (
-        <div
-          style={imp.dropZone}
-          onDragOver={e => e.preventDefault()}
-          onDrop={e => { e.preventDefault(); handleFile(e.dataTransfer.files?.[0]); }}
-          onClick={() => fileRef.current?.click()}
-        >
-          <span style={imp.dropTitle}>Drop a CSV file here, or click to browse</span>
-          <span style={imp.dropSub}>Exports from Square Appointments, Acuity, Fresha or any spreadsheet saved as CSV.</span>
-          <input ref={fileRef} type="file" accept=".csv,text/csv" style={{ display: 'none' }} onChange={e => handleFile(e.target.files?.[0])} />
-        </div>
-      )}
-
-      {step === 'map' && (
-        <>
-          <div style={imp.subCard}>
-            <div style={imp.subCardTitle}>{fileName} · {rows.length} row{rows.length !== 1 ? 's' : ''}</div>
-            <div style={imp.controlRow}>
-              <div style={imp.control}>
-                <label style={imp.ctrlLabel}>This file contains</label>
-                <div style={imp.segmented}>
-                  {['clients', 'appointments'].map(k => (
-                    <button key={k} style={{ ...imp.segBtn, ...(kind === k ? imp.segBtnActive : {}) }}
-                      onClick={() => { setKind(k); setMapping(suggestMapping(headers, k, preset)); }}>
-                      {k === 'clients' ? 'Clients' : 'Appointments'}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div style={imp.control}>
-                <label style={imp.ctrlLabel}>Source</label>
-                <select style={imp.select} value={preset} onChange={e => applyPreset(e.target.value)}>
-                  {Object.entries(PRESETS).map(([key, p]) => <option key={key} value={key}>{p.label}</option>)}
-                </select>
-              </div>
-              <div style={imp.control}>
-                <label style={imp.ctrlLabel}>Date format</label>
-                <div style={imp.segmented}>
-                  <button style={{ ...imp.segBtn, ...(dayFirst ? imp.segBtnActive : {}) }} onClick={() => setDayFirst(true)}>DD/MM/YYYY</button>
-                  <button style={{ ...imp.segBtn, ...(!dayFirst ? imp.segBtnActive : {}) }} onClick={() => setDayFirst(false)}>MM/DD/YYYY</button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div style={imp.subCard}>
-            <div style={imp.subCardTitle}>Map columns</div>
-            <div style={imp.mapGrid}>
-              {fields.map(f => (
-                <div key={f.key} style={imp.mapRow}>
-                  <span style={imp.mapField}>{f.label}{f.hint && <span style={imp.mapHint}> — {f.hint}</span>}</span>
-                  <select style={imp.select} value={mapping[f.key] ?? ''}
-                    onChange={e => setMapping(m => ({ ...m, [f.key]: e.target.value || undefined }))}>
-                    <option value="">— not imported —</option>
-                    {headers.map(h => <option key={h} value={h}>{h}</option>)}
-                  </select>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {kind === 'appointments' && artistNames.length > 0 && (
-            <div style={imp.subCard}>
-              <div style={imp.subCardTitle}>Match artists</div>
-              <p style={imp.subCardDesc}>Match names found in the file to artists in your studio. Unmatched appointments import as unassigned.</p>
-              <div style={imp.mapGrid}>
-                {artistNames.map(raw => (
-                  <div key={raw} style={imp.mapRow}>
-                    <span style={imp.mapField}>{raw}</span>
-                    <select style={imp.select} value={artistMap[raw] ?? UNASSIGNED}
-                      onChange={e => setArtistMap(m => ({ ...m, [raw]: e.target.value }))}>
-                      <option value={UNASSIGNED}>Leave unassigned</option>
-                      {artists.map(a => <option key={a.artistId} value={a.artistId}>{a.name}</option>)}
-                    </select>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div style={imp.btnRow}>
-            <button style={imp.btnGhost} onClick={reset}>Start over</button>
-            <button style={imp.btnPrimary} onClick={() => setStep('preview')}>Preview import</button>
-          </div>
-        </>
-      )}
-
-      {step === 'preview' && (
-        <>
-          <div style={imp.statRow}>
-            <div style={imp.statCard}>
-              <span style={imp.statValue}>{validRows.length}</span>
-              <span style={imp.statLabel}>Rows ready to import</span>
-            </div>
-            <div style={imp.statCard}>
-              <span style={{ ...imp.statValue, color: invalidRows.length ? '#e86f6f' : 'var(--text)' }}>{invalidRows.length}</span>
-              <span style={imp.statLabel}>Rows with problems (skipped)</span>
-            </div>
-          </div>
-
-          {invalidRows.length > 0 && (
-            <div style={imp.subCard}>
-              <div style={imp.subCardTitle}>Problems</div>
-              <div style={imp.problemList}>
-                {invalidRows.slice(0, 20).map(p => (
-                  <div key={p.line} style={imp.problemRow}>
-                    <span style={imp.problemLine}>Line {p.line}</span>
-                    <span style={imp.problemReason}>{p.errors.join(', ')}</span>
-                  </div>
-                ))}
-                {invalidRows.length > 20 && <span style={imp.subCardDesc}>…and {invalidRows.length - 20} more</span>}
-              </div>
-            </div>
-          )}
-
-          <div style={imp.subCard}>
-            <div style={imp.subCardTitle}>Preview</div>
-            <div style={{ overflowX: 'auto' }}>
-              <table style={imp.table}>
-                <thead><tr>{previewColumns(kind).map(c => <th key={c.key} style={imp.th}>{c.label}</th>)}</tr></thead>
-                <tbody>
-                  {validRows.slice(0, 50).map(p => (
-                    <tr key={p.line}>{previewColumns(kind).map(c => <td key={c.key} style={imp.td}>{c.render(p.payload)}</td>)}</tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            {validRows.length > 50 && <span style={imp.subCardDesc}>Showing first 50 of {validRows.length}</span>}
-          </div>
-
-          <div style={imp.btnRow}>
-            <button style={imp.btnGhost} onClick={() => setStep('map')}>Back</button>
-            <button style={{ ...imp.btnPrimary, ...(validRows.length === 0 ? imp.btnDisabled : {}) }}
-              disabled={validRows.length === 0} onClick={runImport}>
-              Import {validRows.length} row{validRows.length !== 1 ? 's' : ''}
-            </button>
-          </div>
-        </>
-      )}
-
-      {step === 'importing' && (
-        <div style={imp.subCard}>
-          <div style={imp.subCardTitle}>Importing…</div>
-          <div style={imp.progressTrack}>
-            <div style={{ ...imp.progressFill, width: `${Math.round((progress / Math.max(validRows.length, 1)) * 100)}%` }} />
-          </div>
-          <span style={imp.subCardDesc}>{Math.min(progress, validRows.length)} / {validRows.length} rows</span>
-        </div>
-      )}
-
-      {step === 'done' && result && (
-        <>
-          <div style={imp.statRow}>
-            <div style={imp.statCard}><span style={{ ...imp.statValue, color: '#4cc98a' }}>{result.imported}</span><span style={imp.statLabel}>Imported</span></div>
-            <div style={imp.statCard}><span style={imp.statValue}>{result.linked}</span><span style={imp.statLabel}>Linked to existing app users</span></div>
-            <div style={imp.statCard}><span style={imp.statValue}>{result.skipped}</span><span style={imp.statLabel}>Skipped (already imported)</span></div>
-          </div>
-          {result.errors.length > 0 && (
-            <div style={imp.subCard}>
-              <div style={imp.subCardTitle}>Rows the server could not import</div>
-              <div style={imp.problemList}>
-                {result.errors.slice(0, 20).map((e, i) => (
-                  <div key={i} style={imp.problemRow}>
-                    <span style={imp.problemLine}>{e.line ? `Line ${e.line}` : `Row ${e.index + 1}`}</span>
-                    <span style={imp.problemReason}>{e.reason}</span>
-                  </div>
-                ))}
-                {result.errors.length > 20 && <span style={imp.subCardDesc}>…and {result.errors.length - 20} more</span>}
-              </div>
-            </div>
-          )}
-          <div style={imp.btnRow}>
-            <button style={imp.btnPrimary} onClick={reset}>Import another file</button>
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
-const imp = {
-  error: { background: 'rgba(232,111,111,0.08)', border: '1px solid rgba(232,111,111,0.35)', borderRadius: 10, padding: '0.7rem 1rem', color: '#e86f6f', fontSize: '0.82rem' },
-  dropZone: { border: '1.5px dashed var(--border)', borderRadius: 12, padding: '3rem 2rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', background: 'var(--bg-base)' },
-  dropTitle: { fontSize: '0.925rem', fontWeight: 600, color: 'var(--text)' },
-  dropSub: { fontSize: '0.75rem', color: 'var(--text-faint)' },
-  subCard: { background: 'var(--bg-base)', border: '1px solid var(--border-faint)', borderRadius: 10, padding: '0.85rem 1rem', display: 'flex', flexDirection: 'column', gap: '0.65rem' },
-  subCardTitle: { fontSize: '0.78rem', fontWeight: 700, color: 'var(--text)' },
-  subCardDesc: { fontSize: '0.72rem', color: 'var(--text-faint)', margin: 0 },
-  controlRow: { display: 'flex', gap: '1.25rem', flexWrap: 'wrap' },
-  control: { display: 'flex', flexDirection: 'column', gap: '0.3rem' },
-  ctrlLabel: { fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-secondary)' },
-  segmented: { display: 'flex', gap: 3, background: 'var(--bg-chip)', borderRadius: 7, padding: 3 },
-  segBtn: { background: 'transparent', border: 'none', borderRadius: 5, padding: '0.28rem 0.65rem', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', cursor: 'pointer' },
-  segBtnActive: { background: 'var(--bg-card)', color: 'var(--text)', boxShadow: '0 1px 2px rgba(0,0,0,0.15)' },
-  select: { background: 'var(--bg-chip)', border: '1px solid var(--border)', borderRadius: 7, color: 'var(--text)', fontSize: '0.78rem', padding: '0.32rem 0.55rem', minWidth: 170 },
-  mapGrid: { display: 'flex', flexDirection: 'column', gap: '0.4rem' },
-  mapRow: { display: 'flex', alignItems: 'center', gap: '1rem', justifyContent: 'space-between' },
-  mapField: { fontSize: '0.8rem', color: 'var(--text-dim)', fontWeight: 500 },
-  mapHint: { fontSize: '0.7rem', color: 'var(--text-ghost)', fontWeight: 400 },
-  statRow: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '0.65rem' },
-  statCard: { background: 'var(--bg-base)', border: '1px solid var(--border-faint)', borderRadius: 10, padding: '1rem 1.25rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' },
-  statValue: { fontSize: '2rem', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.03em', lineHeight: 1 },
-  statLabel: { fontSize: '0.72rem', color: 'var(--text-faint)', fontWeight: 500 },
-  problemList: { display: 'flex', flexDirection: 'column', gap: '0.3rem' },
-  problemRow: { display: 'flex', gap: '0.75rem', alignItems: 'baseline' },
-  problemLine: { fontSize: '0.75rem', fontWeight: 600, color: '#e86f6f', minWidth: 64, flexShrink: 0 },
-  problemReason: { fontSize: '0.78rem', color: 'var(--text-secondary)' },
-  table: { width: '100%', borderCollapse: 'collapse' },
-  th: { textAlign: 'left', fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-secondary)', padding: '0.3rem 0.55rem', borderBottom: '1px solid var(--border-faint)', whiteSpace: 'nowrap' },
-  td: { fontSize: '0.78rem', color: 'var(--text-dim)', padding: '0.3rem 0.55rem', borderBottom: '1px solid var(--border-faint)', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  btnRow: { display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' },
-  btnGhost: { background: 'var(--bg-chip)', border: '1px solid var(--border)', borderRadius: 7, color: 'var(--text-muted)', fontSize: '0.8rem', fontWeight: 600, padding: '0.45rem 0.9rem', cursor: 'pointer' },
-  btnPrimary: { background: 'var(--accent)', border: 'none', borderRadius: 7, color: 'var(--accent-contrast, #111)', fontSize: '0.8rem', fontWeight: 700, padding: '0.45rem 1rem', cursor: 'pointer' },
-  btnDisabled: { opacity: 0.4, cursor: 'not-allowed' },
-  progressTrack: { height: 7, background: 'var(--bg-chip)', borderRadius: 4, overflow: 'hidden' },
-  progressFill: { height: '100%', background: 'var(--accent)', transition: 'width 0.2s' },
-};
 
 export default function SettingsPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState('');
   const [address, setAddress] = useState('');
+  const [addressLat, setAddressLat] = useState(null);
+  const [addressLng, setAddressLng] = useState(null);
   const [email, setEmail] = useState('');
   const [aftercareInstructions, setAftercareInstructions] = useState('');
   const [widgetBgColor, setWidgetBgColor] = useState('#111111');
@@ -590,7 +329,10 @@ export default function SettingsPage() {
           getStripeStatus().catch(() => null),
         ]);
         setName(account.studio?.name ?? '');
-        setAddress(account.studio?.address_string ?? '');
+        const addr = account.studio?.addressString ?? '';
+        setAddress(addr);
+        if (account.studio?.latitude != null) setAddressLat(account.studio.latitude);
+        if (account.studio?.longitude != null) setAddressLng(account.studio.longitude);
         setAftercareInstructions(account.studio?.aftercare_instructions ?? '');
         setWidgetBgColor(account.studio?.widget_bg_color || '#111111');
         setWidgetAccentColor(account.studio?.widget_accent_color || '#f5ecd9');
@@ -643,7 +385,7 @@ export default function SettingsPage() {
     try {
       const wc = parseFloat(walkinCut);
       const pc = parseFloat(personalCut);
-      await updateStudioProfile(name.trim(), address.trim(), widgetBgColor, widgetAccentColor, isNaN(wc) ? 0 : wc, isNaN(pc) ? 0 : pc, aftercareInstructions, timezone);
+      await updateStudioProfile(name.trim(), address.trim(), widgetBgColor, widgetAccentColor, isNaN(wc) ? 0 : wc, isNaN(pc) ? 0 : pc, aftercareInstructions, timezone, addressLat, addressLng);
       invalidate('studio-account');
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
@@ -888,7 +630,12 @@ export default function SettingsPage() {
             </div>
             <div style={s.field}>
               <label style={s.label}>Address</label>
-              <input style={s.input} value={address} onChange={e => setAddress(e.target.value)} placeholder="Studio address" />
+              <AddressAutocomplete
+                value={address}
+                onChange={setAddress}
+                onSelect={(addr, lat, lng) => { setAddress(addr); setAddressLat(lat); setAddressLng(lng); }}
+                inputStyle={s.input}
+              />
             </div>
             <div style={s.field}>
               <label style={s.label}>Timezone</label>
@@ -1009,7 +756,7 @@ export default function SettingsPage() {
         </section>
 
         {/* ── Payments ── */}
-        <p style={{ ...s.groupLabel, marginTop: '0.5rem' }}>Payments</p>
+        <p style={{ ...s.groupLabel, marginTop: '1.25rem' }}>Payments</p>
 
         <section style={{ ...s.card, gridColumn: '1 / -1' }}>
           <h2 style={s.sectionTitle}>Stripe Connect</h2>
@@ -1058,7 +805,7 @@ export default function SettingsPage() {
         </section>
 
         {/* ── Bookings ── */}
-        <p style={{ ...s.groupLabel, marginTop: '0.5rem' }}>Bookings</p>
+        <p style={{ ...s.groupLabel, marginTop: '1.25rem' }}>Bookings</p>
 
         <section style={{ ...s.card, gridColumn: '1 / -1' }}>
           <h2 style={s.sectionTitle}>Aftercare Instructions</h2>
@@ -1282,61 +1029,52 @@ export default function SettingsPage() {
           </div>
         </section>
 
-        <section style={s.card}>
-          <h2 style={s.sectionTitle}>Widget Appearance</h2>
-          <p style={s.sectionDesc}>Customise the booking widget colours to match your brand.</p>
-          <div style={s.colorRow}>
-            <div style={s.colorField}>
-              <label style={s.label}>Background</label>
-              <div style={s.colorInputWrap}>
-                <input type="color" value={widgetBgColor} onChange={e => setWidgetBgColor(e.target.value)} style={s.colorSwatch} />
-                <input
-                  style={{ ...s.input, fontFamily: 'ui-monospace,monospace', fontSize: '0.82rem' }}
-                  value={widgetBgColor}
-                  onChange={e => setWidgetBgColor(e.target.value)}
-                  maxLength={7}
-                />
-              </div>
-            </div>
-            <div style={s.colorField}>
-              <label style={s.label}>Highlight</label>
-              <div style={s.colorInputWrap}>
-                <input type="color" value={widgetAccentColor} onChange={e => setWidgetAccentColor(e.target.value)} style={s.colorSwatch} />
-                <input
-                  style={{ ...s.input, fontFamily: 'ui-monospace,monospace', fontSize: '0.82rem' }}
-                  value={widgetAccentColor}
-                  onChange={e => setWidgetAccentColor(e.target.value)}
-                  maxLength={7}
-                />
-              </div>
-            </div>
-          </div>
-          <WidgetPreview bg={widgetBgColor} accent={widgetAccentColor} studioName={name || 'Your Studio'} />
-          <button onClick={saveProfile} style={s.saveBtn} disabled={saving}>
-            {saving ? 'Saving…' : saved ? 'Saved!' : 'Save appearance'}
-          </button>
-        </section>
-
-        <section style={s.card}>
-          <h2 style={s.sectionTitle}>Booking Widget</h2>
-          <p style={s.sectionDesc}>Paste this into any page on your website to embed the booking form directly — no iframe, no redirects.</p>
-          <div style={s.embedCard}>
-            <pre style={s.codeBlock}>{embedSnippet}</pre>
-            <button onClick={copyEmbed} style={s.copyBtn}>{embedCopied ? 'Copied!' : 'Copy snippet'}</button>
-          </div>
-        </section>
-
-        {/* ── Data ── */}
-        <p style={{ ...s.groupLabel, marginTop: '0.5rem' }}>Data</p>
-
         <section style={{ ...s.card, gridColumn: '1 / -1' }}>
-          <h2 style={s.sectionTitle}>Import data</h2>
-          <p style={s.sectionDesc}>Bring clients and appointment history over from another booking system or spreadsheet.</p>
-          <ImportSection />
+          <h2 style={s.sectionTitle}>Booking Widget</h2>
+          <p style={s.sectionDesc}>Embed the booking form on your website. Customise the colours to match your brand.</p>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', alignItems: 'start' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div style={s.colorRow}>
+                <div style={s.colorField}>
+                  <label style={s.label}>Background</label>
+                  <div style={s.colorInputWrap}>
+                    <input type="color" value={widgetBgColor} onChange={e => setWidgetBgColor(e.target.value)} style={s.colorSwatch} />
+                    <input
+                      style={{ ...s.input, fontFamily: 'ui-monospace,monospace', fontSize: '0.82rem' }}
+                      value={widgetBgColor}
+                      onChange={e => setWidgetBgColor(e.target.value)}
+                      maxLength={7}
+                    />
+                  </div>
+                </div>
+                <div style={s.colorField}>
+                  <label style={s.label}>Highlight</label>
+                  <div style={s.colorInputWrap}>
+                    <input type="color" value={widgetAccentColor} onChange={e => setWidgetAccentColor(e.target.value)} style={s.colorSwatch} />
+                    <input
+                      style={{ ...s.input, fontFamily: 'ui-monospace,monospace', fontSize: '0.82rem' }}
+                      value={widgetAccentColor}
+                      onChange={e => setWidgetAccentColor(e.target.value)}
+                      maxLength={7}
+                    />
+                  </div>
+                </div>
+              </div>
+              <div style={s.embedCard}>
+                <label style={s.label}>Embed snippet</label>
+                <pre style={s.codeBlock}>{embedSnippet}</pre>
+                <button onClick={copyEmbed} style={s.copyBtn}>{embedCopied ? 'Copied!' : 'Copy snippet'}</button>
+              </div>
+              <button onClick={saveProfile} style={s.saveBtn} disabled={saving}>
+                {saving ? 'Saving…' : saved ? 'Saved!' : 'Save'}
+              </button>
+            </div>
+            <WidgetPreview bg={widgetBgColor} accent={widgetAccentColor} studioName={name || 'Your Studio'} />
+          </div>
         </section>
 
         {/* ── Account ── */}
-        <p style={{ ...s.groupLabel, marginTop: '0.5rem' }}>Account</p>
+        <p style={{ ...s.groupLabel, marginTop: '1.25rem' }}>Account</p>
 
         <section style={s.card}>
           <h2 style={s.sectionTitle}>Account</h2>
@@ -1367,6 +1105,7 @@ export default function SettingsPage() {
         </section>
 
       </div>
+      <div style={{ height: '2rem' }} />
     </div>
   );
 }
@@ -1379,7 +1118,7 @@ const s = {
   card: { display: 'flex', flexDirection: 'column', gap: '1rem', background: 'var(--bg-card)', border: '1px solid var(--border-faint)', borderRadius: 12, padding: '1.25rem' },
   loadingDot: { width: 8, height: 8, borderRadius: '50%', background: 'var(--border)', margin: '4rem auto' },
   section: { display: 'flex', flexDirection: 'column', gap: '1rem' },
-  sectionTitle: { fontSize: '0.875rem', fontWeight: 600, color: 'var(--text)', margin: 0, paddingBottom: '0.65rem', borderBottom: '1px solid var(--border-faint)' },
+  sectionTitle: { fontSize: '0.875rem', fontWeight: 600, color: 'var(--text)', margin: '0 0 0.25rem' },
   sectionDesc: { fontSize: '0.82rem', color: 'var(--text-secondary)', margin: 0 },
   form: { display: 'flex', flexDirection: 'column', gap: '1rem' },
   field: { display: 'flex', flexDirection: 'column', gap: '0.4rem' },
@@ -1390,7 +1129,7 @@ const s = {
   saveBtn: { alignSelf: 'flex-start', background: 'var(--accent-tint)', border: '1px solid var(--accent-tint-border)', borderRadius: 8, padding: '0.55rem 1.25rem', fontSize: '0.85rem', fontWeight: 600, color: 'var(--accent)', cursor: 'pointer' },
   // Hours
   hoursGrid: { display: 'flex', flexDirection: 'column', gap: '6px' },
-  hoursRow: { display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.5rem 0.75rem', background: 'var(--bg-card)', borderRadius: 8 },
+  hoursRow: { display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.5rem 0.75rem', background: 'var(--bg-base)', borderRadius: 8 },
   dayLabel: { fontSize: '0.83rem', color: 'var(--text-dim)', width: 90, flexShrink: 0 },
   closedToggle: { display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', flexShrink: 0 },
   timePair: { display: 'flex', alignItems: 'center', gap: '0.5rem', marginLeft: 'auto' },
@@ -1412,7 +1151,7 @@ const s = {
   unavailDate: { fontSize: '0.78rem', color: 'rgba(255,200,60,0.8)' },
   clearBtn: { background: 'none', border: 'none', color: 'rgba(255,200,60,0.5)', cursor: 'pointer', fontSize: '0.7rem', padding: 0 },
   // Walk-in
-  walkInCard: { display: 'flex', alignItems: 'center', gap: '1.5rem', background: 'var(--bg-card)', border: '1px solid var(--border-faint)', borderRadius: 12, padding: '1.25rem' },
+  walkInCard: { display: 'flex', alignItems: 'center', gap: '1.5rem' },
   walkInLeft: { flex: 1, display: 'flex', flexDirection: 'column', gap: '0.75rem', minWidth: 0 },
   walkInUrl: { fontSize: '0.78rem', color: 'var(--text-muted)', wordBreak: 'break-all' },
   copyBtn: { alignSelf: 'flex-start', background: 'var(--accent-tint)', border: '1px solid var(--accent-tint-border)', borderRadius: 6, padding: '0.35rem 0.85rem', fontSize: '0.78rem', fontWeight: 600, color: 'var(--accent)', cursor: 'pointer' },
@@ -1423,8 +1162,8 @@ const s = {
   colorInputWrap: { display: 'flex', alignItems: 'center', gap: '0.5rem' },
   colorSwatch: { width: 36, height: 36, padding: 2, background: 'var(--bg-chip)', border: '1px solid var(--border)', borderRadius: 8, cursor: 'pointer', flexShrink: 0 },
   // Embed
-  embedCard: { display: 'flex', flexDirection: 'column', gap: '0.75rem', background: 'var(--bg-card)', border: '1px solid var(--border-faint)', borderRadius: 12, padding: '1.1rem 1.25rem' },
-  codeBlock: { margin: 0, fontFamily: 'ui-monospace,monospace', fontSize: '0.78rem', color: 'var(--text-dim)', lineHeight: 1.7, whiteSpace: 'pre-wrap', wordBreak: 'break-all' },
+  embedCard: { display: 'flex', flexDirection: 'column', gap: '0.65rem' },
+  codeBlock: { margin: 0, fontFamily: 'ui-monospace,monospace', fontSize: '0.78rem', color: 'var(--text-dim)', lineHeight: 1.7, whiteSpace: 'pre-wrap', wordBreak: 'break-all', background: 'var(--bg-base)', border: '1px solid var(--border-faint)', borderRadius: 8, padding: '0.75rem 1rem' },
   // Consent templates
   addTemplateBtn: { background: 'var(--accent-tint)', border: '1px solid var(--accent-tint-border)', borderRadius: 8, padding: '0.5rem 1rem', fontSize: '0.82rem', fontWeight: 600, color: 'var(--accent)', cursor: 'pointer', flexShrink: 0 },
   templateRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--bg-card)', border: '1px solid var(--border-faint)', borderRadius: 8, padding: '0.65rem 0.9rem', gap: '0.75rem' },

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { listStudioBookings, acceptBookingWithStation, rejectBooking, cancelBooking, recordOutcome, createFollowUpBooking, sendSelectionLink, confirmBooking, reassignArtist, getStudioArtists } from '@/lib/api';
+import { listStudioBookings, acceptBookingWithStation, rejectBooking, cancelBooking, recordOutcome, createFollowUpBooking, sendSelectionLink, confirmBooking, reassignArtist, getStudioArtists, getStripeStatus } from '@/lib/api';
 import { getCached, setCached, invalidatePrefix } from '@/lib/cache';
 import { statusColors, statusLabel, capitalise } from '@/lib/status';
 import { getBookingType } from '@/lib/bookingType';
@@ -47,6 +47,7 @@ export default function AppointmentsPage() {
   const [reassignResend, setReassignResend] = useState(true);
   const [reassignSaving, setReassignSaving] = useState(false);
   const [studioArtists, setStudioArtists] = useState([]);
+  const [stripeConnected, setStripeConnected] = useState(false);
 
   const combinedStatus = activeFilter;
 
@@ -94,6 +95,12 @@ export default function AppointmentsPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  useEffect(() => {
+    getStripeStatus()
+      .then(s => setStripeConnected(s?.connected && s?.charges_enabled))
+      .catch(() => {});
+  }, []);
+
   async function loadMore() {
     if (!nextCursor || loadingMore) return;
     setLoadingMore(true);
@@ -130,10 +137,10 @@ export default function AppointmentsPage() {
   function handleNoShow(id) { setNoShowTarget(id); }
   function handleCancel(id) { setCancelTarget(id); }
 
-  async function confirmComplete(finalPrice, paymentMethod, wantsFollowUp) {
+  async function confirmComplete(finalPrice, paymentSplits, wantsFollowUp) {
     setActionLoading(true);
     try {
-      await recordOutcome(completeTarget.id, 'completed', finalPrice, paymentMethod);
+      await recordOutcome(completeTarget.id, 'completed', finalPrice, paymentSplits);
       if (wantsFollowUp) await createFollowUpBooking(completeTarget.id);
       await load(true);
       setSelected(null);
@@ -309,21 +316,29 @@ export default function AppointmentsPage() {
               <option value={168}>7 days</option>
               <option value={336}>14 days</option>
             </select>
-            <label style={s.modalCheckRow}>
-              <input type="checkbox" checked={sendLinkDeposit} onChange={e => setSendLinkDeposit(e.target.checked)} style={{ accentColor: 'var(--accent)' }} />
-              <span style={{ fontSize: '0.85rem', color: 'var(--text-dim)' }}>Require deposit</span>
-            </label>
-            {sendLinkDeposit && (
-              <input
-                type="number"
-                inputMode="decimal"
-                placeholder="Deposit amount ($)"
-                value={sendLinkAmount}
-                onChange={e => setSendLinkAmount(e.target.value)}
-                onKeyDown={e => ['e','E','+','-'].includes(e.key) && e.preventDefault()}
-                style={s.modalInput}
-                min="0"
-              />
+            {stripeConnected ? (
+              <>
+                <label style={s.modalCheckRow}>
+                  <input type="checkbox" checked={sendLinkDeposit} onChange={e => setSendLinkDeposit(e.target.checked)} style={{ accentColor: 'var(--accent)' }} />
+                  <span style={{ fontSize: '0.85rem', color: 'var(--text-dim)' }}>Require deposit</span>
+                </label>
+                {sendLinkDeposit && (
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    placeholder="Deposit amount ($)"
+                    value={sendLinkAmount}
+                    onChange={e => setSendLinkAmount(e.target.value)}
+                    onKeyDown={e => ['e','E','+','-'].includes(e.key) && e.preventDefault()}
+                    style={s.modalInput}
+                    min="0"
+                  />
+                )}
+              </>
+            ) : (
+              <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: '0.25rem 0 0', padding: '0.5rem 0.65rem', background: 'rgba(255,255,255,0.04)', borderRadius: 6 }}>
+                Connect a Stripe account in Settings to require a deposit.
+              </p>
             )}
             <div style={s.modalActions}>
               <button style={s.modalCancel} onClick={() => setSendLinkTarget(null)}>Cancel</button>

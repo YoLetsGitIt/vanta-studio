@@ -102,9 +102,9 @@ function useBookingActions(afterChange) {
     if (action === 'accept')  run(() => acceptBookingWithStation(selectedEntry.bookingId, stationId), () => {});
   }
 
-  const confirmComplete = (finalPrice, paymentMethod, wantsFollowUp) =>
+  const confirmComplete = (finalPrice, paymentSplits, wantsFollowUp) =>
     run(async () => {
-      await recordOutcome(completeTarget.id, 'completed', finalPrice, paymentMethod);
+      await recordOutcome(completeTarget.id, 'completed', finalPrice, paymentSplits);
       if (wantsFollowUp) await createFollowUpBooking(completeTarget.id);
     }, () => setCompleteTarget(null));
   const confirmNoShow = () =>
@@ -385,7 +385,6 @@ function DayView({ date }) {
             </button>
           </>
         )}
-        <button onClick={() => setShowNewBooking(true)} style={s.newBookingBtn}>+ New booking</button>
       </div>
 
       {cols.length === 0 ? (

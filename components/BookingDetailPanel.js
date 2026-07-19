@@ -409,9 +409,21 @@ export default function BookingDetailPanel({
                 {depositConfirmedAt ? 'Confirmed' : depositPaid ? 'Paid — unconfirmed' : 'Unpaid'}
               </span>
             </div>
-            {depositAmount != null && (
-              <span style={{ fontSize: '0.85rem', color: 'var(--text-dim)', marginTop: '0.2rem' }}>${depositAmount}</span>
-            )}
+            {depositAmount != null && (() => {
+              const feeCents = Math.round(depositAmount * 0.03 * 100) + 50;
+              const total = depositAmount + feeCents / 100;
+              return (
+                <div style={{ marginTop: '0.2rem' }}>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--text-dim)' }}>
+                    ${depositAmount.toFixed(2)}
+                    <span style={{ color: 'var(--text-ghost)', fontSize: '0.78rem' }}> + ${(feeCents / 100).toFixed(2)} fee</span>
+                  </span>
+                  <span style={{ fontSize: '0.78rem', color: 'var(--text-ghost)', marginLeft: '0.4rem' }}>
+                    = ${total.toFixed(2)} charged to client
+                  </span>
+                </div>
+              );
+            })()}
             {depositPaidAt && (
               <span style={{ fontSize: '0.72rem', color: 'var(--text-ghost)' }}>
                 Paid {new Date(depositPaidAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}

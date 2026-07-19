@@ -623,6 +623,17 @@ export default function NewAppointmentPanel({ open, onClose, onCreated }) {
                       placeholder="0.00"
                     />
                   </div>
+                  {(() => {
+                    const da = parseFloat(depositAmount) || 0;
+                    if (da <= 0) return null;
+                    const feeCents = Math.round(da * 0.03 * 100) + 50;
+                    const total = da + feeCents / 100;
+                    return (
+                      <span style={{ fontSize: '0.74rem', color: 'var(--text-ghost)', marginTop: '0.25rem', display: 'block' }}>
+                        Client charged ${total.toFixed(2)} (incl. ${(feeCents / 100).toFixed(2)} fee)
+                      </span>
+                    );
+                  })()}
                 </div>
               </div>
             </div>
