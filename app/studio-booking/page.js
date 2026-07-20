@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { getSupabase } from '@/lib/supabase';
 import { getStudioPublic, createWalkIn, walkinUploadSign, signatureUploadSign, getStudioConsentTemplates } from '@/lib/api';
 
 const SESSION_TYPES = ['Tattoo', 'Piercing', 'Consultation', 'Touch-up', 'Cover-up', 'Other'];
@@ -93,15 +92,6 @@ function WalkInInner() {
   const [studio, setStudio]   = useState(null);
   const [studioErr, setStudioErr] = useState('');
 
-  // Auth state
-  const [session, setSession] = useState(null);
-  const [authMode, setAuthMode] = useState('login'); // 'login' | 'signup'
-  const [authEmail, setAuthEmail] = useState('');
-  const [authPassword, setAuthPassword] = useState('');
-  const [authName, setAuthName] = useState('');
-  const [authLoading, setAuthLoading] = useState(false);
-  const [authError, setAuthError] = useState('');
-
   // Form state
   const [firstName, setFirstName]   = useState('');
   const [lastName, setLastName]     = useState('');
@@ -142,60 +132,6 @@ function WalkInInner() {
       .then(d => setConsentTemplates(d.templates ?? []))
       .catch(() => {}); // non-fatal — studio may have no consent forms
   }, [studioId]);
-
-  // Check existing session and pre-fill form fields from Supabase user
-  useEffect(() => {
-    const supabase = getSupabase();
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      if (data.session?.user) {
-        const u = data.session.user;
-        setEmail(u.email ?? '');
-        setAuthEmail(u.email ?? '');
-        const full = u.user_metadata?.full_name ?? u.user_metadata?.name ?? '';
-        const parts = full.trim().split(' ');
-        setFirstName(parts[0] ?? '');
-        setLastName(parts.slice(1).join(' '));
-      }
-    });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, s) => {
-      setSession(s);
-      if (s?.user) {
-        const u = s.user;
-        setEmail(u.email ?? '');
-        setAuthEmail(u.email ?? '');
-        const full = u.user_metadata?.full_name ?? u.user_metadata?.name ?? '';
-        const parts = full.trim().split(' ');
-        setFirstName(parts[0] ?? '');
-        setLastName(parts.slice(1).join(' '));
-      }
-    });
-    return () => subscription.unsubscribe();
-  }, []);
-
-  async function handleAuth(e) {
-    e.preventDefault();
-    setAuthError('');
-    setAuthLoading(true);
-    const supabase = getSupabase();
-    try {
-      if (authMode === 'login') {
-        const { error } = await supabase.auth.signInWithPassword({ email: authEmail, password: authPassword });
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.auth.signUp({
-          email: authEmail,
-          password: authPassword,
-          options: { data: { full_name: authName } },
-        });
-        if (error) throw error;
-      }
-    } catch (err) {
-      setAuthError(err.message);
-    } finally {
-      setAuthLoading(false);
-    }
-  }
 
   function handlePhotoChange(e) {
     const files = Array.from(e.target.files).slice(0, 5);
@@ -376,50 +312,7 @@ function WalkInInner() {
         <h1 style={s.studioName}>{studio.name}</h1>
       </div>
 
-      {!session ? (
-        <form onSubmit={handleAuth} style={s.form}>
-          <p style={s.authIntro}>
-            {authMode === 'login' ? 'Log in to continue' : 'Create an account to continue'}
-          </p>
-
-          {authMode === 'signup' && (
-            <Field label="Full name">
-              <input
-                style={s.input} type="text" value={authName} required
-                onChange={e => setAuthName(e.target.value)} placeholder="Your name"
-              />
-            </Field>
-          )}
-          <Field label="Email">
-            <input
-              style={s.input} type="email" value={authEmail} required
-              onChange={e => setAuthEmail(e.target.value)} placeholder="you@example.com"
-            />
-          </Field>
-          <Field label="Password">
-            <input
-              style={s.input} type="password" value={authPassword} required
-              onChange={e => setAuthPassword(e.target.value)}
-              placeholder={authMode === 'signup' ? 'Choose a password' : 'Your password'}
-            />
-          </Field>
-
-          {authError && <p style={s.error}>{authError}</p>}
-
-          <button type="submit" disabled={authLoading} style={s.submitBtn}>
-            {authLoading ? '…' : authMode === 'login' ? 'Log in' : 'Create account'}
-          </button>
-
-          <button
-            type="button"
-            style={s.switchLink}
-            onClick={() => { setAuthMode(m => m === 'login' ? 'signup' : 'login'); setAuthError(''); }}
-          >
-            {authMode === 'login' ? "Don't have an account? Sign up" : 'Already have an account? Log in'}
-          </button>
-        </form>
-      ) : (
-        <form onSubmit={handleSubmit} style={s.form}>
+      <form onSubmit={handleSubmit} style={s.form}>
 
           {/* ── About you ── */}
           <Section title="About you" first>
@@ -647,17 +540,9 @@ function WalkInInner() {
             <button type="submit" disabled={submitting} style={s.submitBtn}>
               {submitting ? 'Submitting…' : 'Request booking'}
             </button>
-            <button
-              type="button"
-              style={s.switchLink}
-              onClick={() => getSupabase().auth.signOut()}
-            >
-              Sign out
-            </button>
           </div>
 
         </form>
-      )}
     </div>
   );
 }
