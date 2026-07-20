@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { getStudioRevenueStats, getPayoutSummaries, createPayout, getArtistPayoutHistory, getArtistEarningsBreakdown, getReimbursements, reviewReimbursement } from '@/lib/api';
+import { getStudioRevenueStats, getPayoutSummaries, createPayout, deletePayout, getArtistPayoutHistory, getArtistEarningsBreakdown, getReimbursements, reviewReimbursement } from '@/lib/api';
 import { getSupabase } from '@/lib/supabase';
 import { toISODate } from '@/lib/format';
 import {
@@ -617,41 +617,54 @@ function PayoutsSection({ payouts, onPay, onViewEarnings }) {
             <tr>{headers.map(h => <th key={h} style={st.th}>{h}</th>)}</tr>
           </thead>
           <tbody>
-            {payouts.map(p => (
-              <tr key={p.artist_id} style={st.trClickable} onClick={() => onPay(p)} title="View payout history">
-                <td style={{ ...st.td, color: 'var(--text)', fontWeight: 500 }}>
-                  <span style={st.artistLink}>{p.artist_name}</span>
-                </td>
-                <td style={st.td}>
-                  {fmt(p.total_earned)}
-                  {p.earned_studio > 0 && p.earned_personal > 0 && (
-                    <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: 2 }}>
-                      Studio {fmt(p.earned_studio)} · Personal {fmt(p.earned_personal)}
-                    </div>
+            {payouts.map(p => {
+              const hasIncomplete = p.incomplete_recordings > 0;
+              return (
+                <tr key={p.artist_id} style={st.trClickable} onClick={() => onPay(p)} title="View payout history">
+                  <td style={{ ...st.td, color: 'var(--text)', fontWeight: 500 }}>
+                    <span style={st.artistLink}>{p.artist_name}</span>
+                    {hasIncomplete && (
+                      <span title={`${p.incomplete_recordings} booking${p.incomplete_recordings > 1 ? 's' : ''} with missing payment recordings`}
+                        style={{ marginLeft: '0.4rem', fontSize: '0.68rem', fontWeight: 600, padding: '0.15rem 0.4rem', borderRadius: 4,
+                          background: 'rgba(245,158,58,0.12)', color: '#f59e3a', border: '1px solid rgba(245,158,58,0.25)' }}>
+                        {p.incomplete_recordings} incomplete
+                      </span>
+                    )}
+                  </td>
+                  <td style={st.td}>
+                    {fmt(p.total_earned)}
+                    {p.earned_studio > 0 && p.earned_personal > 0 && (
+                      <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: 2 }}>
+                        Studio {fmt(p.earned_studio)} · Personal {fmt(p.earned_personal)}
+                      </div>
+                    )}
+                  </td>
+                  {hasCut && (
+                    <td style={{ ...st.td, fontWeight: 600, color: '#4cc98a' }}>{fmt(p.artist_payout)}</td>
                   )}
-                </td>
-                {hasCut && (
-                  <td style={{ ...st.td, fontWeight: 600, color: '#4cc98a' }}>{fmt(p.artist_payout)}</td>
-                )}
-                <td style={st.td}>{fmt(p.total_paid)}</td>
-                <td style={{
-                  ...st.td,
-                  color: p.outstanding > 0 ? 'var(--accent)' : 'var(--text-secondary)',
-                  fontWeight: 600,
-                }}>
-                  {p.outstanding > 0
-                    ? <span onClick={e => { e.stopPropagation(); onViewEarnings(p); }} style={st.earningsLink} title="View breakdown">{fmt(p.outstanding)}</span>
-                    : fmt(p.outstanding)
-                  }
-                </td>
-                <td style={{ ...st.td, textAlign: 'right' }}>
-                  {p.outstanding > 0
-                    ? <button onClick={e => { e.stopPropagation(); onPay(p); }} style={st.payBtn}>Pay out</button>
-                    : <span style={st.historyHint}>History ›</span>
-                  }
-                </td>
-              </tr>
-            ))}
+                  <td style={st.td}>{fmt(p.total_paid)}</td>
+                  <td style={{
+                    ...st.td,
+                    color: p.outstanding > 0 ? 'var(--accent)' : 'var(--text-secondary)',
+                    fontWeight: 600,
+                  }}>
+                    {p.outstanding > 0
+                      ? <span onClick={e => { e.stopPropagation(); onViewEarnings(p); }} style={st.earningsLink} title="View breakdown">{fmt(p.outstanding)}</span>
+                      : fmt(p.outstanding)
+                    }
+                  </td>
+                  <td style={{ ...st.td, textAlign: 'right' }}>
+                    {p.outstanding > 0
+                      ? <button onClick={e => { e.stopPropagation(); onPay(p); }}
+                          style={{ ...st.payBtn, ...(hasIncomplete ? { background: 'rgba(245,158,58,0.15)', borderColor: 'rgba(245,158,58,0.35)', color: '#f59e3a' } : {}) }}>
+                          Pay out{hasIncomplete ? ' ⚠' : ''}
+                        </button>
+                      : <span style={st.historyHint}>History ›</span>
+                    }
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -668,12 +681,15 @@ function PayoutPanel({ artist, onClose, onPaid }) {
   const [note,     setNote]     = useState('');
   const [error,    setError]    = useState('');
   const [history,  setHistory]  = useState(null); // null = loading
+  const [deleting, setDeleting] = useState(null); // payout id being deleted
 
-  useEffect(() => {
+  function loadHistory() {
     getArtistPayoutHistory(artist.artist_id)
       .then(d => setHistory(d.payouts ?? []))
       .catch(() => setHistory([]));
-  }, [artist.artist_id]);
+  }
+
+  useEffect(() => { loadHistory(); }, [artist.artist_id]);
 
   const amount = mode === 'full' ? artist.outstanding : parseFloat(custom || '0');
   const valid  = amount > 0 && amount <= artist.outstanding + 0.001;
@@ -688,6 +704,20 @@ function PayoutPanel({ artist, onClose, onPaid }) {
     } catch (e) {
       setError(e.message);
       setSaving(false);
+    }
+  }
+
+  async function handleDelete(payoutId) {
+    if (!confirm('Delete this payout record?')) return;
+    setDeleting(payoutId);
+    try {
+      await deletePayout(payoutId);
+      onPaid(); // refresh payout summaries table
+      loadHistory();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setDeleting(null);
     }
   }
 
@@ -711,6 +741,19 @@ function PayoutPanel({ artist, onClose, onPaid }) {
         </div>
 
         <div style={st.panelBody}>
+          {artist.incomplete_recordings > 0 && (
+            <div style={{
+              background: 'rgba(245,158,58,0.08)', border: '1px solid rgba(245,158,58,0.25)',
+              borderRadius: 8, padding: '0.7rem 0.9rem', marginBottom: '1rem',
+            }}>
+              <p style={{ margin: 0, fontSize: '0.82rem', color: '#f59e3a', fontWeight: 600 }}>
+                ⚠ {artist.incomplete_recordings} booking{artist.incomplete_recordings > 1 ? 's' : ''} missing required payment recording{artist.incomplete_recordings > 1 ? 's' : ''}
+              </p>
+              <p style={{ margin: '0.25rem 0 0', fontSize: '0.75rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                Review and record missing payments before processing this payout.
+              </p>
+            </div>
+          )}
           {artist.outstanding > 0 && <>
             {/* Mode toggle */}
             <div style={st.modeRow}>
@@ -780,12 +823,18 @@ function PayoutPanel({ artist, onClose, onPaid }) {
             {history !== null && history.length > 0 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '260px', overflowY: 'auto', paddingRight: '0.25rem' }}>
                 {history.map(p => (
-                  <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '0.5rem 0.65rem', background: 'var(--bg-chip)', borderRadius: 7, border: '1px solid var(--border-faint)' }}>
-                    <div>
+                  <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem 0.65rem', background: 'var(--bg-chip)', borderRadius: 7, border: '1px solid var(--border-faint)' }}>
+                    <div style={{ flex: 1 }}>
                       <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text)' }}>{fmt(p.amount)}</span>
                       {p.note && <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginLeft: '0.5rem' }}>{p.note}</span>}
+                      <span style={{ fontSize: '0.72rem', color: 'var(--text-ghost)', marginLeft: '0.5rem' }}>{fmtShortDate(p.paid_at)}</span>
                     </div>
-                    <span style={{ fontSize: '0.72rem', color: 'var(--text-ghost)', whiteSpace: 'nowrap', marginLeft: '0.5rem' }}>{fmtShortDate(p.paid_at)}</span>
+                    <button
+                      onClick={() => handleDelete(p.id)}
+                      disabled={deleting === p.id}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-ghost)', fontSize: '0.75rem', padding: '0.2rem 0.4rem', opacity: deleting === p.id ? 0.4 : 1 }}
+                      title="Delete payout record"
+                    >✕</button>
                   </div>
                 ))}
               </div>
@@ -816,11 +865,36 @@ function EarningsPanel({ artist, onClose }) {
     return ({ app: 'App', studio: 'Studio', manual: 'Manual', import: 'Import' })[s] ?? s;
   }
 
+  function fmtMethod(m) {
+    return ({ cash: 'Cash', bank_transfer: 'Bank transfer', card: 'Card', online: 'Online' })[m] ?? m;
+  }
+
+  function PaymentCell({ entry }) {
+    if (entry.splits && entry.splits.length > 1) {
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+          {entry.splits.map((s, i) => (
+            <span key={i} style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
+              {fmtMethod(s.method)} <span style={{ color: 'var(--text-ghost)' }}>{fmt(s.amount)}</span>
+            </span>
+          ))}
+        </div>
+      );
+    }
+    if (entry.splits && entry.splits.length === 1) {
+      return <span style={{ fontSize: '0.82rem' }}>{fmtMethod(entry.splits[0].method)}</span>;
+    }
+    if (entry.payment_method) {
+      return <span style={{ fontSize: '0.82rem' }}>{fmtMethod(entry.payment_method)}</span>;
+    }
+    return <span style={{ color: 'var(--text-ghost)' }}>—</span>;
+  }
+
   const total = entries ? entries.reduce((s, e) => s + (e.artist_cut ?? 0), 0) : null;
 
   return (
     <div style={st.overlay} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div style={{ ...st.panel, maxWidth: 520, maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ ...st.panel, maxWidth: 580, maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         <div style={st.panelHeader}>
           <div>
             <p style={st.panelTitle}>Earnings breakdown · {artist.artist_name}</p>
@@ -841,7 +915,7 @@ function EarningsPanel({ artist, onClose }) {
               <table style={{ ...st.table, borderRadius: 0, border: 'none', borderBottom: '1px solid var(--border-faint)' }}>
                 <thead>
                   <tr>
-                    {['Date', 'Client', 'Source', 'Gross', 'Artist cut'].map(h => (
+                    {['Date', 'Client', 'Source', 'Payment', 'Gross', 'Artist cut'].map(h => (
                       <th key={h} style={st.th}>{h}</th>
                     ))}
                   </tr>
@@ -852,6 +926,7 @@ function EarningsPanel({ artist, onClose }) {
                       <td style={{ ...st.td, whiteSpace: 'nowrap' }}>{fmtDate(e.chosen_time)}</td>
                       <td style={{ ...st.td, color: 'var(--text)', fontWeight: 500 }}>{e.client_name}</td>
                       <td style={st.td}>{fmtSource(e.source)}</td>
+                      <td style={st.td}><PaymentCell entry={e} /></td>
                       <td style={st.td}>{fmt(e.gross)}</td>
                       <td style={{ ...st.td, fontWeight: 600, color: '#4cc98a' }}>{fmt(e.artist_cut)}</td>
                     </tr>

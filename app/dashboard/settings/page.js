@@ -275,6 +275,7 @@ export default function SettingsPage() {
   const [timezone, setTimezone] = useState('Australia/Sydney');
   const [walkinCut, setWalkinCut] = useState('0');
   const [personalCut, setPersonalCut] = useState('0');
+  const [paymentRecordingReq, setPaymentRecordingReq] = useState('studio_only');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [profileError, setProfileError] = useState('');
@@ -339,6 +340,7 @@ export default function SettingsPage() {
         setTimezone(account.studio?.timezone || 'Australia/Sydney');
         setWalkinCut(String(account.studio?.walkin_cut_percent ?? account.studio?.studio_cut_percent ?? 0));
         setPersonalCut(String(account.studio?.personal_cut_percent ?? account.studio?.studio_cut_percent ?? 0));
+        setPaymentRecordingReq(account.studio?.payment_recording_requirement ?? 'studio_only');
         setEmail(session?.user?.email ?? '');
         setStudioId(account.studio_id);
         setWalkInUrl(window.location.origin + '/studio-booking?s=' + account.studio_id);
@@ -385,7 +387,7 @@ export default function SettingsPage() {
     try {
       const wc = parseFloat(walkinCut);
       const pc = parseFloat(personalCut);
-      await updateStudioProfile(name.trim(), address.trim(), widgetBgColor, widgetAccentColor, isNaN(wc) ? 0 : wc, isNaN(pc) ? 0 : pc, aftercareInstructions, timezone, addressLat, addressLng);
+      await updateStudioProfile(name.trim(), address.trim(), widgetBgColor, widgetAccentColor, isNaN(wc) ? 0 : wc, isNaN(pc) ? 0 : pc, aftercareInstructions, timezone, addressLat, addressLng, paymentRecordingReq);
       invalidate('studio-account');
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
@@ -705,6 +707,21 @@ export default function SettingsPage() {
                   </div>
                 ))}
               </div>
+            </div>
+            <div style={s.field}>
+              <label style={s.label}>Payment recording requirement</label>
+              <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: '0 0 0.5rem' }}>
+                Which parties must record payment before a payout can be processed.
+              </p>
+              <select
+                style={{ ...s.input, cursor: 'pointer', colorScheme: 'auto' }}
+                value={paymentRecordingReq}
+                onChange={e => setPaymentRecordingReq(e.target.value)}
+              >
+                <option value="studio_only">Studio only</option>
+                <option value="artist_only">Artist only</option>
+                <option value="both">Both artist and studio</option>
+              </select>
             </div>
             {profileError && <p style={s.errorText}>{profileError}</p>}
             <button type="submit" style={s.saveBtn} disabled={saving}>

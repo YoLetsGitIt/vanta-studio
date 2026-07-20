@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { getAvailableStations, getStations, getClientConsents, getNotes, addNote, deleteNote, getBookingConsentSubmissions, getStudioClients, generateConsentLink } from '@/lib/api';
+import { getAvailableStations, getStations, getClientConsents, getNotes, addNote, deleteNote, getBookingConsentSubmissions, getStudioClients, generateConsentLink, getStudioBookingPayment } from '@/lib/api';
 import { statusColors, statusLabel, capitalise as cap } from '@/lib/status';
 import { formatDob as fmtDob } from '@/lib/format';
 import { getCached, setCached } from '@/lib/cache';
@@ -62,6 +62,9 @@ export default function BookingDetailPanel({
   const [availableStations, setAvailableStations] = useState([]);
   const [stationsLoading,   setStationsLoading]   = useState(false);
   const [stationError,      setStationError]      = useState('');
+
+  // ── Payment recording status ───────────────────────────────────────────────
+  const [paymentSplits, setPaymentSplits] = useState(null); // null = not loaded
 
   // ── Studio notes state (notes table, entity_type='booking') ────────────────
   const [studioNotes, setStudioNotes] = useState(null); // null = loading
@@ -142,6 +145,14 @@ export default function BookingDetailPanel({
 
   const displayStatus = isNoShow ? 'no_show' : status;
   const sc = statusColors(displayStatus);
+
+  // ── Load payment split recordings for completed bookings ─────────────────
+  useEffect(() => {
+    if (!bookingId || !isCompleted) { setPaymentSplits(null); return; }
+    getStudioBookingPayment(bookingId)
+      .then(d => setPaymentSplits(d.splits ?? []))
+      .catch(() => setPaymentSplits([]));
+  }, [bookingId, isCompleted]);
 
   // ── Load studio notes for this booking ─────────────────────────────────────
   useEffect(() => {
@@ -343,6 +354,35 @@ export default function BookingDetailPanel({
                 <span style={{ fontSize: '0.82rem', color: 'var(--text-dim)' }}>{PAYMENT_LABELS[paymentMethod] ?? paymentMethod}</span>
               </div>
             )}
+            {showCompleted && paymentSplits !== null && (() => {
+              const artistSplits = paymentSplits.filter(s => s.recorded_by === 'artist');
+              const studioSplits = paymentSplits.filter(s => s.recorded_by === 'studio');
+              const artistTotal  = artistSplits.reduce((n, s) => n + (s.amount ?? 0), 0);
+              const studioTotal  = studioSplits.reduce((n, s) => n + (s.amount ?? 0), 0);
+              return (
+                <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '0.6rem', marginTop: '0.1rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                  <span style={{ fontSize: '0.72rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-ghost)', marginBottom: '0.1rem' }}>Payment recordings</span>
+                  {[
+                    { label: 'Artist', splits: artistSplits, total: artistTotal },
+                    { label: 'Studio', splits: studioSplits, total: studioTotal },
+                  ].map(({ label, splits, total }) => (
+                    <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.78rem', color: 'var(--text-ghost)' }}>{label}</span>
+                      {splits.length > 0 ? (
+                        <span style={{ fontSize: '0.8rem', color: '#4cc98a', fontWeight: 600 }}>
+                          ✓ ${total.toFixed(2)}
+                          {splits.length > 1
+                            ? ` (${splits.map(s => PAYMENT_LABELS[s.method] ?? s.method).join(', ')})`
+                            : ` · ${PAYMENT_LABELS[splits[0].method] ?? splits[0].method}`}
+                        </span>
+                      ) : (
+                        <span style={{ fontSize: '0.78rem', color: '#e86f6f' }}>✗ Not recorded</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
             {showCompleted && aftercareInstructions && (
               <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '0.65rem', marginTop: '0.15rem' }}>
                 <span style={{ fontSize: '0.72rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-ghost)', display: 'block', marginBottom: '0.4rem' }}>Aftercare</span>
