@@ -869,20 +869,39 @@ function EarningsPanel({ artist, onClose }) {
     return ({ cash: 'Cash', bank_transfer: 'Bank transfer', card: 'Card', online: 'Online' })[m] ?? m;
   }
 
-  function PaymentCell({ entry }) {
-    if (entry.splits && entry.splits.length > 1) {
+  function SplitGroup({ label, splits }) {
+    if (!splits || splits.length === 0) {
       return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-          {entry.splits.map((s, i) => (
-            <span key={i} style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
-              {fmtMethod(s.method)} <span style={{ color: 'var(--text-ghost)' }}>{fmt(s.amount)}</span>
-            </span>
-          ))}
+        <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'baseline' }}>
+          <span style={{ fontSize: '0.68rem', fontWeight: 600, color: 'var(--text-ghost)', minWidth: 34 }}>{label}</span>
+          <span style={{ fontSize: '0.75rem', color: 'var(--text-ghost)' }}>—</span>
         </div>
       );
     }
-    if (entry.splits && entry.splits.length === 1) {
-      return <span style={{ fontSize: '0.82rem' }}>{fmtMethod(entry.splits[0].method)}</span>;
+    return (
+      <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'baseline', flexWrap: 'wrap' }}>
+        <span style={{ fontSize: '0.68rem', fontWeight: 600, color: 'var(--text-ghost)', minWidth: 34 }}>{label}</span>
+        <span style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
+          {splits.map((s, i) => (
+            <span key={i} style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
+              {fmtMethod(s.method)} <span style={{ color: 'var(--text-ghost)' }}>{fmt(s.amount)}</span>
+            </span>
+          ))}
+        </span>
+      </div>
+    );
+  }
+
+  function PaymentCell({ entry }) {
+    if (entry.splits && entry.splits.length > 0) {
+      const artistSplits = entry.splits.filter(s => s.recorded_by === 'artist');
+      const studioSplits = entry.splits.filter(s => s.recorded_by === 'studio');
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+          <SplitGroup label="Artist" splits={artistSplits} />
+          <SplitGroup label="Studio" splits={studioSplits} />
+        </div>
+      );
     }
     if (entry.payment_method) {
       return <span style={{ fontSize: '0.82rem' }}>{fmtMethod(entry.payment_method)}</span>;
