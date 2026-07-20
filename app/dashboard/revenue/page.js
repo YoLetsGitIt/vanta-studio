@@ -913,7 +913,7 @@ function EarningsPanel({ artist, onClose }) {
 
   return (
     <div style={st.overlay} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div style={{ ...st.panel, maxWidth: 580, maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ ...st.panel, width: 'min(95vw, 820px)', maxWidth: 'unset', maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         <div style={st.panelHeader}>
           <div>
             <p style={st.panelTitle}>Earnings breakdown · {artist.artist_name}</p>
