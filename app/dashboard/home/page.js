@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic';
 import { getStudioArtists, getStudioSchedule, getMyStudioAccount } from '@/lib/api';
 import { initials, toISODate } from '@/lib/format';
 import { getCached, setCached } from '@/lib/cache';
+import { useLanguage } from '@/lib/i18n';
 
 const QRCodeSVG = dynamic(() => import('qrcode.react').then(m => m.QRCodeSVG), { ssr: false });
 
@@ -13,6 +14,7 @@ function formatTime(iso) {
 }
 
 export default function HomePage() {
+  const { t } = useLanguage();
   const [artists, setArtists] = useState([]);
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -65,19 +67,19 @@ export default function HomePage() {
   return (
     <div style={s.page}>
       <div style={s.header}>
-        <h1 style={s.title}>Today</h1>
+        <h1 style={s.title}>{t('today')}</h1>
         <p style={s.date}>{today}</p>
       </div>
 
       <div style={s.body}>
-        {loading && <p style={s.msg}>Loading…</p>}
+        {loading && <p style={s.msg}>{t('loading')}</p>}
 
         {/* Walk-in link card */}
         {walkInUrl && (
           <div style={s.walkInCard}>
             <div style={s.walkInLeft}>
-              <span style={s.walkInTitle}>Studio booking link</span>
-              <span style={s.walkInSub}>Share this link or QR code for on-the-spot bookings</span>
+              <span style={s.walkInTitle}>{t('home_booking_link')}</span>
+              <span style={s.walkInSub}>{t('home_booking_link_desc')}</span>
               <div style={s.walkInUrlRow}>
                 <span style={s.walkInUrlText}>{walkInUrl}</span>
                 <button
@@ -88,7 +90,7 @@ export default function HomePage() {
                     setTimeout(() => setCopied(false), 2000);
                   }}
                 >
-                  {copied ? 'Copied!' : 'Copy'}
+                  {copied ? t('copied') : t('copy')}
                 </button>
               </div>
             </div>
@@ -102,17 +104,17 @@ export default function HomePage() {
           <div style={s.statRow}>
             <div style={s.statCard}>
               <span style={s.statValue}>{workingToday.length}</span>
-              <span style={s.statLabel}>Artists working today</span>
+              <span style={s.statLabel}>{t('home_artists_today')}</span>
             </div>
             <div style={s.statCard}>
               <span style={s.statValue}>{entries.length}</span>
-              <span style={s.statLabel}>Bookings today</span>
+              <span style={s.statLabel}>{t('home_bookings_today')}</span>
             </div>
           </div>
         )}
 
         {!loading && workingToday.length === 0 && (
-          <p style={s.msg}>No artists have bookings today.</p>
+          <p style={s.msg}>{t('home_no_artists_today')}</p>
         )}
 
         {!loading && workingToday.map(artist => {

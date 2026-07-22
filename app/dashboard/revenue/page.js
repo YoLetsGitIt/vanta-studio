@@ -8,6 +8,7 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
   PieChart, Pie, Cell, Legend,
 } from 'recharts';
+import { useLanguage } from '@/lib/i18n';
 
 
 const QUICK_OPTIONS = [
@@ -38,6 +39,7 @@ function formatDate(d) {
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function RevenuePage() {
+  const { t } = useLanguage();
   const today = toDateStr(new Date());
   const [startDate,   setStartDate]   = useState(() => dateFromDaysAgo(7));
   const [endDate,     setEndDate]     = useState(today);
@@ -150,7 +152,7 @@ export default function RevenuePage() {
     <div style={st.page}>
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div style={st.header}>
-        <h1 style={st.title}>Analytics</h1>
+        <h1 style={st.title}>{t('nav_analytics')}</h1>
         <div style={st.controls}>
           <div style={st.quickPicker}>
             {QUICK_OPTIONS.map(opt => (
@@ -168,7 +170,7 @@ export default function RevenuePage() {
           </div>
           <div style={st.dateSep} />
           <button onClick={exportCSV} disabled={!stats?.weekly?.length} style={st.exportBtn} title="Export weekly stats as CSV">
-            Export CSV
+            {t('revenue_export')}
           </button>
         </div>
       </div>
@@ -177,16 +179,16 @@ export default function RevenuePage() {
       <div style={st.tabBar}>
         <button onClick={() => setTab('overview')}
           style={{ ...st.tabBtn, ...(tab === 'overview' ? st.tabActive : {}) }}>
-          Overview
+          {t('revenue_overview')}
         </button>
         <button onClick={() => setTab('financial')}
           style={{ ...st.tabBtn, ...(tab === 'financial' ? st.tabActive : {}) }}>
           <LockIcon locked={!unlocked} />
-          Financial
+          {t('revenue_financial')}
         </button>
         {tab === 'financial' && unlocked && (
           <button onClick={handleLock} style={st.lockBtn} title="Lock financial tab">
-            Lock
+            {t('revenue_lock')}
           </button>
         )}
       </div>
@@ -213,7 +215,7 @@ export default function RevenuePage() {
 
       {/* ── Body ───────────────────────────────────────────────────────────── */}
       <div style={st.body}>
-        {loading && <p style={st.msg}>Loading…</p>}
+        {loading && <p style={st.msg}>{t('loading')}</p>}
         {error   && <p style={{ ...st.msg, color: '#e86f6f' }}>{error}</p>}
 
         {!loading && !error && stats && (
@@ -221,34 +223,34 @@ export default function RevenuePage() {
             {/* ── Overview tab ──────────────────────────────────────────── */}
             {tab === 'overview' && (
               <>
-                <Section title="Appointment metrics">
+                <Section title={t('revenue_appt_metrics')}>
                   <div style={st.kpiGrid}>
-                    <KpiCard label="Total appointments"    value={a?.total ?? 0} />
-                    <KpiCard label="Completed"             value={a?.completed ?? 0} color="#4cc98a" />
-                    <KpiCard label="Confirmed / upcoming"  value={a?.confirmed ?? 0} color="#6fa3e8" />
-                    <KpiCard label="Pending"               value={a?.pending ?? 0}   color="#f59e3a" />
-                    <KpiCard label="Cancelled"             value={a?.cancelled ?? 0} color={isLight ? 'rgba(17,16,8,0.35)' : 'rgba(255,255,255,0.3)'} />
+                    <KpiCard label={t('revenue_total_appts')}    value={a?.total ?? 0} />
+                    <KpiCard label={t('status_completed')}             value={a?.completed ?? 0} color="#4cc98a" />
+                    <KpiCard label={t('revenue_upcoming')}  value={a?.confirmed ?? 0} color="#6fa3e8" />
+                    <KpiCard label={t('status_pending')}               value={a?.pending ?? 0}   color="#f59e3a" />
+                    <KpiCard label={t('status_cancelled')}             value={a?.cancelled ?? 0} color={isLight ? 'rgba(17,16,8,0.35)' : 'rgba(255,255,255,0.3)'} />
                     <KpiCard label="No-shows"              value={a?.no_shows ?? 0}  color="#e86f6f" />
-                    <KpiCard label="Avg appointment value" value={fmt(a?.avg_value)} accent />
-                    <KpiCard label="Appointment revenue"   value={fmt(a?.revenue)} />
+                    <KpiCard label={t('revenue_avg_value')} value={fmt(a?.avg_value)} accent />
+                    <KpiCard label={t('revenue_appt_revenue')}   value={fmt(a?.revenue)} />
                   </div>
                   {a?.by_source?.length > 0 && (
                     <SourceBreakdown data={a.by_source} />
                   )}
                 </Section>
 
-                <Section title="Customer insights">
+                <Section title={t('revenue_customer_insights')}>
                   <div style={st.kpiGrid}>
-                    <KpiCard label="New clients"       value={c?.new_clients ?? 0}       color="#4cc98a" />
-                    <KpiCard label="Returning clients" value={c?.returning_clients ?? 0} color="#6fa3e8" />
+                    <KpiCard label={t('revenue_new_clients')}       value={c?.new_clients ?? 0}       color="#4cc98a" />
+                    <KpiCard label={t('revenue_returning_clients')} value={c?.returning_clients ?? 0} color="#6fa3e8" />
                   </div>
                   {c?.top_clients?.length > 0 && (
                     <>
-                      <p style={st.sectionSub}>Top clients by spend in period</p>
+                      <p style={st.sectionSub}>{t('revenue_top_clients')}</p>
                       <div style={st.tableScroll}>
                         <table style={st.table}>
                           <thead>
-                            <tr>{['Client','Visits','Last visit','Spend','Avg spend'].map(h => <th key={h} style={st.th}>{h}</th>)}</tr>
+                            <tr>{[t('revenue_client'), t('revenue_visits'), t('revenue_last_visit'), t('revenue_spend'), t('revenue_avg_spend')].map(h => <th key={h} style={st.th}>{h}</th>)}</tr>
                           </thead>
                           <tbody>
                             {c.top_clients.map((cl, i) => (
@@ -296,6 +298,7 @@ export default function RevenuePage() {
 // ── Financial content (shown when unlocked) ───────────────────────────────────
 
 function FinancialContent({ s, weeklyChart, byArtist, startDate, endDate, isLight }) {
+  const { t } = useLanguage();
   const tickColor = isLight ? 'rgba(17,16,8,0.4)' : 'rgba(255,255,255,0.3)';
   const gridColor = isLight ? 'rgba(0,0,0,0.07)' : 'rgba(255,255,255,0.05)';
   const tooltipBg = isLight ? '#f5f2ec' : '#151b24';
@@ -305,21 +308,21 @@ function FinancialContent({ s, weeklyChart, byArtist, startDate, endDate, isLigh
     <>
       <Section title={`Revenue summary · ${startDate} – ${endDate}`}>
         <div style={st.kpiGrid}>
-          <KpiCard label="Gross sales"           value={fmt(s?.gross_sales)}       accent />
-          <KpiCard label="Net sales"             value={fmt(s?.net_sales)}          />
-          <KpiCard label="Deposits collected"    value={fmt(s?.deposits_collected)} />
-          <KpiCard label="Remaining balances"    value={fmt(s?.remaining_balances)} />
-          <KpiCard label="Completed sessions"    value={s?.completed_sessions ?? 0} />
-          <KpiCard label="Refunds"               value="—" dim />
-          <KpiCard label="Discounts given"       value="—" dim />
-          <KpiCard label="Taxes collected"       value="—" dim />
-          <KpiCard label="Gift card sales"       value="—" dim />
-          <KpiCard label="Gift card redemptions" value="—" dim />
-          <KpiCard label="Tips"                  value="—" dim />
+          <KpiCard label={t('revenue_gross_sales')}           value={fmt(s?.gross_sales)}       accent />
+          <KpiCard label={t('revenue_net_sales')}             value={fmt(s?.net_sales)}          />
+          <KpiCard label={t('revenue_deposits')}    value={fmt(s?.deposits_collected)} />
+          <KpiCard label={t('revenue_remaining_balances')}    value={fmt(s?.remaining_balances)} />
+          <KpiCard label={t('revenue_completed_sessions')}    value={s?.completed_sessions ?? 0} />
+          <KpiCard label={t('revenue_refunds')}               value="—" dim />
+          <KpiCard label={t('revenue_discounts')}       value="—" dim />
+          <KpiCard label={t('revenue_taxes')}       value="—" dim />
+          <KpiCard label={t('revenue_gift_card_sales')}       value="—" dim />
+          <KpiCard label={t('revenue_gift_card_redemptions')} value="—" dim />
+          <KpiCard label={t('revenue_tips')}                  value="—" dim />
         </div>
       </Section>
 
-      <Section title="Weekly gross sales">
+      <Section title={t('revenue_weekly_gross')}>
         {weeklyChart.length > 0 ? (
           <div style={st.chartWrap}>
             <ResponsiveContainer width="100%" height={200}>
@@ -342,16 +345,16 @@ function FinancialContent({ s, weeklyChart, byArtist, startDate, endDate, isLigh
             </div>
           </div>
         ) : (
-          <p style={st.empty}>No completed sessions in this period.</p>
+          <p style={st.empty}>{t('revenue_no_sessions')}</p>
         )}
       </Section>
 
       {byArtist?.length > 0 && (
-        <Section title="Artist performance">
+        <Section title={t('revenue_artist_perf')}>
           <div style={st.tableScroll}>
             <table style={st.table}>
               <thead>
-                <tr>{['Artist','Tattoos','Revenue','Avg ticket','Deposits','Hours','Sales / hr'].map(h => <th key={h} style={st.th}>{h}</th>)}</tr>
+                <tr>{[t('revenue_artist'), t('revenue_tattoos'), t('revenue_gross_sales'), t('revenue_avg_ticket'), t('revenue_deposits'), t('revenue_hours'), t('revenue_sales_hr')].map(h => <th key={h} style={st.th}>{h}</th>)}</tr>
               </thead>
               <tbody>
                 {byArtist.map(ar => (
@@ -369,7 +372,7 @@ function FinancialContent({ s, weeklyChart, byArtist, startDate, endDate, isLigh
             </table>
           </div>
           {byArtist.some(a => a.estimated_hours > 0) && (
-            <p style={st.note}>Hours are estimated from proposed session duration.</p>
+            <p style={st.note}>{t('revenue_hours_note')}</p>
           )}
         </Section>
       )}
@@ -380,6 +383,7 @@ function FinancialContent({ s, weeklyChart, byArtist, startDate, endDate, isLigh
 // ── Password gate ─────────────────────────────────────────────────────────────
 
 function PasswordGate({ email, onUnlock }) {
+  const { t } = useLanguage();
   const [value,   setValue]   = useState('');
   const [shake,   setShake]   = useState(false);
   const [wrong,   setWrong]   = useState(false);
@@ -413,21 +417,21 @@ function PasswordGate({ email, onUnlock }) {
             <path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
           </svg>
         </div>
-        <p style={st.gateTitle}>Financial data is protected</p>
-        <p style={st.gateSubtitle}>Enter the password to view revenue &amp; artist performance.</p>
+        <p style={st.gateTitle}>{t('revenue_protected')}</p>
+        <p style={st.gateSubtitle}>{t('revenue_password_hint')}</p>
         <form onSubmit={handleSubmit} style={st.gateForm}>
           <input
             ref={inputRef}
             type="password"
             value={value}
             onChange={e => { setValue(e.target.value); setWrong(false); }}
-            placeholder="Password"
+            placeholder={t('revenue_password')}
             style={{ ...st.gateInput, borderColor: wrong ? '#e86f6f' : 'var(--border)' }}
             autoComplete="off"
           />
-          {wrong && <p style={st.gateError}>Incorrect password</p>}
+          {wrong && <p style={st.gateError}>{t('revenue_wrong_password')}</p>}
           <button type="submit" style={{ ...st.gateBtn, opacity: loading ? 0.6 : 1 }} disabled={loading}>
-            {loading ? 'Verifying…' : 'Unlock'}
+            {t(loading ? 'revenue_verifying' : 'revenue_unlock')}
           </button>
         </form>
       </div>
@@ -542,13 +546,14 @@ const REIMB_STATUS_STYLE = {
 };
 
 function ReimbursementsSection({ reimbursements, reviewingId, onReview }) {
+  const { t } = useLanguage();
   if (!reimbursements?.length) return null;
   return (
-    <Section title="Reimbursement requests">
+    <Section title={t('revenue_reimbursements')}>
       <div style={st.tableScroll}>
         <table style={st.table}>
           <thead>
-            <tr>{['Artist', 'Requested', 'Description', 'Amount', ''].map(h => <th key={h} style={st.th}>{h}</th>)}</tr>
+            <tr>{[t('revenue_artist'), t('revenue_requested'), t('revenue_description'), t('revenue_amount'), ''].map(h => <th key={h} style={st.th}>{h}</th>)}</tr>
           </thead>
           <tbody>
             {reimbursements.map(rb => {
@@ -568,7 +573,7 @@ function ReimbursementsSection({ reimbursements, reviewingId, onReview }) {
                           disabled={busy}
                           style={{ ...st.payBtn, opacity: busy ? 0.5 : 1 }}
                         >
-                          Approve
+                          {t('approve')}
                         </button>
                         <button
                           onClick={() => onReview(rb.id, 'reject')}
@@ -581,7 +586,7 @@ function ReimbursementsSection({ reimbursements, reviewingId, onReview }) {
                             opacity: busy ? 0.5 : 1,
                           }}
                         >
-                          Reject
+                          {t('reject')}
                         </button>
                       </span>
                     ) : (
@@ -604,13 +609,14 @@ function ReimbursementsSection({ reimbursements, reviewingId, onReview }) {
 }
 
 function PayoutsSection({ payouts, onPay, onViewEarnings }) {
+  const { t } = useLanguage();
   if (!payouts?.length) return null;
   const hasCut = payouts.some(p => p.artist_payout != null && p.artist_payout !== p.total_earned);
   const headers = hasCut
-    ? ['Artist', 'Gross', 'Artist payout', 'Paid out', 'Outstanding', '']
-    : ['Artist', 'Earned', 'Paid out', 'Outstanding', ''];
+    ? [t('revenue_artist'), t('revenue_gross'), 'Artist payout', 'Paid out', 'Outstanding', '']
+    : [t('revenue_artist'), 'Earned', 'Paid out', 'Outstanding', ''];
   return (
-    <Section title="Artist payouts · all-time">
+    <Section title={t('revenue_payouts')}>
       <div style={st.tableScroll}>
         <table style={st.table}>
           <thead>
@@ -675,6 +681,7 @@ function PayoutsSection({ payouts, onPay, onViewEarnings }) {
 // ── Payout panel (modal) ──────────────────────────────────────────────────────
 
 function PayoutPanel({ artist, onClose, onPaid }) {
+  const { t } = useLanguage();
   const [mode,     setMode]     = useState('full'); // 'full' | 'custom'
   const [custom,   setCustom]   = useState('');
   const [saving,   setSaving]   = useState(false);
@@ -734,7 +741,7 @@ function PayoutPanel({ artist, onClose, onPaid }) {
             <p style={st.panelSub}>
               {artist.outstanding > 0
                 ? `Outstanding: ${fmt(artist.outstanding)}`
-                : 'All paid out'}
+                : t('revenue_all_paid')}
             </p>
           </div>
           <button onClick={onClose} style={st.closeBtn}>✕</button>
@@ -814,11 +821,11 @@ function PayoutPanel({ artist, onClose, onPaid }) {
           {/* Payout history */}
           <div style={{ marginTop: artist.outstanding > 0 ? '1.5rem' : 0 }}>
             <p style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-ghost)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '0.6rem' }}>
-              Payout history
+              {t('revenue_payout_history')}
             </p>
-            {history === null && <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Loading…</p>}
+            {history === null && <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{t('loading')}</p>}
             {history !== null && history.length === 0 && (
-              <p style={{ fontSize: '0.8rem', color: 'var(--text-ghost)' }}>No payouts recorded yet.</p>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-ghost)' }}>{t('revenue_no_payouts')}</p>
             )}
             {history !== null && history.length > 0 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '260px', overflowY: 'auto', paddingRight: '0.25rem' }}>
@@ -849,6 +856,7 @@ function PayoutPanel({ artist, onClose, onPaid }) {
 // ── Earnings breakdown panel ──────────────────────────────────────────────────
 
 function EarningsPanel({ artist, onClose }) {
+  const { t } = useLanguage();
   const [entries, setEntries] = useState(null);
 
   useEffect(() => {
@@ -917,14 +925,14 @@ function EarningsPanel({ artist, onClose }) {
         <div style={st.panelHeader}>
           <div>
             <p style={st.panelTitle}>Earnings breakdown · {artist.artist_name}</p>
-            <p style={st.panelSub}>All completed bookings contributing to artist payout</p>
+            <p style={st.panelSub}>{t('revenue_earnings_desc')}</p>
           </div>
           <button onClick={onClose} style={st.closeBtn}>✕</button>
         </div>
 
         <div style={{ overflowY: 'auto', flex: 1 }}>
           {entries === null && (
-            <p style={{ padding: '1.5rem', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Loading…</p>
+            <p style={{ padding: '1.5rem', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{t('loading')}</p>
           )}
           {entries !== null && entries.length === 0 && (
             <p style={{ padding: '1.5rem', fontSize: '0.85rem', color: 'var(--text-ghost)' }}>No completed bookings found.</p>
@@ -934,7 +942,7 @@ function EarningsPanel({ artist, onClose }) {
               <table style={{ ...st.table, borderRadius: 0, border: 'none', borderBottom: '1px solid var(--border-faint)' }}>
                 <thead>
                   <tr>
-                    {['Date', 'Client', 'Source', 'Payment', 'Gross', 'Artist cut'].map(h => (
+                    {[t('revenue_date'), t('revenue_client'), t('revenue_source'), t('revenue_payment'), t('revenue_gross'), t('revenue_artist_cut')].map(h => (
                       <th key={h} style={st.th}>{h}</th>
                     ))}
                   </tr>
@@ -953,7 +961,7 @@ function EarningsPanel({ artist, onClose }) {
                 </tbody>
               </table>
               <div style={{ padding: '0.85rem 1rem', display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', borderTop: '1px solid var(--border-faint)' }}>
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 500 }}>Total artist payout</span>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 500 }}>{t('revenue_total_payout')}</span>
                 <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#4cc98a' }}>{fmt(total)}</span>
               </div>
             </>

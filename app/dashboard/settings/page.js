@@ -15,13 +15,14 @@ import { getSupabase } from '@/lib/supabase';
 import { invalidate } from '@/lib/cache';
 import { setDemoMode } from '@/lib/mode';
 import { getTheme, setTheme } from '@/lib/theme';
+import { useLanguage, LANGUAGES } from '@/lib/i18n';
 
 const QRCodeSVG = dynamic(() => import('qrcode.react').then(m => m.QRCodeSVG), { ssr: false });
 
-const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+const DAY_KEYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 
 function defaultHours() {
-  return DAYS.map((_, i) => ({
+  return DAY_KEYS.map((_, i) => ({
     day_of_week: i,
     open_time: '09:00',
     close_time: '17:00',
@@ -263,6 +264,7 @@ function WidgetPreview({ bg, accent, studioName }) {
 
 export default function SettingsPage() {
   const router = useRouter();
+  const { lang, switchLanguage, t } = useLanguage();
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState('');
   const [address, setAddress] = useState('');
@@ -276,6 +278,7 @@ export default function SettingsPage() {
   const [walkinCut, setWalkinCut] = useState('0');
   const [personalCut, setPersonalCut] = useState('0');
   const [paymentRecordingReq, setPaymentRecordingReq] = useState('studio_only');
+  const [rescheduleWindow, setRescheduleWindow] = useState(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [profileError, setProfileError] = useState('');
@@ -341,6 +344,7 @@ export default function SettingsPage() {
         setWalkinCut(String(account.studio?.walkin_cut_percent ?? account.studio?.studio_cut_percent ?? 0));
         setPersonalCut(String(account.studio?.personal_cut_percent ?? account.studio?.studio_cut_percent ?? 0));
         setPaymentRecordingReq(account.studio?.payment_recording_requirement ?? 'studio_only');
+        setRescheduleWindow(account.studio?.reschedule_window_hours ?? null);
         setEmail(session?.user?.email ?? '');
         setStudioId(account.studio_id);
         setWalkInUrl(window.location.origin + '/studio-booking?s=' + account.studio_id);
@@ -387,7 +391,7 @@ export default function SettingsPage() {
     try {
       const wc = parseFloat(walkinCut);
       const pc = parseFloat(personalCut);
-      await updateStudioProfile(name.trim(), address.trim(), widgetBgColor, widgetAccentColor, isNaN(wc) ? 0 : wc, isNaN(pc) ? 0 : pc, aftercareInstructions, timezone, addressLat, addressLng, paymentRecordingReq);
+      await updateStudioProfile(name.trim(), address.trim(), widgetBgColor, widgetAccentColor, isNaN(wc) ? 0 : wc, isNaN(pc) ? 0 : pc, aftercareInstructions, timezone, addressLat, addressLng, paymentRecordingReq, rescheduleWindow);
       invalidate('studio-account');
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
@@ -616,15 +620,15 @@ export default function SettingsPage() {
 
   return (
     <div style={s.page}>
-      <h1 style={s.pageTitle}>Settings</h1>
+      <h1 style={s.pageTitle}>{t('settings')}</h1>
 
       <div style={s.grid}>
 
         {/* ── Studio ── */}
-        <p style={s.groupLabel}>Studio</p>
+        <p style={s.groupLabel}>{t('section_studio')}</p>
 
         <section style={s.card}>
-          <h2 style={s.sectionTitle}>Profile</h2>
+          <h2 style={s.sectionTitle}>{t('profile')}</h2>
           <form onSubmit={handleSaveProfile} style={s.form}>
             <div style={s.field}>
               <label style={s.label}>Studio Name</label>
@@ -725,17 +729,17 @@ export default function SettingsPage() {
             </div>
             {profileError && <p style={s.errorText}>{profileError}</p>}
             <button type="submit" style={s.saveBtn} disabled={saving}>
-              {saving ? 'Saving…' : saved ? 'Saved!' : 'Save changes'}
+              {saving ? t('saving') : saved ? t('saved') : t('save_changes')}
             </button>
           </form>
         </section>
 
         <section style={s.card}>
-          <h2 style={s.sectionTitle}>Hours</h2>
+          <h2 style={s.sectionTitle}>{t('hours')}</h2>
           <div style={s.hoursGrid}>
             {hours.map((day, i) => (
               <div key={i} style={s.hoursRow}>
-                <span style={s.dayLabel}>{DAYS[i]}</span>
+                <span style={s.dayLabel}>{t(DAY_KEYS[i])}</span>
                 <label style={s.closedToggle}>
                   <input
                     type="checkbox"
@@ -744,7 +748,7 @@ export default function SettingsPage() {
                     style={{ accentColor: '#f5ecd9' }}
                   />
                   <span style={{ color: day.is_closed ? 'var(--text-ghost)' : 'var(--text-muted)', fontSize: '0.75rem' }}>
-                    Closed
+                    {t('closed')}
                   </span>
                 </label>
                 {!day.is_closed && (
@@ -768,15 +772,15 @@ export default function SettingsPage() {
             ))}
           </div>
           <button onClick={handleSaveHours} style={s.saveBtn} disabled={hoursSaving}>
-            {hoursSaving ? 'Saving…' : hoursSaved ? 'Saved!' : 'Save hours'}
+            {hoursSaving ? t('saving') : hoursSaved ? t('saved') : t('save_hours')}
           </button>
         </section>
 
         {/* ── Payments ── */}
-        <p style={{ ...s.groupLabel, marginTop: '1.25rem' }}>Payments</p>
+        <p style={{ ...s.groupLabel, marginTop: '1.25rem' }}>{t('section_payments')}</p>
 
         <section style={{ ...s.card, gridColumn: '1 / -1' }}>
-          <h2 style={s.sectionTitle}>Stripe Connect</h2>
+          <h2 style={s.sectionTitle}>{t('stripe_connect')}</h2>
           <p style={s.sectionDesc}>
             Connect your Stripe account to collect deposits from clients when sending selection links.
             Payments go directly to your Stripe account minus the platform fee.
@@ -822,10 +826,29 @@ export default function SettingsPage() {
         </section>
 
         {/* ── Bookings ── */}
-        <p style={{ ...s.groupLabel, marginTop: '1.25rem' }}>Bookings</p>
+        <p style={{ ...s.groupLabel, marginTop: '1.25rem' }}>{t('section_bookings')}</p>
 
         <section style={{ ...s.card, gridColumn: '1 / -1' }}>
-          <h2 style={s.sectionTitle}>Aftercare Instructions</h2>
+          <h2 style={s.sectionTitle}>{t('reschedule_window')}</h2>
+          <p style={s.sectionDesc}>{t('reschedule_window_desc')}</p>
+          <select
+            style={{ ...s.input, cursor: 'pointer', colorScheme: 'dark' }}
+            value={rescheduleWindow ?? ''}
+            onChange={e => setRescheduleWindow(e.target.value === '' ? null : Number(e.target.value))}
+          >
+            <option value="">{t('reschedule_window_none')}</option>
+            <option value="24">{t('reschedule_window_24h')}</option>
+            <option value="48">{t('reschedule_window_48h')}</option>
+            <option value="72">{t('reschedule_window_72h')}</option>
+            <option value="168">{t('reschedule_window_1w')}</option>
+          </select>
+          <button onClick={saveProfile} style={s.saveBtn} disabled={saving}>
+            {saving ? t('saving') : saved ? t('saved') : t('save')}
+          </button>
+        </section>
+
+        <section style={{ ...s.card, gridColumn: '1 / -1' }}>
+          <h2 style={s.sectionTitle}>{t('aftercare_instructions')}</h2>
           <p style={s.sectionDesc}>Aftercare guidance that gets attached to every completed booking. Clients can see this on their booking record after their session.</p>
           <textarea
             style={{ ...s.input, minHeight: 120, resize: 'vertical', lineHeight: 1.6 }}
@@ -834,17 +857,17 @@ export default function SettingsPage() {
             placeholder="e.g. Keep the area clean and moisturised for the first 2 weeks. Avoid direct sunlight…"
           />
           <button onClick={saveProfile} style={s.saveBtn} disabled={saving}>
-            {saving ? 'Saving…' : saved ? 'Saved!' : 'Save'}
+            {saving ? t('saving') : saved ? t('saved') : t('save')}
           </button>
         </section>
 
         <section style={{ ...s.card, gridColumn: '1 / -1' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
-              <h2 style={s.sectionTitle}>Consent Form Templates</h2>
+              <h2 style={s.sectionTitle}>{t('consent_forms')}</h2>
               <p style={s.sectionDesc}>Create consent forms, waivers, and health questionnaires with custom fields, e-signatures, and minor / guardian support.</p>
             </div>
-            <button onClick={openNewTemplate} style={s.addTemplateBtn}>+ New form</button>
+            <button onClick={openNewTemplate} style={s.addTemplateBtn}>{t('new_form')}</button>
           </div>
 
           {consentTemplates.length === 0 && (
@@ -970,7 +993,7 @@ export default function SettingsPage() {
         )}
 
         <section style={s.card}>
-          <h2 style={s.sectionTitle}>Stations</h2>
+          <h2 style={s.sectionTitle}>{t('stations')}</h2>
           <p style={s.sectionDesc}>Artists are assigned to a free station when a booking is accepted.</p>
           <div style={s.stationList}>
             {stations.map(st => (
@@ -1026,17 +1049,17 @@ export default function SettingsPage() {
             ))}
           </div>
           <button onClick={handleAddStation} style={s.saveBtn} disabled={stationLoading}>
-            + Add station
+            {t('add_station')}
           </button>
         </section>
 
         <section style={s.card}>
-          <h2 style={s.sectionTitle}>Studio Booking Link</h2>
+          <h2 style={s.sectionTitle}>{t('booking_link')}</h2>
           <p style={s.sectionDesc}>Share this link or QR code so clients can submit booking requests.</p>
           <div style={s.walkInCard}>
             <div style={s.walkInLeft}>
               <span style={s.walkInUrl}>{walkInUrl}</span>
-              <button onClick={copyLink} style={s.copyBtn}>{copied ? 'Copied!' : 'Copy link'}</button>
+              <button onClick={copyLink} style={s.copyBtn}>{copied ? t('copied') : t('copy_link')}</button>
             </div>
             {walkInUrl && (
               <div style={s.qrWrap}>
@@ -1047,7 +1070,7 @@ export default function SettingsPage() {
         </section>
 
         <section style={{ ...s.card, gridColumn: '1 / -1' }}>
-          <h2 style={s.sectionTitle}>Booking Widget</h2>
+          <h2 style={s.sectionTitle}>{t('booking_widget')}</h2>
           <p style={s.sectionDesc}>Embed the booking form on your website. Customise the colours to match your brand.</p>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', alignItems: 'start' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -1080,10 +1103,10 @@ export default function SettingsPage() {
               <div style={s.embedCard}>
                 <label style={s.label}>Embed snippet</label>
                 <pre style={s.codeBlock}>{embedSnippet}</pre>
-                <button onClick={copyEmbed} style={s.copyBtn}>{embedCopied ? 'Copied!' : 'Copy snippet'}</button>
+                <button onClick={copyEmbed} style={s.copyBtn}>{embedCopied ? t('copied') : t('copy_snippet')}</button>
               </div>
               <button onClick={saveProfile} style={s.saveBtn} disabled={saving}>
-                {saving ? 'Saving…' : saved ? 'Saved!' : 'Save'}
+                {saving ? t('saving') : saved ? t('saved') : t('save')}
               </button>
             </div>
             <WidgetPreview bg={widgetBgColor} accent={widgetAccentColor} studioName={name || 'Your Studio'} />
@@ -1091,26 +1114,26 @@ export default function SettingsPage() {
         </section>
 
         {/* ── Account ── */}
-        <p style={{ ...s.groupLabel, marginTop: '1.25rem' }}>Account</p>
+        <p style={{ ...s.groupLabel, marginTop: '1.25rem' }}>{t('section_account')}</p>
 
         <section style={s.card}>
-          <h2 style={s.sectionTitle}>Account</h2>
+          <h2 style={s.sectionTitle}>{t('account')}</h2>
           <div style={s.field}>
             <label style={s.label}>Email</label>
             <input style={{ ...s.input, ...s.inputReadonly }} value={email} readOnly />
           </div>
-          <button onClick={handleSignOut} style={s.signOutBtn}>Sign out</button>
+          <button onClick={handleSignOut} style={s.signOutBtn}>{t('sign_out')}</button>
         </section>
 
         <section style={s.card}>
-          <h2 style={s.sectionTitle}>Appearance</h2>
+          <h2 style={s.sectionTitle}>{t('appearance')}</h2>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
               <span style={{ fontSize: '0.875rem', color: 'var(--text-dim)', fontWeight: 500 }}>
-                {theme === 'dark' ? 'Dark mode' : 'Light mode'}
+                {theme === 'dark' ? t('dark_mode') : t('light_mode')}
               </span>
               <p style={{ fontSize: '0.78rem', color: 'var(--text-faint)', margin: '0.2rem 0 0' }}>
-                {theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+                {theme === 'dark' ? t('switch_to_light') : t('switch_to_dark')}
               </p>
             </div>
             <button onClick={toggleTheme} style={s.themeToggle} aria-label="Toggle theme">
@@ -1118,6 +1141,33 @@ export default function SettingsPage() {
                 <span style={s.themeToggleThumb(theme)} />
               </span>
             </button>
+          </div>
+        </section>
+
+        <section style={s.card}>
+          <h2 style={s.sectionTitle}>{t('language')}</h2>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            {LANGUAGES.map(l => (
+              <button
+                key={l.id}
+                onClick={() => switchLanguage(l.id)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '0.75rem',
+                  padding: '0.65rem 0.9rem',
+                  background: lang === l.id ? 'var(--accent-tint)' : 'var(--bg-base)',
+                  border: `1px solid ${lang === l.id ? 'var(--accent-tint-border)' : 'var(--border-faint)'}`,
+                  borderRadius: 10, cursor: 'pointer', textAlign: 'left',
+                }}
+              >
+                <span style={{ fontSize: '1.1rem' }}>{l.flag}</span>
+                <span style={{ fontSize: '0.87rem', fontWeight: 500, color: lang === l.id ? 'var(--accent)' : 'var(--text-dim)' }}>
+                  {l.name}
+                </span>
+                {lang === l.id && (
+                  <span style={{ marginLeft: 'auto', fontSize: '0.72rem', fontWeight: 600, color: 'var(--accent)' }}>✓</span>
+                )}
+              </button>
+            ))}
           </div>
         </section>
 

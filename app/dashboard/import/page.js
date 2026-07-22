@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { parseCSV } from '@/lib/csv';
+import { useLanguage } from '@/lib/i18n';
 import {
   CLIENT_FIELDS,
   APPOINTMENT_FIELDS,
@@ -23,6 +24,7 @@ const CHUNK_SIZE = 200;
 const UNASSIGNED = '';
 
 export default function ImportPage() {
+  const { t } = useLanguage();
   const [step, setStep] = useState('upload'); // upload | map | preview | importing | done
   const [fileName, setFileName] = useState('');
   const [headers, setHeaders] = useState([]);
@@ -204,8 +206,8 @@ export default function ImportPage() {
   return (
     <div style={s.page}>
       <div style={s.header}>
-        <h1 style={s.title}>Import data</h1>
-        <p style={s.sub}>Bring clients and appointment history over from another booking system or spreadsheet.</p>
+        <h1 style={s.title}>{t('import_title')}</h1>
+        <p style={s.sub}>{t('import_desc')}</p>
       </div>
 
       <div style={s.body}>
@@ -218,7 +220,7 @@ export default function ImportPage() {
             onDrop={e => { e.preventDefault(); handleFile(e.dataTransfer.files?.[0]); }}
             onClick={() => fileRef.current?.click()}
           >
-            <span style={s.dropTitle}>Drop a CSV file here, or click to browse</span>
+            <span style={s.dropTitle}>{t('import_drop')}</span>
             <span style={s.dropSub}>
               Exports from Square Appointments, Acuity, Fresha or any spreadsheet saved as CSV.
             </span>
@@ -252,7 +254,7 @@ export default function ImportPage() {
                   </div>
                 </div>
                 <div style={s.control}>
-                  <label style={s.label}>Source</label>
+                  <label style={s.label}>{t('import_source')}</label>
                   <select style={s.select} value={preset} onChange={e => applyPreset(e.target.value)}>
                     {Object.entries(PRESETS).map(([key, p]) => (
                       <option key={key} value={key}>{p.label}</option>
@@ -260,7 +262,7 @@ export default function ImportPage() {
                   </select>
                 </div>
                 <div style={s.control}>
-                  <label style={s.label}>Date format</label>
+                  <label style={s.label}>{t('import_date_format')}</label>
                   <div style={s.segmented}>
                     <button style={{ ...s.segBtn, ...(dayFirst ? s.segBtnActive : {}) }} onClick={() => setDayFirst(true)}>DD/MM/YYYY</button>
                     <button style={{ ...s.segBtn, ...(!dayFirst ? s.segBtnActive : {}) }} onClick={() => setDayFirst(false)}>MM/DD/YYYY</button>
@@ -270,7 +272,7 @@ export default function ImportPage() {
             </div>
 
             <div style={s.card}>
-              <div style={s.cardTitle}>Map columns</div>
+              <div style={s.cardTitle}>{t('import_map_cols')}</div>
               <div style={s.mapGrid}>
                 {fields.map(f => (
                   <div key={f.key} style={s.mapRow}>
@@ -293,7 +295,7 @@ export default function ImportPage() {
 
             {kind === 'appointments' && artistNames.length > 0 && (
               <div style={s.card}>
-                <div style={s.cardTitle}>Match artists</div>
+                <div style={s.cardTitle}>{t('import_match_artists')}</div>
                 <p style={s.cardSub}>Match names found in the file to artists in your studio. Unmatched appointments import as unassigned.</p>
                 <div style={s.mapGrid}>
                   {artistNames.map(raw => (
@@ -304,7 +306,7 @@ export default function ImportPage() {
                         value={artistMap[raw] ?? UNASSIGNED}
                         onChange={e => setArtistMap(m => ({ ...m, [raw]: e.target.value }))}
                       >
-                        <option value={UNASSIGNED}>Leave unassigned</option>
+                        <option value={UNASSIGNED}>{t('import_unassigned')}</option>
                         {artists.map(a => <option key={a.artistId} value={a.artistId}>{a.name}</option>)}
                       </select>
                     </div>
@@ -314,8 +316,8 @@ export default function ImportPage() {
             )}
 
             <div style={s.btnRow}>
-              <button style={s.btnGhost} onClick={reset}>Start over</button>
-              <button style={s.btnPrimary} onClick={() => setStep('preview')}>Preview import</button>
+              <button style={s.btnGhost} onClick={reset}>{t('import_start_over')}</button>
+              <button style={s.btnPrimary} onClick={() => setStep('preview')}>{t('import_preview')}</button>
             </div>
           </>
         )}
@@ -325,11 +327,11 @@ export default function ImportPage() {
             <div style={s.statRow}>
               <div style={s.statCard}>
                 <span style={s.statValue}>{validRows.length}</span>
-                <span style={s.statLabel}>Rows ready to import</span>
+                <span style={s.statLabel}>{t('import_rows_ready')}</span>
               </div>
               <div style={s.statCard}>
                 <span style={{ ...s.statValue, color: invalidRows.length ? '#e86f6f' : 'var(--text)' }}>{invalidRows.length}</span>
-                <span style={s.statLabel}>Rows with problems (skipped)</span>
+                <span style={s.statLabel}>{t('import_rows_problems')}</span>
               </div>
             </div>
 
@@ -372,13 +374,13 @@ export default function ImportPage() {
             </div>
 
             <div style={s.btnRow}>
-              <button style={s.btnGhost} onClick={() => setStep('map')}>Back</button>
+              <button style={s.btnGhost} onClick={() => setStep('map')}>{t('back')}</button>
               <button
                 style={{ ...s.btnPrimary, ...(validRows.length === 0 ? s.btnDisabled : {}) }}
                 disabled={validRows.length === 0}
                 onClick={runImport}
               >
-                Import {validRows.length} row{validRows.length !== 1 ? 's' : ''}
+                {t('import_import_btn')} {validRows.length} row{validRows.length !== 1 ? 's' : ''}
               </button>
             </div>
           </>
@@ -386,7 +388,7 @@ export default function ImportPage() {
 
         {step === 'importing' && (
           <div style={s.card}>
-            <div style={s.cardTitle}>Importing…</div>
+            <div style={s.cardTitle}>{t('import_importing')}</div>
             <div style={s.progressTrack}>
               <div style={{ ...s.progressFill, width: `${Math.round((progress / Math.max(validRows.length, 1)) * 100)}%` }} />
             </div>
@@ -399,15 +401,15 @@ export default function ImportPage() {
             <div style={s.statRow}>
               <div style={s.statCard}>
                 <span style={{ ...s.statValue, color: '#4cc98a' }}>{result.imported}</span>
-                <span style={s.statLabel}>Imported</span>
+                <span style={s.statLabel}>{t('import_imported')}</span>
               </div>
               <div style={s.statCard}>
                 <span style={s.statValue}>{result.linked}</span>
-                <span style={s.statLabel}>Linked to existing app users</span>
+                <span style={s.statLabel}>{t('import_linked')}</span>
               </div>
               <div style={s.statCard}>
                 <span style={s.statValue}>{result.skipped}</span>
-                <span style={s.statLabel}>Skipped (already imported)</span>
+                <span style={s.statLabel}>{t('import_skipped')}</span>
               </div>
             </div>
 

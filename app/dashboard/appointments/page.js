@@ -1,25 +1,27 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { listStudioBookings, acceptBookingWithStation, rejectBooking, cancelBooking, recordOutcome, createFollowUpBooking, sendSelectionLink, confirmBooking, reassignArtist, getStudioArtists, getStripeStatus } from '@/lib/api';
+import { listStudioBookings, acceptBookingWithStation, rejectBooking, cancelBooking, recordOutcome, createFollowUpBooking, sendSelectionLink, confirmBooking, reassignArtist, rescheduleBooking, getStudioArtists, getStripeStatus } from '@/lib/api';
 import { getCached, setCached, invalidatePrefix } from '@/lib/cache';
 import { statusColors, statusLabel, capitalise } from '@/lib/status';
 import { getBookingType } from '@/lib/bookingType';
 import CompleteBookingModal from '@/components/CompleteBookingModal';
 import RejectBookingModal from '@/components/RejectBookingModal';
 import BookingDetailPanel from '@/components/BookingDetailPanel';
+import { useLanguage } from '@/lib/i18n';
 
 const STATUS_FILTERS = [
-  { value: 'pending',               label: 'Pending' },
-  { value: 'awaiting_payment',      label: 'Awaiting Payment' },
-  { value: 'requires_confirmation', label: 'Needs Confirmation' },
-  { value: 'confirmed',             label: 'Confirmed' },
-  { value: 'completed,cancelled',   label: 'Completed' },
+  { value: 'pending',               tKey: 'status_pending' },
+  { value: 'awaiting_payment',      tKey: 'status_awaiting_payment' },
+  { value: 'requires_confirmation', tKey: 'status_needs_confirmation' },
+  { value: 'confirmed',             tKey: 'status_confirmed' },
+  { value: 'completed,cancelled',   tKey: 'status_completed' },
 ];
 
 const DEFAULT_FILTER = 'pending';
 
 export default function AppointmentsPage() {
+  const { t } = useLanguage();
   const [activeFilter, setActiveFilter] = useState(DEFAULT_FILTER);
   const [sortDir, setSortDir] = useState('desc');
   const [search, setSearch] = useState('');
@@ -46,6 +48,12 @@ export default function AppointmentsPage() {
   const [reassignArtistId, setReassignArtistId] = useState('');
   const [reassignResend, setReassignResend] = useState(true);
   const [reassignSaving, setReassignSaving] = useState(false);
+  const [rescheduleTarget, setRescheduleTarget] = useState(null); // booking object
+  const [rescheduleDate,  setRescheduleDate]  = useState('');
+  const [rescheduleStart, setRescheduleStart] = useState('');
+  const [rescheduleEnd,   setRescheduleEnd]   = useState('');
+  const [rescheduleMsg,   setRescheduleMsg]   = useState('');
+  const [rescheduleSaving, setRescheduleSaving] = useState(false);
   const [studioArtists, setStudioArtists] = useState([]);
   const [stripeConnected, setStripeConnected] = useState(false);
 
@@ -226,6 +234,39 @@ export default function AppointmentsPage() {
     finally { setReassignSaving(false); }
   }
 
+  function openReschedule(booking) {
+    const currentTime = booking?.chosen_time ?? booking?.proposed_time_primary ?? null;
+    const dt = currentTime ? new Date(currentTime) : new Date();
+    const pad = n => String(n).padStart(2, '0');
+    const dateStr = `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`;
+    const startHHMM = `${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
+    const durationMins = booking?.duration_minutes ?? 60;
+    const endDt = new Date(dt.getTime() + durationMins * 60000);
+    const endHHMM = `${pad(endDt.getHours())}:${pad(endDt.getMinutes())}`;
+    setRescheduleDate(dateStr);
+    setRescheduleStart(startHHMM);
+    setRescheduleEnd(endHHMM);
+    setRescheduleMsg('');
+    setRescheduleTarget(booking);
+  }
+
+  async function confirmReschedule() {
+    if (!rescheduleStart || !rescheduleEnd || !rescheduleMsg.trim()) return;
+    const [sh, sm] = rescheduleStart.split(':').map(Number);
+    const [eh, em] = rescheduleEnd.split(':').map(Number);
+    const durationMins = (eh * 60 + em) - (sh * 60 + sm);
+    if (durationMins <= 0) { alert('End time must be after start time.'); return; }
+    const newTime = new Date(`${rescheduleDate}T${rescheduleStart}:00`).toISOString();
+    setRescheduleSaving(true);
+    try {
+      await rescheduleBooking(rescheduleTarget.id, newTime, rescheduleMsg.trim(), durationMins);
+      await load(true);
+      setRescheduleTarget(null);
+      showToast('Booking rescheduled · client emailed');
+    } catch (e) { alert(e.message); }
+    finally { setRescheduleSaving(false); }
+  }
+
   const filteredBookings = useMemo(() => {
     if (!search.trim()) return bookings;
     const q = search.trim().toLowerCase();
@@ -272,9 +313,9 @@ export default function AppointmentsPage() {
       )}
       {cancelTarget && (
         <RejectBookingModal
-          title="Cancel booking"
+          title={t('cancel_booking_title')}
           placeholder="Reason for cancellation…"
-          confirmLabel="Cancel booking"
+          confirmLabel={t('cancel_booking_confirm')}
           saving={actionLoading}
           onConfirm={confirmCancel}
           onCancel={() => setCancelTarget(null)}
@@ -284,9 +325,9 @@ export default function AppointmentsPage() {
       {sendLinkTarget && (
         <div style={s.modalOverlay} onClick={() => setSendLinkTarget(null)}>
           <div style={s.modal} onClick={e => e.stopPropagation()}>
-            <h3 style={s.modalTitle}>Send selection link</h3>
-            <p style={s.modalSub}>The client will receive an email with a link to choose their artist and time.</p>
-            <label style={s.modalLabel}>Appointment duration</label>
+            <h3 style={s.modalTitle}>{t('appt_send_link')}</h3>
+            <p style={s.modalSub}>{t('appt_send_link_desc')}</p>
+            <label style={s.modalLabel}>{t('appt_duration')}</label>
             <select value={sendLinkDuration} onChange={e => setSendLinkDuration(Number(e.target.value))} style={s.modalSelect}>
               <option value={60}>1 hour</option>
               <option value={90}>1.5 hours</option>
@@ -297,7 +338,7 @@ export default function AppointmentsPage() {
               <option value={360}>6 hours</option>
               <option value={480}>Full day (8 hrs)</option>
             </select>
-            <label style={s.modalLabel}>Estimated quote ($)</label>
+            <label style={s.modalLabel}>{t('appt_quote')}</label>
             <input
               type="number"
               inputMode="numeric"
@@ -308,7 +349,7 @@ export default function AppointmentsPage() {
               style={s.modalInput}
               min="0"
             />
-            <label style={s.modalLabel}>Link expires after</label>
+            <label style={s.modalLabel}>{t('appt_expires')}</label>
             <select value={sendLinkHours} onChange={e => setSendLinkHours(Number(e.target.value))} style={s.modalSelect}>
               <option value={24}>24 hours</option>
               <option value={48}>48 hours</option>
@@ -320,7 +361,7 @@ export default function AppointmentsPage() {
               <>
                 <label style={s.modalCheckRow}>
                   <input type="checkbox" checked={sendLinkDeposit} onChange={e => setSendLinkDeposit(e.target.checked)} style={{ accentColor: 'var(--accent)' }} />
-                  <span style={{ fontSize: '0.85rem', color: 'var(--text-dim)' }}>Require deposit</span>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--text-dim)' }}>{t('appt_deposit')}</span>
                 </label>
                 {sendLinkDeposit && (
                   <input
@@ -337,13 +378,13 @@ export default function AppointmentsPage() {
               </>
             ) : (
               <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: '0.25rem 0 0', padding: '0.5rem 0.65rem', background: 'rgba(255,255,255,0.04)', borderRadius: 6 }}>
-                Connect a Stripe account in Settings to require a deposit.
+                {t('appt_stripe_hint')}
               </p>
             )}
             <div style={s.modalActions}>
-              <button style={s.modalCancel} onClick={() => setSendLinkTarget(null)}>Cancel</button>
+              <button style={s.modalCancel} onClick={() => setSendLinkTarget(null)}>{t('cancel')}</button>
               <button style={{ ...s.modalConfirm, opacity: sendLinkSaving ? 0.5 : 1 }} onClick={confirmSendLink} disabled={sendLinkSaving}>
-                {sendLinkSaving ? 'Sending…' : 'Send link'}
+                {t(sendLinkSaving ? 'sending' : 'appt_send_link_btn')}
               </button>
             </div>
           </div>
@@ -353,22 +394,22 @@ export default function AppointmentsPage() {
       {reassignTarget && (
         <div style={s.modalOverlay} onClick={() => setReassignTarget(null)}>
           <div style={s.modal} onClick={e => e.stopPropagation()}>
-            <h3 style={s.modalTitle}>Reassign artist</h3>
-            <label style={s.modalLabel}>New artist</label>
+            <h3 style={s.modalTitle}>{t('appt_reassign')}</h3>
+            <label style={s.modalLabel}>{t('appt_new_artist')}</label>
             <select value={reassignArtistId} onChange={e => setReassignArtistId(e.target.value)} style={s.modalSelect}>
-              <option value="">Select artist…</option>
+              <option value="">{t('appt_select_artist')}</option>
               {studioArtists.map(a => (
                 <option key={a.artistId ?? a.id} value={a.artistId ?? a.id}>{a.name}</option>
               ))}
             </select>
             <label style={s.modalCheckRow}>
               <input type="checkbox" checked={reassignResend} onChange={e => setReassignResend(e.target.checked)} style={{ accentColor: 'var(--accent)' }} />
-              <span style={{ fontSize: '0.85rem', color: 'var(--text-dim)' }}>Send new selection link to client</span>
+              <span style={{ fontSize: '0.85rem', color: 'var(--text-dim)' }}>{t('appt_resend_link')}</span>
             </label>
             <div style={s.modalActions}>
-              <button style={s.modalCancel} onClick={() => setReassignTarget(null)}>Cancel</button>
+              <button style={s.modalCancel} onClick={() => setReassignTarget(null)}>{t('cancel')}</button>
               <button style={{ ...s.modalConfirm, opacity: (!reassignArtistId || reassignSaving) ? 0.5 : 1 }} onClick={confirmReassign} disabled={!reassignArtistId || reassignSaving}>
-                {reassignSaving ? 'Saving…' : 'Reassign'}
+                {t(reassignSaving ? 'saving' : 'appt_reassign_btn')}
               </button>
             </div>
           </div>
@@ -376,10 +417,10 @@ export default function AppointmentsPage() {
       )}
 
       <div style={s.header}>
-        <h1 style={s.title}>Bookings</h1>
+        <h1 style={s.title}>{t('nav_bookings')}</h1>
         <input
           type="search"
-          placeholder="Search by name or email…"
+          placeholder={t('appt_search')}
           value={search}
           onChange={e => setSearch(e.target.value)}
           style={s.searchInput}
@@ -393,12 +434,12 @@ export default function AppointmentsPage() {
                 onClick={() => selectFilter(f.value)}
                 style={{ ...s.filterBtn, ...(activeFilter === f.value ? s.filterActive : {}) }}
               >
-                {f.label}
+                {t(f.tKey)}
               </button>
             ))}
           </div>
           <button onClick={toggleSort} style={s.sortBtn}>
-            {sortDir === 'desc' ? '↓ Newest' : '↑ Oldest'}
+            {t(sortDir === 'desc' ? 'sort_newest' : 'sort_oldest')}
           </button>
         </div>
       </div>
@@ -407,7 +448,7 @@ export default function AppointmentsPage() {
         {loading && <SkeletonList />}
         {error && <p style={{ ...s.msg, color: '#e86f6f' }}>{error}</p>}
         {!loading && !error && filteredBookings.length === 0 && (
-          <p style={s.msg}>{search ? 'No results for that search.' : 'No appointments found.'}</p>
+          <p style={s.msg}>{t(search ? 'appt_no_results' : 'appt_none')}</p>
         )}
         {!loading && filteredBookings.map(b => (
           <BookingRow
@@ -419,7 +460,7 @@ export default function AppointmentsPage() {
         ))}
         {nextCursor && !loading && (
           <button onClick={loadMore} disabled={loadingMore} style={s.loadMore}>
-            {loadingMore ? 'Loading…' : 'Load more'}
+            {t(loadingMore ? 'loading' : 'load_more')}
           </button>
         )}
       </div>
@@ -437,8 +478,80 @@ export default function AppointmentsPage() {
           onSendLink={() => handleSendLink(selectedBooking.id)}
           onConfirm={() => handleConfirm(selectedBooking.id)}
           onReassign={() => openReassign(selectedBooking.id)}
+          onReschedule={() => openReschedule(selectedBooking)}
           actionLoading={actionLoading}
         />
+      )}
+
+      {/* ── Reschedule modal ── */}
+      {rescheduleTarget && (
+        <div style={s.modalOverlay} onClick={e => e.target === e.currentTarget && setRescheduleTarget(null)}>
+          <div style={s.modal}>
+            <h3 style={s.modalTitle}>{t('reschedule_booking')}</h3>
+            <p style={s.modalSub}>
+              {rescheduleTarget.requester_name} · {rescheduleTarget.session_type}
+            </p>
+
+            <div style={s.modalField}>
+              <label style={s.modalLabel}>{t('sched_date')}</label>
+              <input
+                type="date"
+                value={rescheduleDate}
+                disabled
+                style={{ ...s.modalInput, colorScheme: 'auto', opacity: 0.55, cursor: 'not-allowed' }}
+              />
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem', marginBottom: '0.85rem' }}>
+              <div>
+                <label style={s.modalLabel}>{t('nap_start_time')}</label>
+                <input
+                  type="time"
+                  value={rescheduleStart}
+                  onChange={e => setRescheduleStart(e.target.value)}
+                  style={{ ...s.modalInput, colorScheme: 'auto' }}
+                />
+              </div>
+              <div>
+                <label style={s.modalLabel}>{t('reschedule_end_time')}</label>
+                <input
+                  type="time"
+                  value={rescheduleEnd}
+                  onChange={e => setRescheduleEnd(e.target.value)}
+                  style={{ ...s.modalInput, colorScheme: 'auto' }}
+                />
+              </div>
+            </div>
+
+            <div style={s.modalField}>
+              <label style={s.modalLabel}>{t('reschedule_message')} <span style={{ color: '#e86f6f' }}>*</span></label>
+              <p style={s.modalHint}>{t('reschedule_message_hint')}</p>
+              <textarea
+                value={rescheduleMsg}
+                onChange={e => setRescheduleMsg(e.target.value)}
+                placeholder="e.g. We need to move your appointment due to an artist scheduling conflict. Apologies for the inconvenience!"
+                rows={4}
+                style={{ ...s.modalInput, resize: 'vertical', lineHeight: 1.5 }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.6rem', marginTop: '0.5rem' }}>
+              <button
+                style={s.modalCancelBtn}
+                onClick={() => setRescheduleTarget(null)}
+                disabled={rescheduleSaving}
+              >
+                {t('cancel')}
+              </button>
+              <button
+                style={{ ...s.modalSaveBtn, opacity: (!rescheduleStart || !rescheduleEnd || !rescheduleMsg.trim() || rescheduleSaving) ? 0.5 : 1 }}
+                onClick={confirmReschedule}
+                disabled={!rescheduleStart || !rescheduleEnd || !rescheduleMsg.trim() || rescheduleSaving}
+              >
+                {t(rescheduleSaving ? 'saving' : 'reschedule_confirm')}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -469,6 +582,7 @@ function SkeletonList() {
 }
 
 function BookingRow({ booking: b, selected, onSelect }) {
+  const { t } = useLanguage();
   const displayStatus = b.status === 'completed' && b.outcome === 'no_show' ? 'no_show' : b.status;
   const sc = statusColors(displayStatus);
   const dateStr = b.chosen_time || b.proposed_time_primary;
@@ -509,12 +623,12 @@ function BookingRow({ booking: b, selected, onSelect }) {
           <>
             <span style={s.dateMonth}>{reqMonth}</span>
             <span style={s.dateDay}>{reqDay}</span>
-            <span style={s.dateTime}>requested</span>
+            <span style={s.dateTime}>{t('appt_requested')}</span>
           </>
         ) : (
           <>
             <span style={s.dateMonth}>—</span>
-            <span style={{ ...s.dateDay, fontSize: '0.72rem', color: 'var(--text-ghost)' }}>TBD</span>
+            <span style={{ ...s.dateDay, fontSize: '0.72rem', color: 'var(--text-ghost)' }}>{t('tbd')}</span>
           </>
         )}
       </div>
@@ -523,7 +637,7 @@ function BookingRow({ booking: b, selected, onSelect }) {
       <div style={s.rowMain}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
           <span style={s.clientName}>{b.requester_name}</span>
-          {b.parent_booking_id && <span style={s.followUpTag}>Follow-up</span>}
+          {b.parent_booking_id && <span style={s.followUpTag}>{t('appt_followup')}</span>}
         </div>
         {sessionParts.length > 0 && (
           <span style={s.rowMeta}>{sessionParts.join(' · ')}</span>
@@ -709,5 +823,17 @@ const s = {
     padding: '0.45rem 1.1rem', borderRadius: 7,
     border: '1px solid rgba(76,201,138,0.35)', background: 'rgba(76,201,138,0.12)',
     color: '#4cc98a', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer',
+  },
+  modalField: { display: 'flex', flexDirection: 'column', gap: '0.35rem' },
+  modalHint: { fontSize: '0.75rem', color: 'var(--text-ghost)', margin: 0, lineHeight: 1.4 },
+  modalCancelBtn: {
+    flex: 1, padding: '0.5rem', borderRadius: 7,
+    border: '1px solid var(--border-faint)', background: 'transparent',
+    color: 'var(--text-muted)', fontSize: '0.82rem', fontWeight: 500, cursor: 'pointer',
+  },
+  modalSaveBtn: {
+    flex: 2, padding: '0.5rem', borderRadius: 7,
+    border: '1px solid rgba(245,236,217,0.25)', background: 'rgba(245,236,217,0.08)',
+    color: 'var(--accent)', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer',
   },
 };

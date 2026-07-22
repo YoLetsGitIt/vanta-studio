@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { useLanguage } from '@/lib/i18n';
 
 const PAYMENT_METHODS = [
   { value: 'cash', label: 'Cash' },
@@ -35,6 +36,7 @@ const inputStyle = {
 const selectStyle = { ...inputStyle, cursor: 'pointer', colorScheme: 'auto' };
 
 export default function CompleteBookingModal({ outcome = 'completed', initialPrice, onConfirm, onCancel, saving }) {
+  const { t } = useLanguage();
   const [finalPrice, setFinalPrice] = useState(initialPrice != null ? String(initialPrice) : '');
   const [splits, setSplits] = useState([{ method: '', amount: '' }]);
   const [followUp, setFollowUp] = useState(false);
@@ -87,18 +89,18 @@ export default function CompleteBookingModal({ outcome = 'completed', initialPri
     <div style={overlay} onClick={e => e.target === e.currentTarget && onCancel()}>
       <div style={modal}>
         <h2 style={{ margin: '0 0 0.5rem', fontSize: '1.1rem', fontWeight: 700, color: 'var(--text)' }}>
-          {isNoShow ? 'Mark as No Show' : 'Mark as Complete'}
+          {isNoShow ? t('noshow_title') : t('complete_title')}
         </h2>
         <p style={{ margin: '0 0 1.25rem', fontSize: '0.83rem', color: 'var(--text-secondary)' }}>
           {isNoShow
-            ? 'The client did not attend this appointment.'
-            : 'Record payment details for this session.'}
+            ? t('noshow_desc')
+            : t('complete_desc')}
         </p>
 
         {!isNoShow && (
           <>
             <div style={{ marginBottom: '1rem' }}>
-              <label style={labelStyle}>Final Price ($)</label>
+              <label style={labelStyle}>{t('complete_final_price')}</label>
               <input
                 type="number"
                 min="0"
@@ -112,7 +114,7 @@ export default function CompleteBookingModal({ outcome = 'completed', initialPri
 
             <div style={{ marginBottom: '0.5rem' }}>
               <label style={labelStyle}>
-                Payment Method <span style={{ color: '#e86f6f' }}>*</span>
+                {t('complete_payment_method')} <span style={{ color: '#e86f6f' }}>*</span>
               </label>
               {splits.map((split, idx) => (
                 <div key={idx} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem', alignItems: 'center' }}>
@@ -169,7 +171,7 @@ export default function CompleteBookingModal({ outcome = 'completed', initialPri
                   color: 'var(--text-muted)', fontSize: '0.82rem', width: '100%',
                 }}
               >
-                + Add payment method
+                {t('complete_add_payment')}
               </button>
             </div>
 
@@ -182,7 +184,7 @@ export default function CompleteBookingModal({ outcome = 'completed', initialPri
                 onChange={e => setFollowUp(e.target.checked)}
                 style={{ accentColor: 'var(--accent)', width: 14, height: 14, flexShrink: 0 }}
               />
-              <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>Book a follow-up session</span>
+              <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>{t('complete_followup')}</span>
             </label>
           </>
         )}
@@ -201,7 +203,7 @@ export default function CompleteBookingModal({ outcome = 'completed', initialPri
               fontSize: '0.9rem', fontWeight: 600,
             }}
           >
-            Cancel
+            {t('cancel')}
           </button>
           <button
             onClick={handleSubmit}
@@ -214,7 +216,7 @@ export default function CompleteBookingModal({ outcome = 'completed', initialPri
               fontSize: '0.9rem', fontWeight: 700,
             }}
           >
-            {saving ? 'Saving…' : 'Confirm'}
+            {saving ? t('saving') : t('confirm')}
           </button>
         </div>
       </div>

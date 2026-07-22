@@ -11,6 +11,7 @@ import {
 } from '@/lib/api';
 import { invalidatePrefix } from '@/lib/cache';
 import { formatDob } from '@/lib/format';
+import { useLanguage } from '@/lib/i18n';
 
 const DURATION_OPTIONS = [
   { label: '30 min', value: 30 },
@@ -95,6 +96,8 @@ function TimeSelect({ value, onChange }) {
 }
 
 export default function NewAppointmentPanel({ open, onClose, onCreated }) {
+  const { t } = useLanguage();
+
   // ── Client
   const [clientMode, setClientMode] = useState('search');
   const [clientSearch, setClientSearch] = useState('');
@@ -244,17 +247,17 @@ export default function NewAppointmentPanel({ open, onClose, onCreated }) {
 
   const timeError = useMemo(() => {
     if (!studioHours.length || !dayHours) return null;
-    if (dayHours.is_closed) return 'Studio is closed on this day.';
+    if (dayHours.is_closed) return t('nap_err_closed');
     if (!startTime) return null;
     const [sh, sm] = startTime.split(':').map(Number);
     const startMins = sh * 60 + sm;
     const endMins = startMins + durationMins;
     const [oh, om] = dayHours.open_time.split(':').map(Number);
     const [ch, cm] = dayHours.close_time.split(':').map(Number);
-    if (startMins < oh * 60 + om) return `Studio opens at ${dayHours.open_time} — start time is too early.`;
-    if (endMins > ch * 60 + cm) return `Appointment ends after closing time (${dayHours.close_time}).`;
+    if (startMins < oh * 60 + om) return `${t('nap_err_opens_at')} ${dayHours.open_time} — ${t('nap_err_too_early')}`;
+    if (endMins > ch * 60 + cm) return `${t('nap_err_ends_after')} (${dayHours.close_time}).`;
     return null;
-  }, [studioHours, dayHours, startTime, durationMins]);
+  }, [studioHours, dayHours, startTime, durationMins, t]);
 
   const clientName = clientMode === 'search'
     ? (selectedClient?.name || '')
@@ -282,9 +285,9 @@ export default function NewAppointmentPanel({ open, onClose, onCreated }) {
 
   async function handleSubmit(e) {
     e.preventDefault();
-    if (!clientName) { setError("Client name is required."); return; }
-    if (!artistId) { setError('Please select an artist.'); return; }
-    if (!bookingDate || !startTime) { setError('Please set a date and start time.'); return; }
+    if (!clientName) { setError(t('nap_err_client')); return; }
+    if (!artistId) { setError(t('nap_err_artist')); return; }
+    if (!bookingDate || !startTime) { setError(t('nap_err_datetime')); return; }
     if (timeError) { setError(timeError); return; }
     setSaving(true); setError('');
     try {
@@ -333,7 +336,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated }) {
       <div style={{ ...bd.panel, transform: open ? 'translateX(0)' : 'translateX(100%)' }}>
 
         <div style={bd.header}>
-          <span style={bd.title}>New Appointment</span>
+          <span style={bd.title}>{t('nap_title')}</span>
           <button onClick={handleClose} style={bd.closeBtn} aria-label="Close">✕</button>
         </div>
 
@@ -344,21 +347,21 @@ export default function NewAppointmentPanel({ open, onClose, onCreated }) {
 
             {/* ── BOOKING TYPE ── */}
             <div style={bd.section}>
-              <p style={bd.sectionLabel}>Booking Type</p>
+              <p style={bd.sectionLabel}>{t('nap_booking_type')}</p>
               <div style={bd.modeTabs}>
                 <button
                   type="button"
                   style={{ ...bd.modeTab, ...(bookingType === 'personal' ? bd.modeTabActive : {}) }}
                   onClick={() => setBookingType('personal')}
                 >
-                  Personal
+                  {t('nap_type_personal')}
                 </button>
                 <button
                   type="button"
                   style={{ ...bd.modeTab, ...(bookingType === 'studio' ? bd.modeTabActive : {}) }}
                   onClick={() => setBookingType('studio')}
                 >
-                  Studio
+                  {t('nap_type_studio')}
                 </button>
               </div>
             </div>
@@ -366,9 +369,9 @@ export default function NewAppointmentPanel({ open, onClose, onCreated }) {
             {/* ── ARTIST ── */}
             {artists.length > 0 && (
               <div style={bd.section}>
-                <p style={bd.sectionLabel}>Artist</p>
+                <p style={bd.sectionLabel}>{t('bdp_artist')}</p>
                 <select style={bd.select} value={artistId} onChange={e => setArtistId(e.target.value)} required>
-                  <option value="">Select artist…</option>
+                  <option value="">{t('nap_select_artist')}</option>
                   {artists.map(a => (
                     <option key={a.artistId ?? a.artist_id ?? a.id} value={a.artistId ?? a.artist_id ?? a.id}>
                       {a.name}
@@ -380,7 +383,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated }) {
 
             {/* ── CLIENT ── */}
             <div style={bd.section}>
-              <p style={bd.sectionLabel}>Client</p>
+              <p style={bd.sectionLabel}>{t('nap_client')}</p>
 
               <div style={bd.modeTabs}>
                 <button
@@ -388,14 +391,14 @@ export default function NewAppointmentPanel({ open, onClose, onCreated }) {
                   style={{ ...bd.modeTab, ...(clientMode === 'search' ? bd.modeTabActive : {}) }}
                   onClick={() => { setClientMode('search'); setFirstName(''); setLastName(''); setClientEmail(''); setClientPhone(''); }}
                 >
-                  Search existing
+                  {t('nap_search_existing')}
                 </button>
                 <button
                   type="button"
                   style={{ ...bd.modeTab, ...(clientMode === 'manual' ? bd.modeTabActive : {}) }}
                   onClick={() => { setClientMode('manual'); setSelectedClient(null); }}
                 >
-                  New client
+                  {t('nap_new_client')}
                 </button>
               </div>
 
@@ -414,7 +417,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated }) {
                   <div style={{ position: 'relative' }}>
                     <input
                       style={bd.input}
-                      placeholder="Search by name, email or phone…"
+                      placeholder={t('clients_search')}
                       value={clientSearch}
                       onChange={e => { setClientSearch(e.target.value); setShowDropdown(true); }}
                       onFocus={() => setShowDropdown(true)}
@@ -433,9 +436,9 @@ export default function NewAppointmentPanel({ open, onClose, onCreated }) {
                     )}
                     {clientSearch && filteredClients.length === 0 && (
                       <div style={bd.noResults}>
-                        No matches —{' '}
+                        {t('nap_no_matches')}{' '}
                         <button type="button" style={bd.linkBtn} onClick={() => setClientMode('manual')}>
-                          enter manually
+                          {t('nap_enter_manually')}
                         </button>
                       </div>
                     )}
@@ -445,27 +448,27 @@ export default function NewAppointmentPanel({ open, onClose, onCreated }) {
                 <>
                   <div style={bd.fieldRow}>
                     <div style={bd.field}>
-                      <label style={bd.label}>First name</label>
+                      <label style={bd.label}>{t('nap_first_name')}</label>
                       <input
                         style={bd.input}
                         value={firstName}
                         onChange={e => setFirstName(e.target.value)}
-                        placeholder="First"
+                        placeholder={t('nap_first_name')}
                         autoFocus
                       />
                     </div>
                     <div style={bd.field}>
-                      <label style={bd.label}>Last name</label>
+                      <label style={bd.label}>{t('nap_last_name')}</label>
                       <input
                         style={bd.input}
                         value={lastName}
                         onChange={e => setLastName(e.target.value)}
-                        placeholder="Last"
+                        placeholder={t('nap_last_name')}
                       />
                     </div>
                   </div>
                   <div style={bd.field}>
-                    <label style={bd.label}>Date of birth</label>
+                    <label style={bd.label}>{t('clients_dob')}</label>
                     <input
                       style={{ ...bd.input, colorScheme: 'dark' }}
                       type="date"
@@ -475,7 +478,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated }) {
                   </div>
                   <div style={bd.fieldRow}>
                     <div style={bd.field}>
-                      <label style={bd.label}>Email</label>
+                      <label style={bd.label}>{t('sched_email')}</label>
                       <input
                         style={bd.input}
                         type="email"
@@ -485,7 +488,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated }) {
                       />
                     </div>
                     <div style={bd.field}>
-                      <label style={bd.label}>Phone</label>
+                      <label style={bd.label}>{t('sched_phone')}</label>
                       <input
                         style={bd.input}
                         type="tel"
@@ -501,10 +504,10 @@ export default function NewAppointmentPanel({ open, onClose, onCreated }) {
 
             {/* ── BOOKING DETAILS ── */}
             <div style={bd.section}>
-              <p style={bd.sectionLabel}>Booking Details</p>
+              <p style={bd.sectionLabel}>{t('nap_booking_details')}</p>
 
               <div style={bd.field}>
-                <label style={bd.label}>Date</label>
+                <label style={bd.label}>{t('sched_date')}</label>
                 <input
                   style={bd.input}
                   type="date"
@@ -515,12 +518,12 @@ export default function NewAppointmentPanel({ open, onClose, onCreated }) {
               </div>
 
               <div style={bd.field}>
-                <label style={bd.label}>Start time</label>
+                <label style={bd.label}>{t('nap_start_time')}</label>
                 <TimeSelect value={startTime} onChange={setStartTime} />
               </div>
 
               <div style={bd.field}>
-                <label style={bd.label}>Duration</label>
+                <label style={bd.label}>{t('bdp_duration')}</label>
                 <select style={bd.select} value={durationMins} onChange={e => setDurationMins(Number(e.target.value))}>
                   {DURATION_OPTIONS.map(opt => (
                     <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -534,28 +537,28 @@ export default function NewAppointmentPanel({ open, onClose, onCreated }) {
                   {timeError}
                 </div>
               ) : dayHours && !dayHours.is_closed ? (
-                <p style={bd.hint}>Studio open {dayHours.open_time} – {dayHours.close_time}</p>
+                <p style={bd.hint}>{t('nap_studio_open')} {dayHours.open_time} – {dayHours.close_time}</p>
               ) : bookingDate && !studioHours.length ? (
-                <p style={bd.hint}>Save studio hours in Settings to enable time validation.</p>
+                <p style={bd.hint}>{t('nap_no_hours_hint')}</p>
               ) : null}
             </div>
 
             {/* ── STATION — revealed after date + time + duration are set ── */}
             {bookingDate && startTime && allStations.length > 0 && (
               <div style={{ ...bd.section, opacity: timeError ? 0.35 : 1, pointerEvents: timeError ? 'none' : 'auto' }}>
-                <p style={bd.sectionLabel}>Station</p>
+                <p style={bd.sectionLabel}>{t('bdp_station')}</p>
                 {stationsLoading ? (
-                  <p style={bd.hint}>Checking availability…</p>
+                  <p style={bd.hint}>{t('nap_checking')}</p>
                 ) : (
                   <>
                     <select style={bd.select} value={stationId} onChange={e => setStationId(e.target.value)}>
-                      <option value="">No station</option>
+                      <option value="">{t('nap_no_station')}</option>
                       {(availableStations ?? allStations).map(s => (
                         <option key={s.id} value={s.id}>{s.name}</option>
                       ))}
                     </select>
                     {availableStations !== null && availableStations.length === 0 && (
-                      <p style={bd.inlineError}>No stations available on this date.</p>
+                      <p style={bd.inlineError}>{t('nap_no_stations_date')}</p>
                     )}
                   </>
                 )}
@@ -564,13 +567,13 @@ export default function NewAppointmentPanel({ open, onClose, onCreated }) {
 
             {/* ── DETAILS ── */}
             <div style={bd.section}>
-              <p style={bd.sectionLabel}>Details</p>
+              <p style={bd.sectionLabel}>{t('nap_details')}</p>
               <label style={bd.checkRow}>
                 <input type="checkbox" checked={retouch} onChange={e => setRetouch(e.target.checked)} style={bd.checkbox} />
-                <span>Retouch</span>
+                <span>{t('nap_retouch')}</span>
               </label>
               <div style={bd.field}>
-                <label style={bd.label}>Size</label>
+                <label style={bd.label}>{t('bdp_size')}</label>
                 <div style={{ display: 'flex', gap: '0.4rem' }}>
                   <input
                     style={{ ...bd.input, flex: 1 }}
@@ -596,10 +599,10 @@ export default function NewAppointmentPanel({ open, onClose, onCreated }) {
 
             {/* ── PRICING ── */}
             <div style={bd.section}>
-              <p style={bd.sectionLabel}>Pricing</p>
+              <p style={bd.sectionLabel}>{t('nap_pricing')}</p>
               <div style={bd.fieldRow}>
                 <div style={bd.field}>
-                  <label style={bd.label}>Final price</label>
+                  <label style={bd.label}>{t('bdp_final_price')}</label>
                   <div style={bd.prefixWrap}>
                     <span style={bd.prefix}>$</span>
                     <input
@@ -612,7 +615,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated }) {
                   </div>
                 </div>
                 <div style={bd.field}>
-                  <label style={bd.label}>Deposit</label>
+                  <label style={bd.label}>{t('bdp_deposit')}</label>
                   <div style={bd.prefixWrap}>
                     <span style={bd.prefix}>$</span>
                     <input
@@ -630,7 +633,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated }) {
                     const total = da + feeCents / 100;
                     return (
                       <span style={{ fontSize: '0.74rem', color: 'var(--text-ghost)', marginTop: '0.25rem', display: 'block' }}>
-                        Client charged ${total.toFixed(2)} (incl. ${(feeCents / 100).toFixed(2)} fee)
+                        {t('nap_fee_client_charged')} ${total.toFixed(2)} ({t('nap_fee_incl')} ${(feeCents / 100).toFixed(2)} {t('nap_fee_suffix')})
                       </span>
                     );
                   })()}
@@ -640,12 +643,12 @@ export default function NewAppointmentPanel({ open, onClose, onCreated }) {
 
             {/* ── NOTES ── */}
             <div style={{ ...bd.section, borderBottom: 'none', marginBottom: 0 }}>
-              <p style={bd.sectionLabel}>Notes</p>
+              <p style={bd.sectionLabel}>{t('bdp_notes')}</p>
               <textarea
                 style={{ ...bd.input, minHeight: 72, resize: 'vertical' }}
                 value={notes}
                 onChange={e => setNotes(e.target.value)}
-                placeholder="Optional notes…"
+                placeholder={t('nap_notes_placeholder')}
               />
             </div>
 
@@ -656,7 +659,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated }) {
               style={{ ...bd.submitBtn, opacity: saving ? 0.6 : 1, background: saved ? '#4cc98a' : bd.submitBtn.background, color: saved ? '#0b0f16' : bd.submitBtn.color }}
               disabled={saving || saved}
             >
-              {saved ? 'Appointment created ✓' : saving ? 'Creating…' : 'Create Appointment'}
+              {saved ? t('nap_created') : saving ? t('sched_creating') : t('nap_create')}
             </button>
 
           </form>

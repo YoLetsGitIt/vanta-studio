@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { useLanguage } from '@/lib/i18n';
 
 const overlay = {
   position: 'fixed', inset: 0, zIndex: 1000,
@@ -25,6 +26,7 @@ export default function RejectBookingModal({
   placeholder = 'e.g. Not available on the requested date, design outside my style…',
   confirmLabel = 'Reject Booking',
 }) {
+  const { t } = useLanguage();
   const [reason, setReason] = useState('');
   const [error, setError] = useState('');
 
@@ -42,7 +44,7 @@ export default function RejectBookingModal({
         </h2>
 
         <div style={{ marginBottom: '1.25rem' }}>
-          <label style={labelStyle}>Reason <span style={{ color: '#e86f6f' }}>*</span></label>
+          <label style={labelStyle}>{t('reason')} <span style={{ color: '#e86f6f' }}>*</span></label>
           <textarea
             rows={4}
             placeholder={placeholder}
@@ -72,7 +74,7 @@ export default function RejectBookingModal({
               fontSize: '0.9rem', fontWeight: 600,
             }}
           >
-            Back
+            {t('back')}
           </button>
           <button
             onClick={handleSubmit}
@@ -85,7 +87,7 @@ export default function RejectBookingModal({
               fontSize: '0.9rem', fontWeight: 700,
             }}
           >
-            {saving ? 'Saving…' : confirmLabel}
+            {saving ? t('saving') : confirmLabel}
           </button>
         </div>
       </div>

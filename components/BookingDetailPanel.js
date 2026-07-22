@@ -6,6 +6,7 @@ import { getAvailableStations, getStations, getClientConsents, getNotes, addNote
 import { statusColors, statusLabel, capitalise as cap } from '@/lib/status';
 import { formatDob as fmtDob } from '@/lib/format';
 import { getCached, setCached } from '@/lib/cache';
+import { useLanguage } from '@/lib/i18n';
 
 const PAYMENT_LABELS = { cash: 'Cash', card: 'Card / POS', bank_transfer: 'Bank Transfer' };
 const CONSENT_STYLE  = {
@@ -54,8 +55,10 @@ export default function BookingDetailPanel({
   onSendLink,   // optional fn() — for pending bookings
   onConfirm,    // optional fn() — for requires_confirmation bookings
   onReassign,   // optional fn() — for requires_confirmation bookings
+  onReschedule, // optional fn() — edit booking time
 }) {
   const router = useRouter();
+  const { t } = useLanguage();
 
   // ── Station picker state ───────────────────────────────────────────────────
   const [stationStep,       setStationStep]       = useState(false);
@@ -142,6 +145,7 @@ export default function BookingDetailPanel({
   const canSendLink       = status === 'pending' || status === 'awaiting_payment';
   const canAcceptReject   = canAccept || canReject; // kept for layout gate
   const canConfirm        = status === 'requires_confirmation';
+  const canReschedule     = !['cancelled', 'rejected', 'timed_out', 'completed'].includes(status);
 
   const displayStatus = isNoShow ? 'no_show' : status;
   const sc = statusColors(displayStatus);
@@ -199,7 +203,7 @@ export default function BookingDetailPanel({
   const consentStatus = !consent ? 'none'
     : consent.consent_version === consentVersion ? 'current' : 'outdated';
   const cs = CONSENT_STYLE[consentStatus];
-  const consentLabel = { current: 'Consented', outdated: 'Outdated', none: 'No consent' }[consentStatus];
+  const consentLabel = { current: t('clients_consented'), outdated: t('clients_outdated'), none: t('clients_no_consent') }[consentStatus];
 
   // Match this booking's client against the contact book for their saved profile.
   useEffect(() => {
@@ -309,7 +313,7 @@ export default function BookingDetailPanel({
           <button onClick={onClose} style={p.closeBtn}>✕</button>
         </div>
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Loading…</span>
+          <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{t('loading')}</span>
         </div>
       </aside>
     );
@@ -334,7 +338,7 @@ export default function BookingDetailPanel({
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <span style={{ fontSize: '0.85rem', fontWeight: 700, color: showCompleted ? '#4cc98a' : '#e86f6f' }}>
-                {showCompleted ? '✓ Completed' : '✗ No Show'}
+                {showCompleted ? t('bdp_completed') : t('bdp_no_show_label')}
               </span>
               {outcomeAt && (
                 <span style={{ fontSize: '0.72rem', color: 'var(--text-ghost)', marginLeft: 'auto' }}>
@@ -344,13 +348,13 @@ export default function BookingDetailPanel({
             </div>
             {showCompleted && finalPrice != null && (
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: '0.78rem', color: 'var(--text-ghost)' }}>Final price</span>
+                <span style={{ fontSize: '0.78rem', color: 'var(--text-ghost)' }}>{t('bdp_final_price')}</span>
                 <span style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text)' }}>${finalPrice}</span>
               </div>
             )}
             {showCompleted && paymentMethod && (
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: '0.78rem', color: 'var(--text-ghost)' }}>Payment</span>
+                <span style={{ fontSize: '0.78rem', color: 'var(--text-ghost)' }}>{t('bdp_payment')}</span>
                 <span style={{ fontSize: '0.82rem', color: 'var(--text-dim)' }}>{PAYMENT_LABELS[paymentMethod] ?? paymentMethod}</span>
               </div>
             )}
@@ -361,10 +365,10 @@ export default function BookingDetailPanel({
               const studioTotal  = studioSplits.reduce((n, s) => n + (s.amount ?? 0), 0);
               return (
                 <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '0.6rem', marginTop: '0.1rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                  <span style={{ fontSize: '0.72rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-ghost)', marginBottom: '0.1rem' }}>Payment recordings</span>
+                  <span style={{ fontSize: '0.72rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-ghost)', marginBottom: '0.1rem' }}>{t('bdp_payment_recordings')}</span>
                   {[
-                    { label: 'Artist', splits: artistSplits, total: artistTotal },
-                    { label: 'Studio', splits: studioSplits, total: studioTotal },
+                    { label: t('bdp_artist'), splits: artistSplits, total: artistTotal },
+                    { label: t('nav_studios'), splits: studioSplits, total: studioTotal },
                   ].map(({ label, splits, total }) => (
                     <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{ fontSize: '0.78rem', color: 'var(--text-ghost)' }}>{label}</span>
@@ -376,7 +380,7 @@ export default function BookingDetailPanel({
                             : ` · ${PAYMENT_LABELS[splits[0].method] ?? splits[0].method}`}
                         </span>
                       ) : (
-                        <span style={{ fontSize: '0.78rem', color: '#e86f6f' }}>✗ Not recorded</span>
+                        <span style={{ fontSize: '0.78rem', color: '#e86f6f' }}>{t('bdp_not_recorded')}</span>
                       )}
                     </div>
                   ))}
@@ -385,7 +389,7 @@ export default function BookingDetailPanel({
             })()}
             {showCompleted && aftercareInstructions && (
               <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '0.65rem', marginTop: '0.15rem' }}>
-                <span style={{ fontSize: '0.72rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-ghost)', display: 'block', marginBottom: '0.4rem' }}>Aftercare</span>
+                <span style={{ fontSize: '0.72rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-ghost)', display: 'block', marginBottom: '0.4rem' }}>{t('bdp_aftercare')}</span>
                 <p style={{ fontSize: '0.8rem', color: 'var(--text-dim)', lineHeight: 1.6, whiteSpace: 'pre-wrap', margin: 0 }}>{aftercareInstructions}</p>
               </div>
             )}
@@ -394,7 +398,7 @@ export default function BookingDetailPanel({
 
         {/* ── Booking info ── */}
         {status && (
-          <Row label="Status">
+          <Row label={t('bdp_status')}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
               <span style={{ fontSize: '0.72rem', fontWeight: 600, padding: '0.2rem 0.55rem', borderRadius: 20,
                 background: sc.bg, color: sc.text, border: `1px solid ${sc.border}` }}>
@@ -409,17 +413,17 @@ export default function BookingDetailPanel({
             </div>
           </Row>
         )}
-        {artistName && <Row label="Artist" value={artistName} />}
-        {sessionType && <Row label="Session" value={cap(sessionType.replace(/_/g, ' '))} />}
-        {placement   && <Row label="Placement" value={placement} />}
-        {size        && <Row label="Size" value={size} />}
-        {color       && <Row label="Style" value={color} />}
-        {design      && <Row label="Design" value={design} />}
-        {notes       && <Row label="Notes" value={notes} />}
+        {artistName && <Row label={t('bdp_artist')} value={artistName} />}
+        {sessionType && <Row label={t('bdp_session')} value={cap(sessionType.replace(/_/g, ' '))} />}
+        {placement   && <Row label={t('bdp_placement')} value={placement} />}
+        {size        && <Row label={t('bdp_size')} value={size} />}
+        {color       && <Row label={t('bdp_style')} value={color} />}
+        {design      && <Row label={t('bdp_design')} value={design} />}
+        {notes       && <Row label={t('bdp_notes')} value={notes} />}
 
         {refImages.length > 0 && (
           <div>
-            <span style={p.label}>Reference photos</span>
+            <span style={p.label}>{t('bdp_ref_photos')}</span>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginTop: '0.45rem' }}>
               {refImages.map(img => (
                 <a key={img.id} href={img.signed_url} target="_blank" rel="noopener noreferrer"
@@ -433,20 +437,20 @@ export default function BookingDetailPanel({
           </div>
         )}
 
-        {quote != null && <Row label="Quoted price" value={`$${Number(quote).toLocaleString()}`} />}
-        {durationLabel && <Row label="Duration" value={durationLabel} />}
+        {quote != null && <Row label={t('bdp_quoted')} value={`$${Number(quote).toLocaleString()}`} />}
+        {durationLabel && <Row label={t('bdp_duration')} value={durationLabel} />}
 
         {/* Deposit */}
         {depositRequired && (
           <div style={p.depositBox}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={p.label}>Deposit</span>
+              <span style={p.label}>{t('bdp_deposit')}</span>
               <span style={{
                 fontSize: '0.68rem', fontWeight: 700, padding: '0.1rem 0.4rem', borderRadius: 4,
                 background: depositConfirmedAt ? 'rgba(76,201,138,0.12)' : depositPaid ? 'rgba(250,204,21,0.12)' : 'rgba(232,111,111,0.1)',
                 color: depositConfirmedAt ? '#4cc98a' : depositPaid ? '#facc15' : '#e86f6f',
               }}>
-                {depositConfirmedAt ? 'Confirmed' : depositPaid ? 'Paid — unconfirmed' : 'Unpaid'}
+                {depositConfirmedAt ? t('bdp_deposit_confirmed') : depositPaid ? t('bdp_deposit_unconfirmed') : t('bdp_deposit_unpaid')}
               </span>
             </div>
             {depositAmount != null && (() => {
@@ -472,16 +476,16 @@ export default function BookingDetailPanel({
           </div>
         )}
 
-        {createdAt && <Row label="Requested" value={fmtDate(createdAt)} />}
-        {status === 'awaiting_payment' && updatedAt && <Row label="Link sent" value={fmtDate(updatedAt)} />}
-        {status === 'awaiting_payment' && selectionTokenExpiresAt && <Row label="Link expires" value={fmtDate(selectionTokenExpiresAt)} />}
-        {proposedTime && <Row label="Proposed" value={fmtDate(proposedTime)} />}
-        {chosenTime   && <Row label="Appointment" value={fmtDate(chosenTime)} />}
-        {stationName  && <Row label="Station" value={stationName} />}
-        {cancelReason && <Row label="Cancelled" value={cancelReason} />}
+        {createdAt && <Row label={t('bdp_requested_at')} value={fmtDate(createdAt)} />}
+        {status === 'awaiting_payment' && updatedAt && <Row label={t('bdp_link_sent')} value={fmtDate(updatedAt)} />}
+        {status === 'awaiting_payment' && selectionTokenExpiresAt && <Row label={t('bdp_link_expires')} value={fmtDate(selectionTokenExpiresAt)} />}
+        {proposedTime && <Row label={t('bdp_proposed')} value={fmtDate(proposedTime)} />}
+        {chosenTime   && <Row label={t('bdp_appointment')} value={fmtDate(chosenTime)} />}
+        {stationName  && <Row label={t('bdp_station')} value={stationName} />}
+        {cancelReason && <Row label={t('bdp_cancelled_reason')} value={cancelReason} />}
         {holdExpiresAt && canConfirm && (
           <div style={{ background: 'rgba(111,163,232,0.07)', border: '1px solid rgba(111,163,232,0.2)', borderRadius: 8, padding: '0.55rem 0.75rem' }}>
-            <span style={{ fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#6fa3e8', display: 'block', marginBottom: '0.15rem' }}>Client hold expires</span>
+            <span style={{ fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#6fa3e8', display: 'block', marginBottom: '0.15rem' }}>{t('bdp_client_hold')}</span>
             <span style={{ fontSize: '0.82rem', color: 'var(--text-dim)' }}>{fmtDate(holdExpiresAt)}</span>
           </div>
         )}
@@ -489,7 +493,7 @@ export default function BookingDetailPanel({
         {/* ── Client info ── */}
         <div style={p.divider} />
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={p.sectionLabel}>Client information</span>
+          <span style={p.sectionLabel}>{t('bdp_client_info')}</span>
           {(email || (clientName && clientName !== '—')) && (
             <button
               onClick={() => {
@@ -499,7 +503,7 @@ export default function BookingDetailPanel({
               }}
               style={{ background: 'none', border: 'none', padding: 0, color: 'var(--accent)', fontSize: '0.72rem', fontWeight: 600, cursor: 'pointer' }}
             >
-              View client →
+              {t('bdp_view_client')}
             </button>
           )}
         </div>
@@ -509,7 +513,7 @@ export default function BookingDetailPanel({
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <span style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text)' }}>{clientName}</span>
             {clientAge != null && clientAge < 18 && (
-              <span style={{ fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.04em', padding: '0.05rem 0.35rem', borderRadius: 4, background: 'rgba(245,158,58,0.15)', color: '#f59e3a' }}>MINOR</span>
+              <span style={{ fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.04em', padding: '0.05rem 0.35rem', borderRadius: 4, background: 'rgba(245,158,58,0.15)', color: '#f59e3a' }}>{t('bdp_minor')}</span>
             )}
           </div>
           {dob && (
@@ -522,7 +526,7 @@ export default function BookingDetailPanel({
         {/* Contact rows */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
           <span style={{ fontSize: '0.82rem', color: email ? 'var(--text-secondary)' : 'var(--text-ghost)' }}>
-            {email || 'No email on file'}
+            {email || t('clients_no_email')}
           </span>
           {phone ? (
             <button
@@ -533,19 +537,19 @@ export default function BookingDetailPanel({
               <span style={{ fontSize: '0.68rem', color: 'var(--text-ghost)' }}>↗</span>
             </button>
           ) : (
-            <span style={{ fontSize: '0.82rem', color: 'var(--text-ghost)' }}>No phone on file</span>
+            <span style={{ fontSize: '0.82rem', color: 'var(--text-ghost)' }}>{t('clients_no_phone')}</span>
           )}
         </div>
 
         {/* Consent */}
         {email && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-            <span style={p.label}>Consent</span>
+            <span style={p.label}>{t('bdp_consent')}</span>
             {consentLoading || submissionsLoading ? (
               <span style={{ fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.04em',
                 padding: '0.1rem 0.4rem', borderRadius: 4,
                 background: 'var(--bg-chip)', color: 'var(--text-ghost)', opacity: 0.5 }}>
-                Loading…
+                {t('loading')}
               </span>
             ) : (
               <>
@@ -565,7 +569,7 @@ export default function BookingDetailPanel({
                     style={{ ...p.linkBtn, color: linkCopied ? '#4cc98a' : 'var(--accent)',
                       borderColor: linkCopied ? '#4cc98a' : 'var(--accent)' }}
                   >
-                    {linkCopied ? 'Email sent ✓' : linkGenerating ? 'Sending…' : 'Send consent link →'}
+                    {linkCopied ? t('clients_email_sent') : linkGenerating ? t('sending') : t('clients_send_consent')}
                   </button>
                 )}
               </>
@@ -578,13 +582,13 @@ export default function BookingDetailPanel({
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             {allergies && (
               <div style={{ background: 'rgba(232,111,111,0.08)', border: '1px solid rgba(232,111,111,0.2)', borderRadius: 6, padding: '0.45rem 0.6rem' }}>
-                <span style={{ fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#e86f6f' }}>⚠ Allergies</span>
+                <span style={{ fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#e86f6f' }}>{t('bdp_allergies')}</span>
                 <p style={{ margin: '0.15rem 0 0', fontSize: '0.8rem', color: 'var(--text-dim)', lineHeight: 1.4 }}>{allergies}</p>
               </div>
             )}
             {designPreferences.length > 0 && (
               <div>
-                <span style={p.label}>Design preferences</span>
+                <span style={p.label}>{t('clients_design_prefs')}</span>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem', marginTop: '0.3rem' }}>
                   {designPreferences.map(s => (
                     <span key={s} style={{ fontSize: '0.7rem', fontWeight: 500, padding: '0.15rem 0.5rem', borderRadius: 20, background: 'var(--bg-chip)', color: 'var(--text-muted)', border: '1px solid var(--border-faint)' }}>{s}</span>
@@ -592,14 +596,14 @@ export default function BookingDetailPanel({
                 </div>
               </div>
             )}
-            {painTolerance && <Row label="Pain tolerance" value={cap(painTolerance)} />}
+            {painTolerance && <Row label={t('clients_pain')} value={cap(painTolerance)} />}
           </div>
         )}
 
         {clientHistory.length > 0 && (
           <div>
             <span style={{ ...p.label, display: 'block', marginBottom: '0.5rem' }}>
-              Other bookings ({clientHistory.length})
+              {t('bdp_other_bookings')} ({clientHistory.length})
             </span>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
               {clientHistory.map(bk => {
@@ -629,7 +633,7 @@ export default function BookingDetailPanel({
         {/* ── Station picker ── */}
         {stationStep && (
           <div style={p.stationPicker}>
-            <p style={p.stationLabel}>Assign a station</p>
+            <p style={p.stationLabel}>{t('bdp_assign_station')}</p>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
               {availableStations.map(st => (
                 <button key={st.id} onClick={() => { setStationStep(false); onAccept(st.id); }}
@@ -641,7 +645,7 @@ export default function BookingDetailPanel({
             <button onClick={() => setStationStep(false)}
               style={{ background: 'none', border: 'none', padding: 0, fontSize: '0.78rem',
                 color: 'var(--text-muted)', cursor: 'pointer', fontFamily: 'inherit' }}>
-              Cancel
+              {t('cancel')}
             </button>
           </div>
         )}
@@ -652,12 +656,12 @@ export default function BookingDetailPanel({
       {bookingId && (
         <div style={{ padding: '0.75rem 1rem 0' }}>
           <div style={p.divider} />
-          <span style={p.sectionLabel}>Studio notes</span>
+          <span style={p.sectionLabel}>{t('bdp_studio_notes')}</span>
           <textarea
             value={noteInput}
             onChange={e => setNoteInput(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleAddNote(); }}
-            placeholder="Internal note — not visible to client…"
+            placeholder={t('bdp_note_placeholder')}
             rows={2}
             style={{
               width: '100%', marginTop: '0.4rem', resize: 'vertical',
@@ -678,7 +682,7 @@ export default function BookingDetailPanel({
                 opacity: (!noteInput.trim() || noteAdding) ? 0.45 : 1,
               }}
             >
-              {noteAdding ? 'Saving…' : 'Add note'}
+              {noteAdding ? t('saving') : t('clients_add_note_btn')}
             </button>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.5rem' }}>
@@ -690,7 +694,7 @@ export default function BookingDetailPanel({
                     {new Date(n.created_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
                   </span>
                   <button onClick={() => handleDeleteNote(n.id)} style={{ fontSize: '0.68rem', color: '#e86f6f', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
-                    Delete
+                    {t('delete')}
                   </button>
                 </div>
               </div>
@@ -703,7 +707,7 @@ export default function BookingDetailPanel({
       {submissionsLoading && (
         <div style={{ padding: '0 1rem' }}>
           <div style={p.divider} />
-          <span style={{ fontSize: '0.72rem', color: 'var(--text-ghost)' }}>Loading consent forms…</span>
+          <span style={{ fontSize: '0.72rem', color: 'var(--text-ghost)' }}>{t('loading')}</span>
         </div>
       )}
       {!submissionsLoading && consentSubmissions.length > 0 && (
@@ -713,7 +717,7 @@ export default function BookingDetailPanel({
             style={{ ...p.sectionLabel, background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', gap: '0.35rem', width: '100%' }}
             onClick={() => setSubmissionsExpanded(x => !x)}
           >
-            <span>Consent forms ({consentSubmissions.length})</span>
+            <span>{t('bdp_consent_forms')} ({consentSubmissions.length})</span>
             <span style={{ marginLeft: 'auto', fontSize: '0.7rem', color: 'var(--text-ghost)' }}>{submissionsExpanded ? '▲' : '▼'}</span>
           </button>
           {submissionsExpanded && (
@@ -726,13 +730,13 @@ export default function BookingDetailPanel({
                       {sub.template_type}
                     </span>
                     {sub.is_minor && (
-                      <span style={{ fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', padding: '0.1rem 0.4rem', borderRadius: 4, background: 'rgba(245,158,58,0.12)', color: '#f59e3a' }}>Minor</span>
+                      <span style={{ fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', padding: '0.1rem 0.4rem', borderRadius: 4, background: 'rgba(245,158,58,0.12)', color: '#f59e3a' }}>{t('bdp_minor')}</span>
                     )}
                   </div>
 
                   {sub.signer_name && (
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ fontSize: '0.72rem', color: 'var(--text-ghost)' }}>Signed by</span>
+                      <span style={{ fontSize: '0.72rem', color: 'var(--text-ghost)' }}>{t('bdp_signed_by')}</span>
                       <span style={{ fontSize: '0.78rem', color: 'var(--text-dim)' }}>{sub.signer_name}</span>
                     </div>
                   )}
@@ -751,7 +755,7 @@ export default function BookingDetailPanel({
                   {/* Client signature */}
                   {sub.client_signature_url && (
                     <div>
-                      <p style={{ fontSize: '0.68rem', color: 'var(--text-ghost)', margin: '0 0 0.25rem' }}>Client signature</p>
+                      <p style={{ fontSize: '0.68rem', color: 'var(--text-ghost)', margin: '0 0 0.25rem' }}>{t('bdp_client_signature')}</p>
                       <img
                         src={sub.client_signature_url}
                         alt="Client signature"
@@ -763,7 +767,7 @@ export default function BookingDetailPanel({
                   {/* Guardian info */}
                   {sub.guardian_name && (
                     <div style={{ borderTop: '1px solid var(--border-faint)', paddingTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                      <span style={{ fontSize: '0.68rem', fontWeight: 600, color: 'var(--text-ghost)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Guardian</span>
+                      <span style={{ fontSize: '0.68rem', fontWeight: 600, color: 'var(--text-ghost)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('bdp_guardian')}</span>
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                         <span style={{ fontSize: '0.72rem', color: 'var(--text-ghost)' }}>{sub.guardian_relationship ?? 'Guardian'}</span>
                         <span style={{ fontSize: '0.78rem', color: 'var(--text-dim)' }}>{sub.guardian_name}</span>
@@ -791,34 +795,37 @@ export default function BookingDetailPanel({
       )}
 
       {/* ── Actions ── */}
-      {!stationStep && (canAcceptReject || canComplete || isFutureConfirmed || canSendLink || canConfirm) && (
+      {!stationStep && (canAcceptReject || canComplete || isFutureConfirmed || canSendLink || canConfirm || canReschedule) && (
         <div style={p.actions}>
           {canSendLink && onSendLink && (
             <Btn onClick={onSendLink} disabled={actionLoading} variant="primary">
-              {status === 'awaiting_payment' ? 'Resend Link' : 'Send Link'}
+              {status === 'awaiting_payment' ? t('bdp_resend_link') : t('bdp_send_link')}
             </Btn>
           )}
           {canReject && onReject && (
-            <Btn onClick={onReject} disabled={actionLoading} variant="danger">Reject</Btn>
+            <Btn onClick={onReject} disabled={actionLoading} variant="danger">{t('reject')}</Btn>
           )}
           {/* requires_confirmation: confirm or reassign */}
           {canConfirm && onConfirm && (
-            <Btn onClick={onConfirm} disabled={actionLoading} variant="success">Confirm</Btn>
+            <Btn onClick={onConfirm} disabled={actionLoading} variant="success">{t('bdp_confirm')}</Btn>
           )}
           {canConfirm && onReassign && (
-            <Btn onClick={onReassign} disabled={actionLoading} variant="neutral">Reassign</Btn>
+            <Btn onClick={onReassign} disabled={actionLoading} variant="neutral">{t('reassign')}</Btn>
           )}
           {isFutureConfirmed && onCancel && (
-            <Btn onClick={onCancel} disabled={actionLoading} variant="danger">Cancel</Btn>
+            <Btn onClick={onCancel} disabled={actionLoading} variant="danger">{t('cancel')}</Btn>
+          )}
+          {canReschedule && onReschedule && (
+            <Btn onClick={onReschedule} disabled={actionLoading} variant="neutral">{t('reschedule')}</Btn>
           )}
           {canComplete && onComplete && (
-            <Btn onClick={onComplete} disabled={actionLoading} variant="success">Mark Complete</Btn>
+            <Btn onClick={onComplete} disabled={actionLoading} variant="success">{t('bdp_mark_complete')}</Btn>
           )}
           {canComplete && onNoShow && (
-            <Btn onClick={onNoShow} disabled={actionLoading} variant="danger">No Show</Btn>
+            <Btn onClick={onNoShow} disabled={actionLoading} variant="danger">{t('bdp_no_show')}</Btn>
           )}
           {canComplete && onCancel && (
-            <Btn onClick={onCancel} disabled={actionLoading} variant="danger">Cancel</Btn>
+            <Btn onClick={onCancel} disabled={actionLoading} variant="danger">{t('cancel')}</Btn>
           )}
         </div>
       )}

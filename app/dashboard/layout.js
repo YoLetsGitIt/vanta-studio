@@ -7,24 +7,33 @@ import { getSupabase } from '@/lib/supabase';
 import { getArtistProfile, getMyStudioAccount } from '@/lib/api';
 import { isDemoMode, setDemoMode } from '@/lib/mode';
 import { initTheme } from '@/lib/theme';
+import { useLanguage, LanguageProvider } from '@/lib/i18n';
 import NewAppointmentPanel from '@/components/NewAppointmentPanel';
 
 const NAV = [
-  { href: '/dashboard/home',         label: 'Dashboard',    icon: HomeIcon },
-  { href: '/dashboard/schedule',     label: 'Schedule',     icon: GridCalIcon },
-  { href: '/dashboard/artists',      label: 'Artists',      icon: UsersIcon },
-  { href: '/dashboard/clients',      label: 'Clients',      icon: PersonIcon },
-  { href: '/dashboard/appointments', label: 'Bookings',     icon: CalendarIcon },
-  { href: '/dashboard/revenue',      label: 'Analytics',    icon: RevenueIcon },
-  // { href: '/dashboard/analytics',    label: 'Analytics',    icon: ChartIcon },
-  { href: '/dashboard/studios',      label: 'Studios',      icon: BuildingIcon, adminOnly: true },
+  { href: '/dashboard/home',         tKey: 'nav_dashboard', icon: HomeIcon },
+  { href: '/dashboard/schedule',     tKey: 'nav_schedule',  icon: GridCalIcon },
+  { href: '/dashboard/artists',      tKey: 'nav_artists',   icon: UsersIcon },
+  { href: '/dashboard/clients',      tKey: 'nav_clients',   icon: PersonIcon },
+  { href: '/dashboard/appointments', tKey: 'nav_bookings',  icon: CalendarIcon },
+  { href: '/dashboard/revenue',      tKey: 'nav_analytics', icon: RevenueIcon },
+  { href: '/dashboard/studios',      tKey: 'nav_studios',   icon: BuildingIcon, adminOnly: true },
 ];
 
 const ADMIN_EMAIL = process.env.NEXT_PUBLIC_ADMIN_EMAIL ?? '';
 
 export default function DashboardLayout({ children }) {
+  return (
+    <LanguageProvider>
+      <DashboardShell>{children}</DashboardShell>
+    </LanguageProvider>
+  );
+}
+
+function DashboardShell({ children }) {
   const router = useRouter();
   const pathname = usePathname();
+  const { t } = useLanguage();
   const [user, setUser] = useState(null);
   const [artist, setArtist] = useState(null);
   const [studioName, setStudioName] = useState('');
@@ -97,11 +106,11 @@ export default function DashboardLayout({ children }) {
 
             <button onClick={() => setAppointmentPanelOpen(true)} style={s.newApptBtn}>
               <PlusIcon size={13} />
-              New Appointment
+              {t('new_appointment')}
             </button>
 
             <nav style={s.nav}>
-              {NAV.filter(item => !item.adminOnly || user?.email === ADMIN_EMAIL).map(({ href, label, icon: Icon }) => {
+              {NAV.filter(item => !item.adminOnly || user?.email === ADMIN_EMAIL).map(({ href, tKey, icon: Icon }) => {
                 const active = pathname.startsWith(href);
                 return (
                   <Link
@@ -114,7 +123,7 @@ export default function DashboardLayout({ children }) {
                     }}
                   >
                     <Icon size={16} />
-                    <span style={{ fontWeight: active ? 600 : 400 }}>{label}</span>
+                    <span style={{ fontWeight: active ? 600 : 400 }}>{t(tKey)}</span>
                   </Link>
                 );
               })}

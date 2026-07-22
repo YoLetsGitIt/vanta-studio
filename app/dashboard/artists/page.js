@@ -6,6 +6,7 @@ import { getStudioArtists, approveStudioArtist, rejectStudioArtist, getStudioArt
 import { getCached, setCached, invalidatePrefix } from '@/lib/cache';
 import { APPROVAL_STATUS_COLORS } from '@/lib/status';
 import { initials } from '@/lib/format';
+import { useLanguage } from '@/lib/i18n';
 
 function fmtHHMM(hhmm) {
   if (!hhmm) return '';
@@ -24,6 +25,7 @@ export default function ArtistsPage() {
 }
 
 function ArtistsInner() {
+  const { t } = useLanguage();
   const router = useRouter();
   const params = useSearchParams();
   const selectedId = params.get('id');
@@ -124,18 +126,18 @@ function ArtistsInner() {
       )}
       <div style={s.header}>
         <div style={s.headerLeft}>
-          <h1 style={s.title}>{showPending ? 'Pending Review' : 'My Artists'}</h1>
+          <h1 style={s.title}>{t(showPending ? 'artists_pending_review' : 'artists_my_artists')}</h1>
           <p style={s.subtitle}>
-            {showPending ? 'Artists requesting to join your studio' : 'Approved artists at your studio'}
+            {t(showPending ? 'artists_pending_desc' : 'artists_approved_desc')}
           </p>
         </div>
         <button
           onClick={() => setShowPending(v => !v)}
           style={{ ...s.pendingBtn, ...(showPending ? s.pendingBtnActive : {}) }}
         >
-          {showPending ? '← Back to my artists' : (
+          {showPending ? t('artists_back') : (
             <>
-              Pending review
+              {t('artists_pending_review')}
               {pending.length > 0 && <span style={s.pendingCount}>{pending.length}</span>}
             </>
           )}
@@ -143,10 +145,10 @@ function ArtistsInner() {
       </div>
 
       <div style={s.body}>
-        {loading && <p style={s.msg}>Loading…</p>}
+        {loading && <p style={s.msg}>{t('loading')}</p>}
         {error && <p style={{ ...s.msg, color: '#e86f6f' }}>{error}</p>}
         {!loading && !error && artists.length === 0 && (
-          <p style={s.msg}>No {showPending ? 'pending' : 'approved'} artists.</p>
+          <p style={s.msg}>{t(showPending ? 'artists_none_pending' : 'artists_none_approved')}</p>
         )}
         {!loading && artists.map(artist => (
           <ArtistRow
@@ -164,6 +166,7 @@ function ArtistsInner() {
 }
 
 function ArtistRow({ artist, onClick, onApprove, onReject, actionLoading }) {
+  const { t } = useLanguage();
   const sc = APPROVAL_STATUS_COLORS[artist.status] ?? APPROVAL_STATUS_COLORS.approved;
   const artistInitials = initials(artist.name);
 
@@ -178,8 +181,8 @@ function ArtistRow({ artist, onClick, onApprove, onReject, actionLoading }) {
 
         <div style={s.cardInfo}>
           <div style={s.nameRow}>
-            <span style={s.name}>{artist.name || 'Unnamed artist'}</span>
-            {artist.studioType === 'guest' && <span style={s.guestBadge}>Guest</span>}
+            <span style={s.name}>{artist.name || t('artists_unnamed')}</span>
+            {artist.studioType === 'guest' && <span style={s.guestBadge}>{t('artists_guest')}</span>}
             {artist.status !== 'approved' && (
               <span style={{ ...s.statusBadge, background: sc.bg, color: sc.text, border: `1px solid ${sc.border}` }}>
                 {artist.status.charAt(0).toUpperCase() + artist.status.slice(1)}
@@ -199,14 +202,14 @@ function ArtistRow({ artist, onClick, onApprove, onReject, actionLoading }) {
               disabled={actionLoading}
               style={{ ...s.actionBtn, ...s.approveBtn, opacity: actionLoading ? 0.5 : 1 }}
             >
-              {actionLoading ? '…' : 'Approve'}
+              {actionLoading ? '…' : t('approve')}
             </button>
             <button
               onClick={onReject}
               disabled={actionLoading}
               style={{ ...s.actionBtn, ...s.rejectBtn, opacity: actionLoading ? 0.5 : 1 }}
             >
-              {actionLoading ? '…' : 'Reject'}
+              {actionLoading ? '…' : t('reject')}
             </button>
           </div>
         ) : (
@@ -224,6 +227,7 @@ function ArtistRow({ artist, onClick, onApprove, onReject, actionLoading }) {
 }
 
 function ArtistDetail({ artist, onBack, onApprove, onReject, actionLoading }) {
+  const { t } = useLanguage();
   const sc = APPROVAL_STATUS_COLORS[artist.status] ?? APPROVAL_STATUS_COLORS.approved;
   const artistInitials = initials(artist.name);
 
@@ -311,8 +315,8 @@ function ArtistDetail({ artist, onBack, onApprove, onReject, actionLoading }) {
           )}
           <div style={s.detailMeta}>
             <div style={s.detailNameRow}>
-              <span style={s.detailName}>{artist.name || 'Unnamed artist'}</span>
-              {artist.studioType === 'guest' && <span style={s.guestBadge}>Guest</span>}
+              <span style={s.detailName}>{artist.name || t('artists_unnamed')}</span>
+              {artist.studioType === 'guest' && <span style={s.guestBadge}>{t('artists_guest')}</span>}
               {artist.status !== 'approved' && (
                 <span style={{ ...s.statusBadge, background: sc.bg, color: sc.text, border: `1px solid ${sc.border}` }}>
                   {artist.status.charAt(0).toUpperCase() + artist.status.slice(1)}
@@ -325,22 +329,22 @@ function ArtistDetail({ artist, onBack, onApprove, onReject, actionLoading }) {
         </div>
 
         <div style={s.statsGrid}>
-          <StatCard label="Total sessions" value={stats ? stats.totalBookings : '—'} />
-          <StatCard label="Completed" value={stats ? stats.completed : '—'} />
-          <StatCard label="Upcoming" value={stats ? stats.upcoming : '—'} />
-          <StatCard label="Revenue" value={stats ? `$${Math.round(stats.totalRevenue).toLocaleString()}` : '—'} />
+          <StatCard label={t('artists_total_sessions')} value={stats ? stats.totalBookings : '—'} />
+          <StatCard label={t('status_completed')} value={stats ? stats.completed : '—'} />
+          <StatCard label={t('artists_upcoming_stat')} value={stats ? stats.upcoming : '—'} />
+          <StatCard label={t('artists_revenue')} value={stats ? `$${Math.round(stats.totalRevenue).toLocaleString()}` : '—'} />
         </div>
 
         {artist.bio && (
           <div style={s.detailSection}>
-            <span style={s.sectionLabel}>Bio</span>
+            <span style={s.sectionLabel}>{t('artists_bio')}</span>
             <p style={s.bio}>{artist.bio}</p>
           </div>
         )}
 
         {artist.speciality?.length > 0 && (
           <div style={s.detailSection}>
-            <span style={s.sectionLabel}>Specialities</span>
+            <span style={s.sectionLabel}>{t('artists_specialities')}</span>
             <div style={s.tags}>
               {artist.speciality.map(tag => (
                 <span key={tag} style={s.tag}>{tag}</span>
@@ -352,20 +356,20 @@ function ArtistDetail({ artist, onBack, onApprove, onReject, actionLoading }) {
         {/* Work timetable */}
         <div style={s.detailSection}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={s.sectionLabel}>Work timetable</span>
+            <span style={s.sectionLabel}>{t('artists_timetable')}</span>
             {!editingSchedule && workSchedule !== null && (
-              <button onClick={openScheduleEdit} style={s.editSchedBtn}>Edit</button>
+              <button onClick={openScheduleEdit} style={s.editSchedBtn}>{t('edit')}</button>
             )}
           </div>
 
           {workSchedule === null && (
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-ghost)', margin: '0.4rem 0 0' }}>Loading…</p>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-ghost)', margin: '0.4rem 0 0' }}>{t('loading')}</p>
           )}
 
           {/* Read-only view */}
           {!editingSchedule && workSchedule !== null && (
             workSchedule.length === 0 ? (
-              <p style={{ fontSize: '0.8rem', color: 'var(--text-ghost)', margin: '0.4rem 0 0' }}>No timetable set. Click Edit to add one.</p>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-ghost)', margin: '0.4rem 0 0' }}>{t('artists_no_timetable')}</p>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', marginTop: '0.5rem' }}>
                 {SCHED_DAYS.map(({ label, dow }) => {
@@ -378,7 +382,7 @@ function ArtistDetail({ artist, onBack, onApprove, onReject, actionLoading }) {
                           {fmtHHMM(day.start_time)} – {fmtHHMM(day.end_time)}
                         </span>
                       ) : (
-                        <span style={{ fontSize: '0.75rem', color: 'var(--text-ghost)' }}>Off</span>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-ghost)' }}>{t('artists_off')}</span>
                       )}
                     </div>
                   );
@@ -420,7 +424,7 @@ function ArtistDetail({ artist, onBack, onApprove, onReject, actionLoading }) {
                         />
                       </>
                     ) : (
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-ghost)' }}>Off</span>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-ghost)' }}>{t('artists_off')}</span>
                     )}
                   </div>
                 );
@@ -428,9 +432,9 @@ function ArtistDetail({ artist, onBack, onApprove, onReject, actionLoading }) {
               {scheduleError && <p style={{ fontSize: '0.75rem', color: 'var(--error)', margin: 0 }}>{scheduleError}</p>}
               <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem' }}>
                 <button onClick={saveSchedule} disabled={scheduleSaving} style={s.schedSaveBtn}>
-                  {scheduleSaving ? 'Saving…' : 'Save'}
+                  {t(scheduleSaving ? 'saving' : 'save')}
                 </button>
-                <button onClick={() => setEditingSchedule(false)} style={s.schedCancelBtn}>Cancel</button>
+                <button onClick={() => setEditingSchedule(false)} style={s.schedCancelBtn}>{t('cancel')}</button>
               </div>
             </div>
           )}
@@ -438,12 +442,12 @@ function ArtistDetail({ artist, onBack, onApprove, onReject, actionLoading }) {
 
         {/* Upcoming schedule */}
         <div style={s.detailSection}>
-          <span style={s.sectionLabel}>Upcoming (next 2 weeks)</span>
+          <span style={s.sectionLabel}>{t('artists_upcoming')}</span>
           {schedule === null && (
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-ghost)', margin: '0.4rem 0 0' }}>Loading…</p>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-ghost)', margin: '0.4rem 0 0' }}>{t('loading')}</p>
           )}
           {schedule !== null && schedule.length === 0 && (
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-ghost)', margin: '0.4rem 0 0' }}>No upcoming bookings.</p>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-ghost)', margin: '0.4rem 0 0' }}>{t('artists_no_bookings')}</p>
           )}
           {schedule !== null && schedule.length > 0 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.5rem' }}>
@@ -481,14 +485,14 @@ function ArtistDetail({ artist, onBack, onApprove, onReject, actionLoading }) {
               disabled={actionLoading}
               style={{ ...s.detailActionBtn, ...s.approveBtn, opacity: actionLoading ? 0.5 : 1 }}
             >
-              {actionLoading ? '…' : 'Approve'}
+              {actionLoading ? '…' : t('approve')}
             </button>
             <button
               onClick={onReject}
               disabled={actionLoading}
               style={{ ...s.detailActionBtn, ...s.rejectBtn, opacity: actionLoading ? 0.5 : 1 }}
             >
-              {actionLoading ? '…' : 'Reject'}
+              {actionLoading ? '…' : t('reject')}
             </button>
           </div>
         )}
@@ -507,14 +511,15 @@ function StatCard({ label, value }) {
 }
 
 function ArtistRejectModal({ onConfirm, onCancel, saving }) {
+  const { t } = useLanguage();
   const [reason, setReason] = useState('');
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
       onClick={e => e.target === e.currentTarget && onCancel()}>
       <div style={{ background: 'var(--bg-modal)', border: '1px solid var(--border)', borderRadius: 16, padding: '1.5rem', width: '100%', maxWidth: 400 }}>
-        <h2 style={{ margin: '0 0 1.25rem', fontSize: '1.1rem', fontWeight: 700, color: 'var(--text)' }}>Reject artist</h2>
+        <h2 style={{ margin: '0 0 1.25rem', fontSize: '1.1rem', fontWeight: 700, color: 'var(--text)' }}>{t('artists_reject')}</h2>
         <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '0.4rem' }}>
-          Reason <span style={{ color: 'var(--text-ghost)', fontWeight: 400 }}>(optional)</span>
+          {t('artists_reason')} <span style={{ color: 'var(--text-ghost)', fontWeight: 400 }}>{t('optional')}</span>
         </label>
         <textarea
           rows={4}
@@ -525,10 +530,10 @@ function ArtistRejectModal({ onConfirm, onCancel, saving }) {
         />
         <div style={{ display: 'flex', gap: '0.75rem' }}>
           <button onClick={onCancel} disabled={saving} style={{ flex: 1, padding: '0.7rem', borderRadius: 8, border: '1px solid var(--border-strong)', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '0.9rem', fontWeight: 600 }}>
-            Back
+            {t('back')}
           </button>
           <button onClick={() => onConfirm(reason.trim())} disabled={saving} style={{ flex: 2, padding: '0.7rem', borderRadius: 8, border: 'none', background: saving ? 'var(--bg-chip)' : 'rgba(232,111,111,0.85)', color: saving ? 'var(--text-ghost)' : '#fff', cursor: saving ? 'default' : 'pointer', fontSize: '0.9rem', fontWeight: 700 }}>
-            {saving ? 'Rejecting…' : 'Reject artist'}
+            {saving ? t('saving') : t('artists_reject')}
           </button>
         </div>
       </div>

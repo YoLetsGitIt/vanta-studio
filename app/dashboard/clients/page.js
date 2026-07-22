@@ -12,8 +12,10 @@ const TATTOO_STYLES = [
 import { getCached, setCached } from '@/lib/cache';
 import { statusColors, capitalise } from '@/lib/status';
 import { formatDob } from '@/lib/format';
+import { useLanguage } from '@/lib/i18n';
 
 function ClientsInner() {
+  const { t } = useLanguage();
   const params = useSearchParams();
   const [bookings, setBookings] = useState([]);
   const [contacts, setContacts] = useState([]);
@@ -180,7 +182,7 @@ function ClientsInner() {
     <div style={s.page}>
       <div style={s.header}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <h1 style={s.title}>Clients</h1>
+          <h1 style={s.title}>{t('nav_clients')}</h1>
           {/* Client data export disabled for now — re-enable when the export flow is finalised.
           <button
             onClick={exportCSV}
@@ -195,7 +197,7 @@ function ClientsInner() {
         <div style={s.searchWrap}>
           <input
             type="text"
-            placeholder="Search by name, email or phone…"
+            placeholder={t('clients_search')}
             value={search}
             onChange={e => setSearch(e.target.value)}
             style={s.searchInput}
@@ -205,10 +207,10 @@ function ClientsInner() {
 
       <div style={s.layout}>
         <div style={s.list}>
-          {loading && <p style={s.msg}>Loading…</p>}
+          {loading && <p style={s.msg}>{t('loading')}</p>}
           {error && <p style={{ ...s.msg, color: '#e86f6f' }}>{error}</p>}
           {!loading && !error && filtered.length === 0 && (
-            <p style={s.msg}>No clients found.</p>
+            <p style={s.msg}>{t('clients_none')}</p>
           )}
           {filtered.map(client => {
             const key = client.email || client.name;
@@ -231,8 +233,8 @@ function ClientsInner() {
                   </span>
                 </div>
                 <div style={s.clientStats}>
-                  <span style={s.sessionCount}>{client.bookings.length} session{client.bookings.length !== 1 ? 's' : ''}</span>
-                  {client.imported && <span style={{ ...s.badge, ...s.badgeGrey }}>Imported</span>}
+                  <span style={s.sessionCount}>{client.bookings.length} {t('clients_sessions')}</span>
+                  {client.imported && <span style={{ ...s.badge, ...s.badgeGrey }}>{t('clients_imported')}</span>}
                   <ConsentBadge status={consentStatus} />
                 </div>
               </div>
@@ -269,12 +271,14 @@ function getConsentStatus(consent, currentVersion) {
 }
 
 function ConsentBadge({ status }) {
-  if (status === 'current') return <span style={{ ...s.badge, ...s.badgeGreen }}>Consented</span>;
-  if (status === 'outdated') return <span style={{ ...s.badge, ...s.badgeYellow }}>Outdated</span>;
-  return <span style={{ ...s.badge, ...s.badgeRed }}>No consent</span>;
+  const { t } = useLanguage();
+  if (status === 'current') return <span style={{ ...s.badge, ...s.badgeGreen }}>{t('clients_consented')}</span>;
+  if (status === 'outdated') return <span style={{ ...s.badge, ...s.badgeYellow }}>{t('clients_outdated')}</span>;
+  return <span style={{ ...s.badge, ...s.badgeRed }}>{t('clients_no_consent')}</span>;
 }
 
 function ClientDetail({ client, onClose, consent, consentVersion, onSendConsentLink }) {
+  const { t } = useLanguage();
   const [linkGenerating, setLinkGenerating] = useState(false);
   const [linkCopied,     setLinkCopied]     = useState(false);
   const [linkErr,        setLinkErr]        = useState('');
@@ -392,7 +396,7 @@ function ClientDetail({ client, onClose, consent, consentVersion, onSendConsentL
             <span style={s.contactArrow}>↗</span>
           </a>
         ) : (
-          <div style={s.contactRowMissing}><span style={s.contactIcon}>✉</span><span>No email on file</span></div>
+          <div style={s.contactRowMissing}><span style={s.contactIcon}>✉</span><span>{t('clients_no_email')}</span></div>
         )}
         {client.phone ? (
           <button onClick={() => { const a = document.createElement('a'); a.href = `sms:${client.phone}`; a.click(); }} style={s.contactRow}>
@@ -401,14 +405,14 @@ function ClientDetail({ client, onClose, consent, consentVersion, onSendConsentL
             <span style={s.contactArrow}>↗</span>
           </button>
         ) : (
-          <div style={s.contactRowMissing}><span style={s.contactIcon}>✆</span><span>No phone on file</span></div>
+          <div style={s.contactRowMissing}><span style={s.contactIcon}>✆</span><span>{t('clients_no_phone')}</span></div>
         )}
-        {client.dob && <Field label="Date of birth">{formatDob(client.dob)}</Field>}
-        <Field label="Total sessions">{client.bookings.length}</Field>
-        <Field label="Completed">{client.bookings.filter(b => b.outcome === 'completed').length}</Field>
+        {client.dob && <Field label={t('clients_dob')}>{formatDob(client.dob)}</Field>}
+        <Field label={t('clients_total_sessions')}>{client.bookings.length}</Field>
+        <Field label={t('status_completed')}>{client.bookings.filter(b => b.outcome === 'completed').length}</Field>
 
         <div style={s.consentSection}>
-          <span style={s.sectionLabel}>Consent form</span>
+          <span style={s.sectionLabel}>{t('clients_consent_form')}</span>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
             <ConsentBadge status={consentStatus} />
             {consent && (
@@ -429,7 +433,7 @@ function ClientDetail({ client, onClose, consent, consentVersion, onSendConsentL
                   cursor: 'pointer', fontFamily: 'inherit', letterSpacing: '0.01em',
                 }}
               >
-                {linkCopied ? 'Email sent ✓' : linkGenerating ? 'Sending…' : 'Send consent link →'}
+                {linkCopied ? t('clients_email_sent') : linkGenerating ? t('sending') : t('clients_send_consent')}
               </button>
             )}
           </div>
@@ -438,12 +442,12 @@ function ClientDetail({ client, onClose, consent, consentVersion, onSendConsentL
 
         {/* Profile fields */}
         <div style={{ borderTop: '1px solid var(--border-faint)', paddingTop: '1rem', marginTop: '0.25rem' }}>
-          <span style={s.sectionLabel}>Client profile</span>
+          <span style={s.sectionLabel}>{t('clients_profile')}</span>
           <div style={{ marginTop: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
 
             {/* Design preferences — multiselect pills */}
             <div>
-              <span style={s.fieldLabel}>Design preferences</span>
+              <span style={s.fieldLabel}>{t('clients_design_prefs')}</span>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginTop: '0.35rem' }}>
                 {TATTOO_STYLES.map(style => {
                   const active = styles.includes(style);
@@ -467,7 +471,7 @@ function ClientDetail({ client, onClose, consent, consentVersion, onSendConsentL
 
             {/* Allergies */}
             <div>
-              <span style={s.fieldLabel}>Allergies / skin conditions</span>
+              <span style={s.fieldLabel}>{t('clients_allergies')}</span>
               <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.35rem' }}>
                 {['No', 'Yes'].map(opt => {
                   const active = opt === 'Yes' ? hasAllergies : !hasAllergies;
@@ -483,7 +487,7 @@ function ClientDetail({ client, onClose, consent, consentVersion, onSendConsentL
                         color: active ? 'var(--accent)' : 'var(--text-ghost)',
                         cursor: 'pointer',
                       }}
-                    >{opt}</button>
+                    >{opt === 'No' ? t('no') : t('yes')}</button>
                   );
                 })}
               </div>
@@ -501,7 +505,7 @@ function ClientDetail({ client, onClose, consent, consentVersion, onSendConsentL
             {/* Pain tolerance 0-10 */}
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '0.35rem' }}>
-                <span style={s.fieldLabel}>Pain tolerance</span>
+                <span style={s.fieldLabel}>{t('clients_pain')}</span>
                 {pain !== '' && (
                   <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--accent)' }}>{pain}/10</span>
                 )}
@@ -524,13 +528,13 @@ function ClientDetail({ client, onClose, consent, consentVersion, onSendConsentL
                   onMouseDown={e => e.preventDefault()}
                   onClick={() => setPain('5')}
                   style={{ marginTop: '0.4rem', fontSize: '0.72rem', color: 'var(--text-ghost)', background: 'none', border: '1px dashed var(--border-faint)', borderRadius: 5, padding: '0.2rem 0.55rem', cursor: 'pointer' }}
-                >Set pain tolerance</button>
+                >{t('clients_set_pain')}</button>
               )}
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
               <button onClick={handleSaveProfile} disabled={profSaving} style={s.consentBtn}>
-                {profSaving ? 'Saving…' : profSaved ? 'Saved!' : 'Save profile'}
+                {t(profSaving ? 'saving' : profSaved ? 'saved' : 'clients_save_profile')}
               </button>
               {profErr && <span style={{ fontSize: '0.72rem', color: '#e86f6f' }}>{profErr}</span>}
             </div>
@@ -539,11 +543,11 @@ function ClientDetail({ client, onClose, consent, consentVersion, onSendConsentL
 
         {/* Notes */}
         <div style={{ borderTop: '1px solid var(--border-faint)', paddingTop: '1rem', marginTop: '0.25rem' }}>
-          <span style={s.sectionLabel}>Notes</span>
+          <span style={s.sectionLabel}>{t('clients_notes')}</span>
           <div style={{ marginTop: '0.6rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
             <textarea
               rows={2}
-              placeholder="Add a note about this client…"
+              placeholder={t('clients_add_note')}
               value={noteInput}
               onChange={e => setNoteInput(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleAddNote(); }}
@@ -551,17 +555,17 @@ function ClientDetail({ client, onClose, consent, consentVersion, onSendConsentL
             />
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               {noteErr && <span style={{ fontSize: '0.72rem', color: '#e86f6f' }}>{noteErr}</span>}
-              <span style={{ fontSize: '0.68rem', color: 'var(--text-ghost)', marginLeft: 'auto', marginRight: '0.5rem' }}>⌘↵ to save</span>
+              <span style={{ fontSize: '0.68rem', color: 'var(--text-ghost)', marginLeft: 'auto', marginRight: '0.5rem' }}>{t('clients_cmd_to_save')}</span>
               <button
                 onClick={handleAddNote}
                 disabled={noteAdding || !noteInput.trim()}
                 style={{ fontSize: '0.75rem', fontWeight: 600, padding: '0.25rem 0.75rem', borderRadius: 5, border: '1px solid var(--border-faint)', background: 'var(--bg-chip)', color: 'var(--text-dim)', cursor: 'pointer', opacity: (!noteInput.trim() || noteAdding) ? 0.45 : 1 }}
               >
-                {noteAdding ? 'Saving…' : 'Add note'}
+                {t(noteAdding ? 'saving' : 'clients_add_note_btn')}
               </button>
             </div>
-            {notes === null && <p style={{ fontSize: '0.78rem', color: 'var(--text-ghost)' }}>Loading…</p>}
-            {notes !== null && notes.length === 0 && <p style={{ fontSize: '0.78rem', color: 'var(--text-ghost)' }}>No notes yet.</p>}
+            {notes === null && <p style={{ fontSize: '0.78rem', color: 'var(--text-ghost)' }}>{t('loading')}</p>}
+            {notes !== null && notes.length === 0 && <p style={{ fontSize: '0.78rem', color: 'var(--text-ghost)' }}>{t('clients_no_notes')}</p>}
             {notes !== null && notes.map(n => (
               <div key={n.id} style={{ background: 'var(--bg-chip)', border: '1px solid var(--border-faint)', borderRadius: 6, padding: '0.5rem 0.65rem', position: 'relative' }}>
                 <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text)', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{n.content}</p>
@@ -573,7 +577,7 @@ function ClientDetail({ client, onClose, consent, consentVersion, onSendConsentL
                     onClick={() => handleDeleteNote(n.id)}
                     style={{ fontSize: '0.68rem', color: '#e86f6f', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
                   >
-                    Delete
+                    {t('delete')}
                   </button>
                 </div>
               </div>
@@ -582,7 +586,7 @@ function ClientDetail({ client, onClose, consent, consentVersion, onSendConsentL
         </div>
 
         <div style={{ borderTop: '1px solid var(--border-faint)', paddingTop: '1rem', marginTop: '0.25rem' }}>
-          <span style={s.sectionLabel}>Booking history</span>
+          <span style={s.sectionLabel}>{t('clients_booking_history')}</span>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', marginTop: '0.75rem' }}>
             {sorted.map(b => (
               <div key={b.id} style={s.historyRow}>

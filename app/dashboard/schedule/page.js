@@ -1,13 +1,14 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getStudioArtists, getStudioSchedule, getStudioScheduleRange, getStudioBooking, acceptBookingWithStation, createManualBooking, createFollowUpBooking, rejectBooking, recordOutcome, getStations } from '@/lib/api';
+import { getStudioArtists, getStudioSchedule, getStudioScheduleRange, getStudioBooking, acceptBookingWithStation, createManualBooking, createFollowUpBooking, rejectBooking, recordOutcome, rescheduleBooking, getStations } from '@/lib/api';
 import { getBookingStyle, TYPE_STYLE } from '@/lib/bookingType';
 import BookingDetailPanel from '@/components/BookingDetailPanel';
 import { getCached, setCached, invalidatePrefix } from '@/lib/cache';
 import CompleteBookingModal from '@/components/CompleteBookingModal';
 import RejectBookingModal from '@/components/RejectBookingModal';
 import { initials, toISODate } from '@/lib/format';
+import { useLanguage } from '@/lib/i18n';
 
 const HOUR_PX   = 64;
 const DAY_START = 8;
@@ -60,9 +61,15 @@ function useBookingActions(afterChange) {
   const [detailBooking,  setDetailBooking]  = useState(null);
   const [detailLoading,  setDetailLoading]  = useState(false);
   const [actionLoading,  setActionLoading]  = useState(false);
-  const [completeTarget, setCompleteTarget] = useState(null);
-  const [noShowTarget,   setNoShowTarget]   = useState(null);
-  const [rejectTarget,   setRejectTarget]   = useState(null);
+  const [completeTarget,  setCompleteTarget]  = useState(null);
+  const [noShowTarget,    setNoShowTarget]    = useState(null);
+  const [rejectTarget,    setRejectTarget]    = useState(null);
+  const [rescheduleTarget, setRescheduleTarget] = useState(null);
+  const [rescheduleDate,   setRescheduleDate]   = useState('');
+  const [rescheduleStart,  setRescheduleStart]  = useState('');
+  const [rescheduleEnd,    setRescheduleEnd]    = useState('');
+  const [rescheduleMsg,    setRescheduleMsg]    = useState('');
+  const [rescheduleSaving, setRescheduleSaving] = useState(false);
 
   function openDetail(entry) {
     setSelectedEntry(entry);
@@ -112,16 +119,55 @@ function useBookingActions(afterChange) {
   const confirmReject = (reason) =>
     run(() => rejectBooking(rejectTarget, reason), () => setRejectTarget(null));
 
+  function openReschedule() {
+    const booking = detailBooking;
+    const currentTime = booking?.chosen_time ?? booking?.proposed_time_primary ?? null;
+    const dt = currentTime ? new Date(currentTime) : new Date();
+    const pad = n => String(n).padStart(2, '0');
+    const dateStr = `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`;
+    const startHHMM = `${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
+    const durationMins = booking?.duration_minutes ?? selectedEntry?.durationMins ?? 60;
+    const endDt = new Date(dt.getTime() + durationMins * 60000);
+    const endHHMM = `${pad(endDt.getHours())}:${pad(endDt.getMinutes())}`;
+    setRescheduleDate(dateStr);
+    setRescheduleStart(startHHMM);
+    setRescheduleEnd(endHHMM);
+    setRescheduleMsg('');
+    setRescheduleTarget(booking ?? selectedEntry);
+  }
+
+  async function confirmReschedule() {
+    if (!rescheduleStart || !rescheduleEnd || !rescheduleMsg.trim()) return;
+    const [sh, sm] = rescheduleStart.split(':').map(Number);
+    const [eh, em] = rescheduleEnd.split(':').map(Number);
+    const durationMins = (eh * 60 + em) - (sh * 60 + sm);
+    if (durationMins <= 0) { alert('End time must be after start time.'); return; }
+    const id = detailBooking?.id ?? selectedEntry?.bookingId;
+    const newTime = new Date(`${rescheduleDate}T${rescheduleStart}:00`).toISOString();
+    setRescheduleSaving(true);
+    try {
+      await rescheduleBooking(id, newTime, rescheduleMsg.trim(), durationMins);
+      setRescheduleTarget(null);
+      closeDetail();
+      afterChange();
+    } catch (e) { alert(e.message); }
+    finally { setRescheduleSaving(false); }
+  }
+
   return {
     selectedEntry, detailBooking, detailLoading, actionLoading,
     completeTarget, noShowTarget, rejectTarget,
+    rescheduleTarget, rescheduleDate, rescheduleStart, rescheduleEnd, rescheduleMsg, rescheduleSaving,
     openDetail, closeDetail, handleAction,
     confirmComplete, confirmNoShow, confirmReject,
+    openReschedule, confirmReschedule,
+    setRescheduleStart, setRescheduleEnd, setRescheduleMsg, setRescheduleTarget,
     setCompleteTarget, setNoShowTarget, setRejectTarget,
   };
 }
 
 function BookingOverlays({ actions: a }) {
+  const { t } = useLanguage();
   return (
     <>
       {a.selectedEntry && (
@@ -135,6 +181,7 @@ function BookingOverlays({ actions: a }) {
           onReject={() => a.handleAction('reject')}
           onComplete={() => a.handleAction('complete')}
           onNoShow={() => a.handleAction('no_show')}
+          onReschedule={a.openReschedule}
         />
       )}
       {a.completeTarget && (
@@ -161,13 +208,110 @@ function BookingOverlays({ actions: a }) {
           onCancel={() => a.setRejectTarget(null)}
         />
       )}
+      {a.rescheduleTarget && (
+        <div style={overlayStyle} onClick={e => e.target === e.currentTarget && a.setRescheduleTarget(null)}>
+          <div style={modalStyle}>
+            <h3 style={{ margin: '0 0 0.25rem', fontSize: '0.95rem', fontWeight: 700, color: 'var(--text)' }}>
+              {t('reschedule_booking')}
+            </h3>
+            <p style={{ margin: '0 0 1rem', fontSize: '0.8rem', color: 'var(--text-ghost)' }}>
+              {a.rescheduleTarget.requester_name ?? a.rescheduleTarget.clientName}
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', marginBottom: '0.85rem' }}>
+              <label style={labelStyle}>{t('sched_date')}</label>
+              <input
+                type="date"
+                value={a.rescheduleDate}
+                disabled
+                style={{ ...inputStyle, colorScheme: 'auto', opacity: 0.55, cursor: 'not-allowed' }}
+              />
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem', marginBottom: '0.85rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                <label style={labelStyle}>{t('nap_start_time')}</label>
+                <input
+                  type="time"
+                  value={a.rescheduleStart}
+                  onChange={e => a.setRescheduleStart(e.target.value)}
+                  style={{ ...inputStyle, colorScheme: 'auto' }}
+                />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                <label style={labelStyle}>{t('reschedule_end_time')}</label>
+                <input
+                  type="time"
+                  value={a.rescheduleEnd}
+                  onChange={e => a.setRescheduleEnd(e.target.value)}
+                  style={{ ...inputStyle, colorScheme: 'auto' }}
+                />
+              </div>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', marginBottom: '1rem' }}>
+              <label style={labelStyle}>{t('reschedule_message')} <span style={{ color: '#e86f6f' }}>*</span></label>
+              <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-ghost)', lineHeight: 1.4 }}>
+                {t('reschedule_message_hint')}
+              </p>
+              <textarea
+                value={a.rescheduleMsg}
+                onChange={e => a.setRescheduleMsg(e.target.value)}
+                placeholder="e.g. We need to move your appointment due to a scheduling conflict…"
+                rows={4}
+                style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.5 }}
+              />
+            </div>
+            <div style={{ display: 'flex', gap: '0.6rem' }}>
+              <button style={cancelBtnStyle} onClick={() => a.setRescheduleTarget(null)} disabled={a.rescheduleSaving}>
+                {t('cancel')}
+              </button>
+              <button
+                style={{ ...saveBtnStyle, opacity: (!a.rescheduleStart || !a.rescheduleEnd || !a.rescheduleMsg.trim() || a.rescheduleSaving) ? 0.5 : 1 }}
+                onClick={a.confirmReschedule}
+                disabled={!a.rescheduleStart || !a.rescheduleEnd || !a.rescheduleMsg.trim() || a.rescheduleSaving}
+              >
+                {a.rescheduleSaving ? t('saving') : t('reschedule_confirm')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
 
+const overlayStyle = {
+  position: 'fixed', inset: 0, zIndex: 200,
+  background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(2px)',
+  display: 'flex', alignItems: 'center', justifyContent: 'center',
+};
+const modalStyle = {
+  background: 'var(--bg-panel)', border: '1px solid var(--border)',
+  borderRadius: 12, padding: '1.5rem', width: 340,
+  display: 'flex', flexDirection: 'column',
+};
+const labelStyle = {
+  fontSize: '0.72rem', fontWeight: 600, textTransform: 'uppercase',
+  letterSpacing: '0.06em', color: 'var(--text-ghost)',
+};
+const inputStyle = {
+  width: '100%', boxSizing: 'border-box', padding: '0.5rem 0.75rem',
+  borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-input)',
+  color: 'var(--text)', fontSize: '0.875rem', outline: 'none',
+};
+const cancelBtnStyle = {
+  flex: 1, padding: '0.5rem', borderRadius: 7,
+  border: '1px solid var(--border-faint)', background: 'transparent',
+  color: 'var(--text-muted)', fontSize: '0.82rem', fontWeight: 500, cursor: 'pointer',
+};
+const saveBtnStyle = {
+  flex: 2, padding: '0.5rem', borderRadius: 7,
+  border: '1px solid rgba(245,236,217,0.25)', background: 'rgba(245,236,217,0.08)',
+  color: 'var(--accent)', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer',
+};
+
 // ── Week view ─────────────────────────────────────────────────────────────────
 
 function MonthView({ monthStart, onDayClick }) {
+  const { t } = useLanguage();
   const monthEnd  = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0);
   const gridStart = getMonday(monthStart);
   const gridEnd   = addDays(getMonday(monthEnd), 6);
@@ -224,7 +368,7 @@ function MonthView({ monthStart, onDayClick }) {
   const today = toISO(new Date());
 
 
-  if (loading) return <p style={s.msg}>Loading…</p>;
+  if (loading) return <p style={s.msg}>{t('loading')}</p>;
   if (error)   return <p style={{ ...s.msg, color: '#e86f6f' }}>{error}</p>;
 
   return (
@@ -284,11 +428,11 @@ function MonthView({ monthStart, onDayClick }) {
       <div style={s.legend}>
         <div style={s.legendItem}>
           <div style={{ width: 8, height: 8, borderRadius: 2, background: SOURCE_STYLE.studio.dot, flexShrink: 0 }} />
-          <span style={{ ...s.legendName, color: SOURCE_STYLE.studio.tagColor }}>Studio</span>
+          <span style={{ ...s.legendName, color: SOURCE_STYLE.studio.tagColor }}>{t('sched_legend_studio')}</span>
         </div>
         <div style={s.legendItem}>
           <div style={{ width: 8, height: 8, borderRadius: 2, background: SOURCE_STYLE.personal.dot, flexShrink: 0 }} />
-          <span style={{ ...s.legendName, color: SOURCE_STYLE.personal.tagColor }}>Personal</span>
+          <span style={{ ...s.legendName, color: SOURCE_STYLE.personal.tagColor }}>{t('sched_legend_personal')}</span>
         </div>
       </div>
     </div>
@@ -301,6 +445,7 @@ function MonthView({ monthStart, onDayClick }) {
 // ── Day view ──────────────────────────────────────────────────────────────────
 
 function DayView({ date }) {
+  const { t } = useLanguage();
   const [artists,        setArtists]        = useState([]);
   const [entries,        setEntries]        = useState([]);
   const [loading,        setLoading]        = useState(true);
@@ -357,9 +502,9 @@ function DayView({ date }) {
   const cols = showAll ? sorted : working;
   const hiddenCount = sorted.length - working.length;
 
-  if (loading) return <p style={s.msg}>Loading…</p>;
+  if (loading) return <p style={s.msg}>{t('loading')}</p>;
   if (error)   return <p style={{ ...s.msg, color: '#e86f6f' }}>{error}</p>;
-  if (!sorted.length) return <p style={s.msg}>No approved artists yet.</p>;
+  if (!sorted.length) return <p style={s.msg}>{t('sched_no_artists_yet')}</p>;
 
   return (
     <div style={{ display: 'flex', flex: 1, overflow: 'hidden', position: 'relative' }}>
@@ -369,26 +514,26 @@ function DayView({ date }) {
         {!showAll ? (
           <>
             <span style={s.dayFilterLabel}>
-              {working.length} artist{working.length !== 1 ? 's' : ''} working today
+              {working.length} {t('sched_artists_working')}
             </span>
             {hiddenCount > 0 && (
               <button onClick={() => setShowAll(true)} style={s.dayFilterBtn}>
-                Show all {sorted.length}
+                {t('sched_show_all')} {sorted.length}
               </button>
             )}
           </>
         ) : (
           <>
-            <span style={s.dayFilterLabel}>All artists</span>
+            <span style={s.dayFilterLabel}>{t('sched_all_artists')}</span>
             <button onClick={() => setShowAll(false)} style={s.dayFilterBtn}>
-              Working today only
+              {t('sched_working_today_only')}
             </button>
           </>
         )}
       </div>
 
       {cols.length === 0 ? (
-        <p style={s.msg}>No artists working today.</p>
+        <p style={s.msg}>{t('sched_no_artists_working')}</p>
       ) : (
       <div style={s.calWrap}>
       <div style={{ ...s.grid, gridTemplateColumns: `52px repeat(${cols.length}, minmax(160px, 1fr))` }}>
@@ -480,6 +625,7 @@ function DayView({ date }) {
 // ── Manual booking modal ──────────────────────────────────────────────────────
 
 function ManualBookingModal({ artists, defaultDate, onClose, onCreated }) {
+  const { t } = useLanguage();
   const [artistId,  setArtistId]  = useState(artists[0]?.artistId ?? '');
   const [name,      setName]      = useState('');
   const [email,     setEmail]     = useState('');
@@ -515,48 +661,48 @@ function ManualBookingModal({ artists, defaultDate, onClose, onCreated }) {
     <div style={s.modalOverlay}>
       <div style={s.modal}>
         <div style={s.panelHeader}>
-          <span style={s.panelTitle}>New booking</span>
+          <span style={s.panelTitle}>{t('sched_new_booking')}</span>
           <button onClick={onClose} style={s.panelClose}>✕</button>
         </div>
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', padding: '1rem 1.1rem', overflowY: 'auto', flex: 1 }}>
           <div>
-            <label style={lbl}>Artist *</label>
+            <label style={lbl}>{t('bdp_artist')} *</label>
             <select value={artistId} onChange={e => setArtistId(e.target.value)} style={{ ...inp, cursor: 'pointer' }}>
               {artists.map(a => <option key={a.artistId} value={a.artistId}>{a.name}</option>)}
             </select>
           </div>
           <div>
-            <label style={lbl}>Client name *</label>
+            <label style={lbl}>{t('sched_client_name')} *</label>
             <input value={name} onChange={e => setName(e.target.value)} placeholder="Jane Smith" style={inp} />
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
             <div>
-              <label style={lbl}>Date *</label>
+              <label style={lbl}>{t('sched_date')} *</label>
               <input type="date" value={date} onChange={e => setDate(e.target.value)} style={inp} />
             </div>
             <div>
-              <label style={lbl}>Time *</label>
+              <label style={lbl}>{t('sched_time')} *</label>
               <input type="time" value={time} onChange={e => setTime(e.target.value)} style={inp} />
             </div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
             <div>
-              <label style={lbl}>Email</label>
+              <label style={lbl}>{t('sched_email')}</label>
               <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="optional" style={inp} />
             </div>
             <div>
-              <label style={lbl}>Phone</label>
+              <label style={lbl}>{t('sched_phone')}</label>
               <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="optional" style={inp} />
             </div>
           </div>
           <div>
-            <label style={lbl}>Notes</label>
+            <label style={lbl}>{t('bdp_notes')}</label>
             <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} placeholder="Design details, placement, etc." style={{ ...inp, resize: 'vertical', fontFamily: 'inherit' }} />
           </div>
           {error && <p style={{ ...s.stationError, textAlign: 'left' }}>{error}</p>}
           <div style={{ display: 'flex', gap: '0.5rem', paddingTop: '0.25rem' }}>
-            <button type="button" onClick={onClose} style={{ ...s.actionBtn, flex: 1, background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}>Cancel</button>
-            <button type="submit" disabled={saving} style={{ ...s.actionBtn, ...s.actionBtnPrimary, flex: 2 }}>{saving ? 'Creating…' : 'Create booking'}</button>
+            <button type="button" onClick={onClose} style={{ ...s.actionBtn, flex: 1, background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}>{t('cancel')}</button>
+            <button type="submit" disabled={saving} style={{ ...s.actionBtn, ...s.actionBtnPrimary, flex: 2 }}>{saving ? t('sched_creating') : t('sched_create_booking')}</button>
           </div>
         </form>
       </div>
@@ -567,6 +713,7 @@ function ManualBookingModal({ artists, defaultDate, onClose, onCreated }) {
 // ── Station month view ────────────────────────────────────────────────────────
 
 function StationMonthView({ monthStart, onDayClick }) {
+  const { t } = useLanguage();
   const monthEnd  = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0);
   const gridStart = getMonday(monthStart);
   const gridEnd   = addDays(getMonday(monthEnd), 6);
@@ -606,7 +753,7 @@ function StationMonthView({ monthStart, onDayClick }) {
 
   const today = toISO(new Date());
 
-  if (loading) return <p style={s.msg}>Loading…</p>;
+  if (loading) return <p style={s.msg}>{t('loading')}</p>;
   if (error)   return <p style={{ ...s.msg, color: '#e86f6f' }}>{error}</p>;
 
   return (
@@ -661,7 +808,7 @@ function StationMonthView({ monthStart, onDayClick }) {
                   {unassigned.length > 0 && (
                     <div style={{ ...s.chip, background: 'rgba(245,158,58,0.08)' }}>
                       <div style={{ width: 6, height: 6, borderRadius: 2, background: '#f59e3a', flexShrink: 0 }} />
-                      <span style={{ ...s.chipClient, color: 'var(--text-ghost)' }}>{unassigned.length} unassigned</span>
+                      <span style={{ ...s.chipClient, color: 'var(--text-ghost)' }}>{unassigned.length} {t('sched_unassigned').toLowerCase()}</span>
                     </div>
                   )}
                   {moreStations > 0 && (
@@ -677,11 +824,11 @@ function StationMonthView({ monthStart, onDayClick }) {
       <div style={s.legend}>
         <div style={s.legendItem}>
           <div style={{ width: 8, height: 8, borderRadius: 2, background: '#6fa3e8', flexShrink: 0 }} />
-          <span style={s.legendName}>Station assigned</span>
+          <span style={s.legendName}>{t('sched_station_assigned')}</span>
         </div>
         <div style={s.legendItem}>
           <div style={{ width: 8, height: 8, borderRadius: 2, background: '#f59e3a', flexShrink: 0 }} />
-          <span style={s.legendName}>Unassigned</span>
+          <span style={s.legendName}>{t('sched_unassigned')}</span>
         </div>
       </div>
     </div>
@@ -692,6 +839,7 @@ function StationMonthView({ monthStart, onDayClick }) {
 
 
 function StationView({ date }) {
+  const { t } = useLanguage();
   const dateStr = toISO(date);
   const [entries,      setEntries]      = useState([]);
   const [allStations,  setAllStations]  = useState([]);
@@ -724,8 +872,8 @@ function StationView({ date }) {
     ? allStations.map(s => ({ id: s.id, name: s.name }))
     : [...new Map(assigned.map(e => [e.stationId, e.stationName])).entries()].map(([id, name]) => ({ id, name }));
 
-  if (loading) return <p style={{ padding: '2rem', fontSize: '0.875rem', color: 'var(--text-faint)' }}>Loading…</p>;
-  if (!stations.length) return <p style={{ padding: '2rem', fontSize: '0.875rem', color: 'var(--text-faint)' }}>No stations configured.</p>;
+  if (loading) return <p style={{ padding: '2rem', fontSize: '0.875rem', color: 'var(--text-faint)' }}>{t('loading')}</p>;
+  if (!stations.length) return <p style={{ padding: '2rem', fontSize: '0.875rem', color: 'var(--text-faint)' }}>{t('sched_no_stations')}</p>;
 
   const hourToY = (h) => (h - DAY_START) * HOUR_PX;
 
@@ -815,7 +963,11 @@ function StationView({ date }) {
 
 // ── Page shell ────────────────────────────────────────────────────────────────
 
+const LANG_LOCALE = { en: 'en-AU', 'zh-Hans': 'zh-CN', ko: 'ko-KR' };
+
 export default function SchedulePage() {
+  const { t, lang } = useLanguage();
+  const locale = LANG_LOCALE[lang] ?? 'en-AU';
   const [view,      setView]      = useState('month');  // 'month' | 'day'
   const [lens,      setLens]      = useState('artist'); // 'artist' | 'station'
   const [monthStart, setMonthStart] = useState(() => getMonthStart(new Date()));
@@ -829,21 +981,21 @@ export default function SchedulePage() {
     setView('day');
   }
 
-  const monthLabel = monthStart.toLocaleDateString('en-AU', { month: 'long', year: 'numeric' });
-  const dayLabel   = dayDate.toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long' });
+  const monthLabel = monthStart.toLocaleDateString(locale, { month: 'long', year: 'numeric' });
+  const dayLabel   = dayDate.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' });
 
   return (
     <div style={s.page}>
       <div style={s.header}>
         <div style={s.headerLeft}>
-          <h1 style={s.title}>Schedule</h1>
+          <h1 style={s.title}>{t('nav_schedule')}</h1>
           <div style={s.viewToggle}>
-            <button onClick={() => setView('month')} style={{ ...s.toggleBtn, ...(view === 'month' ? s.toggleActive : {}) }}>Month</button>
-            <button onClick={() => setView('day')}   style={{ ...s.toggleBtn, ...(view === 'day'   ? s.toggleActive : {}) }}>Day</button>
+            <button onClick={() => setView('month')} style={{ ...s.toggleBtn, ...(view === 'month' ? s.toggleActive : {}) }}>{t('sched_month')}</button>
+            <button onClick={() => setView('day')}   style={{ ...s.toggleBtn, ...(view === 'day'   ? s.toggleActive : {}) }}>{t('sched_day')}</button>
           </div>
           <div style={{ ...s.viewToggle, marginLeft: '0.25rem' }}>
-            <button onClick={() => setLens('artist')}  style={{ ...s.toggleBtn, ...(lens === 'artist'  ? s.toggleActive : {}) }}>Artist</button>
-            <button onClick={() => setLens('station')} style={{ ...s.toggleBtn, ...(lens === 'station' ? s.toggleActive : {}) }}>Station</button>
+            <button onClick={() => setLens('artist')}  style={{ ...s.toggleBtn, ...(lens === 'artist'  ? s.toggleActive : {}) }}>{t('bdp_artist')}</button>
+            <button onClick={() => setLens('station')} style={{ ...s.toggleBtn, ...(lens === 'station' ? s.toggleActive : {}) }}>{t('bdp_station')}</button>
           </div>
         </div>
 
@@ -854,7 +1006,7 @@ export default function SchedulePage() {
               <span style={s.navLabel}>{monthLabel}</span>
               <button onClick={() => setMonthStart(d => getMonthStart(new Date(d.getFullYear(), d.getMonth() + 1, 1)))} style={s.navBtn}>→</button>
               {!isCurrentMonth && (
-                <button onClick={() => setMonthStart(getMonthStart(today))} style={s.todayBtn}>Today</button>
+                <button onClick={() => setMonthStart(getMonthStart(today))} style={s.todayBtn}>{t('today')}</button>
               )}
             </>
           ) : (
@@ -863,7 +1015,7 @@ export default function SchedulePage() {
               <span style={s.navLabel}>{dayLabel}</span>
               <button onClick={() => setDayDate(d => addDays(d, 1))}  style={s.navBtn}>→</button>
               {toISO(dayDate) !== toISO(today) && (
-                <button onClick={() => setDayDate(today)} style={s.todayBtn}>Today</button>
+                <button onClick={() => setDayDate(today)} style={s.todayBtn}>{t('today')}</button>
               )}
             </>
           )}
