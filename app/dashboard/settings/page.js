@@ -191,11 +191,13 @@ function AddressAutocomplete({ value, onChange, onSelect, inputStyle }) {
   );
 }
 
-function WidgetPreview({ bg, accent, studioName }) {
+function WidgetPreview({ bg, accent, studioName, fields }) {
   const light = isLightColor(accent);
   const inp = { height: 38, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8 };
   const lbl = { fontSize: '0.65rem', fontWeight: 600, color: 'rgba(255,255,255,0.4)', marginBottom: 4, display: 'block' };
   const fld = { display: 'flex', flexDirection: 'column' };
+  // fields may be null while loading — default all enabled for preview
+  const f = (key) => fields?.[key] ?? { enabled: true, required: false };
   return (
     <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-faint)', borderRadius: 12, padding: '1.25rem' }}>
       <p style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)', letterSpacing: '0.06em', textTransform: 'uppercase', margin: '0 0 0.85rem' }}>Preview</p>
@@ -207,51 +209,75 @@ function WidgetPreview({ bg, accent, studioName }) {
           <span style={{ fontSize: '1.2rem', fontWeight: 700, color: '#fff', letterSpacing: '-0.02em' }}>{studioName}</span>
         </div>
 
-        {/* First + Last */}
+        {/* First + Last — always shown */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
-          <div style={fld}><span style={lbl}>First name</span><div style={inp} /></div>
-          <div style={fld}><span style={lbl}>Last name</span><div style={inp} /></div>
+          <div style={fld}><span style={lbl}>First name *</span><div style={inp} /></div>
+          <div style={fld}><span style={lbl}>Last name *</span><div style={inp} /></div>
         </div>
 
-        <div style={fld}><span style={lbl}>Date of birth</span><div style={inp} /></div>
-        <div style={fld}><span style={lbl}>Email</span><div style={inp} /></div>
+        {/* DOB — always shown, always required */}
+        <div style={fld}><span style={lbl}>Date of birth *</span><div style={inp} /></div>
 
-        {/* Phone */}
+        {f('skin_tone').enabled && (
+          <div style={fld}><span style={lbl}>Skin tone{f('skin_tone').required ? ' *' : ''}</span><div style={inp} /></div>
+        )}
+
+        {/* Email + Phone — always shown */}
+        <div style={fld}><span style={lbl}>Email *</span><div style={inp} /></div>
         <div style={fld}>
-          <span style={lbl}>Phone</span>
+          <span style={lbl}>Phone *</span>
           <div style={{ display: 'flex', gap: 6 }}>
             <div style={{ ...inp, width: 72, flexShrink: 0 }} />
             <div style={{ ...inp, flex: 1 }} />
           </div>
         </div>
 
-        <div style={fld}><span style={lbl}>Artist (optional)</span><div style={inp} /></div>
+        {f('session_type').enabled && (
+          <div style={fld}><span style={lbl}>Session type{f('session_type').required ? ' *' : ''}</span><div style={inp} /></div>
+        )}
+
+        {f('artist_id').enabled && (
+          <div style={fld}><span style={lbl}>Artist preference</span><div style={inp} /></div>
+        )}
 
         {/* Placement chips */}
-        <div style={fld}>
-          <span style={lbl}>Placement</span>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-            {ALL_PLACEMENTS.map((p, i) => (
-              <span key={p} style={{
-                padding: '0.25rem 0.6rem', borderRadius: 20, fontSize: '0.7rem', fontWeight: 500,
-                background: i === 0 ? hexToRgbaStr(accent, 0.12) : 'rgba(255,255,255,0.05)',
-                border: `1px solid ${i === 0 ? accent : 'rgba(255,255,255,0.1)'}`,
-                color: i === 0 ? accent : 'rgba(255,255,255,0.5)',
-              }}>{p}</span>
-            ))}
+        {f('body_location').enabled && (
+          <div style={fld}>
+            <span style={lbl}>Placement{f('body_location').required ? ' *' : ''}</span>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+              {ALL_PLACEMENTS.map((p, i) => (
+                <span key={p} style={{
+                  padding: '0.25rem 0.6rem', borderRadius: 20, fontSize: '0.7rem', fontWeight: 500,
+                  background: i === 0 ? hexToRgbaStr(accent, 0.12) : 'rgba(255,255,255,0.05)',
+                  border: `1px solid ${i === 0 ? accent : 'rgba(255,255,255,0.1)'}`,
+                  color: i === 0 ? accent : 'rgba(255,255,255,0.5)',
+                }}>{p}</span>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
-        <div style={fld}><span style={lbl}>Design description</span><div style={{ ...inp, height: 72 }} /></div>
-        <div style={fld}><span style={lbl}>Additional notes (optional)</span><div style={{ ...inp, height: 52 }} /></div>
+        {f('design_details').enabled && (
+          <div style={fld}><span style={lbl}>Design description{f('design_details').required ? ' *' : ''}</span><div style={{ ...inp, height: 72 }} /></div>
+        )}
+
+        {f('size').enabled && (
+          <div style={fld}><span style={lbl}>Size{f('size').required ? ' *' : ''}</span><div style={inp} /></div>
+        )}
+
+        {f('notes').enabled && (
+          <div style={fld}><span style={lbl}>Additional notes</span><div style={{ ...inp, height: 52 }} /></div>
+        )}
 
         {/* Photo upload */}
-        <div style={fld}>
-          <span style={lbl}>Reference photos (optional, up to 5)</span>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '0.5rem 0.85rem', fontSize: '0.78rem', color: 'rgba(255,255,255,0.45)', alignSelf: 'flex-start' }}>
-            + Add photos
+        {f('image_paths').enabled && (
+          <div style={fld}>
+            <span style={lbl}>Reference photos{f('image_paths').required ? ' *' : ' (optional, up to 5)'}</span>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '0.5rem 0.85rem', fontSize: '0.78rem', color: 'rgba(255,255,255,0.45)', alignSelf: 'flex-start' }}>
+              + Add photos
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Button */}
         <div style={{ padding: '0.75rem', background: accent, borderRadius: 9, fontSize: '0.85rem', fontWeight: 700, color: light ? '#0e0e0e' : '#ffffff', textAlign: 'center' }}>
@@ -1122,14 +1148,13 @@ export default function SettingsPage() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                 <label style={s.label}>Form fields</label>
                 <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: '0 0 0.35rem' }}>
-                  Name, email, and phone are always shown.
+                  Name, date of birth, email, and phone are always shown.
                 </p>
                 {formFields === null ? (
                   <div style={s.loadingDot} />
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
                     {[
-                      { key: 'dob',            label: 'Date of birth' },
                       { key: 'skin_tone',      label: 'Skin tone' },
                       { key: 'session_type',   label: 'Session type' },
                       { key: 'artist_id',      label: 'Artist preference' },
@@ -1174,16 +1199,28 @@ export default function SettingsPage() {
                     })}
                     {consentTemplates.length > 0 && (
                       <>
-                        <div style={{ height: '0.5rem', borderTop: '1px solid var(--border)', margin: '0.25rem 0' }} />
-                        <span style={{ fontSize: '0.68rem', fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--text-faint)', padding: '0 0.1rem' }}>Consent forms</span>
+                        <div style={{ borderTop: '1px solid var(--border)', margin: '0.1rem 0' }} />
                         {consentTemplates.map(t => (
                           <div key={t.id} style={s.formFieldRow}>
                             <span style={{ flex: 1, fontSize: '0.83rem', fontWeight: 500, color: t.is_active ? 'var(--text)' : 'var(--text-ghost)' }}>
                               {t.name}
                             </span>
-                            <span style={{ fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', padding: '0.1rem 0.45rem', borderRadius: 4, background: t.type === 'waiver' ? 'rgba(232,111,111,0.12)' : t.type === 'health' ? 'rgba(76,201,138,0.12)' : 'rgba(245,236,217,0.08)', color: t.type === 'waiver' ? '#e86f6f' : t.type === 'health' ? '#4cc98a' : 'var(--accent)' }}>
-                              {t.type === 'health' ? 'Health' : t.type === 'waiver' ? 'Waiver' : 'Consent'}
-                            </span>
+                            {t.is_active && (
+                              <label style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', cursor: 'pointer' }}>
+                                <input
+                                  type="checkbox"
+                                  checked={t.is_required ?? true}
+                                  onChange={async e => {
+                                    try {
+                                      const updated = await updateConsentTemplate(t.id, { is_required: e.target.checked });
+                                      setConsentTemplates(prev => prev.map(x => x.id === t.id ? updated : x));
+                                    } catch {}
+                                  }}
+                                  style={{ accentColor: 'var(--accent)' }}
+                                />
+                                <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Required</span>
+                              </label>
+                            )}
                             <button
                               onClick={() => toggleTemplateActive(t)}
                               style={{
@@ -1212,7 +1249,7 @@ export default function SettingsPage() {
                 {saving ? t('saving') : saved ? t('saved') : t('save')}
               </button>
             </div>
-            <WidgetPreview bg={widgetBgColor} accent={widgetAccentColor} studioName={name || 'Your Studio'} />
+            <WidgetPreview bg={widgetBgColor} accent={widgetAccentColor} studioName={name || 'Your Studio'} fields={formFields} />
           </div>
         </section>
 

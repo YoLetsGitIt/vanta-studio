@@ -197,8 +197,10 @@ function WalkInInner() {
     e.preventDefault();
     if (field('body_location').enabled && placements.length === 0) { setSubmitError('Please select at least one placement.'); return; }
 
-    // Validate consent form templates
+    // Validate consent form templates — only enforce required ones
     for (const t of consentTemplates) {
+      const required = t.is_required ?? true;
+      if (!required) continue;
       const ts = templateState[t.id] ?? {};
       for (const f of (t.fields ?? [])) {
         if (f.required && ['text', 'textarea', 'yesno'].includes(f.type)) {
@@ -334,11 +336,9 @@ function WalkInInner() {
                 <input style={s.input} type="text" value={lastName} required onChange={e => setLastName(e.target.value)} placeholder="Last" />
               </Field>
             </div>
-            {field('dob').enabled && (
-              <Field label={<>Date of birth{field('dob').required && <Required />}</>}>
-                <input style={{ ...s.input, colorScheme: 'dark' }} type="date" value={dob} required={field('dob').required} onChange={e => setDob(e.target.value)} />
-              </Field>
-            )}
+            <Field label={<>Date of birth<Required /></>}>
+              <input style={{ ...s.input, colorScheme: 'dark' }} type="date" value={dob} required onChange={e => setDob(e.target.value)} />
+            </Field>
             {field('skin_tone').enabled && (
               <Field label={<>Skin tone{field('skin_tone').required && <Required />}</>}>
                 <select style={s.input} value={skinTone} required={field('skin_tone').required} onChange={e => setSkinTone(e.target.value)}>
