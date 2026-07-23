@@ -218,10 +218,6 @@ function WidgetPreview({ bg, accent, studioName, fields }) {
         {/* DOB — always shown, always required */}
         <div style={fld}><span style={lbl}>Date of birth *</span><div style={inp} /></div>
 
-        {f('skin_tone').enabled && (
-          <div style={fld}><span style={lbl}>Skin tone{f('skin_tone').required ? ' *' : ''}</span><div style={inp} /></div>
-        )}
-
         {/* Email + Phone — always shown */}
         <div style={fld}><span style={lbl}>Email *</span><div style={inp} /></div>
         <div style={fld}>
@@ -263,6 +259,10 @@ function WidgetPreview({ bg, accent, studioName, fields }) {
 
         {f('size').enabled && (
           <div style={fld}><span style={lbl}>Size{f('size').required ? ' *' : ''}</span><div style={inp} /></div>
+        )}
+
+        {f('skin_tone').enabled && (
+          <div style={fld}><span style={lbl}>Skin tone{f('skin_tone').required ? ' *' : ''}</span><div style={inp} /></div>
         )}
 
         {f('notes').enabled && (
@@ -1155,12 +1155,12 @@ export default function SettingsPage() {
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
                     {[
-                      { key: 'skin_tone',      label: 'Skin tone' },
                       { key: 'session_type',   label: 'Session type' },
                       { key: 'artist_id',      label: 'Artist preference' },
                       { key: 'body_location',  label: 'Placement' },
                       { key: 'design_details', label: 'Design description' },
                       { key: 'size',           label: 'Size' },
+                      { key: 'skin_tone',      label: 'Skin tone' },
                       { key: 'notes',          label: 'Additional notes' },
                       { key: 'image_paths',    label: 'Reference photos' },
                     ].map(({ key, label }) => {

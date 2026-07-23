@@ -339,16 +339,6 @@ function WalkInInner() {
             <Field label={<>Date of birth<Required /></>}>
               <input style={{ ...s.input, colorScheme: 'dark' }} type="date" value={dob} required onChange={e => setDob(e.target.value)} />
             </Field>
-            {field('skin_tone').enabled && (
-              <Field label={<>Skin tone{field('skin_tone').required && <Required />}</>}>
-                <select style={s.input} value={skinTone} required={field('skin_tone').required} onChange={e => setSkinTone(e.target.value)}>
-                  <option value="">Select skin tone…</option>
-                  {['Very light', 'Light', 'Medium', 'Olive', 'Brown', 'Dark'].map(t => (
-                    <option key={t} value={t}>{t}</option>
-                  ))}
-                </select>
-              </Field>
-            )}
             <Field label="Email">
               <input style={s.input} type="email" value={email} required onChange={e => setEmail(e.target.value)} placeholder="you@example.com" />
             </Field>
@@ -434,6 +424,17 @@ function WalkInInner() {
             {field('design_details').enabled && (
               <Field label={<>Design description{field('design_details').required ? <Required /> : <Optional />}</>}>
                 <textarea style={{ ...s.input, ...s.textarea }} value={design} required={field('design_details').required} onChange={e => setDesign(e.target.value)} placeholder="Describe what you'd like…" />
+              </Field>
+            )}
+
+            {field('skin_tone').enabled && (
+              <Field label={<>Skin tone{field('skin_tone').required ? <Required /> : <Optional />}</>}>
+                <select style={s.input} value={skinTone} required={field('skin_tone').required} onChange={e => setSkinTone(e.target.value)}>
+                  <option value="">Select skin tone…</option>
+                  {['Very light', 'Light', 'Medium', 'Olive', 'Brown', 'Dark'].map(t => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
               </Field>
             )}
 
