@@ -1172,6 +1172,33 @@ export default function SettingsPage() {
                         </div>
                       );
                     })}
+                    {consentTemplates.length > 0 && (
+                      <>
+                        <div style={{ height: '0.5rem', borderTop: '1px solid var(--border)', margin: '0.25rem 0' }} />
+                        <span style={{ fontSize: '0.68rem', fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--text-faint)', padding: '0 0.1rem' }}>Consent forms</span>
+                        {consentTemplates.map(t => (
+                          <div key={t.id} style={s.formFieldRow}>
+                            <span style={{ flex: 1, fontSize: '0.83rem', fontWeight: 500, color: t.is_active ? 'var(--text)' : 'var(--text-ghost)' }}>
+                              {t.name}
+                            </span>
+                            <span style={{ fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', padding: '0.1rem 0.45rem', borderRadius: 4, background: t.type === 'waiver' ? 'rgba(232,111,111,0.12)' : t.type === 'health' ? 'rgba(76,201,138,0.12)' : 'rgba(245,236,217,0.08)', color: t.type === 'waiver' ? '#e86f6f' : t.type === 'health' ? '#4cc98a' : 'var(--accent)' }}>
+                              {t.type === 'health' ? 'Health' : t.type === 'waiver' ? 'Waiver' : 'Consent'}
+                            </span>
+                            <button
+                              onClick={() => toggleTemplateActive(t)}
+                              style={{
+                                ...s.fieldToggleBtn,
+                                background: t.is_active ? 'var(--accent-tint)' : 'var(--bg-chip)',
+                                borderColor: t.is_active ? 'var(--accent-tint-border)' : 'var(--border)',
+                                color: t.is_active ? 'var(--accent)' : 'var(--text-ghost)',
+                              }}
+                            >
+                              {t.is_active ? 'On' : 'Off'}
+                            </button>
+                          </div>
+                        ))}
+                      </>
+                    )}
                   </div>
                 )}
               </div>
