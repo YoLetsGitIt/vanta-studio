@@ -1129,11 +1129,12 @@ export default function SettingsPage() {
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
                     {[
+                      { key: 'dob',            label: 'Date of birth' },
+                      { key: 'skin_tone',      label: 'Skin tone' },
                       { key: 'session_type',   label: 'Session type' },
+                      { key: 'artist_id',      label: 'Artist preference' },
                       { key: 'body_location',  label: 'Placement' },
                       { key: 'design_details', label: 'Design description' },
-                      { key: 'dob',            label: 'Date of birth' },
-                      { key: 'artist_id',      label: 'Artist preference' },
                       { key: 'size',           label: 'Size' },
                       { key: 'notes',          label: 'Additional notes' },
                       { key: 'image_paths',    label: 'Reference photos' },

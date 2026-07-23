@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { getStudioPublic, createWalkIn, walkinUploadSign, signatureUploadSign, getStudioConsentTemplates } from '@/lib/api';
+import { getStudioPublic, createWalkIn, walkinUploadSign, signatureUploadSign, getStudioConsentTemplates, getFormConfigPublic } from '@/lib/api';
 
 const SESSION_TYPES = ['Tattoo', 'Piercing', 'Consultation', 'Touch-up', 'Cover-up', 'Other'];
 
@@ -91,6 +91,7 @@ function WalkInInner() {
 
   const [studio, setStudio]   = useState(null);
   const [studioErr, setStudioErr] = useState('');
+  const [formConfig, setFormConfig] = useState(null); // null = loading
 
   // Form state
   const [firstName, setFirstName]   = useState('');
@@ -99,18 +100,18 @@ function WalkInInner() {
   const [phoneCode, setPhoneCode]   = useState(() => detectCountry());
   const [phoneNum,  setPhoneNum]    = useState('');
   const [dob, setDob]               = useState('');
+  const [skinTone, setSkinTone]     = useState('');
+  const [sessionType, setSessionType] = useState('');
   const [artistId, setArtistId]     = useState('');
   const [placements, setPlacements]  = useState([]);
   const [design, setDesign]         = useState('');
   const [size, setSize]             = useState('');
   const [sizeUnit, setSizeUnit]     = useState('cm');
-  const [retouch, setRetouch]       = useState(false);
   const [notes, setNotes]           = useState('');
-  const [photos, setPhotos]         = useState([]); // File objects
+  const [photos, setPhotos]         = useState([]);
   const [photoPreviews, setPhotoPreviews] = useState([]);
-  // New consent template system
+  // Consent template system
   const [consentTemplates, setConsentTemplates] = useState([]);
-  // Per-template state: { [templateId]: { answers, accepted, sigBlob, guardianSigBlob } }
   const [templateState, setTemplateState] = useState({});
   // Guardian info (shared across minor-flagged templates)
   const [guardianName, setGuardianName] = useState('');
@@ -122,15 +123,23 @@ function WalkInInner() {
   const [submitError, setSubmitError] = useState('');
   const [done, setDone]             = useState(false);
 
-  // Load studio info and consent templates
+  // field(key) returns {enabled, required} from the loaded config, defaulting to enabled/not-required
+  function field(key) {
+    return formConfig?.[key] ?? { enabled: true, required: false };
+  }
+
+  // Load studio, form config, and consent templates in parallel
   useEffect(() => {
     if (!studioId) return;
-    getStudioPublic(studioId)
-      .then(setStudio)
-      .catch(e => setStudioErr(e.message));
-    getStudioConsentTemplates(studioId)
-      .then(d => setConsentTemplates(d.templates ?? []))
-      .catch(() => {}); // non-fatal — studio may have no consent forms
+    Promise.all([
+      getStudioPublic(studioId),
+      getFormConfigPublic(studioId).catch(() => ({ fields: {} })),
+      getStudioConsentTemplates(studioId).catch(() => ({ templates: [] })),
+    ]).then(([studioData, configData, consentData]) => {
+      setStudio(studioData);
+      setFormConfig(configData.fields ?? {});
+      setConsentTemplates(consentData.templates ?? []);
+    }).catch(e => setStudioErr(e.message));
   }, [studioId]);
 
   function handlePhotoChange(e) {
@@ -186,7 +195,7 @@ function WalkInInner() {
 
   async function handleSubmit(e) {
     e.preventDefault();
-    if (placements.length === 0) { setSubmitError('Please select at least one placement.'); return; }
+    if (field('body_location').enabled && placements.length === 0) { setSubmitError('Please select at least one placement.'); return; }
 
     // Validate consent form templates
     for (const t of consentTemplates) {
@@ -274,7 +283,8 @@ function WalkInInner() {
         email,
         phone: `${COUNTRIES.find(c => c.id === phoneCode)?.dial ?? ''} ${phoneNum}`.trim(),
         dob,
-        session_type:         retouch ? 'retouch' : '',
+        skin_tone:            skinTone,
+        session_type:         sessionType,
         body_location:        placements.join(', '),
         design_details:       design,
         size:                 size.trim() ? `${size.trim()}${sizeUnit}` : '',
@@ -293,7 +303,7 @@ function WalkInInner() {
 
   if (!studioId) return <p style={s.msg}>Invalid link — no studio ID.</p>;
   if (studioErr) return <p style={{ ...s.msg, color: '#e86f6f' }}>{studioErr}</p>;
-  if (!studio)   return <p style={s.msg}>Loading…</p>;
+  if (!studio || formConfig === null) return <p style={s.msg}>Loading…</p>;
 
   if (done) {
     return (
@@ -324,9 +334,21 @@ function WalkInInner() {
                 <input style={s.input} type="text" value={lastName} required onChange={e => setLastName(e.target.value)} placeholder="Last" />
               </Field>
             </div>
-            <Field label="Date of birth">
-              <input style={{ ...s.input, colorScheme: 'dark' }} type="date" value={dob} onChange={e => setDob(e.target.value)} />
-            </Field>
+            {field('dob').enabled && (
+              <Field label={<>Date of birth{field('dob').required && <Required />}</>}>
+                <input style={{ ...s.input, colorScheme: 'dark' }} type="date" value={dob} required={field('dob').required} onChange={e => setDob(e.target.value)} />
+              </Field>
+            )}
+            {field('skin_tone').enabled && (
+              <Field label={<>Skin tone{field('skin_tone').required && <Required />}</>}>
+                <select style={s.input} value={skinTone} required={field('skin_tone').required} onChange={e => setSkinTone(e.target.value)}>
+                  <option value="">Select skin tone…</option>
+                  {['Very light', 'Light', 'Medium', 'Olive', 'Brown', 'Dark'].map(t => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+              </Field>
+            )}
             <Field label="Email">
               <input style={s.input} type="email" value={email} required onChange={e => setEmail(e.target.value)} placeholder="you@example.com" />
             </Field>
@@ -355,109 +377,126 @@ function WalkInInner() {
 
           {/* ── Your tattoo ── */}
           <Section title="Your tattoo">
-            <Field label="Artist (optional)">
-              <select style={s.input} value={artistId} onChange={e => setArtistId(e.target.value)}>
-                <option value="">No preference — studio will assign</option>
-                {studio.artists.map(a => (
-                  <option key={a.artistId} value={a.artistId}>
-                    {a.name}{a.studioType === 'guest' ? ' (Guest)' : ''}
-                  </option>
-                ))}
-              </select>
-            </Field>
+            {field('session_type').enabled && (
+              <Field label={<>Session type{field('session_type').required && <Required />}</>}>
+                <select style={s.input} value={sessionType} required={field('session_type').required} onChange={e => setSessionType(e.target.value)}>
+                  <option value="">Select session type…</option>
+                  {SESSION_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </Field>
+            )}
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-              <label style={s.label}>
-                Placement
-                <span style={{ color: 'rgba(255,255,255,0.2)', fontWeight: 400, marginLeft: 6 }}>
-                  {placements.length}/3
-                </span>
-              </label>
-              <div style={s.chipGrid}>
-                {PLACEMENTS.map(p => {
-                  const active = placements.includes(p);
-                  return (
-                    <button
-                      key={p}
-                      type="button"
-                      onClick={() => {
-                        if (active) {
-                          setPlacements(prev => prev.filter(x => x !== p));
-                        } else if (placements.length < 3) {
-                          setPlacements(prev => [...prev, p]);
-                        }
-                      }}
-                      style={{ ...s.placementChip, ...(active ? s.placementChipActive : {}), ...(!active && placements.length >= 3 ? s.placementChipDisabled : {}) }}
-                    >
-                      {p}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <Field label="Design description">
-              <textarea style={{ ...s.input, ...s.textarea }} value={design} required onChange={e => setDesign(e.target.value)} placeholder="Describe what you'd like…" />
-            </Field>
-
-            <Field label="Size (optional)">
-              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                <input
-                  style={{ ...s.input, flex: 1 }}
-                  type="number" min="0" step="0.1"
-                  inputMode="decimal"
-                  value={size}
-                  onChange={e => { const v = e.target.value; if (v === '' || /^\d*\.?\d*$/.test(v)) setSize(v); }}
-                  onKeyDown={e => ['e','E','+','-'].includes(e.key) && e.preventDefault()}
-                  placeholder="e.g. 10"
-                />
-                <div style={{ display: 'flex', background: 'rgba(255,255,255,0.06)', borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)', flexShrink: 0 }}>
-                  {['cm', 'in'].map(u => (
-                    <button
-                      key={u} type="button"
-                      onClick={() => setSizeUnit(u)}
-                      style={{
-                        padding: '0.55rem 0.75rem', border: 'none', cursor: 'pointer',
-                        fontSize: '0.82rem', fontWeight: 600, fontFamily: 'inherit',
-                        background: sizeUnit === u ? 'rgba(255,255,255,0.15)' : 'transparent',
-                        color: sizeUnit === u ? '#fff' : 'rgba(255,255,255,0.4)',
-                      }}
-                    >
-                      {u}
-                    </button>
+            {field('artist_id').enabled && (
+              <Field label={<>Artist preference{field('artist_id').required ? <Required /> : <Optional />}</>}>
+                <select style={s.input} value={artistId} required={field('artist_id').required} onChange={e => setArtistId(e.target.value)}>
+                  <option value="">No preference — studio will assign</option>
+                  {studio.artists.map(a => (
+                    <option key={a.artistId} value={a.artistId}>
+                      {a.name}{a.studioType === 'guest' ? ' (Guest)' : ''}
+                    </option>
                   ))}
+                </select>
+              </Field>
+            )}
+
+            {field('body_location').enabled && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                <label style={s.label}>
+                  Placement{field('body_location').required ? <Required /> : null}
+                  <span style={{ color: 'rgba(255,255,255,0.2)', fontWeight: 400, marginLeft: 6 }}>
+                    {placements.length}/3
+                  </span>
+                </label>
+                <div style={s.chipGrid}>
+                  {PLACEMENTS.map(p => {
+                    const active = placements.includes(p);
+                    return (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => {
+                          if (active) {
+                            setPlacements(prev => prev.filter(x => x !== p));
+                          } else if (placements.length < 3) {
+                            setPlacements(prev => [...prev, p]);
+                          }
+                        }}
+                        style={{ ...s.placementChip, ...(active ? s.placementChipActive : {}), ...(!active && placements.length >= 3 ? s.placementChipDisabled : {}) }}
+                      >
+                        {p}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
-            </Field>
+            )}
 
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: 'rgba(255,255,255,0.7)', cursor: 'pointer' }}>
-              <input type="checkbox" checked={retouch} onChange={e => setRetouch(e.target.checked)} style={{ width: 16, height: 16, accentColor: '#f5ecd9', cursor: 'pointer' }} />
-              This is a retouch / touch-up
-            </label>
+            {field('design_details').enabled && (
+              <Field label={<>Design description{field('design_details').required ? <Required /> : <Optional />}</>}>
+                <textarea style={{ ...s.input, ...s.textarea }} value={design} required={field('design_details').required} onChange={e => setDesign(e.target.value)} placeholder="Describe what you'd like…" />
+              </Field>
+            )}
 
-            <Field label="Additional notes (optional)">
-              <textarea style={{ ...s.input, ...s.textarea }} value={notes} onChange={e => setNotes(e.target.value)} placeholder="Anything else the artist should know" />
-            </Field>
+            {field('size').enabled && (
+              <Field label={<>Size{field('size').required ? <Required /> : <Optional />}</>}>
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <input
+                    style={{ ...s.input, flex: 1 }}
+                    type="number" min="0" step="0.1"
+                    inputMode="decimal"
+                    value={size}
+                    required={field('size').required}
+                    onChange={e => { const v = e.target.value; if (v === '' || /^\d*\.?\d*$/.test(v)) setSize(v); }}
+                    onKeyDown={e => ['e','E','+','-'].includes(e.key) && e.preventDefault()}
+                    placeholder="e.g. 10"
+                  />
+                  <div style={{ display: 'flex', background: 'rgba(255,255,255,0.06)', borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)', flexShrink: 0 }}>
+                    {['cm', 'in'].map(u => (
+                      <button
+                        key={u} type="button"
+                        onClick={() => setSizeUnit(u)}
+                        style={{
+                          padding: '0.55rem 0.75rem', border: 'none', cursor: 'pointer',
+                          fontSize: '0.82rem', fontWeight: 600, fontFamily: 'inherit',
+                          background: sizeUnit === u ? 'rgba(255,255,255,0.15)' : 'transparent',
+                          color: sizeUnit === u ? '#fff' : 'rgba(255,255,255,0.4)',
+                        }}
+                      >
+                        {u}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </Field>
+            )}
+
+            {field('notes').enabled && (
+              <Field label={<>Additional notes{field('notes').required ? <Required /> : <Optional />}</>}>
+                <textarea style={{ ...s.input, ...s.textarea }} value={notes} required={field('notes').required} onChange={e => setNotes(e.target.value)} placeholder="Anything else the artist should know" />
+              </Field>
+            )}
           </Section>
 
           {/* ── Reference photos ── */}
-          <Section title="Reference photos">
-            <p style={s.sectionHint}>Optional — up to 5 images</p>
-            <label style={s.uploadLabel}>
-              <input type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={handlePhotoChange} />
-              + Add photos
-            </label>
-            {photoPreviews.length > 0 && (
-              <div style={s.photoGrid}>
-                {photoPreviews.map((url, i) => (
-                  <div key={i} style={s.photoThumb}>
-                    <img src={url} alt="" style={s.thumbImg} />
-                    <button type="button" style={s.thumbRemove} onClick={() => removePhoto(i)}>✕</button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </Section>
+          {field('image_paths').enabled && (
+            <Section title="Reference photos">
+              <p style={s.sectionHint}>{field('image_paths').required ? 'Required — up to 5 images' : 'Optional — up to 5 images'}</p>
+              <label style={s.uploadLabel}>
+                <input type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={handlePhotoChange} />
+                + Add photos
+              </label>
+              {photoPreviews.length > 0 && (
+                <div style={s.photoGrid}>
+                  {photoPreviews.map((url, i) => (
+                    <div key={i} style={s.photoThumb}>
+                      <img src={url} alt="" style={s.thumbImg} />
+                      <button type="button" style={s.thumbRemove} onClick={() => removePhoto(i)}>✕</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Section>
+          )}
 
           {/* ── Consent forms ── */}
           {consentTemplates.length > 0 && (
@@ -679,6 +718,14 @@ function SignaturePad({ onCapture }) {
   );
 }
 
+function Required() {
+  return <span style={{ color: '#e86f6f', marginLeft: 3 }}>*</span>;
+}
+
+function Optional() {
+  return <span style={{ color: 'rgba(255,255,255,0.25)', fontWeight: 400, marginLeft: 4 }}>(optional)</span>;
+}
+
 function Section({ title, children, first = false }) {
   return (
     <div style={{
@@ -695,7 +742,7 @@ function Section({ title, children, first = false }) {
 function Field({ label, children }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-      <label style={s.label}>{label}</label>
+      <span style={s.label}>{label}</span>
       {children}
     </div>
   );
