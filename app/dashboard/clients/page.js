@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { listStudioBookings, getStudioClients, getClientConsents, getNotes, addNote, deleteNote, ensureStudioClient, patchStudioClient, generateConsentLink } from '@/lib/api';
+import { listStudioBookings, getStudioClients, getClientConsents, getNotes, addNote, deleteNote, ensureStudioClient, patchStudioClient, generateConsentLink, listConsentTemplates } from '@/lib/api';
 
 const TATTOO_STYLES = [
   'Traditional', 'Neo Traditional', 'Blackwork', 'Fine Line', 'Realism',
@@ -25,6 +25,7 @@ function ClientsInner() {
   const [selected, setSelected] = useState(null);
   const [consents, setConsents] = useState({});
   const [consentVersion, setConsentVersion] = useState('1');
+  const [consentTemplates, setConsentTemplates] = useState([]);
 
   // Auto-select a client when navigated from booking detail.
   useEffect(() => {
@@ -45,10 +46,12 @@ function ClientsInner() {
         return;
       }
       try {
-        const [data, contactData] = await Promise.all([
+        const [data, contactData, templateData] = await Promise.all([
           listStudioBookings(''),
           getStudioClients().catch(() => ({ clients: [] })), // contact book is optional
+          listConsentTemplates().catch(() => ({ templates: [] })),
         ]);
+        setConsentTemplates(templateData.templates ?? []);
         const b = data.bookings ?? [];
         const c = contactData.clients ?? [];
         setCached(key, b);
@@ -174,8 +177,8 @@ function ClientsInner() {
   //   a.click();
   // }
 
-  const handleSendConsentLink = useCallback(async (email) => {
-    await generateConsentLink(email);
+  const handleSendConsentLink = useCallback(async (email, templateId) => {
+    await generateConsentLink(email, templateId);
   }, []);
 
   return (
@@ -248,6 +251,7 @@ function ClientsInner() {
             onClose={() => setSelected(null)}
             consent={selectedClient.email ? consents[selectedClient.email] : null}
             consentVersion={consentVersion}
+            consentTemplates={consentTemplates}
             onSendConsentLink={handleSendConsentLink}
           />
         )}
@@ -277,11 +281,12 @@ function ConsentBadge({ status }) {
   return <span style={{ ...s.badge, ...s.badgeRed }}>{t('clients_no_consent')}</span>;
 }
 
-function ClientDetail({ client, onClose, consent, consentVersion, onSendConsentLink }) {
+function ClientDetail({ client, onClose, consent, consentVersion, consentTemplates = [], onSendConsentLink }) {
   const { t } = useLanguage();
   const [linkGenerating, setLinkGenerating] = useState(false);
   const [linkCopied,     setLinkCopied]     = useState(false);
   const [linkErr,        setLinkErr]        = useState('');
+  const [selectedTemplateId, setSelectedTemplateId] = useState('');
   const [notes,       setNotes]       = useState(null); // null = loading
   const [noteInput,   setNoteInput]   = useState('');
   const [noteAdding,  setNoteAdding]  = useState(false);
@@ -369,10 +374,18 @@ function ClientDetail({ client, onClose, consent, consentVersion, onSendConsentL
 
   async function handleSendLink() {
     if (!client.email) return;
+    // If multiple templates and none selected yet, block
+    if (consentTemplates.length > 1 && !selectedTemplateId) {
+      setLinkErr('Please select a consent form to send.');
+      return;
+    }
     setLinkGenerating(true);
     setLinkErr('');
     try {
-      await onSendConsentLink(client.email);
+      const templateId = consentTemplates.length === 1
+        ? consentTemplates[0].id
+        : selectedTemplateId || undefined;
+      await onSendConsentLink(client.email, templateId);
       setLinkCopied(true);
       setTimeout(() => setLinkCopied(false), 3000);
     } catch (e) {
@@ -421,20 +434,38 @@ function ClientDetail({ client, onClose, consent, consentVersion, onSendConsentL
               </span>
             )}
             {(consentStatus === 'none' || consentStatus === 'outdated') && client.email && (
-              <button
-                onClick={handleSendLink}
-                disabled={linkGenerating}
-                style={{
-                  background: 'none',
-                  border: `1px solid ${linkCopied ? '#4cc98a' : 'var(--accent)'}`,
-                  borderRadius: 6, padding: '0.1rem 0.55rem',
-                  color: linkCopied ? '#4cc98a' : 'var(--accent)',
-                  fontSize: '0.72rem', fontWeight: 600,
-                  cursor: 'pointer', fontFamily: 'inherit', letterSpacing: '0.01em',
-                }}
-              >
-                {linkCopied ? t('clients_email_sent') : linkGenerating ? t('sending') : t('clients_send_consent')}
-              </button>
+              <>
+                {consentTemplates.length > 1 && (
+                  <select
+                    value={selectedTemplateId}
+                    onChange={e => { setSelectedTemplateId(e.target.value); setLinkErr(''); }}
+                    style={{
+                      background: 'var(--bg-chip)', border: '1px solid var(--border)',
+                      borderRadius: 6, padding: '0.1rem 0.5rem',
+                      color: 'var(--text)', fontSize: '0.72rem', fontFamily: 'inherit',
+                    }}
+                  >
+                    <option value="">Select form…</option>
+                    {consentTemplates.map(tmpl => (
+                      <option key={tmpl.id} value={tmpl.id}>{tmpl.name}</option>
+                    ))}
+                  </select>
+                )}
+                <button
+                  onClick={handleSendLink}
+                  disabled={linkGenerating}
+                  style={{
+                    background: 'none',
+                    border: `1px solid ${linkCopied ? '#4cc98a' : 'var(--accent)'}`,
+                    borderRadius: 6, padding: '0.1rem 0.55rem',
+                    color: linkCopied ? '#4cc98a' : 'var(--accent)',
+                    fontSize: '0.72rem', fontWeight: 600,
+                    cursor: 'pointer', fontFamily: 'inherit', letterSpacing: '0.01em',
+                  }}
+                >
+                  {linkCopied ? t('clients_email_sent') : linkGenerating ? t('sending') : t('clients_send_consent')}
+                </button>
+              </>
             )}
           </div>
           {linkErr && <p style={{ fontSize: '0.72rem', color: '#e86f6f', margin: '0.3rem 0 0' }}>{linkErr}</p>}

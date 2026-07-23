@@ -415,6 +415,7 @@ export default function SettingsPage() {
 
   // ── Consent templates ──────────────────────────────────────────────────────
   const [consentTemplates, setConsentTemplates] = useState([]);
+  const [widgetConsentTemplateId, setWidgetConsentTemplateId] = useState('');
   const [templateBuilderOpen, setTemplateBuilderOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState(null); // null = new
   const [templateName, setTemplateName] = useState('');
@@ -471,6 +472,7 @@ export default function SettingsPage() {
         if (hoursData.hours?.length === 7) setHours(hoursData.hours);
         setStations(stationsData.stations ?? []);
         setConsentTemplates(templateData.templates ?? []);
+        setWidgetConsentTemplateId(account.studio?.widget_consent_template_id ?? '');
         setStripeStatus(stripeData ?? { connected: false, charges_enabled: false });
         setFormFields(formConfigData?.fields ?? {});
 
@@ -512,7 +514,7 @@ export default function SettingsPage() {
     try {
       const wc = parseFloat(walkinCut);
       const pc = parseFloat(personalCut);
-      await updateStudioProfile(name.trim(), address.trim(), widgetBgColor, widgetAccentColor, isNaN(wc) ? 0 : wc, isNaN(pc) ? 0 : pc, aftercareInstructions, timezone, addressLat, addressLng, paymentRecordingReq, rescheduleWindow);
+      await updateStudioProfile(name.trim(), address.trim(), widgetBgColor, widgetAccentColor, isNaN(wc) ? 0 : wc, isNaN(pc) ? 0 : pc, aftercareInstructions, timezone, addressLat, addressLng, paymentRecordingReq, rescheduleWindow, widgetConsentTemplateId || null);
       invalidate('studio-account');
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
@@ -664,15 +666,6 @@ export default function SettingsPage() {
       setTemplateError(e.message);
     } finally {
       setTemplateSaving(false);
-    }
-  }
-
-  async function toggleTemplateActive(t) {
-    try {
-      const updated = await updateConsentTemplate(t.id, { is_active: !t.is_active });
-      setConsentTemplates(prev => prev.map(x => x.id === t.id ? updated : x));
-    } catch (e) {
-      alert(e.message);
     }
   }
 
@@ -1010,14 +1003,10 @@ export default function SettingsPage() {
               <div style={s.templateRowLeft}>
                 <span style={s.templateName}>{t.name}</span>
                 {t.requires_minor_guardian && <span style={s.guardianBadge}>Guardian</span>}
-                {!t.is_active && <span style={s.inactiveBadge}>Inactive</span>}
                 <span style={s.templateFieldCount}>{(t.fields ?? []).length} field{(t.fields ?? []).length !== 1 ? 's' : ''}</span>
               </div>
               <div style={s.templateRowActions}>
                 <button style={s.templateActionBtn} onClick={() => openEditTemplate(t)}>Edit</button>
-                <button style={s.templateActionBtn} onClick={() => toggleTemplateActive(t)}>
-                  {t.is_active ? 'Deactivate' : 'Activate'}
-                </button>
                 <button style={{ ...s.templateActionBtn, color: '#e86f6f' }} onClick={() => handleDeleteTemplate(t)}>Delete</button>
               </div>
             </div>
@@ -1286,47 +1275,21 @@ export default function SettingsPage() {
                     {consentTemplates.length > 0 && (
                       <>
                         <div style={{ borderTop: '1px solid var(--border)', margin: '0.1rem 0' }} />
-                        {consentTemplates.map(t => (
-                          <div key={t.id} style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-                            <div style={s.formFieldRow}>
-                              <span style={{ flex: 1, fontSize: '0.83rem', fontWeight: 500, color: t.is_active ? 'var(--text)' : 'var(--text-ghost)' }}>
-                                {t.name}
-                              </span>
-                              {t.is_active && (
-                                <label style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', cursor: 'pointer' }}>
-                                  <input
-                                    type="checkbox"
-                                    checked={t.is_required ?? true}
-                                    onChange={async e => {
-                                      try {
-                                        const updated = await updateConsentTemplate(t.id, { is_required: e.target.checked });
-                                        setConsentTemplates(prev => prev.map(x => x.id === t.id ? updated : x));
-                                      } catch {}
-                                    }}
-                                    style={{ accentColor: 'var(--accent)' }}
-                                  />
-                                  <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Required</span>
-                                </label>
-                              )}
-                              <button
-                                onClick={() => toggleTemplateActive(t)}
-                                style={{
-                                  ...s.fieldToggleBtn,
-                                  background: t.is_active ? 'var(--accent-tint)' : 'var(--bg-chip)',
-                                  borderColor: t.is_active ? 'var(--accent-tint-border)' : 'var(--border)',
-                                  color: t.is_active ? 'var(--accent)' : 'var(--text-ghost)',
-                                }}
-                              >
-                                {t.is_active ? 'On' : 'Off'}
-                              </button>
-                            </div>
-                            {!t.is_active && (
-                              <p style={{ fontSize: '0.72rem', color: '#e8a24a', margin: '0 0 0.1rem 0.85rem', lineHeight: 1.4 }}>
-                                Client consent for this form will need to be collected on arrival.
-                              </p>
-                            )}
-                          </div>
-                        ))}
+                        <div style={s.formFieldRow}>
+                          <span style={{ flex: 1, fontSize: '0.83rem', fontWeight: 500, color: 'var(--text)' }}>
+                            Consent form
+                          </span>
+                          <select
+                            value={widgetConsentTemplateId}
+                            onChange={e => setWidgetConsentTemplateId(e.target.value)}
+                            style={{ ...s.input, width: 'auto', fontSize: '0.8rem', padding: '0.3rem 0.6rem' }}
+                          >
+                            <option value="">None</option>
+                            {consentTemplates.map(t => (
+                              <option key={t.id} value={t.id}>{t.name}</option>
+                            ))}
+                          </select>
+                        </div>
                       </>
                     )}
                   </div>
