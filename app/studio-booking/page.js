@@ -214,6 +214,10 @@ function WalkInInner() {
           return;
         }
       }
+      if (!ts.answers?.__agreed__) {
+        setSubmitError(`Please confirm you have read and agreed to "${t.name}".`);
+        return;
+      }
       if (t.requires_signature && !ts.sigBlob) {
         setSubmitError(`Please sign "${t.name}".`);
         return;
@@ -538,6 +542,19 @@ function WalkInInner() {
                         onChange={v => setTemplateAnswer(t.id, field.id, v)}
                       />
                     ))}
+
+                    {/* Always-required agreement checkbox */}
+                    <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6rem', cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={!!ts.answers?.__agreed__}
+                        onChange={e => setTemplateAnswer(t.id, '__agreed__', e.target.checked ? 'true' : '')}
+                        style={{ accentColor: '#f5ecd9', flexShrink: 0, marginTop: 2 }}
+                      />
+                      <span style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.7)', lineHeight: 1.5 }}>
+                        I have read and agreed to the above <span style={{ color: '#e86f6f' }}>*</span>
+                      </span>
+                    </label>
 
                     {isMinor && t.requires_minor_guardian && (
                       <div style={s.guardianBox}>

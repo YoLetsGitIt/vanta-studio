@@ -285,6 +285,100 @@ function WidgetPreview({ bg, accent, studioName, fields }) {
 }
 
 
+function ConsentFormPreview({ name, fields, requiresSig, requiresGuardian }) {
+  const inp = { height: 36, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8 };
+  const lbl = { fontSize: '0.7rem', fontWeight: 600, color: 'rgba(255,255,255,0.4)', marginBottom: 3, display: 'block' };
+  return (
+    <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-faint)', borderRadius: 12, padding: '1.25rem' }}>
+      <p style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)', letterSpacing: '0.06em', textTransform: 'uppercase', margin: '0 0 0.85rem' }}>Preview</p>
+      <div style={{ background: '#111', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: '1.35rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+        {name ? (
+          <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#fff', margin: 0 }}>{name}</h3>
+        ) : (
+          <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'rgba(255,255,255,0.2)', margin: 0, fontStyle: 'italic' }}>Form name</h3>
+        )}
+
+        {fields.length === 0 && (
+          <p style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.2)', margin: 0, fontStyle: 'italic' }}>Add fields to preview the form…</p>
+        )}
+
+        {fields.map(f => {
+          if (f.type === 'heading') return (
+            <div key={f.id} style={{ paddingBottom: '0.5rem', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+              <span style={{ fontSize: '0.87rem', fontWeight: 700, color: 'rgba(255,255,255,0.8)' }}>{f.label || <em style={{ color: 'rgba(255,255,255,0.2)' }}>Section heading</em>}</span>
+            </div>
+          );
+          if (f.type === 'paragraph') return (
+            <p key={f.id} style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)', lineHeight: 1.6, margin: 0 }}>
+              {f.label || <em>Paragraph text…</em>}
+            </p>
+          );
+          if (f.type === 'checkbox') return (
+            <label key={f.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
+              <div style={{ width: 15, height: 15, borderRadius: 3, border: '1px solid rgba(255,255,255,0.2)', marginTop: 2, flexShrink: 0 }} />
+              <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.55)', lineHeight: 1.5 }}>
+                {f.label || <em style={{ color: 'rgba(255,255,255,0.2)' }}>Checkbox label</em>}
+                {f.required && <span style={{ color: '#e86f6f', marginLeft: 3 }}>*</span>}
+              </span>
+            </label>
+          );
+          if (f.type === 'yesno') return (
+            <div key={f.id} style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+              <span style={lbl}>{f.label || <em>Question</em>}{f.required && ' *'}</span>
+              <div style={{ display: 'flex', gap: 6 }}>
+                {['Yes', 'No'].map(opt => (
+                  <div key={opt} style={{ padding: '0.3rem 0.9rem', borderRadius: 6, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)' }}>{opt}</div>
+                ))}
+              </div>
+            </div>
+          );
+          if (f.type === 'textarea') return (
+            <div key={f.id} style={{ display: 'flex', flexDirection: 'column' }}>
+              <span style={lbl}>{f.label || <em>Field</em>}{f.required && ' *'}</span>
+              <div style={{ ...inp, height: 60 }} />
+            </div>
+          );
+          return (
+            <div key={f.id} style={{ display: 'flex', flexDirection: 'column' }}>
+              <span style={lbl}>{f.label || <em>Field</em>}{f.required && ' *'}</span>
+              <div style={inp} />
+            </div>
+          );
+        })}
+
+        {/* Always-required agreement checkbox */}
+        <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
+          <div style={{ width: 15, height: 15, borderRadius: 3, border: '1px solid rgba(255,255,255,0.2)', marginTop: 2, flexShrink: 0 }} />
+          <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.55)', lineHeight: 1.5 }}>
+            I have read and agreed to the above <span style={{ color: '#e86f6f' }}>*</span>
+          </span>
+        </label>
+
+        {requiresGuardian && (
+          <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 8, padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <span style={{ fontSize: '0.67rem', fontWeight: 600, color: 'rgba(255,255,255,0.25)', display: 'block', marginBottom: 4 }}>Guardian details (minors only)</span>
+            <div style={inp} />
+            <div style={inp} />
+          </div>
+        )}
+
+        {requiresSig && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+            <span style={lbl}>Signature *</span>
+            <div style={{ height: 64, background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.1)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <span style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.18)' }}>Sign here</span>
+            </div>
+          </div>
+        )}
+
+        <div style={{ padding: '0.6rem', background: 'rgba(245,236,217,0.1)', border: '1px solid rgba(245,236,217,0.18)', borderRadius: 8, fontSize: '0.8rem', fontWeight: 700, color: '#f5ecd9', textAlign: 'center', marginTop: 4 }}>
+          Submit
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function SettingsPage() {
   const router = useRouter();
   const { lang, switchLanguage, t } = useLanguage();
@@ -933,74 +1027,89 @@ export default function SettingsPage() {
         {/* ── Template builder modal ── */}
         {templateBuilderOpen && (
           <div style={s.modalOverlay} onClick={e => e.target === e.currentTarget && setTemplateBuilderOpen(false)}>
-            <div style={s.templateModal}>
-              <h2 style={{ margin: '0 0 1.25rem', fontSize: '1.05rem', fontWeight: 700, color: 'var(--text)' }}>
+            <div style={{ ...s.templateModal, maxWidth: 980 }}>
+              <h2 style={{ margin: '0 0 1rem', fontSize: '1.05rem', fontWeight: 700, color: 'var(--text)' }}>
                 {editingTemplate ? 'Edit form' : 'New consent form'}
               </h2>
 
-              <div style={s.field}>
-                <label style={s.label}>Form name <span style={{ color: '#e86f6f' }}>*</span></label>
-                <input style={s.input} type="text" value={templateName} onChange={e => setTemplateName(e.target.value)} placeholder="e.g. Tattoo Consent" />
-              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', alignItems: 'start' }}>
+                {/* Left — editor */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <div style={s.field}>
+                    <label style={s.label}>Form name <span style={{ color: '#e86f6f' }}>*</span></label>
+                    <input style={s.input} type="text" value={templateName} onChange={e => setTemplateName(e.target.value)} placeholder="e.g. Tattoo Consent" />
+                  </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                <label style={s.toggleRow}>
-                  <input type="checkbox" checked={templateRequiresSig} onChange={e => setTemplateRequiresSig(e.target.checked)}
-                    style={{ accentColor: 'var(--accent)' }} />
-                  <span style={{ fontSize: '0.83rem', color: 'var(--text-secondary)' }}>Require client signature</span>
-                </label>
-                <label style={s.toggleRow}>
-                  <input type="checkbox" checked={templateRequiresGuardian} onChange={e => setTemplateRequiresGuardian(e.target.checked)}
-                    style={{ accentColor: 'var(--accent)' }} />
-                  <span style={{ fontSize: '0.83rem', color: 'var(--text-secondary)' }}>Require parent / guardian consent for minors (under 18)</span>
-                </label>
-              </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    <label style={s.toggleRow}>
+                      <input type="checkbox" checked={templateRequiresSig} onChange={e => setTemplateRequiresSig(e.target.checked)}
+                        style={{ accentColor: 'var(--accent)' }} />
+                      <span style={{ fontSize: '0.83rem', color: 'var(--text-secondary)' }}>Require client signature</span>
+                    </label>
+                    <label style={s.toggleRow}>
+                      <input type="checkbox" checked={templateRequiresGuardian} onChange={e => setTemplateRequiresGuardian(e.target.checked)}
+                        style={{ accentColor: 'var(--accent)' }} />
+                      <span style={{ fontSize: '0.83rem', color: 'var(--text-secondary)' }}>Require parent / guardian consent for minors (under 18)</span>
+                    </label>
+                  </div>
 
-              <div style={{ borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
-                  <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Fields ({templateFields.length})</span>
-                  <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-                    {[['heading','Heading'],['paragraph','Paragraph'],['checkbox','Checkbox'],['text','Text'],['textarea','Textarea'],['yesno','Yes/No']].map(([type, label]) => (
-                      <button key={type} style={s.addFieldBtn} onClick={() => addField(type)}>+ {label}</button>
+                  <div style={{ borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+                      <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Fields ({templateFields.length})</span>
+                      <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                        {[['heading','Heading'],['paragraph','Paragraph'],['checkbox','Checkbox'],['text','Text'],['textarea','Textarea'],['yesno','Yes/No']].map(([type, label]) => (
+                          <button key={type} style={s.addFieldBtn} onClick={() => addField(type)}>+ {label}</button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {templateFields.length === 0 && (
+                      <p style={{ fontSize: '0.78rem', color: 'var(--text-ghost)', fontStyle: 'italic' }}>No fields yet. Add fields using the buttons above.</p>
+                    )}
+
+                    {templateFields.map((f, idx) => (
+                      <div key={f.id} style={s.fieldEditorRow}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.4rem' }}>
+                          <span style={s.fieldTypeBadge}>{f.type}</span>
+                          <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.25rem' }}>
+                            <button style={s.fieldMoveBtn} onClick={() => moveField(f.id, -1)} disabled={idx === 0}>↑</button>
+                            <button style={s.fieldMoveBtn} onClick={() => moveField(f.id, 1)} disabled={idx === templateFields.length - 1}>↓</button>
+                            <button style={{ ...s.fieldMoveBtn, color: '#e86f6f' }} onClick={() => removeField(f.id)}>✕</button>
+                          </div>
+                        </div>
+                        {['heading','paragraph','checkbox'].includes(f.type) ? (
+                          <textarea
+                            style={{ ...s.input, minHeight: f.type === 'paragraph' ? 72 : 38, resize: 'vertical', fontSize: '0.82rem' }}
+                            value={f.label}
+                            onChange={e => updateField(f.id, { label: e.target.value })}
+                            placeholder={f.type === 'heading' ? 'Section heading…' : f.type === 'paragraph' ? 'Paragraph text…' : 'Checkbox label (e.g. I agree to…)'}
+                          />
+                        ) : (
+                          <input style={{ ...s.input, fontSize: '0.82rem' }} type="text" value={f.label}
+                            onChange={e => updateField(f.id, { label: e.target.value })}
+                            placeholder="Field label…" />
+                        )}
+                        {!['heading','paragraph'].includes(f.type) && (
+                          <label style={{ ...s.toggleRow, marginTop: '0.3rem' }}>
+                            <input type="checkbox" checked={!!f.required} onChange={e => updateField(f.id, { required: e.target.checked })}
+                              style={{ accentColor: 'var(--accent)' }} />
+                            <span style={{ fontSize: '0.76rem', color: 'var(--text-ghost)' }}>Required</span>
+                          </label>
+                        )}
+                      </div>
                     ))}
                   </div>
                 </div>
 
-                {templateFields.length === 0 && (
-                  <p style={{ fontSize: '0.78rem', color: 'var(--text-ghost)', fontStyle: 'italic' }}>No fields yet. Add fields using the buttons above.</p>
-                )}
-
-                {templateFields.map((f, idx) => (
-                  <div key={f.id} style={s.fieldEditorRow}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.4rem' }}>
-                      <span style={s.fieldTypeBadge}>{f.type}</span>
-                      <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.25rem' }}>
-                        <button style={s.fieldMoveBtn} onClick={() => moveField(f.id, -1)} disabled={idx === 0}>↑</button>
-                        <button style={s.fieldMoveBtn} onClick={() => moveField(f.id, 1)} disabled={idx === templateFields.length - 1}>↓</button>
-                        <button style={{ ...s.fieldMoveBtn, color: '#e86f6f' }} onClick={() => removeField(f.id)}>✕</button>
-                      </div>
-                    </div>
-                    {['heading','paragraph','checkbox'].includes(f.type) ? (
-                      <textarea
-                        style={{ ...s.input, minHeight: f.type === 'paragraph' ? 72 : 38, resize: 'vertical', fontSize: '0.82rem' }}
-                        value={f.label}
-                        onChange={e => updateField(f.id, { label: e.target.value })}
-                        placeholder={f.type === 'heading' ? 'Section heading…' : f.type === 'paragraph' ? 'Paragraph text…' : 'Checkbox label (e.g. I agree to…)'}
-                      />
-                    ) : (
-                      <input style={{ ...s.input, fontSize: '0.82rem' }} type="text" value={f.label}
-                        onChange={e => updateField(f.id, { label: e.target.value })}
-                        placeholder="Field label…" />
-                    )}
-                    {!['heading','paragraph'].includes(f.type) && (
-                      <label style={{ ...s.toggleRow, marginTop: '0.3rem' }}>
-                        <input type="checkbox" checked={!!f.required} onChange={e => updateField(f.id, { required: e.target.checked })}
-                          style={{ accentColor: 'var(--accent)' }} />
-                        <span style={{ fontSize: '0.76rem', color: 'var(--text-ghost)' }}>Required</span>
-                      </label>
-                    )}
-                  </div>
-                ))}
+                {/* Right — preview */}
+                <div style={{ position: 'sticky', top: 0 }}>
+                  <ConsentFormPreview
+                    name={templateName}
+                    fields={templateFields}
+                    requiresSig={templateRequiresSig}
+                    requiresGuardian={templateRequiresGuardian}
+                  />
+                </div>
               </div>
 
               {templateError && <p style={{ fontSize: '0.8rem', color: '#e86f6f', margin: 0 }}>{templateError}</p>}
