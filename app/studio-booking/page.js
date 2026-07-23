@@ -528,12 +528,7 @@ function WalkInInner() {
                 const ts = templateState[t.id] ?? {};
                 return (
                   <div key={t.id} style={s.consentBox}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <span style={s.consentFormTitle}>{t.name}</span>
-                      <span style={{ ...s.formTypeBadge, ...(s.formTypeBadgeColors[t.type] ?? {}) }}>
-                        {t.type === 'health' ? 'Health' : t.type === 'waiver' ? 'Waiver' : 'Consent'}
-                      </span>
-                    </div>
+                    <span style={s.consentFormTitle}>{t.name}</span>
 
                     {(t.fields ?? []).map(field => (
                       <ConsentFormField

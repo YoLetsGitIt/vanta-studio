@@ -324,7 +324,6 @@ export default function SettingsPage() {
   const [templateBuilderOpen, setTemplateBuilderOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState(null); // null = new
   const [templateName, setTemplateName] = useState('');
-  const [templateType, setTemplateType] = useState('consent');
   const [templateRequiresSig, setTemplateRequiresSig] = useState(true);
   const [templateRequiresGuardian, setTemplateRequiresGuardian] = useState(false);
   const [templateFields, setTemplateFields] = useState([]);
@@ -507,7 +506,6 @@ export default function SettingsPage() {
   function openNewTemplate() {
     setEditingTemplate(null);
     setTemplateName('');
-    setTemplateType('consent');
     setTemplateRequiresSig(true);
     setTemplateRequiresGuardian(false);
     setTemplateFields([]);
@@ -518,7 +516,6 @@ export default function SettingsPage() {
   function openEditTemplate(t) {
     setEditingTemplate(t);
     setTemplateName(t.name);
-    setTemplateType(t.type);
     setTemplateRequiresSig(t.requires_signature);
     setTemplateRequiresGuardian(t.requires_minor_guardian);
     setTemplateFields(t.fields ?? []);
@@ -557,7 +554,6 @@ export default function SettingsPage() {
     try {
       const payload = {
         name: templateName.trim(),
-        type: templateType,
         requires_signature: templateRequiresSig,
         requires_minor_guardian: templateRequiresGuardian,
         fields: templateFields,
@@ -906,7 +902,7 @@ export default function SettingsPage() {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
               <h2 style={s.sectionTitle}>{t('consent_forms')}</h2>
-              <p style={s.sectionDesc}>Create consent forms, waivers, and health questionnaires with custom fields, e-signatures, and minor / guardian support.</p>
+              <p style={s.sectionDesc}>Create consent forms with custom fields, e-signatures, and minor / guardian support.</p>
             </div>
             <button onClick={openNewTemplate} style={s.addTemplateBtn}>{t('new_form')}</button>
           </div>
@@ -918,9 +914,6 @@ export default function SettingsPage() {
           {consentTemplates.map(t => (
             <div key={t.id} style={s.templateRow}>
               <div style={s.templateRowLeft}>
-                <span style={{ ...s.formTypeBadge, ...(s.formTypeBadgeColors[t.type] ?? {}) }}>
-                  {t.type === 'health' ? 'Health' : t.type === 'waiver' ? 'Waiver' : 'Consent'}
-                </span>
                 <span style={s.templateName}>{t.name}</span>
                 {t.requires_minor_guardian && <span style={s.guardianBadge}>Guardian</span>}
                 {!t.is_active && <span style={s.inactiveBadge}>Inactive</span>}
@@ -948,17 +941,6 @@ export default function SettingsPage() {
               <div style={s.field}>
                 <label style={s.label}>Form name <span style={{ color: '#e86f6f' }}>*</span></label>
                 <input style={s.input} type="text" value={templateName} onChange={e => setTemplateName(e.target.value)} placeholder="e.g. Tattoo Consent" />
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                <div style={s.field}>
-                  <label style={s.label}>Type</label>
-                  <select style={s.input} value={templateType} onChange={e => setTemplateType(e.target.value)}>
-                    <option value="consent">Consent</option>
-                    <option value="waiver">Waiver</option>
-                    <option value="health">Health questionnaire</option>
-                  </select>
-                </div>
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
