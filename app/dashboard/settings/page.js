@@ -1201,37 +1201,44 @@ export default function SettingsPage() {
                       <>
                         <div style={{ borderTop: '1px solid var(--border)', margin: '0.1rem 0' }} />
                         {consentTemplates.map(t => (
-                          <div key={t.id} style={s.formFieldRow}>
-                            <span style={{ flex: 1, fontSize: '0.83rem', fontWeight: 500, color: t.is_active ? 'var(--text)' : 'var(--text-ghost)' }}>
-                              {t.name}
-                            </span>
-                            {t.is_active && (
-                              <label style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', cursor: 'pointer' }}>
-                                <input
-                                  type="checkbox"
-                                  checked={t.is_required ?? true}
-                                  onChange={async e => {
-                                    try {
-                                      const updated = await updateConsentTemplate(t.id, { is_required: e.target.checked });
-                                      setConsentTemplates(prev => prev.map(x => x.id === t.id ? updated : x));
-                                    } catch {}
-                                  }}
-                                  style={{ accentColor: 'var(--accent)' }}
-                                />
-                                <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Required</span>
-                              </label>
+                          <div key={t.id} style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                            <div style={s.formFieldRow}>
+                              <span style={{ flex: 1, fontSize: '0.83rem', fontWeight: 500, color: t.is_active ? 'var(--text)' : 'var(--text-ghost)' }}>
+                                {t.name}
+                              </span>
+                              {t.is_active && (
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', cursor: 'pointer' }}>
+                                  <input
+                                    type="checkbox"
+                                    checked={t.is_required ?? true}
+                                    onChange={async e => {
+                                      try {
+                                        const updated = await updateConsentTemplate(t.id, { is_required: e.target.checked });
+                                        setConsentTemplates(prev => prev.map(x => x.id === t.id ? updated : x));
+                                      } catch {}
+                                    }}
+                                    style={{ accentColor: 'var(--accent)' }}
+                                  />
+                                  <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Required</span>
+                                </label>
+                              )}
+                              <button
+                                onClick={() => toggleTemplateActive(t)}
+                                style={{
+                                  ...s.fieldToggleBtn,
+                                  background: t.is_active ? 'var(--accent-tint)' : 'var(--bg-chip)',
+                                  borderColor: t.is_active ? 'var(--accent-tint-border)' : 'var(--border)',
+                                  color: t.is_active ? 'var(--accent)' : 'var(--text-ghost)',
+                                }}
+                              >
+                                {t.is_active ? 'On' : 'Off'}
+                              </button>
+                            </div>
+                            {!t.is_active && (
+                              <p style={{ fontSize: '0.72rem', color: '#e8a24a', margin: '0 0 0.1rem 0.85rem', lineHeight: 1.4 }}>
+                                Client consent for this form will need to be collected on arrival.
+                              </p>
                             )}
-                            <button
-                              onClick={() => toggleTemplateActive(t)}
-                              style={{
-                                ...s.fieldToggleBtn,
-                                background: t.is_active ? 'var(--accent-tint)' : 'var(--bg-chip)',
-                                borderColor: t.is_active ? 'var(--accent-tint-border)' : 'var(--border)',
-                                color: t.is_active ? 'var(--accent)' : 'var(--text-ghost)',
-                              }}
-                            >
-                              {t.is_active ? 'On' : 'Off'}
-                            </button>
                           </div>
                         ))}
                       </>
