@@ -106,6 +106,7 @@ function WalkInInner() {
   const [design, setDesign]         = useState('');
   const [size, setSize]             = useState('');
   const [sizeUnit, setSizeUnit]     = useState('cm');
+  const [colorStyle, setColorStyle] = useState('');
   const [notes, setNotes]           = useState('');
   const [photos, setPhotos]         = useState([]);
   const [photoPreviews, setPhotoPreviews] = useState([]);
@@ -289,6 +290,7 @@ function WalkInInner() {
         body_location:        placements.join(', '),
         design_details:       design,
         size:                 size.trim() ? `${size.trim()}${sizeUnit}` : '',
+        color:                colorStyle,
         notes,
         image_paths:          imagePaths,
         consent_accepted:     consentSubmissions.length > 0,
@@ -460,6 +462,36 @@ function WalkInInner() {
                 </div>
               </Field>
             )}
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+              <label style={s.label}>Colour</label>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                {['Black', 'Grey', 'Color'].map(opt => {
+                  const active = colorStyle === opt;
+                  return (
+                    <button
+                      key={opt}
+                      type="button"
+                      onClick={() => setColorStyle(active ? '' : opt)}
+                      style={{
+                        flex: 1,
+                        padding: '0.6rem 0',
+                        border: `1px solid ${active ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.1)'}`,
+                        borderRadius: 8,
+                        background: active ? 'rgba(255,255,255,0.13)' : 'rgba(255,255,255,0.05)',
+                        color: active ? '#fff' : 'rgba(255,255,255,0.55)',
+                        fontSize: '0.85rem',
+                        fontWeight: active ? 600 : 500,
+                        cursor: 'pointer',
+                        fontFamily: 'inherit',
+                      }}
+                    >
+                      {opt}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
 
             {field('notes').enabled && (
               <Field label={<>Additional notes{field('notes').required ? <Required /> : <Optional />}</>}>
