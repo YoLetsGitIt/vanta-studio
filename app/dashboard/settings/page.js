@@ -867,63 +867,6 @@ export default function SettingsPage() {
         </section>
 
         <section style={{ ...s.card, gridColumn: '1 / -1' }}>
-          <h2 style={s.sectionTitle}>Booking form fields</h2>
-          <p style={s.sectionDesc}>Choose which fields appear on your studio booking form. Name, email, and phone are always included.</p>
-          {formFields === null ? (
-            <div style={s.loadingDot} />
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              {[
-                { key: 'session_type',   label: 'Session type',        hint: 'Small / medium / large etc.' },
-                { key: 'body_location',  label: 'Placement',           hint: 'Where on the body' },
-                { key: 'design_details', label: 'Design description',  hint: 'What the client wants' },
-                { key: 'dob',            label: 'Date of birth',       hint: 'Client age verification' },
-                { key: 'artist_id',      label: 'Artist preference',   hint: 'Which artist they want' },
-                { key: 'size',           label: 'Size',                hint: 'Approximate size of the piece' },
-                { key: 'notes',          label: 'Additional notes',    hint: 'Free-form extra info' },
-                { key: 'image_paths',    label: 'Reference photos',    hint: 'Up to 5 images' },
-              ].map(({ key, label, hint }) => {
-                const entry = formFields[key] ?? { enabled: false, required: false };
-                return (
-                  <div key={key} style={s.formFieldRow}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <span style={{ fontSize: '0.87rem', fontWeight: 500, color: entry.enabled ? 'var(--text)' : 'var(--text-ghost)' }}>{label}</span>
-                      <span style={{ marginLeft: '0.5rem', fontSize: '0.75rem', color: 'var(--text-ghost)' }}>{hint}</span>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', flexShrink: 0 }}>
-                      {entry.enabled && (
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer' }}>
-                          <input
-                            type="checkbox"
-                            checked={entry.required}
-                            onChange={e => handleFormFieldToggle(key, 'required', e.target.checked)}
-                            style={{ accentColor: 'var(--accent)' }}
-                            disabled={formFieldsSaving}
-                          />
-                          <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Required</span>
-                        </label>
-                      )}
-                      <button
-                        onClick={() => handleFormFieldToggle(key, 'enabled', !entry.enabled)}
-                        disabled={formFieldsSaving}
-                        style={{
-                          ...s.fieldToggleBtn,
-                          background: entry.enabled ? 'var(--accent-tint)' : 'var(--bg-chip)',
-                          borderColor: entry.enabled ? 'var(--accent-tint-border)' : 'var(--border)',
-                          color: entry.enabled ? 'var(--accent)' : 'var(--text-ghost)',
-                        }}
-                      >
-                        {entry.enabled ? 'On' : 'Off'}
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </section>
-
-        <section style={{ ...s.card, gridColumn: '1 / -1' }}>
           <h2 style={s.sectionTitle}>{t('aftercare_instructions')}</h2>
           <p style={s.sectionDesc}>Aftercare guidance that gets attached to every completed booking. Clients can see this on their booking record after their session.</p>
           <textarea
@@ -1176,6 +1119,62 @@ export default function SettingsPage() {
                   </div>
                 </div>
               </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                <label style={s.label}>Form fields</label>
+                <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: '0 0 0.35rem' }}>
+                  Name, email, and phone are always shown.
+                </p>
+                {formFields === null ? (
+                  <div style={s.loadingDot} />
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                    {[
+                      { key: 'session_type',   label: 'Session type' },
+                      { key: 'body_location',  label: 'Placement' },
+                      { key: 'design_details', label: 'Design description' },
+                      { key: 'dob',            label: 'Date of birth' },
+                      { key: 'artist_id',      label: 'Artist preference' },
+                      { key: 'size',           label: 'Size' },
+                      { key: 'notes',          label: 'Additional notes' },
+                      { key: 'image_paths',    label: 'Reference photos' },
+                    ].map(({ key, label }) => {
+                      const entry = formFields[key] ?? { enabled: false, required: false };
+                      return (
+                        <div key={key} style={s.formFieldRow}>
+                          <span style={{ flex: 1, fontSize: '0.83rem', fontWeight: 500, color: entry.enabled ? 'var(--text)' : 'var(--text-ghost)' }}>
+                            {label}
+                          </span>
+                          {entry.enabled && (
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', cursor: 'pointer' }}>
+                              <input
+                                type="checkbox"
+                                checked={entry.required}
+                                onChange={e => handleFormFieldToggle(key, 'required', e.target.checked)}
+                                style={{ accentColor: 'var(--accent)' }}
+                                disabled={formFieldsSaving}
+                              />
+                              <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Required</span>
+                            </label>
+                          )}
+                          <button
+                            onClick={() => handleFormFieldToggle(key, 'enabled', !entry.enabled)}
+                            disabled={formFieldsSaving}
+                            style={{
+                              ...s.fieldToggleBtn,
+                              background: entry.enabled ? 'var(--accent-tint)' : 'var(--bg-chip)',
+                              borderColor: entry.enabled ? 'var(--accent-tint-border)' : 'var(--border)',
+                              color: entry.enabled ? 'var(--accent)' : 'var(--text-ghost)',
+                            }}
+                          >
+                            {entry.enabled ? 'On' : 'Off'}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
               <div style={s.embedCard}>
                 <label style={s.label}>Embed snippet</label>
                 <pre style={s.codeBlock}>{embedSnippet}</pre>
