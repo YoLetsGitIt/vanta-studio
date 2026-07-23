@@ -10,6 +10,7 @@ import {
   setStationUnavailability, clearStationUnavailability,
   listConsentTemplates, createConsentTemplate, updateConsentTemplate, deleteConsentTemplate,
   getStripeStatus, startStripeOnboarding, disconnectStripe,
+  getFormConfig, updateFormConfig,
 } from '@/lib/api';
 import { getSupabase } from '@/lib/supabase';
 import { invalidate } from '@/lib/cache';
@@ -312,6 +313,9 @@ export default function SettingsPage() {
   const [stripeConnecting, setStripeConnecting] = useState(false);
   const [stripeError, setStripeError] = useState('');
 
+  const [formFields, setFormFields] = useState(null); // null = loading
+  const [formFieldsSaving, setFormFieldsSaving] = useState(false);
+
   const [hours, setHours] = useState(defaultHours());
   const [hoursSaving, setHoursSaving] = useState(false);
   const [hoursSaved, setHoursSaved] = useState(false);
@@ -324,13 +328,14 @@ export default function SettingsPage() {
   useEffect(() => {
     async function load() {
       try {
-        const [account, { data: { session } }, hoursData, stationsData, templateData, stripeData] = await Promise.all([
+        const [account, { data: { session } }, hoursData, stationsData, templateData, stripeData, formConfigData] = await Promise.all([
           getMyStudioAccount(),
           getSupabase().auth.getSession(),
           getStudioHours().catch(() => ({ hours: [] })),
           getStations().catch(() => ({ stations: [] })),
           listConsentTemplates().catch(() => ({ templates: [] })),
           getStripeStatus().catch(() => null),
+          getFormConfig().catch(() => ({ fields: {} })),
         ]);
         setName(account.studio?.name ?? '');
         const addr = account.studio?.addressString ?? '';
@@ -352,6 +357,7 @@ export default function SettingsPage() {
         setStations(stationsData.stations ?? []);
         setConsentTemplates(templateData.templates ?? []);
         setStripeStatus(stripeData ?? { connected: false, charges_enabled: false });
+        setFormFields(formConfigData?.fields ?? {});
 
         // Handle return from Stripe onboarding.
         const params = new URLSearchParams(window.location.search);
@@ -565,6 +571,19 @@ export default function SettingsPage() {
       setConsentTemplates(prev => prev.filter(x => x.id !== t.id));
     } catch (e) {
       alert(e.message);
+    }
+  }
+
+  async function handleFormFieldToggle(key, prop, value) {
+    const next = { ...formFields, [key]: { ...formFields[key], [prop]: value } };
+    setFormFields(next);
+    setFormFieldsSaving(true);
+    try {
+      await updateFormConfig(next);
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setFormFieldsSaving(false);
     }
   }
 
@@ -845,6 +864,63 @@ export default function SettingsPage() {
           <button onClick={saveProfile} style={s.saveBtn} disabled={saving}>
             {saving ? t('saving') : saved ? t('saved') : t('save')}
           </button>
+        </section>
+
+        <section style={{ ...s.card, gridColumn: '1 / -1' }}>
+          <h2 style={s.sectionTitle}>Booking form fields</h2>
+          <p style={s.sectionDesc}>Choose which fields appear on your studio booking form. Name, email, and phone are always included.</p>
+          {formFields === null ? (
+            <div style={s.loadingDot} />
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              {[
+                { key: 'session_type',   label: 'Session type',        hint: 'Small / medium / large etc.' },
+                { key: 'body_location',  label: 'Placement',           hint: 'Where on the body' },
+                { key: 'design_details', label: 'Design description',  hint: 'What the client wants' },
+                { key: 'dob',            label: 'Date of birth',       hint: 'Client age verification' },
+                { key: 'artist_id',      label: 'Artist preference',   hint: 'Which artist they want' },
+                { key: 'size',           label: 'Size',                hint: 'Approximate size of the piece' },
+                { key: 'notes',          label: 'Additional notes',    hint: 'Free-form extra info' },
+                { key: 'image_paths',    label: 'Reference photos',    hint: 'Up to 5 images' },
+              ].map(({ key, label, hint }) => {
+                const entry = formFields[key] ?? { enabled: false, required: false };
+                return (
+                  <div key={key} style={s.formFieldRow}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ fontSize: '0.87rem', fontWeight: 500, color: entry.enabled ? 'var(--text)' : 'var(--text-ghost)' }}>{label}</span>
+                      <span style={{ marginLeft: '0.5rem', fontSize: '0.75rem', color: 'var(--text-ghost)' }}>{hint}</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', flexShrink: 0 }}>
+                      {entry.enabled && (
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer' }}>
+                          <input
+                            type="checkbox"
+                            checked={entry.required}
+                            onChange={e => handleFormFieldToggle(key, 'required', e.target.checked)}
+                            style={{ accentColor: 'var(--accent)' }}
+                            disabled={formFieldsSaving}
+                          />
+                          <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Required</span>
+                        </label>
+                      )}
+                      <button
+                        onClick={() => handleFormFieldToggle(key, 'enabled', !entry.enabled)}
+                        disabled={formFieldsSaving}
+                        style={{
+                          ...s.fieldToggleBtn,
+                          background: entry.enabled ? 'var(--accent-tint)' : 'var(--bg-chip)',
+                          borderColor: entry.enabled ? 'var(--accent-tint-border)' : 'var(--border)',
+                          color: entry.enabled ? 'var(--accent)' : 'var(--text-ghost)',
+                        }}
+                      >
+                        {entry.enabled ? 'On' : 'Off'}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </section>
 
         <section style={{ ...s.card, gridColumn: '1 / -1' }}>
@@ -1256,6 +1332,8 @@ const s = {
   fieldTypeBadge: { fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', padding: '0.1rem 0.45rem', borderRadius: 4, background: 'var(--bg-chip)', color: 'var(--text-ghost)' },
   fieldMoveBtn: { background: 'var(--bg-chip)', border: '1px solid var(--border)', borderRadius: 4, padding: '0.1rem 0.35rem', fontSize: '0.72rem', color: 'var(--text-muted)', cursor: 'pointer' },
   cancelBtn: { flex: 1, background: 'var(--bg-chip)', border: '1px solid var(--border)', borderRadius: 8, padding: '0.6rem 1rem', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', cursor: 'pointer' },
+  formFieldRow: { display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.6rem 0.85rem', background: 'var(--bg-base)', borderRadius: 8 },
+  fieldToggleBtn: { border: '1px solid', borderRadius: 6, padding: '0.25rem 0.75rem', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer', minWidth: 42, textAlign: 'center' },
   // Stripe
   stripeConnectBtn: { alignSelf: 'flex-start', background: 'var(--accent)', border: 'none', borderRadius: 8, padding: '0.65rem 1.4rem', fontSize: '0.88rem', fontWeight: 700, color: 'var(--accent-contrast, #111)', cursor: 'pointer' },
   stripeDisconnectBtn: { alignSelf: 'flex-start', background: 'transparent', border: '1px solid rgba(255,80,80,0.2)', borderRadius: 6, padding: '0.35rem 0.85rem', fontSize: '0.78rem', color: 'rgba(255,100,100,0.65)', cursor: 'pointer' },
