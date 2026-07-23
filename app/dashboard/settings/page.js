@@ -978,6 +978,7 @@ export default function SettingsPage() {
           </button>
         </section>
 
+        {/* Aftercare instructions — temporarily hidden
         <section style={{ ...s.card, gridColumn: '1 / -1' }}>
           <h2 style={s.sectionTitle}>{t('aftercare_instructions')}</h2>
           <p style={s.sectionDesc}>Aftercare guidance that gets attached to every completed booking. Clients can see this on their booking record after their session.</p>
@@ -991,6 +992,7 @@ export default function SettingsPage() {
             {saving ? t('saving') : saved ? t('saved') : t('save')}
           </button>
         </section>
+        */}
 
         <section style={{ ...s.card, gridColumn: '1 / -1' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
