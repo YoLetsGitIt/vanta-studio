@@ -145,7 +145,7 @@ export default function BookingDetailPanel({
   const canSendLink       = status === 'pending' || status === 'awaiting_payment';
   const canAcceptReject   = canAccept || canReject; // kept for layout gate
   const canConfirm        = status === 'requires_confirmation';
-  const canReschedule     = !['cancelled', 'rejected', 'timed_out', 'completed'].includes(status);
+  const canReschedule     = status === 'confirmed';
 
   const displayStatus = isNoShow ? 'no_show' : status;
   const sc = statusColors(displayStatus);
