@@ -4,7 +4,6 @@ import { useState, useEffect, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { getStudioPublic, createWalkIn, walkinUploadSign, signatureUploadSign, getStudioConsentTemplates, getFormConfigPublic } from '@/lib/api';
 
-const SESSION_TYPES = ['Tattoo', 'Piercing', 'Consultation', 'Touch-up', 'Cover-up', 'Other'];
 
 function detectCountry() {
   try {
@@ -101,7 +100,7 @@ function WalkInInner() {
   const [phoneNum,  setPhoneNum]    = useState('');
   const [dob, setDob]               = useState('');
   const [skinTone, setSkinTone]     = useState('');
-  const [sessionType, setSessionType] = useState('');
+
   const [artistId, setArtistId]     = useState('');
   const [placements, setPlacements]  = useState([]);
   const [design, setDesign]         = useState('');
@@ -286,7 +285,7 @@ function WalkInInner() {
         phone: `${COUNTRIES.find(c => c.id === phoneCode)?.dial ?? ''} ${phoneNum}`.trim(),
         dob,
         skin_tone:            skinTone,
-        session_type:         sessionType,
+
         body_location:        placements.join(', '),
         design_details:       design,
         size:                 size.trim() ? `${size.trim()}${sizeUnit}` : '',
@@ -367,15 +366,6 @@ function WalkInInner() {
 
           {/* ── Your tattoo ── */}
           <Section title="Your tattoo">
-            {field('session_type').enabled && (
-              <Field label={<>Session type{field('session_type').required && <Required />}</>}>
-                <select style={s.input} value={sessionType} required={field('session_type').required} onChange={e => setSessionType(e.target.value)}>
-                  <option value="">Select session type…</option>
-                  {SESSION_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                </select>
-              </Field>
-            )}
-
             {field('artist_id').enabled && (
               <Field label={<>Artist preference{field('artist_id').required ? <Required /> : <Optional />}</>}>
                 <select style={s.input} value={artistId} required={field('artist_id').required} onChange={e => setArtistId(e.target.value)}>

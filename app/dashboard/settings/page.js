@@ -228,10 +228,6 @@ function WidgetPreview({ bg, accent, studioName, fields }) {
           </div>
         </div>
 
-        {f('session_type').enabled && (
-          <div style={fld}><span style={lbl}>Session type{f('session_type').required ? ' *' : ''}</span><div style={inp} /></div>
-        )}
-
         {f('artist_id').enabled && (
           <div style={fld}><span style={lbl}>Artist preference</span><div style={inp} /></div>
         )}
@@ -1155,7 +1151,6 @@ export default function SettingsPage() {
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
                     {[
-                      { key: 'session_type',   label: 'Session type' },
                       { key: 'artist_id',      label: 'Artist preference' },
                       { key: 'body_location',  label: 'Placement' },
                       { key: 'design_details', label: 'Design description' },
