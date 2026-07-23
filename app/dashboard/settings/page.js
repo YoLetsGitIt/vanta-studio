@@ -253,6 +253,13 @@ function WidgetPreview({ bg, accent, studioName, fields }) {
           <div style={fld}><span style={lbl}>Design description{f('design_details').required ? ' *' : ''}</span><div style={{ ...inp, height: 72 }} /></div>
         )}
 
+        {f('retouch').enabled && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0.3rem 0' }}>
+            <div style={{ width: 14, height: 14, borderRadius: 3, border: '1px solid rgba(255,255,255,0.25)', background: 'rgba(255,255,255,0.05)', flexShrink: 0 }} />
+            <span style={{ ...lbl, margin: 0 }}>This is a touch-up / retouch</span>
+          </div>
+        )}
+
         {f('size').enabled && (
           <div style={fld}><span style={lbl}>Size{f('size').required ? ' *' : ''}</span><div style={inp} /></div>
         )}
@@ -1002,7 +1009,6 @@ export default function SettingsPage() {
             <div key={t.id} style={s.templateRow}>
               <div style={s.templateRowLeft}>
                 <span style={s.templateName}>{t.name}</span>
-                {t.requires_minor_guardian && <span style={s.guardianBadge}>Guardian</span>}
                 <span style={s.templateFieldCount}>{(t.fields ?? []).length} field{(t.fields ?? []).length !== 1 ? 's' : ''}</span>
               </div>
               <div style={s.templateRowActions}>
@@ -1035,11 +1041,9 @@ export default function SettingsPage() {
                         style={{ accentColor: 'var(--accent)' }} />
                       <span style={{ fontSize: '0.83rem', color: 'var(--text-secondary)' }}>Require client signature</span>
                     </label>
-                    <label style={s.toggleRow}>
-                      <input type="checkbox" checked={templateRequiresGuardian} onChange={e => setTemplateRequiresGuardian(e.target.checked)}
-                        style={{ accentColor: 'var(--accent)' }} />
-                      <span style={{ fontSize: '0.83rem', color: 'var(--text-secondary)' }}>Require parent / guardian consent for minors (under 18)</span>
-                    </label>
+                    <p style={{ fontSize: '0.78rem', color: 'var(--text-ghost)', margin: 0, lineHeight: 1.5 }}>
+                      Guardian consent fields appear automatically when the client's date of birth indicates they are under 18.
+                    </p>
                   </div>
 
                   <div style={{ borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>
@@ -1234,6 +1238,7 @@ export default function SettingsPage() {
                       { key: 'artist_id',      label: 'Artist preference' },
                       { key: 'body_location',  label: 'Placement' },
                       { key: 'design_details', label: 'Design description' },
+                      { key: 'retouch',        label: 'Touch-up / retouch' },
                       { key: 'size',           label: 'Size' },
                       { key: 'skin_tone',      label: 'Skin tone' },
                       { key: 'notes',          label: 'Additional notes' },

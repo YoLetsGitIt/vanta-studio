@@ -107,6 +107,7 @@ function WalkInInner() {
   const [size, setSize]             = useState('');
   const [sizeUnit, setSizeUnit]     = useState('cm');
   const [colorStyle, setColorStyle] = useState('');
+  const [retouch, setRetouch]       = useState(false);
   const [notes, setNotes]           = useState('');
   const [photos, setPhotos]         = useState([]);
   const [photoPreviews, setPhotoPreviews] = useState([]);
@@ -222,7 +223,7 @@ function WalkInInner() {
         setSubmitError(`Please sign "${t.name}".`);
         return;
       }
-      if (isMinor && t.requires_minor_guardian) {
+      if (isMinor) {
         if (!guardianName.trim()) { setSubmitError('Please provide the guardian\'s name.'); return; }
         if (!ts.guardianSigBlob) { setSubmitError(`Guardian signature required for "${t.name}".`); return; }
       }
@@ -265,7 +266,7 @@ function WalkInInner() {
         if (t.requires_signature && ts.sigBlob) {
           clientSigPath = await uploadSignature(ts.sigBlob, `Signature for "${t.name}"`);
         }
-        if (isMinor && t.requires_minor_guardian && ts.guardianSigBlob) {
+        if (isMinor && ts.guardianSigBlob) {
           guardianSigPath = await uploadSignature(ts.guardianSigBlob, `Guardian signature for "${t.name}"`);
         }
 
@@ -291,6 +292,7 @@ function WalkInInner() {
         dob,
         skin_tone:            skinTone,
 
+        session_type:         retouch ? 'retouch' : '',
         body_location:        placements.join(', '),
         design_details:       design,
         size:                 size.trim() ? `${size.trim()}${sizeUnit}` : '',
@@ -467,6 +469,13 @@ function WalkInInner() {
               </Field>
             )}
 
+            {field('retouch').enabled && (
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: 'rgba(255,255,255,0.7)', cursor: 'pointer' }}>
+                <input type="checkbox" checked={retouch} onChange={e => setRetouch(e.target.checked)} style={{ width: 16, height: 16, accentColor: '#f5ecd9', cursor: 'pointer' }} />
+                This is a touch-up / retouch
+              </label>
+            )}
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
               <label style={s.label}>Colour</label>
               <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -556,7 +565,7 @@ function WalkInInner() {
                       </span>
                     </label>
 
-                    {isMinor && t.requires_minor_guardian && (
+                    {isMinor && (
                       <div style={s.guardianBox}>
                         <p style={s.guardianTitle}>Parent / Guardian Consent Required</p>
                         <p style={{ ...s.consentText, marginBottom: '0.75rem' }}>
