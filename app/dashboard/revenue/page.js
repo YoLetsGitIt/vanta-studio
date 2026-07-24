@@ -997,7 +997,7 @@ const st = {
     border: '1px solid var(--border)', background: 'transparent',
     color: 'var(--text-muted)', fontSize: '0.78rem', fontWeight: 500, cursor: 'pointer',
   },
-  weekBtnActive: { background: 'var(--accent-tint)', borderColor: 'var(--accent-tint-border)', color: 'var(--accent)' },
+  weekBtnActive: { background: 'var(--accent-tint)', border: '1px solid var(--accent-tint-border)', color: 'var(--accent)' },
   exportBtn: {
     padding: '0.3rem 0.75rem', borderRadius: 20,
     border: '1px solid var(--border)', background: 'transparent',
@@ -1112,7 +1112,7 @@ const st = {
     color: 'var(--text-muted)', fontSize: '0.82rem', fontWeight: 500, cursor: 'pointer',
   },
   modeBtnActive: {
-    background: 'var(--accent-tint)', borderColor: 'var(--accent-tint-border)', color: 'var(--accent)',
+    background: 'var(--accent-tint)', border: '1px solid var(--accent-tint-border)', color: 'var(--accent)',
   },
   fullAmt: {
     fontSize: '2rem', fontWeight: 700, color: 'var(--accent)', letterSpacing: '-0.03em',

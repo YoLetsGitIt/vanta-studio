@@ -286,7 +286,7 @@ const s = {
   },
   weekBtnActive: {
     background: 'var(--accent-tint)',
-    borderColor: 'var(--accent-tint-border)',
+    border: '1px solid var(--accent-tint-border)',
     color: 'var(--accent)',
   },
   body: {
