@@ -156,7 +156,7 @@ export default function RevenuePage() {
         <div style={st.controls}>
           <div style={st.quickPicker}>
             {QUICK_OPTIONS.map(opt => (
-              <button key={opt.label} onClick={() => applyQuick(opt)}
+              <button key={opt.label} onMouseDown={e => e.preventDefault()} onClick={() => applyQuick(opt)}
                 style={{ ...st.weekBtn, ...(activeQuick === opt.label ? st.weekBtnActive : {}) }}>
                 {opt.label}
               </button>

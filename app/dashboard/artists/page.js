@@ -132,6 +132,7 @@ function ArtistsInner() {
           </p>
         </div>
         <button
+          onMouseDown={e => e.preventDefault()}
           onClick={() => setShowPending(v => !v)}
           style={{ ...s.pendingBtn, ...(showPending ? s.pendingBtnActive : {}) }}
         >

@@ -66,6 +66,7 @@ export default function StudiosAdminPage() {
           {STATUS_FILTERS.map(f => (
             <button
               key={f.value}
+              onMouseDown={e => e.preventDefault()}
               onClick={() => setFilter(f.value)}
               style={{ ...s.filterBtn, ...(filter === f.value ? s.filterActive : {}) }}
             >

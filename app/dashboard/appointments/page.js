@@ -700,7 +700,7 @@ const s = {
     fontSize: '0.78rem', fontWeight: 500, cursor: 'pointer',
   },
   filterActive: {
-    background: 'var(--accent-active-tint)', borderColor: 'var(--accent-active-border)', color: 'var(--accent)',
+    background: 'var(--accent-tint)', borderColor: 'var(--accent-tint-border)', color: 'var(--accent)',
   },
   body: {
     flex: 1, overflowY: 'auto', padding: '1rem 2rem',

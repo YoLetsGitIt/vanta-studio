@@ -109,6 +109,7 @@ export default function AnalyticsPage() {
           {WEEK_OPTIONS.map(w => (
             <button
               key={w}
+              onMouseDown={e => e.preventDefault()}
               onClick={() => setWeeks(w)}
               style={{ ...s.weekBtn, ...(weeks === w ? s.weekBtnActive : {}) }}
             >
