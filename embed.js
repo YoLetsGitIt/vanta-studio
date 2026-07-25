@@ -235,6 +235,12 @@
     fetch(API + '/studios/' + studioId + '/public')
       .then(function (r) { return r.json(); })
       .then(function (studio) {
+        return fetch(API + '/studios/' + studioId + '/consent-templates')
+          .then(function (r) { return r.json(); })
+          .then(function (data) { studio._consentTemplates = data.templates || []; return studio; })
+          .catch(function () { studio._consentTemplates = []; return studio; });
+      })
+      .then(function (studio) {
         card.removeChild(loadingEl);
         buildForm(card, studioId, studio, defaultCountry);
       })
@@ -556,25 +562,92 @@
       });
     }
 
-    // Consent form (legacy text)
-    var consentCheckEl = null;
-    if (studio.consent_form) {
-      var consentWrap = mk('div', 'vb-consent');
-      var consentText = mk('p', 'vb-consent-text');
-      consentText.textContent = studio.consent_form;
-      consentWrap.appendChild(consentText);
-      var consentLabel = mk('label', 'vb-consent-check');
-      consentCheckEl = document.createElement('input');
-      consentCheckEl.type = 'checkbox';
-      consentCheckEl.style.accentColor = '#f5ecd9';
-      consentCheckEl.style.flexShrink = '0';
-      var consentSpan = mk('span');
-      consentSpan.textContent = 'I have read and agree to the above';
-      consentLabel.appendChild(consentCheckEl);
-      consentLabel.appendChild(consentSpan);
-      consentWrap.appendChild(consentLabel);
-      form.appendChild(consentWrap);
-    }
+    // Consent templates
+    var consentAgreedEls = []; // one checkbox per template
+    var consentTemplates = studio._consentTemplates || [];
+    consentTemplates.forEach(function (tmpl) {
+      var wrap = mk('div', 'vb-consent');
+
+      var titleEl = mk('p');
+      titleEl.style.cssText = 'margin:0 0 0.5rem;font-size:0.85rem;font-weight:700;color:#fff';
+      titleEl.textContent = tmpl.name;
+      wrap.appendChild(titleEl);
+
+      (tmpl.fields || []).forEach(function (f) {
+        if (f.type === 'heading') {
+          var h = mk('p');
+          h.style.cssText = 'margin:0.25rem 0 0;font-size:0.85rem;font-weight:700;color:rgba(255,255,255,0.8)';
+          h.textContent = f.label;
+          wrap.appendChild(h);
+        } else if (f.type === 'paragraph') {
+          var p = mk('p', 'vb-consent-text');
+          p.textContent = f.label;
+          wrap.appendChild(p);
+        } else if (f.type === 'checkbox') {
+          var cl = mk('label', 'vb-consent-check');
+          var ci = document.createElement('input');
+          ci.type = 'checkbox';
+          ci.style.cssText = 'accent-color:#f5ecd9;flex-shrink:0';
+          if (f.required) ci.required = true;
+          var cs = mk('span');
+          cs.textContent = f.label;
+          cl.appendChild(ci);
+          cl.appendChild(cs);
+          wrap.appendChild(cl);
+        } else if (f.type === 'yesno') {
+          var ynWrap = mk('div');
+          ynWrap.style.cssText = 'display:flex;flex-direction:column;gap:0.3rem';
+          var ynLbl = mk('span', 'vb-label');
+          ynLbl.textContent = f.label;
+          ynWrap.appendChild(ynLbl);
+          var ynRow = mk('div');
+          ynRow.style.cssText = 'display:flex;gap:0.5rem';
+          var ynVal = '';
+          ['Yes', 'No'].forEach(function (opt) {
+            var btn = mk('button', 'vb-colour-chip');
+            btn.type = 'button';
+            btn.textContent = opt;
+            btn.addEventListener('click', function () {
+              ynVal = opt;
+              ['Yes', 'No'].forEach(function (o) {
+                ynRow.querySelectorAll('button').forEach(function (b) {
+                  b.className = 'vb-colour-chip' + (b.textContent === ynVal ? ' vb-colour-chip-on' : '');
+                });
+              });
+            });
+            ynRow.appendChild(btn);
+          });
+          ynWrap.appendChild(ynRow);
+          wrap.appendChild(ynWrap);
+        } else if (f.type === 'textarea') {
+          var taWrap = mk('div', 'vb-field');
+          var taLbl = mk('label', 'vb-label');
+          taLbl.textContent = f.label;
+          var ta = mk('textarea', 'vb-input');
+          ta.rows = 2;
+          ta.style.resize = 'vertical';
+          if (f.required) ta.required = true;
+          taWrap.appendChild(taLbl);
+          taWrap.appendChild(ta);
+          wrap.appendChild(taWrap);
+        }
+      });
+
+      // Agreement checkbox — always required
+      var agreeLabel = mk('label', 'vb-consent-check');
+      var agreeCheck = document.createElement('input');
+      agreeCheck.type = 'checkbox';
+      agreeCheck.required = true;
+      agreeCheck.style.cssText = 'accent-color:#f5ecd9;flex-shrink:0';
+      var agreeSpan = mk('span');
+      agreeSpan.textContent = 'I have read and agreed to the above';
+      agreeLabel.appendChild(agreeCheck);
+      agreeLabel.appendChild(agreeSpan);
+      wrap.appendChild(agreeLabel);
+      consentAgreedEls.push(agreeCheck);
+
+      form.appendChild(wrap);
+    });
 
     // Error + submit
     var errEl = mk('div', 'vb-err');
@@ -595,10 +668,12 @@
         errEl.style.display = 'block';
         return;
       }
-      if (studio.consent_form && consentCheckEl && !consentCheckEl.checked) {
-        errEl.textContent = 'Please agree to the consent form.';
-        errEl.style.display = 'block';
-        return;
+      for (var ci = 0; ci < consentAgreedEls.length; ci++) {
+        if (!consentAgreedEls[ci].checked) {
+          errEl.textContent = 'Please agree to all consent forms before submitting.';
+          errEl.style.display = 'block';
+          return;
+        }
       }
 
       var countryObj = null;
