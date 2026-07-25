@@ -647,7 +647,7 @@
           var okTitle = mk('h2', 'vb-ok-title');
           okTitle.textContent = "You're on the list!";
           var okSub = mk('p', 'vb-ok-sub');
-          okSub.textContent = 'Your request has been sent to ' + (studio.name || 'the studio') + '. They'll be in touch soon.';
+          okSub.textContent = 'Your request has been sent to ' + (studio.name || 'the studio') + '. They\'ll be in touch soon.';
           ok.appendChild(icon);
           ok.appendChild(okTitle);
           ok.appendChild(okSub);
