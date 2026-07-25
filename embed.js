@@ -196,11 +196,27 @@
     return el;
   }
 
-  // Returns {enabled, required} for a field key from form_fields config.
+  // Mirrors DefaultFormFieldConfig() in the backend.
+  var DEFAULT_FIELDS = {
+    artist_id:      { enabled: true,  required: false },
+    body_location:  { enabled: true,  required: false },
+    design_details: { enabled: true,  required: false },
+    skin_tone:      { enabled: true,  required: false },
+    size:           { enabled: false, required: false },
+    notes:          { enabled: true,  required: false },
+    image_paths:    { enabled: true,  required: false },
+    retouch:        { enabled: false, required: false },
+    allergies:      { enabled: false, required: false },
+  };
+
+  // Returns {enabled, required} for a field key.
+  // Falls back to DEFAULT_FIELDS when form_fields is absent or the key is missing.
   function fieldCfg(formFields, key) {
-    var f = formFields && formFields[key];
-    if (!f) return { enabled: false, required: false };
-    return { enabled: !!f.enabled, required: !!f.required };
+    if (formFields && formFields[key] !== undefined && formFields[key] !== null) {
+      var f = formFields[key];
+      return { enabled: !!f.enabled, required: !!f.required };
+    }
+    return DEFAULT_FIELDS[key] || { enabled: false, required: false };
   }
 
   function render(container, studioId) {
