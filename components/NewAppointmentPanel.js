@@ -313,6 +313,8 @@ export default function NewAppointmentPanel({ open, onClose, onCreated }) {
       body.source = bookingType === 'studio' ? 'walkin' : 'personal';
       await createManualBooking(body);
       invalidatePrefix('bookings:');
+      invalidatePrefix('schedule:');
+      window.dispatchEvent(new CustomEvent('booking-created'));
       setSaved(true);
       setTimeout(() => {
         setSaved(false);

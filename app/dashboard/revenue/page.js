@@ -44,7 +44,7 @@ export default function RevenuePage() {
   const [startDate,   setStartDate]   = useState(() => dateFromDaysAgo(7));
   const [endDate,     setEndDate]     = useState(today);
   const [activeQuick, setActiveQuick] = useState('1w');
-  const [tab,         setTab]         = useState('overview'); // 'overview' | 'financial'
+  const [tab,         setTab]         = useState('overview'); // 'overview' | 'financial' | 'artists'
   const [unlocked,    setUnlocked]    = useState(false);
   const [userEmail,   setUserEmail]   = useState('');
   const [stats,       setStats]       = useState(null);
@@ -177,17 +177,22 @@ export default function RevenuePage() {
 
       {/* ── Tab bar ────────────────────────────────────────────────────────── */}
       <div style={st.tabBar}>
-        <button onClick={() => setTab('overview')}
+        <button onMouseDown={e => e.preventDefault()} onClick={() => setTab('overview')}
           style={{ ...st.tabBtn, ...(tab === 'overview' ? st.tabActive : {}) }}>
           {t('revenue_overview')}
         </button>
-        <button onClick={() => setTab('financial')}
+        <button onMouseDown={e => e.preventDefault()} onClick={() => setTab('financial')}
           style={{ ...st.tabBtn, ...(tab === 'financial' ? st.tabActive : {}) }}>
           <LockIcon locked={!unlocked} />
           {t('revenue_financial')}
         </button>
-        {tab === 'financial' && unlocked && (
-          <button onClick={handleLock} style={st.lockBtn} title="Lock financial tab">
+        <button onMouseDown={e => e.preventDefault()} onClick={() => setTab('artists')}
+          style={{ ...st.tabBtn, ...(tab === 'artists' ? st.tabActive : {}) }}>
+          <LockIcon locked={!unlocked} />
+          Artists & Payouts
+        </button>
+        {(tab === 'financial' || tab === 'artists') && unlocked && (
+          <button onClick={handleLock} style={st.lockBtn} title="Lock">
             {t('revenue_lock')}
           </button>
         )}
@@ -277,8 +282,41 @@ export default function RevenuePage() {
             {/* ── Financial tab ─────────────────────────────────────────── */}
             {tab === 'financial' && (
               unlocked
+                ? <FinancialContent s={s} weeklyChart={weeklyChart} startDate={startDate} endDate={endDate} isLight={isLight} />
+                : <PasswordGate email={userEmail} onUnlock={handleUnlock} />
+            )}
+
+            {/* ── Artists & Payouts tab ──────────────────────────────────── */}
+            {tab === 'artists' && (
+              unlocked
                 ? <>
-                    <FinancialContent s={s} weeklyChart={weeklyChart} byArtist={stats.by_artist} startDate={startDate} endDate={endDate} isLight={isLight} />
+                    {stats.by_artist?.length > 0 && (
+                      <Section title={t('revenue_artist_perf')}>
+                        <div style={st.tableScroll}>
+                          <table style={st.table}>
+                            <thead>
+                              <tr>{[t('revenue_artist'), t('revenue_tattoos'), t('revenue_gross_sales'), t('revenue_avg_ticket'), t('revenue_deposits'), t('revenue_hours'), t('revenue_sales_hr')].map(h => <th key={h} style={st.th}>{h}</th>)}</tr>
+                            </thead>
+                            <tbody>
+                              {stats.by_artist.map(ar => (
+                                <tr key={ar.artist_id} style={st.tr}>
+                                  <td style={{ ...st.td, color: 'var(--text)', fontWeight: 500 }}>{ar.artist_name}</td>
+                                  <td style={st.td}>{ar.session_count}</td>
+                                  <td style={{ ...st.td, color: 'var(--accent)' }}>{fmt(ar.gross_sales)}</td>
+                                  <td style={st.td}>{fmt(ar.avg_ticket)}</td>
+                                  <td style={st.td}>{fmt(ar.deposits_collected)}</td>
+                                  <td style={st.td}>{fmtHours(ar.estimated_hours)}</td>
+                                  <td style={st.td}>{ar.sales_per_hour > 0 ? fmt(ar.sales_per_hour) : '—'}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                        {stats.by_artist.some(a => a.estimated_hours > 0) && (
+                          <p style={st.note}>{t('revenue_hours_note')}</p>
+                        )}
+                      </Section>
+                    )}
                     <PayoutsSection payouts={payouts} onPay={setPayTarget} onViewEarnings={setEarningsTarget} />
                     <ReimbursementsSection
                       reimbursements={reimbursements}
@@ -297,7 +335,7 @@ export default function RevenuePage() {
 
 // ── Financial content (shown when unlocked) ───────────────────────────────────
 
-function FinancialContent({ s, weeklyChart, byArtist, startDate, endDate, isLight }) {
+function FinancialContent({ s, weeklyChart, startDate, endDate, isLight }) {
   const { t } = useLanguage();
   const tickColor = isLight ? 'rgba(17,16,8,0.4)' : 'rgba(255,255,255,0.3)';
   const gridColor = isLight ? 'rgba(0,0,0,0.07)' : 'rgba(255,255,255,0.05)';
@@ -349,33 +387,6 @@ function FinancialContent({ s, weeklyChart, byArtist, startDate, endDate, isLigh
         )}
       </Section>
 
-      {byArtist?.length > 0 && (
-        <Section title={t('revenue_artist_perf')}>
-          <div style={st.tableScroll}>
-            <table style={st.table}>
-              <thead>
-                <tr>{[t('revenue_artist'), t('revenue_tattoos'), t('revenue_gross_sales'), t('revenue_avg_ticket'), t('revenue_deposits'), t('revenue_hours'), t('revenue_sales_hr')].map(h => <th key={h} style={st.th}>{h}</th>)}</tr>
-              </thead>
-              <tbody>
-                {byArtist.map(ar => (
-                  <tr key={ar.artist_id} style={st.tr}>
-                    <td style={{ ...st.td, color: 'var(--text)', fontWeight: 500 }}>{ar.artist_name}</td>
-                    <td style={st.td}>{ar.session_count}</td>
-                    <td style={{ ...st.td, color: 'var(--accent)' }}>{fmt(ar.gross_sales)}</td>
-                    <td style={st.td}>{fmt(ar.avg_ticket)}</td>
-                    <td style={st.td}>{fmt(ar.deposits_collected)}</td>
-                    <td style={st.td}>{fmtHours(ar.estimated_hours)}</td>
-                    <td style={st.td}>{ar.sales_per_hour > 0 ? fmt(ar.sales_per_hour) : '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          {byArtist.some(a => a.estimated_hours > 0) && (
-            <p style={st.note}>{t('revenue_hours_note')}</p>
-          )}
-        </Section>
-      )}
     </>
   );
 }

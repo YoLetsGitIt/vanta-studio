@@ -191,7 +191,7 @@ function AddressAutocomplete({ value, onChange, onSelect, inputStyle }) {
   );
 }
 
-function WidgetPreview({ bg, accent, studioName, fields }) {
+function WidgetPreview({ bg, accent, studioName, fields, consentTemplate }) {
   const light = isLightColor(accent);
   const inp = { height: 38, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8 };
   const lbl = { fontSize: '0.65rem', fontWeight: 600, color: 'rgba(255,255,255,0.4)', marginBottom: 4, display: 'block' };
@@ -253,6 +253,24 @@ function WidgetPreview({ bg, accent, studioName, fields }) {
           <div style={fld}><span style={lbl}>Design description{f('design_details').required ? ' *' : ''}</span><div style={{ ...inp, height: 72 }} /></div>
         )}
 
+        {f('skin_tone').enabled && (
+          <div style={fld}><span style={lbl}>Skin tone{f('skin_tone').required ? ' *' : ''}</span><div style={inp} /></div>
+        )}
+
+        {f('size').enabled && (
+          <div style={fld}>
+            <span style={lbl}>Size{f('size').required ? ' *' : ''}</span>
+            <div style={{ display: 'flex', gap: 5 }}>
+              <div style={{ ...inp, flex: 1 }} />
+              <div style={{ display: 'flex', background: 'rgba(255,255,255,0.06)', borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)', flexShrink: 0 }}>
+                {['cm', 'in'].map(u => (
+                  <div key={u} style={{ padding: '0 0.6rem', display: 'flex', alignItems: 'center', fontSize: '0.7rem', fontWeight: 600, color: u === 'cm' ? '#fff' : 'rgba(255,255,255,0.35)', background: u === 'cm' ? 'rgba(255,255,255,0.13)' : 'transparent' }}>{u}</div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
         {f('retouch').enabled && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0.3rem 0' }}>
             <div style={{ width: 14, height: 14, borderRadius: 3, border: '1px solid rgba(255,255,255,0.25)', background: 'rgba(255,255,255,0.05)', flexShrink: 0 }} />
@@ -260,16 +278,25 @@ function WidgetPreview({ bg, accent, studioName, fields }) {
           </div>
         )}
 
-        {f('size').enabled && (
-          <div style={fld}><span style={lbl}>Size{f('size').required ? ' *' : ''}</span><div style={inp} /></div>
-        )}
-
-        {f('skin_tone').enabled && (
-          <div style={fld}><span style={lbl}>Skin tone{f('skin_tone').required ? ' *' : ''}</span><div style={inp} /></div>
-        )}
+        {/* Colour — always shown, hardcoded in actual form */}
+        <div style={fld}>
+          <span style={lbl}>Colour</span>
+          <div style={{ display: 'flex', gap: 5 }}>
+            {['Black', 'Grey', 'Color'].map((opt, i) => (
+              <div key={opt} style={{ flex: 1, padding: '0.35rem 0', borderRadius: 7, fontSize: '0.72rem', fontWeight: i === 0 ? 600 : 500, textAlign: 'center', border: `1px solid ${i === 0 ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.1)'}`, background: i === 0 ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.04)', color: i === 0 ? '#fff' : 'rgba(255,255,255,0.45)' }}>{opt}</div>
+            ))}
+          </div>
+        </div>
 
         {f('notes').enabled && (
           <div style={fld}><span style={lbl}>Additional notes</span><div style={{ ...inp, height: 52 }} /></div>
+        )}
+
+        {f('allergies').enabled && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0.3rem 0' }}>
+            <div style={{ width: 14, height: 14, borderRadius: 3, border: '1px solid rgba(255,255,255,0.25)', background: 'rgba(255,255,255,0.05)', flexShrink: 0 }} />
+            <span style={{ ...lbl, margin: 0 }}>I have allergies or sensitivities{f('allergies').required ? '' : ' (optional)'}</span>
+          </div>
         )}
 
         {/* Photo upload */}
@@ -286,6 +313,36 @@ function WidgetPreview({ bg, accent, studioName, fields }) {
         <div style={{ padding: '0.75rem', background: accent, borderRadius: 9, fontSize: '0.85rem', fontWeight: 700, color: light ? '#0e0e0e' : '#ffffff', textAlign: 'center' }}>
           Request booking
         </div>
+
+        {/* Consent form */}
+        {consentTemplate && (
+          <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#fff' }}>{consentTemplate.name}</span>
+            {(consentTemplate.fields ?? []).map((f, i) => {
+              if (f.type === 'heading') return <p key={i} style={{ fontSize: '0.82rem', fontWeight: 700, color: 'rgba(255,255,255,0.8)', margin: 0 }}>{f.label}</p>;
+              if (f.type === 'paragraph') return <p key={i} style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.4)', margin: 0, lineHeight: 1.5 }}>{f.label}</p>;
+              if (f.type === 'checkbox') return (
+                <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
+                  <div style={{ width: 13, height: 13, borderRadius: 3, border: '1px solid rgba(255,255,255,0.2)', marginTop: 2, flexShrink: 0 }} />
+                  <span style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>{f.label}</span>
+                </div>
+              );
+              if (f.type === 'yesno') return (
+                <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <span style={{ fontSize: '0.65rem', fontWeight: 600, color: 'rgba(255,255,255,0.4)' }}>{f.label}</span>
+                  <div style={{ display: 'flex', gap: 5 }}>
+                    {['Yes', 'No'].map(o => <div key={o} style={{ padding: '0.3rem 0.9rem', borderRadius: 7, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', fontSize: '0.72rem', color: 'rgba(255,255,255,0.4)' }}>{o}</div>)}
+                  </div>
+                </div>
+              );
+              return <div key={i} style={{ ...fld }}><span style={lbl}>{f.label}</span><div style={{ ...inp, height: 52 }} /></div>;
+            })}
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
+              <div style={{ width: 13, height: 13, borderRadius: 3, border: '1px solid rgba(255,255,255,0.2)', marginTop: 2, flexShrink: 0 }} />
+              <span style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>I have read and agreed to the above *</span>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -411,6 +468,7 @@ export default function SettingsPage() {
   const [walkInUrl, setWalkInUrl] = useState('');
   const [studioId, setStudioId] = useState('');
   const [theme, setThemeState] = useState('dark');
+  const [tab, setTab] = useState('studio');
 
   useEffect(() => { setThemeState(getTheme()); }, []);
 
@@ -751,12 +809,30 @@ export default function SettingsPage() {
 
   return (
     <div style={s.page}>
-      <h1 style={s.pageTitle}>{t('settings')}</h1>
+      <div style={s.pageHeader}>
+        <h1 style={s.pageTitle}>{t('settings')}</h1>
+        <div style={s.tabBar}>
+          {[
+            { id: 'studio',   label: 'Studio' },
+            { id: 'bookings', label: 'Bookings' },
+            { id: 'payments', label: 'Payments' },
+            { id: 'account',  label: 'Account' },
+          ].map(tb => (
+            <button
+              key={tb.id}
+              onMouseDown={e => e.preventDefault()}
+              onClick={() => setTab(tb.id)}
+              style={{ ...s.tabBtn, ...(tab === tb.id ? s.tabBtnActive : {}) }}
+            >
+              {tb.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
       <div style={s.grid}>
 
-        {/* ── Studio ── */}
-        <p style={s.groupLabel}>{t('section_studio')}</p>
+        {tab === 'studio' && <>
 
         <section style={s.card}>
           <h2 style={s.sectionTitle}>{t('profile')}</h2>
@@ -813,6 +889,62 @@ export default function SettingsPage() {
                 </optgroup>
               </select>
             </div>
+            {profileError && <p style={s.errorText}>{profileError}</p>}
+            <button type="submit" style={s.saveBtn} disabled={saving}>
+              {saving ? t('saving') : saved ? t('saved') : t('save_changes')}
+            </button>
+          </form>
+        </section>
+
+        <section style={s.card}>
+          <h2 style={s.sectionTitle}>{t('hours')}</h2>
+          <div style={s.hoursGrid}>
+            {hours.map((day, i) => (
+              <div key={i} style={s.hoursRow}>
+                <span style={s.dayLabel}>{t(DAY_KEYS[i])}</span>
+                <label style={s.closedToggle}>
+                  <input
+                    type="checkbox"
+                    checked={day.is_closed}
+                    onChange={e => setHourField(i, 'is_closed', e.target.checked)}
+                    style={{ accentColor: '#f5ecd9' }}
+                  />
+                  <span style={{ color: day.is_closed ? 'var(--text-ghost)' : 'var(--text-muted)', fontSize: '0.75rem' }}>
+                    {t('closed')}
+                  </span>
+                </label>
+                {!day.is_closed && (
+                  <div style={s.timePair}>
+                    <input
+                      type="time"
+                      value={day.open_time}
+                      onChange={e => setHourField(i, 'open_time', e.target.value)}
+                      style={s.timeInput}
+                    />
+                    <span style={s.timeSep}>–</span>
+                    <input
+                      type="time"
+                      value={day.close_time}
+                      onChange={e => setHourField(i, 'close_time', e.target.value)}
+                      style={s.timeInput}
+                    />
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+          <button onClick={handleSaveHours} style={s.saveBtn} disabled={hoursSaving}>
+            {hoursSaving ? t('saving') : hoursSaved ? t('saved') : t('save_hours')}
+          </button>
+        </section>
+
+        </>}
+
+        {tab === 'payments' && <>
+
+        <section style={{ ...s.card, gridColumn: '1 / -1' }}>
+          <h2 style={s.sectionTitle}>Commission</h2>
+          <form onSubmit={handleSaveProfile} style={s.form}>
             <div style={s.field}>
               <label style={s.label}>Studio commission (%)</label>
               <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: '0 0 0.5rem' }}>
@@ -865,51 +997,6 @@ export default function SettingsPage() {
           </form>
         </section>
 
-        <section style={s.card}>
-          <h2 style={s.sectionTitle}>{t('hours')}</h2>
-          <div style={s.hoursGrid}>
-            {hours.map((day, i) => (
-              <div key={i} style={s.hoursRow}>
-                <span style={s.dayLabel}>{t(DAY_KEYS[i])}</span>
-                <label style={s.closedToggle}>
-                  <input
-                    type="checkbox"
-                    checked={day.is_closed}
-                    onChange={e => setHourField(i, 'is_closed', e.target.checked)}
-                    style={{ accentColor: '#f5ecd9' }}
-                  />
-                  <span style={{ color: day.is_closed ? 'var(--text-ghost)' : 'var(--text-muted)', fontSize: '0.75rem' }}>
-                    {t('closed')}
-                  </span>
-                </label>
-                {!day.is_closed && (
-                  <div style={s.timePair}>
-                    <input
-                      type="time"
-                      value={day.open_time}
-                      onChange={e => setHourField(i, 'open_time', e.target.value)}
-                      style={s.timeInput}
-                    />
-                    <span style={s.timeSep}>–</span>
-                    <input
-                      type="time"
-                      value={day.close_time}
-                      onChange={e => setHourField(i, 'close_time', e.target.value)}
-                      style={s.timeInput}
-                    />
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-          <button onClick={handleSaveHours} style={s.saveBtn} disabled={hoursSaving}>
-            {hoursSaving ? t('saving') : hoursSaved ? t('saved') : t('save_hours')}
-          </button>
-        </section>
-
-        {/* ── Payments ── */}
-        <p style={{ ...s.groupLabel, marginTop: '1.25rem' }}>{t('section_payments')}</p>
-
         <section style={{ ...s.card, gridColumn: '1 / -1' }}>
           <h2 style={s.sectionTitle}>{t('stripe_connect')}</h2>
           <p style={s.sectionDesc}>
@@ -956,8 +1043,9 @@ export default function SettingsPage() {
           )}
         </section>
 
-        {/* ── Bookings ── */}
-        <p style={{ ...s.groupLabel, marginTop: '1.25rem' }}>{t('section_bookings')}</p>
+        </>}
+
+        {tab === 'bookings' && <>
 
         <section style={{ ...s.card, gridColumn: '1 / -1' }}>
           <h2 style={s.sectionTitle}>{t('reschedule_window')}</h2>
@@ -1000,7 +1088,9 @@ export default function SettingsPage() {
               <h2 style={s.sectionTitle}>{t('consent_forms')}</h2>
               <p style={s.sectionDesc}>Create consent forms with custom fields, e-signatures, and minor / guardian support.</p>
             </div>
+            {/* New form button — re-enable when multiple consent forms are supported
             <button onClick={openNewTemplate} style={s.addTemplateBtn}>{t('new_form')}</button>
+            */}
           </div>
 
           {consentTemplates.length === 0 && (
@@ -1015,7 +1105,12 @@ export default function SettingsPage() {
               </div>
               <div style={s.templateRowActions}>
                 <button style={s.templateActionBtn} onClick={() => openEditTemplate(t)}>Edit</button>
-                <button style={{ ...s.templateActionBtn, color: '#e86f6f' }} onClick={() => handleDeleteTemplate(t)}>Delete</button>
+                <button
+                  style={{ ...s.templateActionBtn, color: '#e86f6f', opacity: consentTemplates.length <= 1 ? 0.35 : 1, cursor: consentTemplates.length <= 1 ? 'not-allowed' : 'pointer' }}
+                  onClick={() => handleDeleteTemplate(t)}
+                  disabled={consentTemplates.length <= 1}
+                  title={consentTemplates.length <= 1 ? 'At least one consent form is required' : undefined}
+                >Delete</button>
               </div>
             </div>
           ))}
@@ -1128,12 +1223,14 @@ export default function SettingsPage() {
                 <div style={s.stationTop}>
                   <span style={s.stationName}>{st.name}</span>
                   <div style={s.stationActions}>
+                    {/* Unavailability button — re-enable when station unavailability is needed
                     <button
                       style={s.stationToggleBtn}
                       onClick={() => setExpandedStation(expandedStation === st.id ? null : st.id)}
                     >
                       {expandedStation === st.id ? 'Hide' : 'Unavailability'}
                     </button>
+                    */}
                     <button
                       style={s.stationRemoveBtn}
                       onClick={() => handleRemoveStation(st.id)}
@@ -1143,6 +1240,7 @@ export default function SettingsPage() {
                     </button>
                   </div>
                 </div>
+                {/* Unavailability panel — re-enable with button above
                 {expandedStation === st.id && (
                   <div style={s.unavailPanel}>
                     <div style={s.unavailAdd}>
@@ -1172,6 +1270,7 @@ export default function SettingsPage() {
                     )}
                   </div>
                 )}
+                */}
               </div>
             ))}
           </div>
@@ -1244,6 +1343,7 @@ export default function SettingsPage() {
                       { key: 'size',           label: 'Size' },
                       { key: 'skin_tone',      label: 'Skin tone' },
                       { key: 'notes',          label: 'Additional notes' },
+                      { key: 'allergies',      label: 'Allergies' },
                       { key: 'image_paths',    label: 'Reference photos' },
                     ].map(({ key, label }) => {
                       const entry = formFields[key] ?? { enabled: false, required: false };
@@ -1283,19 +1383,33 @@ export default function SettingsPage() {
                       <>
                         <div style={{ borderTop: '1px solid var(--border)', margin: '0.1rem 0' }} />
                         <div style={s.formFieldRow}>
-                          <span style={{ flex: 1, fontSize: '0.83rem', fontWeight: 500, color: 'var(--text)' }}>
+                          <span style={{ flex: 1, fontSize: '0.83rem', fontWeight: 500, color: widgetConsentTemplateId ? 'var(--text)' : 'var(--text-ghost)' }}>
                             Consent form
                           </span>
-                          <select
-                            value={widgetConsentTemplateId}
-                            onChange={e => setWidgetConsentTemplateId(e.target.value)}
-                            style={{ ...s.input, width: 'auto', fontSize: '0.8rem', padding: '0.3rem 0.6rem' }}
+                          {/* Multi-template picker — re-enable when studios can have multiple consent forms
+                          {widgetConsentTemplateId && (
+                            <select
+                              value={widgetConsentTemplateId}
+                              onChange={e => setWidgetConsentTemplateId(e.target.value)}
+                              style={{ ...s.input, width: 'auto', fontSize: '0.8rem', padding: '0.3rem 0.6rem' }}
+                            >
+                              {consentTemplates.map(t => (
+                                <option key={t.id} value={t.id}>{t.name}</option>
+                              ))}
+                            </select>
+                          )}
+                          */}
+                          <button
+                            onClick={() => setWidgetConsentTemplateId(widgetConsentTemplateId ? '' : (consentTemplates[0]?.id ?? ''))}
+                            style={{
+                              ...s.fieldToggleBtn,
+                              background: widgetConsentTemplateId ? 'var(--accent-tint)' : 'var(--bg-chip)',
+                              borderColor: widgetConsentTemplateId ? 'var(--accent-tint-border)' : 'var(--border)',
+                              color: widgetConsentTemplateId ? 'var(--accent)' : 'var(--text-ghost)',
+                            }}
                           >
-                            <option value="">None</option>
-                            {consentTemplates.map(t => (
-                              <option key={t.id} value={t.id}>{t.name}</option>
-                            ))}
-                          </select>
+                            {widgetConsentTemplateId ? 'On' : 'Off'}
+                          </button>
                         </div>
                       </>
                     )}
@@ -1303,21 +1417,24 @@ export default function SettingsPage() {
                 )}
               </div>
 
+              <button onClick={saveProfile} style={s.saveBtn} disabled={saving}>
+                {saving ? t('saving') : saved ? t('saved') : t('save')}
+              </button>
               <div style={s.embedCard}>
                 <label style={s.label}>Embed snippet</label>
                 <pre style={s.codeBlock}>{embedSnippet}</pre>
                 <button onClick={copyEmbed} style={s.copyBtn}>{embedCopied ? t('copied') : t('copy_snippet')}</button>
               </div>
-              <button onClick={saveProfile} style={s.saveBtn} disabled={saving}>
-                {saving ? t('saving') : saved ? t('saved') : t('save')}
-              </button>
             </div>
-            <WidgetPreview bg={widgetBgColor} accent={widgetAccentColor} studioName={name || 'Your Studio'} fields={formFields} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <WidgetPreview bg={widgetBgColor} accent={widgetAccentColor} studioName={name || 'Your Studio'} fields={formFields} consentTemplate={widgetConsentTemplateId ? consentTemplates.find(t => t.id === widgetConsentTemplateId) : null} />
+            </div>
           </div>
         </section>
 
-        {/* ── Account ── */}
-        <p style={{ ...s.groupLabel, marginTop: '1.25rem' }}>{t('section_account')}</p>
+        </>}
+
+        {tab === 'account' && <>
 
         <section style={s.card}>
           <h2 style={s.sectionTitle}>{t('account')}</h2>
@@ -1374,6 +1491,8 @@ export default function SettingsPage() {
           </div>
         </section>
 
+        </>}
+
       </div>
       <div style={{ height: '2rem' }} />
     </div>
@@ -1381,8 +1500,12 @@ export default function SettingsPage() {
 }
 
 const s = {
-  page: { padding: '2rem 2.5rem 4rem', display: 'flex', flexDirection: 'column', gap: '1.5rem', minHeight: '100%', boxSizing: 'border-box' },
+  page: { padding: '2rem 2.5rem 4rem', display: 'flex', flexDirection: 'column', gap: '1.25rem', minHeight: '100%', boxSizing: 'border-box' },
+  pageHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' },
   pageTitle: { fontSize: '1.4rem', fontWeight: 700, color: 'var(--text)', margin: 0, letterSpacing: '-0.02em' },
+  tabBar: { display: 'flex', gap: '0.35rem' },
+  tabBtn: { padding: '0.35rem 0.9rem', borderRadius: 20, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-muted)', fontSize: '0.82rem', fontWeight: 500, cursor: 'pointer' },
+  tabBtnActive: { background: 'var(--accent-tint)', border: '1px solid var(--accent-tint-border)', color: 'var(--accent)' },
   grid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', alignItems: 'start' },
   groupLabel: { gridColumn: '1 / -1', margin: '0 0 -0.25rem', fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-ghost)', letterSpacing: '0.08em', textTransform: 'uppercase' },
   card: { display: 'flex', flexDirection: 'column', gap: '1rem', background: 'var(--bg-card)', border: '1px solid var(--border-faint)', borderRadius: 12, padding: '1.25rem' },

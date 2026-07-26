@@ -102,7 +102,15 @@
     '.vb-chip{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:20px;color:rgba(255,255,255,0.6);font-size:0.78rem;font-weight:500;padding:0.35rem 0.75rem;cursor:pointer;font-family:inherit}',
     '.vb-chip-on{background:var(--vb-chip-bg,rgba(245,236,217,0.12));border-color:var(--vb-chip-border,rgba(245,236,217,0.35));color:var(--vb-accent,#f5ecd9)}',
     '.vb-chip-off{opacity:.3;cursor:default}',
+    '.vb-colour-chips{display:flex;gap:0.5rem}',
+    '.vb-colour-chip{flex:1;padding:0.6rem 0;border-radius:8px;font-size:0.85rem;font-weight:500;cursor:pointer;font-family:inherit;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:rgba(255,255,255,0.55);text-align:center}',
+    '.vb-colour-chip-on{background:rgba(255,255,255,0.13);border-color:rgba(255,255,255,0.45);color:#fff;font-weight:600}',
     '.vb-count{color:rgba(255,255,255,0.2);font-weight:400;margin-left:6px}',
+    '.vb-size-row{display:flex;gap:0.5rem}',
+    '.vb-unit-toggle{display:flex;background:rgba(255,255,255,0.06);border-radius:8px;overflow:hidden;border:1px solid rgba(255,255,255,0.1);flex-shrink:0}',
+    '.vb-unit-btn{padding:0 0.75rem;border:none;cursor:pointer;font-size:0.82rem;font-weight:600;font-family:inherit;background:transparent;color:rgba(255,255,255,0.4)}',
+    '.vb-unit-btn-on{background:rgba(255,255,255,0.15);color:#fff}',
+    '.vb-check-row{display:flex;align-items:center;gap:0.5rem;font-size:0.85rem;color:rgba(255,255,255,0.7);cursor:pointer;padding:0.2rem 0}',
     '.vb-upload-label{display:inline-flex;align-items:center;gap:0.4rem;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:0.5rem 0.85rem;font-size:0.82rem;color:rgba(255,255,255,0.55);cursor:pointer;font-family:inherit}',
     '.vb-photo-grid{display:flex;flex-wrap:wrap;gap:0.5rem;margin-top:0.5rem}',
     '.vb-thumb{position:relative;width:72px;height:72px;border-radius:8px;overflow:hidden;border:1px solid rgba(255,255,255,0.1)}',
@@ -163,11 +171,18 @@
 
   function txt(str) { return document.createTextNode(str); }
 
-  function field(labelText, inputEl, extraLabel) {
+  function labelSuffix(required) {
+    var s = mk('span');
+    s.style.cssText = 'margin-left:3px;color:rgba(255,255,255,0.3);font-weight:400';
+    s.textContent = required ? ' *' : ' (optional)';
+    return s;
+  }
+
+  function fieldWrap(labelText, inputEl, required, showSuffix) {
     var wrap = mk('div', 'vb-field');
     var lbl = mk('label', 'vb-label');
     lbl.appendChild(txt(labelText));
-    if (extraLabel) lbl.appendChild(extraLabel);
+    if (showSuffix !== false) lbl.appendChild(labelSuffix(required));
     wrap.appendChild(lbl);
     wrap.appendChild(inputEl);
     return wrap;
@@ -179,6 +194,29 @@
     el.placeholder = placeholder || '';
     if (autocomplete) el.autocomplete = autocomplete;
     return el;
+  }
+
+  // Mirrors DefaultFormFieldConfig() in the backend.
+  var DEFAULT_FIELDS = {
+    artist_id:      { enabled: true,  required: false },
+    body_location:  { enabled: true,  required: false },
+    design_details: { enabled: true,  required: false },
+    skin_tone:      { enabled: true,  required: false },
+    size:           { enabled: false, required: false },
+    notes:          { enabled: true,  required: false },
+    image_paths:    { enabled: true,  required: false },
+    retouch:        { enabled: false, required: false },
+    allergies:      { enabled: false, required: false },
+  };
+
+  // Returns {enabled, required} for a field key.
+  // Falls back to DEFAULT_FIELDS when form_fields is absent or the key is missing.
+  function fieldCfg(formFields, key) {
+    if (formFields && formFields[key] !== undefined && formFields[key] !== null) {
+      var f = formFields[key];
+      return { enabled: !!f.enabled, required: !!f.required };
+    }
+    return DEFAULT_FIELDS[key] || { enabled: false, required: false };
   }
 
   function render(container, studioId) {
@@ -197,6 +235,12 @@
     fetch(API + '/studios/' + studioId + '/public')
       .then(function (r) { return r.json(); })
       .then(function (studio) {
+        return fetch(API + '/studios/' + studioId + '/consent-templates')
+          .then(function (r) { return r.json(); })
+          .then(function (data) { studio._consentTemplates = data.templates || []; return studio; })
+          .catch(function () { studio._consentTemplates = []; return studio; });
+      })
+      .then(function (studio) {
         card.removeChild(loadingEl);
         buildForm(card, studioId, studio, defaultCountry);
       })
@@ -208,9 +252,12 @@
 
   function buildForm(card, studioId, studio, defaultCountry) {
     var artists = studio.artists || [];
+    var ff = studio.form_fields || {};
     var placements = [];
     var selectedFiles = [];
     var photoPreviews = [];
+    var colourStyle = '';
+    var sizeUnit = 'cm';
 
     applyColors(card, studio.widget_bg_color, studio.widget_accent_color);
 
@@ -228,27 +275,27 @@
     var form = mk('form', 'vb-form');
     card.appendChild(form);
 
-    // Name row
+    // Name row — always shown
     var nameRow = mk('div', 'vb-row');
     var firstEl = input('text', 'First', 'given-name');
     firstEl.required = true;
     var lastEl = input('text', 'Last', 'family-name');
     lastEl.required = true;
-    nameRow.appendChild(field('First name', firstEl));
-    nameRow.appendChild(field('Last name', lastEl));
+    nameRow.appendChild(fieldWrap('First name', firstEl, true, false));
+    nameRow.appendChild(fieldWrap('Last name', lastEl, true, false));
     form.appendChild(nameRow);
 
-    // DOB
+    // DOB — always shown
     var dobEl = input('date', '', 'bday');
-    dobEl.className = 'vb-input';
-    form.appendChild(field('Date of birth', dobEl));
+    dobEl.required = true;
+    form.appendChild(fieldWrap('Date of birth', dobEl, true, false));
 
-    // Email
+    // Email — always shown
     var emailEl = input('email', 'you@example.com', 'email');
     emailEl.required = true;
-    form.appendChild(field('Email', emailEl));
+    form.appendChild(fieldWrap('Email', emailEl, true, false));
 
-    // Phone
+    // Phone — always shown
     var codeEl = mk('select', 'vb-input vb-phone-code');
     COUNTRIES.forEach(function (c) {
       var opt = document.createElement('option');
@@ -263,11 +310,12 @@
     var phoneRow = mk('div', 'vb-phone-row');
     phoneRow.appendChild(codeEl);
     phoneRow.appendChild(numEl);
-    form.appendChild(field('Phone', phoneRow));
+    form.appendChild(fieldWrap('Phone', phoneRow, true, false));
 
-    // Artist
+    // Artist preference
     var artistEl = null;
-    if (artists.length > 0) {
+    var artistCfg = fieldCfg(ff, 'artist_id');
+    if (artistCfg.enabled && artists.length > 0) {
       artistEl = mk('select', 'vb-input');
       var blank = document.createElement('option');
       blank.value = '';
@@ -279,126 +327,327 @@
         opt.textContent = (a.name || '') + (a.studioType === 'guest' ? ' (Guest)' : '');
         artistEl.appendChild(opt);
       });
-      form.appendChild(field('Artist (optional)', artistEl));
+      if (artistCfg.required) artistEl.required = true;
+      form.appendChild(fieldWrap('Artist preference', artistEl, artistCfg.required));
     }
 
     // Placement chips
-    var countSpan = mk('span', 'vb-count');
-    countSpan.textContent = '0/3';
-    var placeLabelWrap = mk('div', 'vb-field');
-    var placeLabelEl = mk('label', 'vb-label');
-    placeLabelEl.appendChild(txt('Placement'));
-    placeLabelEl.appendChild(countSpan);
-    var chipsDiv = mk('div', 'vb-chips');
-    var chipMap = {};
-    PLACEMENTS.forEach(function (p) {
-      var chip = mk('button', 'vb-chip');
-      chip.type = 'button';
-      chip.textContent = p;
-      chip.addEventListener('click', function () {
-        var idx = placements.indexOf(p);
-        if (idx >= 0) {
-          placements.splice(idx, 1);
-          chip.className = 'vb-chip';
-        } else if (placements.length < 3) {
-          placements.push(p);
-          chip.className = 'vb-chip vb-chip-on';
-        }
-        countSpan.textContent = placements.length + '/3';
-        PLACEMENTS.forEach(function (pp) {
-          var c = chipMap[pp];
-          var active = placements.indexOf(pp) >= 0;
-          if (!active && placements.length >= 3) {
-            c.className = 'vb-chip vb-chip-off';
-          } else if (!active) {
-            c.className = 'vb-chip';
+    var placeCfg = fieldCfg(ff, 'body_location');
+    var countSpan, placeLabelWrap, chipsDiv, chipMap = {};
+    if (placeCfg.enabled) {
+      countSpan = mk('span', 'vb-count');
+      countSpan.textContent = '0/3';
+      placeLabelWrap = mk('div', 'vb-field');
+      var placeLabelEl = mk('label', 'vb-label');
+      placeLabelEl.appendChild(txt('Placement'));
+      placeLabelEl.appendChild(countSpan);
+      chipsDiv = mk('div', 'vb-chips');
+      PLACEMENTS.forEach(function (p) {
+        var chip = mk('button', 'vb-chip');
+        chip.type = 'button';
+        chip.textContent = p;
+        chip.addEventListener('click', function () {
+          var idx = placements.indexOf(p);
+          if (idx >= 0) {
+            placements.splice(idx, 1);
+            chip.className = 'vb-chip';
+          } else if (placements.length < 3) {
+            placements.push(p);
+            chip.className = 'vb-chip vb-chip-on';
           }
+          countSpan.textContent = placements.length + '/3';
+          PLACEMENTS.forEach(function (pp) {
+            var c = chipMap[pp];
+            var active = placements.indexOf(pp) >= 0;
+            if (!active && placements.length >= 3) {
+              c.className = 'vb-chip vb-chip-off';
+            } else if (!active) {
+              c.className = 'vb-chip';
+            }
+          });
         });
+        chipMap[p] = chip;
+        chipsDiv.appendChild(chip);
       });
-      chipMap[p] = chip;
-      chipsDiv.appendChild(chip);
-    });
-    placeLabelWrap.appendChild(placeLabelEl);
-    placeLabelWrap.appendChild(chipsDiv);
-    form.appendChild(placeLabelWrap);
+      placeLabelWrap.appendChild(placeLabelEl);
+      placeLabelWrap.appendChild(chipsDiv);
+      form.appendChild(placeLabelWrap);
+    }
 
     // Design description
-    var designEl = mk('textarea', 'vb-input');
-    designEl.rows = 3;
-    designEl.placeholder = "Describe what you'd like…";
-    designEl.required = true;
-    designEl.style.resize = 'vertical';
-    form.appendChild(field('Design description', designEl));
+    var designEl = null;
+    var designCfg = fieldCfg(ff, 'design_details');
+    if (designCfg.enabled) {
+      designEl = mk('textarea', 'vb-input');
+      designEl.rows = 3;
+      designEl.placeholder = "Describe what you'd like…";
+      designEl.required = !!designCfg.required;
+      designEl.style.resize = 'vertical';
+      form.appendChild(fieldWrap('Design description', designEl, designCfg.required));
+    }
 
-    // Notes
-    var notesEl = mk('textarea', 'vb-input');
-    notesEl.rows = 2;
-    notesEl.placeholder = 'Anything else the artist should know';
-    notesEl.style.resize = 'vertical';
-    form.appendChild(field('Additional notes (optional)', notesEl));
+    // Skin tone
+    var skinToneEl = null;
+    var skinCfg = fieldCfg(ff, 'skin_tone');
+    if (skinCfg.enabled) {
+      skinToneEl = mk('select', 'vb-input');
+      var stBlank = document.createElement('option');
+      stBlank.value = '';
+      stBlank.textContent = 'Select skin tone…';
+      skinToneEl.appendChild(stBlank);
+      ['Very light', 'Light', 'Medium', 'Olive', 'Brown', 'Dark'].forEach(function (t) {
+        var opt = document.createElement('option');
+        opt.value = t;
+        opt.textContent = t;
+        skinToneEl.appendChild(opt);
+      });
+      if (skinCfg.required) skinToneEl.required = true;
+      form.appendChild(fieldWrap('Skin tone', skinToneEl, skinCfg.required));
+    }
+
+    // Size
+    var sizeEl = null;
+    var unitBtns = {};
+    var sizeCfg = fieldCfg(ff, 'size');
+    if (sizeCfg.enabled) {
+      sizeEl = input('number', 'e.g. 10');
+      sizeEl.min = '0';
+      sizeEl.step = '0.1';
+      sizeEl.style.flex = '1';
+      if (sizeCfg.required) sizeEl.required = true;
+      var unitToggle = mk('div', 'vb-unit-toggle');
+      ['cm', 'in'].forEach(function (u) {
+        var btn = mk('button', 'vb-unit-btn' + (u === 'cm' ? ' vb-unit-btn-on' : ''));
+        btn.type = 'button';
+        btn.textContent = u;
+        btn.addEventListener('click', function () {
+          sizeUnit = u;
+          Object.keys(unitBtns).forEach(function (k) {
+            unitBtns[k].className = 'vb-unit-btn' + (k === u ? ' vb-unit-btn-on' : '');
+          });
+        });
+        unitBtns[u] = btn;
+        unitToggle.appendChild(btn);
+      });
+      var sizeRow = mk('div', 'vb-size-row');
+      sizeRow.appendChild(sizeEl);
+      sizeRow.appendChild(unitToggle);
+      form.appendChild(fieldWrap('Size', sizeRow, sizeCfg.required));
+    }
+
+    // Retouch checkbox
+    var retouchEl = null;
+    var retouchCfg = fieldCfg(ff, 'retouch');
+    if (retouchCfg.enabled) {
+      retouchEl = document.createElement('input');
+      retouchEl.type = 'checkbox';
+      retouchEl.style.cssText = 'width:16px;height:16px;accent-color:#f5ecd9;cursor:pointer;flex-shrink:0';
+      var retouchLabel = mk('label', 'vb-check-row');
+      retouchLabel.appendChild(retouchEl);
+      retouchLabel.appendChild(txt('This is a touch-up / retouch'));
+      form.appendChild(retouchLabel);
+    }
+
+    // Colour — always shown (hardcoded in the booking form)
+    var colourChips = {};
+    (function () {
+      var colourWrap = mk('div', 'vb-field');
+      var colourLbl = mk('label', 'vb-label');
+      colourLbl.textContent = 'Colour';
+      colourWrap.appendChild(colourLbl);
+      var colourRow = mk('div', 'vb-colour-chips');
+      ['Black', 'Grey', 'Color'].forEach(function (opt) {
+        var btn = mk('button', 'vb-colour-chip');
+        btn.type = 'button';
+        btn.textContent = opt;
+        btn.addEventListener('click', function () {
+          colourStyle = colourStyle === opt ? '' : opt;
+          Object.keys(colourChips).forEach(function (k) {
+            colourChips[k].className = 'vb-colour-chip' + (k === colourStyle ? ' vb-colour-chip-on' : '');
+          });
+        });
+        colourChips[opt] = btn;
+        colourRow.appendChild(btn);
+      });
+      colourWrap.appendChild(colourRow);
+      form.appendChild(colourWrap);
+    })();
+
+    // Additional notes
+    var notesEl = null;
+    var notesCfg = fieldCfg(ff, 'notes');
+    if (notesCfg.enabled) {
+      notesEl = mk('textarea', 'vb-input');
+      notesEl.rows = 2;
+      notesEl.placeholder = 'Anything else the artist should know';
+      notesEl.style.resize = 'vertical';
+      if (notesCfg.required) notesEl.required = true;
+      form.appendChild(fieldWrap('Additional notes', notesEl, notesCfg.required));
+    }
+
+    // Allergies checkbox + conditional textarea
+    var allergiesCheckEl = null;
+    var allergiesTextEl = null;
+    var allergiesCfg = fieldCfg(ff, 'allergies');
+    if (allergiesCfg.enabled) {
+      allergiesCheckEl = document.createElement('input');
+      allergiesCheckEl.type = 'checkbox';
+      allergiesCheckEl.style.cssText = 'width:16px;height:16px;accent-color:#f5ecd9;cursor:pointer;flex-shrink:0';
+      var allergiesWrap = mk('div');
+      allergiesWrap.style.cssText = 'display:flex;flex-direction:column;gap:0.5rem';
+      var allergiesCheckLabel = mk('label', 'vb-check-row');
+      allergiesCheckLabel.appendChild(allergiesCheckEl);
+      allergiesCheckLabel.appendChild(txt('I have allergies or sensitivities' + (allergiesCfg.required ? '' : ' (optional)')));
+      allergiesWrap.appendChild(allergiesCheckLabel);
+      allergiesTextEl = mk('textarea', 'vb-input');
+      allergiesTextEl.rows = 2;
+      allergiesTextEl.placeholder = 'Please describe your allergies or sensitivities…';
+      allergiesTextEl.style.cssText = 'resize:vertical;display:none';
+      allergiesWrap.appendChild(allergiesTextEl);
+      allergiesCheckEl.addEventListener('change', function () {
+        allergiesTextEl.style.display = allergiesCheckEl.checked ? 'block' : 'none';
+        if (!allergiesCheckEl.checked) allergiesTextEl.value = '';
+        if (allergiesCfg.required) allergiesTextEl.required = allergiesCheckEl.checked;
+      });
+      form.appendChild(allergiesWrap);
+    }
 
     // Photo upload
-    var photoFieldWrap = mk('div', 'vb-field');
-    var photoLabelEl = mk('label', 'vb-label');
-    photoLabelEl.textContent = 'Reference photos (optional, up to 5)';
-    photoFieldWrap.appendChild(photoLabelEl);
-    var fileInput = document.createElement('input');
-    fileInput.type = 'file';
-    fileInput.accept = 'image/*';
-    fileInput.multiple = true;
-    fileInput.style.display = 'none';
-    var uploadLabel = mk('label', 'vb-upload-label');
-    uploadLabel.textContent = '+ Add photos';
-    uploadLabel.appendChild(fileInput);
-    photoFieldWrap.appendChild(uploadLabel);
-    var photoGrid = mk('div', 'vb-photo-grid');
-    photoFieldWrap.appendChild(photoGrid);
-    form.appendChild(photoFieldWrap);
+    var fileInput = null;
+    var photoGrid = null;
+    var photoCfg = fieldCfg(ff, 'image_paths');
+    if (photoCfg.enabled) {
+      var photoFieldWrap = mk('div', 'vb-field');
+      var photoLabelEl = mk('label', 'vb-label');
+      photoLabelEl.textContent = 'Reference photos' + (photoCfg.required ? ' *' : ' (optional, up to 5)');
+      photoFieldWrap.appendChild(photoLabelEl);
+      fileInput = document.createElement('input');
+      fileInput.type = 'file';
+      fileInput.accept = 'image/*';
+      fileInput.multiple = true;
+      fileInput.style.display = 'none';
+      var uploadLabel = mk('label', 'vb-upload-label');
+      uploadLabel.textContent = '+ Add photos';
+      uploadLabel.appendChild(fileInput);
+      photoFieldWrap.appendChild(uploadLabel);
+      photoGrid = mk('div', 'vb-photo-grid');
+      photoFieldWrap.appendChild(photoGrid);
+      form.appendChild(photoFieldWrap);
 
-    fileInput.addEventListener('change', function () {
-      var files = Array.prototype.slice.call(fileInput.files).slice(0, 5);
-      selectedFiles = files;
-      photoPreviews.forEach(function (u) { URL.revokeObjectURL(u); });
-      photoPreviews = files.map(function (f) { return URL.createObjectURL(f); });
-      photoGrid.innerHTML = '';
-      files.forEach(function (f, i) {
-        var thumb = mk('div', 'vb-thumb');
-        var img = document.createElement('img');
-        img.src = photoPreviews[i];
-        img.alt = '';
-        thumb.appendChild(img);
-        var rm = mk('button', 'vb-thumb-rm');
-        rm.type = 'button';
-        rm.textContent = '✕';
-        rm.addEventListener('click', function () {
-          selectedFiles = selectedFiles.filter(function (_, j) { return j !== i; });
-          photoPreviews = photoPreviews.filter(function (_, j) { return j !== i; });
-          thumb.parentNode.removeChild(thumb);
+      fileInput.addEventListener('change', function () {
+        var files = Array.prototype.slice.call(fileInput.files).slice(0, 5);
+        selectedFiles = files;
+        photoPreviews.forEach(function (u) { URL.revokeObjectURL(u); });
+        photoPreviews = files.map(function (f) { return URL.createObjectURL(f); });
+        photoGrid.innerHTML = '';
+        files.forEach(function (f, i) {
+          var thumb = mk('div', 'vb-thumb');
+          var img = document.createElement('img');
+          img.src = photoPreviews[i];
+          img.alt = '';
+          thumb.appendChild(img);
+          var rm = mk('button', 'vb-thumb-rm');
+          rm.type = 'button';
+          rm.textContent = '✕';
+          rm.addEventListener('click', (function (idx) {
+            return function () {
+              selectedFiles = selectedFiles.filter(function (_, j) { return j !== idx; });
+              photoPreviews = photoPreviews.filter(function (_, j) { return j !== idx; });
+              thumb.parentNode.removeChild(thumb);
+            };
+          })(i));
+          thumb.appendChild(rm);
+          photoGrid.appendChild(thumb);
         });
-        thumb.appendChild(rm);
-        photoGrid.appendChild(thumb);
       });
-    });
-
-    // Consent form
-    var consentCheckEl = null;
-    if (studio.consent_form) {
-      var consentWrap = mk('div', 'vb-consent');
-      var consentText = mk('p', 'vb-consent-text');
-      consentText.textContent = studio.consent_form;
-      consentWrap.appendChild(consentText);
-      var consentLabel = mk('label', 'vb-consent-check');
-      consentCheckEl = document.createElement('input');
-      consentCheckEl.type = 'checkbox';
-      consentCheckEl.style.accentColor = '#f5ecd9';
-      consentCheckEl.style.flexShrink = '0';
-      var consentSpan = mk('span');
-      consentSpan.textContent = 'I have read and agree to the above';
-      consentLabel.appendChild(consentCheckEl);
-      consentLabel.appendChild(consentSpan);
-      consentWrap.appendChild(consentLabel);
-      form.appendChild(consentWrap);
     }
+
+    // Consent templates
+    var consentAgreedEls = []; // one checkbox per template
+    var consentTemplates = studio._consentTemplates || [];
+    consentTemplates.forEach(function (tmpl) {
+      var wrap = mk('div', 'vb-consent');
+
+      var titleEl = mk('p');
+      titleEl.style.cssText = 'margin:0 0 0.5rem;font-size:0.85rem;font-weight:700;color:#fff';
+      titleEl.textContent = tmpl.name;
+      wrap.appendChild(titleEl);
+
+      (tmpl.fields || []).forEach(function (f) {
+        if (f.type === 'heading') {
+          var h = mk('p');
+          h.style.cssText = 'margin:0.25rem 0 0;font-size:0.85rem;font-weight:700;color:rgba(255,255,255,0.8)';
+          h.textContent = f.label;
+          wrap.appendChild(h);
+        } else if (f.type === 'paragraph') {
+          var p = mk('p', 'vb-consent-text');
+          p.textContent = f.label;
+          wrap.appendChild(p);
+        } else if (f.type === 'checkbox') {
+          var cl = mk('label', 'vb-consent-check');
+          var ci = document.createElement('input');
+          ci.type = 'checkbox';
+          ci.style.cssText = 'accent-color:#f5ecd9;flex-shrink:0';
+          if (f.required) ci.required = true;
+          var cs = mk('span');
+          cs.textContent = f.label;
+          cl.appendChild(ci);
+          cl.appendChild(cs);
+          wrap.appendChild(cl);
+        } else if (f.type === 'yesno') {
+          var ynWrap = mk('div');
+          ynWrap.style.cssText = 'display:flex;flex-direction:column;gap:0.3rem';
+          var ynLbl = mk('span', 'vb-label');
+          ynLbl.textContent = f.label;
+          ynWrap.appendChild(ynLbl);
+          var ynRow = mk('div');
+          ynRow.style.cssText = 'display:flex;gap:0.5rem';
+          var ynVal = '';
+          ['Yes', 'No'].forEach(function (opt) {
+            var btn = mk('button', 'vb-colour-chip');
+            btn.type = 'button';
+            btn.textContent = opt;
+            btn.addEventListener('click', function () {
+              ynVal = opt;
+              ['Yes', 'No'].forEach(function (o) {
+                ynRow.querySelectorAll('button').forEach(function (b) {
+                  b.className = 'vb-colour-chip' + (b.textContent === ynVal ? ' vb-colour-chip-on' : '');
+                });
+              });
+            });
+            ynRow.appendChild(btn);
+          });
+          ynWrap.appendChild(ynRow);
+          wrap.appendChild(ynWrap);
+        } else if (f.type === 'textarea') {
+          var taWrap = mk('div', 'vb-field');
+          var taLbl = mk('label', 'vb-label');
+          taLbl.textContent = f.label;
+          var ta = mk('textarea', 'vb-input');
+          ta.rows = 2;
+          ta.style.resize = 'vertical';
+          if (f.required) ta.required = true;
+          taWrap.appendChild(taLbl);
+          taWrap.appendChild(ta);
+          wrap.appendChild(taWrap);
+        }
+      });
+
+      // Agreement checkbox — always required
+      var agreeLabel = mk('label', 'vb-consent-check');
+      var agreeCheck = document.createElement('input');
+      agreeCheck.type = 'checkbox';
+      agreeCheck.required = true;
+      agreeCheck.style.cssText = 'accent-color:#f5ecd9;flex-shrink:0';
+      var agreeSpan = mk('span');
+      agreeSpan.textContent = 'I have read and agreed to the above';
+      agreeLabel.appendChild(agreeCheck);
+      agreeLabel.appendChild(agreeSpan);
+      wrap.appendChild(agreeLabel);
+      consentAgreedEls.push(agreeCheck);
+
+      form.appendChild(wrap);
+    });
 
     // Error + submit
     var errEl = mk('div', 'vb-err');
@@ -414,15 +663,17 @@
       e.preventDefault();
       errEl.style.display = 'none';
 
-      if (placements.length === 0) {
+      if (placeCfg.enabled && placeCfg.required && placements.length === 0) {
         errEl.textContent = 'Please select at least one placement.';
         errEl.style.display = 'block';
         return;
       }
-      if (studio.consent_form && consentCheckEl && !consentCheckEl.checked) {
-        errEl.textContent = 'Please agree to the consent form.';
-        errEl.style.display = 'block';
-        return;
+      for (var ci = 0; ci < consentAgreedEls.length; ci++) {
+        if (!consentAgreedEls[ci].checked) {
+          errEl.textContent = 'Please agree to all consent forms before submitting.';
+          errEl.style.display = 'block';
+          return;
+        }
       }
 
       var countryObj = null;
@@ -434,7 +685,6 @@
       btn.disabled = true;
       btn.textContent = 'Submitting…';
 
-      // Upload photos first (if any), then submit form.
       uploadPhotos(studioId, selectedFiles).then(function (imagePaths) {
         var body = {
           name: (firstEl.value.trim() + ' ' + lastEl.value.trim()).trim(),
@@ -442,9 +692,15 @@
           phone: phoneFull,
           dob: dobEl.value,
           body_location: placements.join(', '),
-          design_details: designEl.value.trim(),
-          notes: notesEl.value.trim(),
+          design_details: designEl ? designEl.value.trim() : '',
+          notes: notesEl ? notesEl.value.trim() : '',
           image_paths: imagePaths,
+          skin_tone: skinToneEl ? skinToneEl.value : '',
+          size: sizeEl ? (sizeEl.value ? sizeEl.value + ' ' + sizeUnit : '') : '',
+          session_type: retouchEl && retouchEl.checked ? 'retouch' : '',
+          allergies: allergiesCheckEl && allergiesCheckEl.checked
+            ? (allergiesTextEl && allergiesTextEl.value.trim() ? allergiesTextEl.value.trim() : 'Yes')
+            : '',
         };
         if (artistEl && artistEl.value) body.artist_id = artistEl.value;
 
@@ -466,7 +722,7 @@
           var okTitle = mk('h2', 'vb-ok-title');
           okTitle.textContent = "You're on the list!";
           var okSub = mk('p', 'vb-ok-sub');
-          okSub.textContent = 'Your request has been sent to ' + (studio.name || 'the studio') + '. They’ll be in touch soon.';
+          okSub.textContent = 'Your request has been sent to ' + (studio.name || 'the studio') + '. They\'ll be in touch soon.';
           ok.appendChild(icon);
           ok.appendChild(okTitle);
           ok.appendChild(okSub);

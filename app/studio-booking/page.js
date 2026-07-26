@@ -108,6 +108,8 @@ function WalkInInner() {
   const [sizeUnit, setSizeUnit]     = useState('cm');
   const [colorStyle, setColorStyle] = useState('');
   const [retouch, setRetouch]       = useState(false);
+  const [hasAllergies, setHasAllergies] = useState(false);
+  const [allergyDetails, setAllergyDetails] = useState('');
   const [notes, setNotes]           = useState('');
   const [photos, setPhotos]         = useState([]);
   const [photoPreviews, setPhotoPreviews] = useState([]);
@@ -298,6 +300,7 @@ function WalkInInner() {
         size:                 size.trim() ? `${size.trim()}${sizeUnit}` : '',
         color:                colorStyle,
         notes,
+        allergies:            hasAllergies ? (allergyDetails.trim() || 'Yes') : '',
         image_paths:          imagePaths,
         consent_accepted:     consentSubmissions.length > 0,
         consent_submissions:  consentSubmissions,
@@ -510,6 +513,24 @@ function WalkInInner() {
               <Field label={<>Additional notes{field('notes').required ? <Required /> : <Optional />}</>}>
                 <textarea style={{ ...s.input, ...s.textarea }} value={notes} required={field('notes').required} onChange={e => setNotes(e.target.value)} placeholder="Anything else the artist should know" />
               </Field>
+            )}
+
+            {field('allergies').enabled && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: 'rgba(255,255,255,0.7)', cursor: 'pointer' }}>
+                  <input type="checkbox" checked={hasAllergies} onChange={e => { setHasAllergies(e.target.checked); if (!e.target.checked) setAllergyDetails(''); }} style={{ width: 16, height: 16, accentColor: '#f5ecd9', cursor: 'pointer' }} />
+                  I have allergies or sensitivities{field('allergies').required ? '' : ' (optional)'}
+                </label>
+                {hasAllergies && (
+                  <textarea
+                    style={{ ...s.input, ...s.textarea }}
+                    value={allergyDetails}
+                    required={field('allergies').required}
+                    onChange={e => setAllergyDetails(e.target.value)}
+                    placeholder="Please describe your allergies or sensitivities…"
+                  />
+                )}
+              </div>
             )}
           </Section>
 

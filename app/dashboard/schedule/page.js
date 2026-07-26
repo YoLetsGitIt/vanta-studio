@@ -330,6 +330,12 @@ function MonthView({ monthStart, onDayClick }) {
   });
 
   useEffect(() => {
+    function handler() { setRefreshKey(k => k + 1); }
+    window.addEventListener('booking-created', handler);
+    return () => window.removeEventListener('booking-created', handler);
+  }, []);
+
+  useEffect(() => {
     let cancelled = false;
     async function load() {
       const start = toISO(gridStart);
@@ -457,6 +463,12 @@ function DayView({ date }) {
     invalidatePrefix('schedule:');
     setRefreshKey(k => k + 1);
   });
+
+  useEffect(() => {
+    function handler() { setRefreshKey(k => k + 1); }
+    window.addEventListener('booking-created', handler);
+    return () => window.removeEventListener('booking-created', handler);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -727,6 +739,12 @@ function StationMonthView({ monthStart, onDayClick }) {
   const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
+    function handler() { setRefreshKey(k => k + 1); }
+    window.addEventListener('booking-created', handler);
+    return () => window.removeEventListener('booking-created', handler);
+  }, []);
+
+  useEffect(() => {
     let cancelled = false;
     const start = toISO(gridStart);
     const end   = toISO(gridEnd);
@@ -844,6 +862,13 @@ function StationView({ date }) {
   const [entries,      setEntries]      = useState([]);
   const [allStations,  setAllStations]  = useState([]);
   const [loading,      setLoading]      = useState(true);
+  const [refreshKey,   setRefreshKey]   = useState(0);
+
+  useEffect(() => {
+    function handler() { invalidatePrefix('schedule:'); setRefreshKey(k => k + 1); }
+    window.addEventListener('booking-created', handler);
+    return () => window.removeEventListener('booking-created', handler);
+  }, []);
 
   useEffect(() => {
     setLoading(true);
@@ -861,7 +886,7 @@ function StationView({ date }) {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [dateStr]);
+  }, [dateStr, refreshKey]); // eslint-disable-line
 
   // Separate assigned (have stationName) from unassigned
   const assigned   = entries.filter(e => e.stationName);

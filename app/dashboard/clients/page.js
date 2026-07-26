@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { listStudioBookings, getStudioClients, getClientConsents, getNotes, addNote, deleteNote, ensureStudioClient, patchStudioClient, generateConsentLink, listConsentTemplates } from '@/lib/api';
+import { listStudioBookings, getStudioClients, getClientConsents, getNotes, addNote, deleteNote, ensureStudioClient, patchStudioClient, generateConsentLink, listConsentTemplates, getClientConsentSubmissions } from '@/lib/api';
 
 const TATTOO_STYLES = [
   'Traditional', 'Neo Traditional', 'Blackwork', 'Fine Line', 'Realism',
@@ -177,8 +177,8 @@ function ClientsInner() {
   //   a.click();
   // }
 
-  const handleSendConsentLink = useCallback(async (email, templateId) => {
-    await generateConsentLink(email, templateId);
+  const handleSendConsentLink = useCallback(async (email, templateId, dob) => {
+    await generateConsentLink(email, templateId, dob);
   }, []);
 
   return (
@@ -249,8 +249,6 @@ function ClientsInner() {
           <ClientDetail
             client={selectedClient}
             onClose={() => setSelected(null)}
-            consent={selectedClient.email ? consents[selectedClient.email] : null}
-            consentVersion={consentVersion}
             consentTemplates={consentTemplates}
             onSendConsentLink={handleSendConsentLink}
           />
@@ -281,12 +279,11 @@ function ConsentBadge({ status }) {
   return <span style={{ ...s.badge, ...s.badgeRed }}>{t('clients_no_consent')}</span>;
 }
 
-function ClientDetail({ client, onClose, consent, consentVersion, consentTemplates = [], onSendConsentLink }) {
+function ClientDetail({ client, onClose, consentTemplates = [], onSendConsentLink }) {
   const { t } = useLanguage();
-  const [linkGenerating, setLinkGenerating] = useState(false);
-  const [linkCopied,     setLinkCopied]     = useState(false);
-  const [linkErr,        setLinkErr]        = useState('');
-  const [selectedTemplateId, setSelectedTemplateId] = useState('');
+  const [linkGeneratingId, setLinkGeneratingId] = useState(null);
+  const [linkSentId,       setLinkSentId]       = useState(null);
+  const [submissions,      setSubmissions]      = useState([]);
   const [notes,       setNotes]       = useState(null); // null = loading
   const [noteInput,   setNoteInput]   = useState('');
   const [noteAdding,  setNoteAdding]  = useState(false);
@@ -318,6 +315,14 @@ function ClientDetail({ client, onClose, consent, consentVersion, consentTemplat
     getNotes('client', client.email)
       .then(d => setNotes(d.notes ?? []))
       .catch(() => setNotes([]));
+  }, [client.email]);
+
+  useEffect(() => {
+    if (!client.email) { setSubmissions([]); return; }
+    setSubmissions([]);
+    getClientConsentSubmissions(client.email)
+      .then(d => setSubmissions(d.submissions ?? []))
+      .catch(() => setSubmissions([]));
   }, [client.email]);
 
   async function handleAddNote() {
@@ -370,28 +375,17 @@ function ClientDetail({ client, onClose, consent, consentVersion, consentTemplat
     (a, b) => new Date(b.created_at) - new Date(a.created_at),
   );
 
-  const consentStatus = getConsentStatus(consent, consentVersion);
-
-  async function handleSendLink() {
+  async function handleSendLink(templateId) {
     if (!client.email) return;
-    // If multiple templates and none selected yet, block
-    if (consentTemplates.length > 1 && !selectedTemplateId) {
-      setLinkErr('Please select a consent form to send.');
-      return;
-    }
-    setLinkGenerating(true);
-    setLinkErr('');
+    setLinkGeneratingId(templateId);
     try {
-      const templateId = consentTemplates.length === 1
-        ? consentTemplates[0].id
-        : selectedTemplateId || undefined;
-      await onSendConsentLink(client.email, templateId);
-      setLinkCopied(true);
-      setTimeout(() => setLinkCopied(false), 3000);
+      await onSendConsentLink(client.email, templateId, client.dob || undefined);
+      setLinkSentId(templateId);
+      setTimeout(() => setLinkSentId(null), 3000);
     } catch (e) {
-      setLinkErr(e.message);
+      alert(e.message);
     } finally {
-      setLinkGenerating(false);
+      setLinkGeneratingId(null);
     }
   }
 
@@ -424,52 +418,71 @@ function ClientDetail({ client, onClose, consent, consentVersion, consentTemplat
         <Field label={t('clients_total_sessions')}>{client.bookings.length}</Field>
         <Field label={t('status_completed')}>{client.bookings.filter(b => b.outcome === 'completed').length}</Field>
 
-        <div style={s.consentSection}>
-          <span style={s.sectionLabel}>{t('clients_consent_form')}</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
-            <ConsentBadge status={consentStatus} />
-            {consent && (
-              <span style={{ fontSize: '0.72rem', color: 'var(--text-ghost)' }}>
-                v{consent.consent_version} · {new Date(consent.agreed_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
-              </span>
-            )}
-            {(consentStatus === 'none' || consentStatus === 'outdated') && client.email && (
-              <>
-                {consentTemplates.length > 1 && (
-                  <select
-                    value={selectedTemplateId}
-                    onChange={e => { setSelectedTemplateId(e.target.value); setLinkErr(''); }}
-                    style={{
-                      background: 'var(--bg-chip)', border: '1px solid var(--border)',
-                      borderRadius: 6, padding: '0.1rem 0.5rem',
-                      color: 'var(--text)', fontSize: '0.72rem', fontFamily: 'inherit',
-                    }}
-                  >
-                    <option value="">Select form…</option>
-                    {consentTemplates.map(tmpl => (
-                      <option key={tmpl.id} value={tmpl.id}>{tmpl.name}</option>
-                    ))}
-                  </select>
-                )}
-                <button
-                  onClick={handleSendLink}
-                  disabled={linkGenerating}
-                  style={{
-                    background: 'none',
-                    border: `1px solid ${linkCopied ? '#4cc98a' : 'var(--accent)'}`,
-                    borderRadius: 6, padding: '0.1rem 0.55rem',
-                    color: linkCopied ? '#4cc98a' : 'var(--accent)',
-                    fontSize: '0.72rem', fontWeight: 600,
-                    cursor: 'pointer', fontFamily: 'inherit', letterSpacing: '0.01em',
-                  }}
-                >
-                  {linkCopied ? t('clients_email_sent') : linkGenerating ? t('sending') : t('clients_send_consent')}
-                </button>
-              </>
-            )}
+        {consentTemplates.length > 0 && (
+          <div style={s.consentSection}>
+            <span style={s.sectionLabel}>{t('clients_consent_form')}</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
+              {/* Multi-template: change .slice(0, 1) to consentTemplates when multiple forms are re-enabled */}
+              {consentTemplates.slice(0, 1).map(ct => {
+                const sub = submissions.find(s => s.template_id === ct.id);
+                const outdated = !!sub && new Date(sub.submitted_at) < new Date(ct.updated_at);
+                const status = !sub ? 'none' : outdated ? 'outdated' : 'current';
+                const sentId = linkSentId === ct.id;
+                const loadingId = linkGeneratingId === ct.id;
+                const badgeStyle = status === 'current'
+                  ? { bg: 'rgba(76,201,138,0.12)', color: '#4cc98a', border: 'rgba(76,201,138,0.25)' }
+                  : status === 'outdated'
+                  ? { bg: 'rgba(245,158,58,0.12)', color: '#f59e3a', border: 'rgba(245,158,58,0.25)' }
+                  : { bg: 'rgba(232,111,111,0.1)', color: '#e86f6f', border: 'rgba(232,111,111,0.2)' };
+                const badgeLabel = status === 'current' ? 'CONSENTED' : status === 'outdated' ? 'OUTDATED' : 'NOT CONSENTED';
+                return (
+                  <div key={ct.id} style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    gap: '0.6rem', padding: '0.55rem 0.7rem',
+                    background: 'var(--bg-chip)', borderRadius: 8,
+                    border: '1px solid var(--border-faint)',
+                  }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem', minWidth: 0 }}>
+                      <span style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ct.name}</span>
+                      {sub && (
+                        <span style={{ fontSize: '0.68rem', color: 'var(--text-ghost)' }}>
+                          {new Date(sub.submitted_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexShrink: 0 }}>
+                      <span style={{
+                        fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.04em',
+                        padding: '0.15rem 0.45rem', borderRadius: 20,
+                        background: badgeStyle.bg, color: badgeStyle.color,
+                        border: `1px solid ${badgeStyle.border}`,
+                      }}>
+                        {badgeLabel}
+                      </span>
+                      {client.email && status !== 'current' && (
+                        <button
+                          onClick={() => handleSendLink(ct.id)}
+                          disabled={loadingId}
+                          style={{
+                            background: 'none',
+                            border: `1px solid ${sentId ? '#4cc98a' : 'var(--accent)'}`,
+                            borderRadius: 6, padding: '0.15rem 0.5rem',
+                            color: sentId ? '#4cc98a' : 'var(--accent)',
+                            fontSize: '0.7rem', fontWeight: 600,
+                            cursor: 'pointer', fontFamily: 'inherit',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {sentId ? 'Sent ✓' : loadingId ? '…' : 'Send link →'}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
-          {linkErr && <p style={{ fontSize: '0.72rem', color: '#e86f6f', margin: '0.3rem 0 0' }}>{linkErr}</p>}
-        </div>
+        )}
 
         {/* Profile fields */}
         <div style={{ borderTop: '1px solid var(--border-faint)', paddingTop: '1rem', marginTop: '0.25rem' }}>

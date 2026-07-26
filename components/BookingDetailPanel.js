@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { getAvailableStations, getStations, getClientConsents, getNotes, addNote, deleteNote, getBookingConsentSubmissions, getStudioClients, generateConsentLink, getStudioBookingPayment } from '@/lib/api';
+import { getAvailableStations, getStations, getClientConsents, getNotes, addNote, deleteNote, getBookingConsentSubmissions, getStudioClients, generateConsentLink, getStudioBookingPayment, listConsentTemplates } from '@/lib/api';
 import { statusColors, statusLabel, capitalise as cap } from '@/lib/status';
 import { formatDob as fmtDob } from '@/lib/format';
 import { getCached, setCached } from '@/lib/cache';
@@ -75,11 +75,12 @@ export default function BookingDetailPanel({
   const [noteAdding,  setNoteAdding]  = useState(false);
 
   // ── Consent state ──────────────────────────────────────────────────────────
-  const [consent,         setConsent]         = useState(null);
-  const [consentVersion,  setConsentVersion]  = useState('1');
-  const [consentLoading,  setConsentLoading]  = useState(false);
-  const [linkGenerating,  setLinkGenerating]  = useState(false);
-  const [linkCopied,      setLinkCopied]      = useState(false);
+  const [consent,              setConsent]              = useState(null);
+  const [consentVersion,       setConsentVersion]       = useState('1');
+  const [consentLoading,       setConsentLoading]       = useState(false);
+  const [linkGeneratingId,     setLinkGeneratingId]     = useState(null);
+  const [linkSentId,           setLinkSentId]           = useState(null);
+  const [consentTemplates,     setConsentTemplates]     = useState([]);
 
   // ── Contact-book profile (allergies / preferences / pain tolerance) ─────────
   const [clientProfile, setClientProfile] = useState(null);
@@ -185,6 +186,11 @@ export default function BookingDetailPanel({
     } catch { /* silent */ }
   }
 
+  // ── Load consent templates (once) ─────────────────────────────────────────
+  useEffect(() => {
+    listConsentTemplates().then(d => setConsentTemplates(d.templates ?? [])).catch(() => {});
+  }, []);
+
   // ── Consent ────────────────────────────────────────────────────────────────
   useEffect(() => {
     setConsent(null);
@@ -246,15 +252,20 @@ export default function BookingDetailPanel({
   const allergies         = clientProfile?.allergies || null;
   const painTolerance     = clientProfile?.pain_tolerance || null;
 
-  async function handleSendConsentLink() {
+  async function handleSendConsentLink(templateId) {
     if (!email) return;
-    setLinkGenerating(true);
+    setLinkGeneratingId(templateId);
     try {
-      await generateConsentLink(email);
-      setLinkCopied(true);
-      setTimeout(() => setLinkCopied(false), 3000);
+      // '__inline__' is the sentinel for the compact booking-panel send button;
+      // resolve to the first template if one exists, otherwise send without.
+      const actualId = templateId === '__inline__'
+        ? (consentTemplates[0]?.id || undefined)
+        : (templateId || undefined);
+      await generateConsentLink(email, actualId);
+      setLinkSentId(templateId);
+      setTimeout(() => setLinkSentId(null), 3000);
     } catch (e) { alert(e.message); }
-    finally { setLinkGenerating(false); }
+    finally { setLinkGeneratingId(null); }
   }
 
   // ── Load consent submissions ───────────────────────────────────────────────
@@ -541,22 +552,15 @@ export default function BookingDetailPanel({
           )}
         </div>
 
-        {/* Consent */}
+        {/* Consent — inline badge (client info section) */}
         {email && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
             <span style={p.label}>{t('bdp_consent')}</span>
             {consentLoading || submissionsLoading ? (
-              <span style={{ fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.04em',
-                padding: '0.1rem 0.4rem', borderRadius: 4,
-                background: 'var(--bg-chip)', color: 'var(--text-ghost)', opacity: 0.5 }}>
-                {t('loading')}
-              </span>
+              <span style={{ fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.04em', padding: '0.1rem 0.4rem', borderRadius: 4, background: 'var(--bg-chip)', color: 'var(--text-ghost)', opacity: 0.5 }}>{t('loading')}</span>
             ) : (
               <>
-                <span style={{ fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.04em',
-                  padding: '0.1rem 0.4rem', borderRadius: 4, background: cs.bg, color: cs.text }}>
-                  {consentLabel}
-                </span>
+                <span style={{ fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.04em', padding: '0.1rem 0.4rem', borderRadius: 4, background: cs.bg, color: cs.text }}>{consentLabel}</span>
                 {consent && (
                   <span style={{ fontSize: '0.72rem', color: 'var(--text-ghost)' }}>
                     v{consent.consent_version} · {new Date(consent.agreed_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
@@ -564,12 +568,18 @@ export default function BookingDetailPanel({
                 )}
                 {(consentStatus === 'none' || consentStatus === 'outdated') && (
                   <button
-                    onClick={handleSendConsentLink}
-                    disabled={linkGenerating}
-                    style={{ ...p.linkBtn, color: linkCopied ? '#4cc98a' : 'var(--accent)',
-                      borderColor: linkCopied ? '#4cc98a' : 'var(--accent)' }}
+                    onClick={() => handleSendConsentLink('__inline__')}
+                    disabled={linkGeneratingId === '__inline__'}
+                    style={{
+                      background: 'none',
+                      border: `1px solid ${linkSentId === '__inline__' ? '#4cc98a' : 'var(--accent)'}`,
+                      borderRadius: 6, padding: '0.1rem 0.5rem',
+                      color: linkSentId === '__inline__' ? '#4cc98a' : 'var(--accent)',
+                      fontSize: '0.7rem', fontWeight: 600,
+                      cursor: 'pointer', fontFamily: 'inherit',
+                    }}
                   >
-                    {linkCopied ? t('clients_email_sent') : linkGenerating ? t('sending') : t('clients_send_consent')}
+                    {linkSentId === '__inline__' ? 'Sent ✓' : linkGeneratingId === '__inline__' ? '…' : 'Send link →'}
                   </button>
                 )}
               </>
@@ -627,6 +637,80 @@ export default function BookingDetailPanel({
                 );
               })}
             </div>
+          </div>
+        )}
+
+        {/* ── Consent submissions (collapsible) ── */}
+        {submissionsLoading && (
+          <div>
+            <div style={p.divider} />
+            <span style={{ fontSize: '0.72rem', color: 'var(--text-ghost)' }}>{t('loading')}</span>
+          </div>
+        )}
+        {!submissionsLoading && consentSubmissions.length > 0 && (
+          <div>
+            <div style={p.divider} />
+            <button
+              style={{ ...p.sectionLabel, background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', gap: '0.35rem', width: '100%' }}
+              onClick={() => setSubmissionsExpanded(x => !x)}
+            >
+              <span>{t('bdp_consent_forms')} ({consentSubmissions.length})</span>
+              <span style={{ marginLeft: 'auto', fontSize: '0.7rem', color: 'var(--text-ghost)' }}>{submissionsExpanded ? '▲' : '▼'}</span>
+            </button>
+            {submissionsExpanded && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', marginTop: '0.65rem' }}>
+                {consentSubmissions.map(sub => (
+                  <div key={sub.id} style={{ background: 'var(--bg-chip)', border: '1px solid var(--border-faint)', borderRadius: 8, padding: '0.75rem 0.85rem', display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-dim)' }}>{sub.template_name}</span>
+                      {sub.is_minor && (
+                        <span style={{ fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', padding: '0.1rem 0.4rem', borderRadius: 4, background: 'rgba(245,158,58,0.12)', color: '#f59e3a' }}>{t('bdp_minor')}</span>
+                      )}
+                    </div>
+                    {sub.signer_name && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ fontSize: '0.72rem', color: 'var(--text-ghost)' }}>{t('bdp_signed_by')}</span>
+                        <span style={{ fontSize: '0.78rem', color: 'var(--text-dim)' }}>{sub.signer_name}</span>
+                      </div>
+                    )}
+                    {sub.answers && Object.entries(sub.answers).length > 0 && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                        {Object.entries(sub.answers).map(([k, v]) => v && v !== true && v !== 'true' && k !== '__agreed__' && (
+                          <div key={k} style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                            <span style={{ color: 'var(--text-ghost)' }}>{k}: </span>{v}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {sub.client_signature_url && (
+                      <div>
+                        <p style={{ fontSize: '0.68rem', color: 'var(--text-ghost)', margin: '0 0 0.25rem' }}>{t('bdp_client_signature')}</p>
+                        <img src={sub.client_signature_url} alt="Client signature"
+                          style={{ maxWidth: '100%', height: 60, objectFit: 'contain', borderRadius: 4, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border-faint)', display: 'block' }} />
+                      </div>
+                    )}
+                    {sub.guardian_name && (
+                      <div style={{ borderTop: '1px solid var(--border-faint)', paddingTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                        <span style={{ fontSize: '0.68rem', fontWeight: 600, color: 'var(--text-ghost)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('bdp_guardian')}</span>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span style={{ fontSize: '0.72rem', color: 'var(--text-ghost)' }}>{sub.guardian_relationship ?? 'Guardian'}</span>
+                          <span style={{ fontSize: '0.78rem', color: 'var(--text-dim)' }}>{sub.guardian_name}</span>
+                        </div>
+                        {sub.guardian_email && <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{sub.guardian_email}</span>}
+                        {sub.guardian_phone && <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{sub.guardian_phone}</span>}
+                        {sub.guardian_signature_url && (
+                          <img src={sub.guardian_signature_url} alt="Guardian signature"
+                            style={{ maxWidth: '100%', height: 60, objectFit: 'contain', borderRadius: 4, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border-faint)', display: 'block', marginTop: '0.25rem' }} />
+                        )}
+                      </div>
+                    )}
+                    <span style={{ fontSize: '0.68rem', color: 'var(--text-ghost)' }}>
+                      {new Date(sub.submitted_at).toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' })}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -703,96 +787,6 @@ export default function BookingDetailPanel({
         </div>
       )}
 
-      {/* ── Consent submissions ── */}
-      {submissionsLoading && (
-        <div style={{ padding: '0 1rem' }}>
-          <div style={p.divider} />
-          <span style={{ fontSize: '0.72rem', color: 'var(--text-ghost)' }}>{t('loading')}</span>
-        </div>
-      )}
-      {!submissionsLoading && consentSubmissions.length > 0 && (
-        <div style={{ padding: '0 1rem 0' }}>
-          <div style={p.divider} />
-          <button
-            style={{ ...p.sectionLabel, background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', gap: '0.35rem', width: '100%' }}
-            onClick={() => setSubmissionsExpanded(x => !x)}
-          >
-            <span>{t('bdp_consent_forms')} ({consentSubmissions.length})</span>
-            <span style={{ marginLeft: 'auto', fontSize: '0.7rem', color: 'var(--text-ghost)' }}>{submissionsExpanded ? '▲' : '▼'}</span>
-          </button>
-          {submissionsExpanded && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', marginTop: '0.65rem' }}>
-              {consentSubmissions.map(sub => (
-                <div key={sub.id} style={{ background: 'var(--bg-chip)', border: '1px solid var(--border-faint)', borderRadius: 8, padding: '0.75rem 0.85rem', display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-dim)' }}>{sub.template_name}</span>
-                    <span style={{ fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', padding: '0.1rem 0.4rem', borderRadius: 4, background: 'var(--bg-card)', color: 'var(--text-ghost)' }}>
-                      {sub.template_type}
-                    </span>
-                    {sub.is_minor && (
-                      <span style={{ fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', padding: '0.1rem 0.4rem', borderRadius: 4, background: 'rgba(245,158,58,0.12)', color: '#f59e3a' }}>{t('bdp_minor')}</span>
-                    )}
-                  </div>
-
-                  {sub.signer_name && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ fontSize: '0.72rem', color: 'var(--text-ghost)' }}>{t('bdp_signed_by')}</span>
-                      <span style={{ fontSize: '0.78rem', color: 'var(--text-dim)' }}>{sub.signer_name}</span>
-                    </div>
-                  )}
-
-                  {/* Field answers */}
-                  {sub.answers && Object.entries(sub.answers).length > 0 && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                      {Object.entries(sub.answers).map(([k, v]) => v && v !== true && v !== 'true' && (
-                        <div key={k} style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-                          <span style={{ color: 'var(--text-ghost)' }}>{k}: </span>{v}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Client signature */}
-                  {sub.client_signature_url && (
-                    <div>
-                      <p style={{ fontSize: '0.68rem', color: 'var(--text-ghost)', margin: '0 0 0.25rem' }}>{t('bdp_client_signature')}</p>
-                      <img
-                        src={sub.client_signature_url}
-                        alt="Client signature"
-                        style={{ maxWidth: '100%', height: 60, objectFit: 'contain', borderRadius: 4, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border-faint)', display: 'block' }}
-                      />
-                    </div>
-                  )}
-
-                  {/* Guardian info */}
-                  {sub.guardian_name && (
-                    <div style={{ borderTop: '1px solid var(--border-faint)', paddingTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                      <span style={{ fontSize: '0.68rem', fontWeight: 600, color: 'var(--text-ghost)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('bdp_guardian')}</span>
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span style={{ fontSize: '0.72rem', color: 'var(--text-ghost)' }}>{sub.guardian_relationship ?? 'Guardian'}</span>
-                        <span style={{ fontSize: '0.78rem', color: 'var(--text-dim)' }}>{sub.guardian_name}</span>
-                      </div>
-                      {sub.guardian_email && <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{sub.guardian_email}</span>}
-                      {sub.guardian_phone && <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{sub.guardian_phone}</span>}
-                      {sub.guardian_signature_url && (
-                        <img
-                          src={sub.guardian_signature_url}
-                          alt="Guardian signature"
-                          style={{ maxWidth: '100%', height: 60, objectFit: 'contain', borderRadius: 4, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border-faint)', display: 'block', marginTop: '0.25rem' }}
-                        />
-                      )}
-                    </div>
-                  )}
-
-                  <span style={{ fontSize: '0.68rem', color: 'var(--text-ghost)' }}>
-                    {new Date(sub.submitted_at).toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' })}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
 
       {/* ── Actions ── */}
       {!stationStep && (canAcceptReject || canComplete || isFutureConfirmed || canSendLink || canConfirm || canReschedule) && (
