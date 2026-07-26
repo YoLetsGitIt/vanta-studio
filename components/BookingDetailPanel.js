@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { getAvailableStations, getStations, getClientConsents, getNotes, addNote, deleteNote, getBookingConsentSubmissions, getStudioClients, generateConsentLink, getStudioBookingPayment, listConsentTemplates } from '@/lib/api';
+import { getStations, getClientConsents, getNotes, addNote, deleteNote, getBookingConsentSubmissions, getStudioClients, generateConsentLink, getStudioBookingPayment, listConsentTemplates } from '@/lib/api';
+import { useStationAvailability } from '@/lib/useStationAvailability';
 import { statusColors, statusLabel, capitalise as cap } from '@/lib/status';
 import { formatDob as fmtDob } from '@/lib/format';
 import { getCached, setCached } from '@/lib/cache';
@@ -61,10 +62,8 @@ export default function BookingDetailPanel({
   const { t } = useLanguage();
 
   // ── Station picker state ───────────────────────────────────────────────────
-  const [stationStep,       setStationStep]       = useState(false);
-  const [availableStations, setAvailableStations] = useState([]);
-  const [stationsLoading,   setStationsLoading]   = useState(false);
-  const [stationError,      setStationError]      = useState('');
+  const [stationStep,  setStationStep]  = useState(false);
+  const [stationError, setStationError] = useState('');
 
   // ── Payment recording status ───────────────────────────────────────────────
   const [paymentSplits, setPaymentSplits] = useState(null); // null = not loaded
@@ -150,6 +149,16 @@ export default function BookingDetailPanel({
 
   const displayStatus = isNoShow ? 'no_show' : status;
   const sc = statusColors(displayStatus);
+
+  // ── Station availability (pre-fetched so the picker is instant on Accept) ──
+  const apptTime = chosenTime ?? proposedTime ?? '';
+  const apptDate = apptTime ? apptTime.slice(0, 10) : '';
+  const { stations: availableStations, loading: stationsLoading } = useStationAvailability({
+    date: apptDate,
+    startTime: apptTime,
+    durationMins: duration ?? 60,
+    excludeBookingId: bookingId ?? '',
+  });
 
   // ── Load payment split recordings for completed bookings ─────────────────
   useEffect(() => {
@@ -280,28 +289,16 @@ export default function BookingDetailPanel({
   }, [bookingId]);
 
   // ── Station picker ─────────────────────────────────────────────────────────
-  async function handleAcceptClick() {
+  function handleAcceptClick() {
     if (!onAccept) return;
-    // A pending booking has no chosen_time yet — accepting confirms the client's
-    // primary requested time, so check station availability against that date.
-    const dateStr = ((chosenTime ?? proposedTime) ?? '').split('T')[0];
-    if (!dateStr) {
-      setStationError('This booking has no requested time to accept.');
+    if (!apptDate) { setStationError('This booking has no requested time to accept.'); return; }
+    if (stationsLoading) return;
+    if (!availableStations || availableStations.length === 0) {
+      setStationError('No stations available at that time.');
       return;
     }
-    setStationsLoading(true);
     setStationError('');
-    try {
-      const data = await getAvailableStations(dateStr, bookingId);
-      const stations = data.stations ?? [];
-      if (stations.length === 0) {
-        setStationError('No stations available on this date.');
-        return;
-      }
-      setAvailableStations(stations);
-      setStationStep(true);
-    } catch { setStationError('Failed to load stations.'); }
-    finally { setStationsLoading(false); }
+    setStationStep(true);
   }
 
   // ── Client history ─────────────────────────────────────────────────────────

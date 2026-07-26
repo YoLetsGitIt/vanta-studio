@@ -4,11 +4,11 @@ import { useState, useEffect, useMemo } from 'react';
 import {
   getStudioArtists,
   getStations,
-  getAvailableStations,
   getStudioHours,
   listStudioBookings,
   createManualBooking,
 } from '@/lib/api';
+import { useStationAvailability } from '@/lib/useStationAvailability';
 import { invalidatePrefix } from '@/lib/cache';
 import { formatDob } from '@/lib/format';
 import { useLanguage } from '@/lib/i18n';
@@ -140,11 +140,9 @@ export default function NewAppointmentPanel({ open, onClose, onCreated }) {
   // ── Remote data
   const [artists, setArtists] = useState([]);
   const [allStations, setAllStations] = useState([]);
-  const [availableStations, setAvailableStations] = useState(null);
   const [studioHours, setStudioHours] = useState([]);
   const [pastBookings, setPastBookings] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [stationsLoading, setStationsLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
@@ -176,18 +174,20 @@ export default function NewAppointmentPanel({ open, onClose, onCreated }) {
     return () => { cancelled = true; };
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Reload available stations whenever the date changes
-  useEffect(() => {
-    if (!bookingDate) { setAvailableStations(null); setStationId(''); return; }
-    let cancelled = false;
-    setStationsLoading(true);
-    setStationId('');
-    getAvailableStations(bookingDate)
-      .then(data => { if (!cancelled) setAvailableStations(data.stations ?? []); })
-      .catch(() => { if (!cancelled) setAvailableStations(allStations); })
-      .finally(() => { if (!cancelled) setStationsLoading(false); });
-    return () => { cancelled = true; };
-  }, [bookingDate]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Build ISO timestamp for time-slot overlap check.
+  const chosenTimeISO = bookingDate && startTime
+    ? new Date(`${bookingDate}T${startTime}:00`).toISOString()
+    : '';
+
+  const { stations: availableStations, loading: stationsLoading } = useStationAvailability({
+    date: bookingDate,
+    startTime: chosenTimeISO,
+    durationMins,
+    fallback: allStations,
+  });
+
+  // Reset station selection whenever date/time/duration changes.
+  useEffect(() => { setStationId(''); }, [bookingDate, chosenTimeISO, durationMins]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Past client search
   const pastClients = useMemo(() => {
