@@ -856,6 +856,8 @@ function StationMonthView({ monthStart, onDayClick }) {
 // ── Station utilization view ──────────────────────────────────────────────────
 
 
+const UNASSIGNED_ID = '__unassigned__';
+
 function StationView({ date }) {
   const { t } = useLanguage();
   const dateStr = toISO(date);
@@ -863,6 +865,7 @@ function StationView({ date }) {
   const [allStations,  setAllStations]  = useState([]);
   const [loading,      setLoading]      = useState(true);
   const [refreshKey,   setRefreshKey]   = useState(0);
+  const [activeId,     setActiveId]     = useState(null);
 
   useEffect(() => {
     function handler() { invalidatePrefix('schedule:'); setRefreshKey(k => k + 1); }
@@ -888,98 +891,142 @@ function StationView({ date }) {
       .finally(() => setLoading(false));
   }, [dateStr, refreshKey]); // eslint-disable-line
 
-  // Separate assigned (have stationName) from unassigned
+  // Reset active station when day changes
+  useEffect(() => { setActiveId(null); }, [dateStr]);
+
   const assigned   = entries.filter(e => e.stationName);
   const unassigned = entries.filter(e => !e.stationName);
 
-  // Always show all active stations (even those with no bookings today)
   const stations = allStations.length > 0
     ? allStations.map(s => ({ id: s.id, name: s.name }))
     : [...new Map(assigned.map(e => [e.stationId, e.stationName])).entries()].map(([id, name]) => ({ id, name }));
 
-  if (loading) return <p style={{ padding: '2rem', fontSize: '0.875rem', color: 'var(--text-faint)' }}>{t('loading')}</p>;
-  if (!stations.length) return <p style={{ padding: '2rem', fontSize: '0.875rem', color: 'var(--text-faint)' }}>{t('sched_no_stations')}</p>;
+  const pills = [
+    ...stations,
+    ...(unassigned.length > 0 ? [{ id: UNASSIGNED_ID, name: `No station (${unassigned.length})` }] : []),
+  ];
 
-  const hourToY = (h) => (h - DAY_START) * HOUR_PX;
+  const currentId = activeId ?? pills[0]?.id ?? null;
+
+  if (loading) return <p style={{ padding: '2rem', fontSize: '0.875rem', color: 'var(--text-faint)' }}>{t('loading')}</p>;
+  if (!pills.length) return <p style={{ padding: '2rem', fontSize: '0.875rem', color: 'var(--text-faint)' }}>{t('sched_no_stations')}</p>;
+
+  const col = currentId === UNASSIGNED_ID
+    ? null
+    : assigned.filter(e => e.stationId === currentId);
 
   return (
-    <div style={{ flex: 1, overflowY: 'auto', padding: '1rem 2rem 2rem' }}>
-      {stations.length > 0 && (
-        <div style={{ overflowX: 'auto' }}>
-          <div style={{ display: 'flex', minWidth: stations.length * 160 + 48 }}>
-            {/* Time axis */}
-            <div style={{ width: 44, flexShrink: 0, position: 'relative', height: GRID_H + HOUR_PX }}>
-              {HOURS.map(h => (
-                <div key={h} style={{ position: 'absolute', top: hourToY(h), fontSize: '0.65rem', color: 'var(--text-ghost)', lineHeight: 1 }}>
-                  {h % 12 || 12}{h < 12 ? 'am' : 'pm'}
-                </div>
-              ))}
-            </div>
-            {/* Station columns */}
-            {stations.map(st => {
-              const col = assigned.filter(e => e.stationId === st.id);
-              return (
-                <div key={st.id} style={{ flex: 1, minWidth: 140, position: 'relative', borderLeft: '1px solid var(--border-faint)' }}>
-                  <div style={{ padding: '0 0 0.5rem 0.75rem', fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-ghost)', textTransform: 'uppercase', letterSpacing: '0.06em', position: 'sticky', top: 0, background: 'var(--bg)', zIndex: 1 }}>
-                    {st.name}
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+
+      {/* Station pill selector */}
+      <div style={{
+        display: 'flex', gap: '0.4rem',
+        padding: '0.6rem 1rem',
+        overflowX: 'auto', flexShrink: 0,
+        borderBottom: '1px solid var(--border-faint)',
+        scrollbarWidth: 'none',
+      }}>
+        {pills.map(st => {
+          const active = st.id === currentId;
+          return (
+            <button key={st.id} onClick={() => setActiveId(st.id)} style={{
+              padding: '0.3rem 0.9rem', borderRadius: 20, flexShrink: 0, cursor: 'pointer',
+              border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
+              background: active ? 'var(--accent-tint)' : 'var(--bg-chip)',
+              color: active ? 'var(--accent)' : 'var(--text-muted)',
+              fontSize: '0.78rem', fontWeight: 600,
+              transition: 'background 0.15s, color 0.15s, border-color 0.15s',
+            }}>
+              {st.name}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Unassigned list */}
+      {currentId === UNASSIGNED_ID && (
+        <div style={{ flex: 1, overflowY: 'auto', padding: '0.75rem 1rem 2rem' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+            {unassigned.map(e => (
+              <div key={e.bookingId} style={{
+                display: 'flex', alignItems: 'center', gap: '0.75rem',
+                padding: '0.65rem 0.85rem',
+                background: 'var(--bg-chip)', border: '1px solid var(--border-faint)', borderRadius: 9,
+              }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {e.clientName}
                   </div>
-                  <div style={{ position: 'relative', height: GRID_H }}>
-                    {/* Hour grid lines */}
-                    {HOURS.map(h => (
-                      <div key={h} style={{ position: 'absolute', top: hourToY(h), left: 0, right: 0, borderTop: '1px solid var(--border-faint)', opacity: 0.5 }} />
-                    ))}
-                    {col.map(e => {
-                      const startMin = minutesFromMidnight(e.chosenTime);
-                      const topPx    = ((startMin - DAY_START * 60) / 60) * HOUR_PX;
-                      const durMins  = e.durationMins ?? 60;
-                      const heightPx = Math.max((durMins / 60) * HOUR_PX, 24);
-                      const ss = srcStyle(e.source);
-                      const unconfirmed = e.status === 'requires_confirmation' || e.status === 'awaiting_payment';
-                      const blockBg     = unconfirmed ? 'rgba(255,255,255,0.04)' : ss.bg;
-                      const blockBorder = unconfirmed ? 'rgba(255,255,255,0.18)' : ss.border;
-                      const nameColor   = unconfirmed ? 'rgba(255,255,255,0.45)' : (ss.tagColor ?? 'var(--text)');
-                      return (
-                        <div key={e.bookingId} style={{
-                          position: 'absolute', top: topPx, left: 6, right: 6, height: heightPx,
-                          background: blockBg,
-                          border: `1px ${unconfirmed ? 'dashed' : 'solid'} ${blockBorder}`,
-                          borderLeft: `3px ${unconfirmed ? 'dashed' : 'solid'} ${blockBorder}`,
-                          borderRadius: 5,
-                          padding: '0.2rem 0.4rem', overflow: 'hidden',
-                        }}>
-                          <div style={{ fontSize: '0.72rem', fontWeight: 700, color: nameColor, lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                            {e.clientName}
-                          </div>
-                          {durMins >= 45 && (
-                            <div style={{ fontSize: '0.65rem', color: 'var(--text-ghost)', marginTop: 2 }}>
-                              {fmtTime(e.chosenTime)} · {fmtDuration(durMins)}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-ghost)', marginTop: 2 }}>
+                    {fmtTime(e.chosenTime)}{e.durationMins ? ` · ${fmtDuration(e.durationMins)}` : ''}
+                    {e.artistName ? ` · ${e.artistName}` : ''}
                   </div>
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
         </div>
       )}
 
-      {unassigned.length > 0 && (
-        <div style={{ marginTop: stations.length > 0 ? '1.5rem' : 0 }}>
-          <p style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-ghost)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '0.5rem' }}>
-            No station assigned ({unassigned.length})
-          </p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-            {unassigned.map(e => (
-              <div key={e.bookingId} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.5rem 0.75rem', background: 'var(--bg-chip)', border: '1px solid var(--border-faint)', borderRadius: 7 }}>
-                <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text)' }}>{e.clientName}</span>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{fmtTime(e.chosenTime)}{e.durationMins ? ` · ${fmtDuration(e.durationMins)}` : ''}</span>
-                {e.artistName && <span style={{ fontSize: '0.72rem', color: 'var(--text-ghost)' }}>{e.artistName}</span>}
-              </div>
-            ))}
-          </div>
+      {/* Station timeline — single-axis vertical scroll only */}
+      {currentId !== UNASSIGNED_ID && (
+        <div style={{ flex: 1, overflowY: 'auto', padding: '0 1rem 2rem' }}>
+          {col.length === 0 ? (
+            <p style={{ padding: '2rem 0', textAlign: 'center', fontSize: '0.875rem', color: 'var(--text-faint)' }}>
+              No bookings today
+            </p>
+          ) : (
+            <div style={{ position: 'relative', height: GRID_H + HOUR_PX }}>
+              {/* Hour rows */}
+              {HOURS.map(h => (
+                <div key={h} style={{
+                  position: 'absolute', top: (h - DAY_START) * HOUR_PX,
+                  left: 0, right: 0,
+                  display: 'flex', alignItems: 'flex-start', gap: '0.6rem',
+                }}>
+                  <span style={{
+                    fontSize: '0.65rem', color: 'var(--text-ghost)',
+                    width: 36, flexShrink: 0, lineHeight: 1, paddingTop: 2,
+                  }}>
+                    {h % 12 || 12}{h < 12 ? 'am' : 'pm'}
+                  </span>
+                  <div style={{ flex: 1, borderTop: '1px solid var(--border-faint)', marginTop: 7, opacity: 0.6 }} />
+                </div>
+              ))}
+              {/* Booking blocks */}
+              {col.map(e => {
+                const startMin = minutesFromMidnight(e.chosenTime);
+                const topPx    = ((startMin - DAY_START * 60) / 60) * HOUR_PX;
+                const durMins  = e.durationMins ?? 60;
+                const heightPx = Math.max((durMins / 60) * HOUR_PX, 44);
+                const ss = srcStyle(e.source);
+                const unconfirmed = e.status === 'requires_confirmation' || e.status === 'awaiting_payment';
+                const blockBg     = unconfirmed ? 'rgba(255,255,255,0.04)' : ss.bg;
+                const blockBorder = unconfirmed ? 'rgba(255,255,255,0.18)' : ss.border;
+                const nameColor   = unconfirmed ? 'rgba(255,255,255,0.45)' : (ss.tagColor ?? 'var(--text)');
+                return (
+                  <div key={e.bookingId} style={{
+                    position: 'absolute', top: topPx, left: 44, right: 0, height: heightPx,
+                    background: blockBg,
+                    border: `1px ${unconfirmed ? 'dashed' : 'solid'} ${blockBorder}`,
+                    borderLeft: `3px ${unconfirmed ? 'dashed' : 'solid'} ${blockBorder}`,
+                    borderRadius: 8,
+                    padding: '0.4rem 0.65rem',
+                    overflow: 'hidden',
+                    display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '0.1rem',
+                  }}>
+                    <div style={{ fontSize: '0.82rem', fontWeight: 700, color: nameColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {e.clientName}
+                    </div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-ghost)', whiteSpace: 'nowrap' }}>
+                      {fmtTime(e.chosenTime)} · {fmtDuration(durMins)}
+                      {e.artistName ? <span style={{ opacity: 0.7 }}> · {e.artistName}</span> : null}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
     </div>
