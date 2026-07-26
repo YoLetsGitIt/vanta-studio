@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import dynamic from 'next/dynamic';
 import {
   getStudioArtists,
   getStudioSchedule,
@@ -13,7 +12,6 @@ import {
 } from '@/lib/api';
 import { initials, toISODate } from '@/lib/format';
 
-const QRCodeSVG = dynamic(() => import('qrcode.react').then(m => m.QRCodeSVG), { ssr: false });
 
 function formatTime(iso) {
   return new Date(iso).toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit', hour12: true });
@@ -36,8 +34,6 @@ export default function HomePage() {
   const [consentTemplates, setConsentTemplates] = useState([]);
   const [submissionsByEmail, setSubmissionsByEmail] = useState({});
   const [loading, setLoading] = useState(true);
-  const [walkInUrl, setWalkInUrl] = useState('');
-  const [copied, setCopied] = useState(false);
   const [sendingLink, setSendingLink] = useState(null);
   const [sentLink, setSentLink] = useState(null);
 
@@ -64,10 +60,6 @@ export default function HomePage() {
         setTodayEntries(e);
         setWeekEntries(we);
         setConsentTemplates(templates);
-
-        if (accountData?.studio_id) {
-          setWalkInUrl(`${window.location.origin}/studio-booking?s=${accountData.studio_id}`);
-        }
 
         // Fetch consent submissions for today's unique client emails
         const emails = [...new Set(e.map(x => x.requesterEmail).filter(Boolean))];
@@ -157,32 +149,6 @@ export default function HomePage() {
 
       <div style={s.body}>
         {loading && <p style={s.msg}>Loading...</p>}
-
-        {/* Walk-in link */}
-        {walkInUrl && (
-          <div style={s.walkInCard}>
-            <div style={s.walkInLeft}>
-              <span style={s.walkInTitle}>Booking link</span>
-              <span style={s.walkInSub}>Share with clients for walk-in bookings</span>
-              <div style={s.walkInUrlRow}>
-                <span style={s.walkInUrlText}>{walkInUrl}</span>
-                <button
-                  style={s.copyBtn}
-                  onClick={() => {
-                    navigator.clipboard.writeText(walkInUrl);
-                    setCopied(true);
-                    setTimeout(() => setCopied(false), 2000);
-                  }}
-                >
-                  {copied ? 'Copied' : 'Copy'}
-                </button>
-              </div>
-            </div>
-            <div style={s.walkInQr}>
-              <QRCodeSVG value={walkInUrl} size={80} bgColor="transparent" fgColor="currentColor" level="M" />
-            </div>
-          </div>
-        )}
 
         {/* Pending alerts */}
         {!loading && hasPending && (
@@ -379,34 +345,6 @@ const s = {
     gap: '0.75rem',
   },
   msg: { fontSize: '0.875rem', color: 'var(--text-faint)' },
-
-  // Walk-in card
-  walkInCard: {
-    background: 'var(--bg-card)',
-    border: '1px solid var(--border)',
-    borderRadius: 12,
-    padding: '1rem 1.25rem',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '1rem',
-  },
-  walkInLeft: { display: 'flex', flexDirection: 'column', gap: '0.35rem', flex: 1, minWidth: 0 },
-  walkInTitle: { fontSize: '0.78rem', fontWeight: 700, color: 'var(--text)' },
-  walkInSub: { fontSize: '0.72rem', color: 'var(--text-secondary)' },
-  walkInUrlRow: { display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.15rem' },
-  walkInUrlText: {
-    fontSize: '0.7rem', color: 'var(--text-muted)',
-    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1,
-  },
-  copyBtn: {
-    background: 'var(--bg-chip)',
-    border: '1px solid var(--border)',
-    borderRadius: 6,
-    color: 'var(--text-muted)',
-    fontSize: '0.7rem', fontWeight: 600,
-    padding: '0.2rem 0.6rem', cursor: 'pointer', flexShrink: 0,
-  },
-  walkInQr: { flexShrink: 0, background: 'var(--bg-card)', borderRadius: 8, padding: 6 },
 
   // Alert card
   alertCard: {
