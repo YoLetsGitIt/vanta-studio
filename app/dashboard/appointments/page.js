@@ -12,13 +12,22 @@ import BookingDetailPanel from '@/components/BookingDetailPanel';
 import { useLanguage } from '@/lib/i18n';
 
 const STATUS_FILTERS = [
-  { value: 'pending',               tKey: 'status_pending' },
-  { value: 'awaiting_payment',      tKey: 'status_awaiting_payment' },
-  { value: 'requires_confirmation', tKey: 'status_needs_confirmation' },
-  { value: 'confirmed',             tKey: 'status_confirmed' },
-  { value: 'deposit_expired',       label: 'Deposit Expired' },
-  { value: 'completed,cancelled',   tKey: 'status_completed' },
+  { value: 'pending',                              tKey: 'status_pending' },
+  { value: 'awaiting_payment',                     tKey: 'status_awaiting_payment' },
+  { value: 'requires_confirmation',                tKey: 'status_needs_confirmation' },
+  { value: 'confirmed',                            tKey: 'status_confirmed' },
+  { value: 'completed,cancelled,deposit_expired',  tKey: 'status_completed' },
 ];
+
+const COMPLETED_SUB_FILTERS = [
+  { value: 'all',             label: 'All',             status: COMPLETED_TAB,      outcome: '' },
+  { value: 'completed',       label: 'Completed',       status: 'completed',        outcome: 'completed' },
+  { value: 'no_show',         label: 'No Show',         status: 'completed',        outcome: 'no_show' },
+  { value: 'deposit_expired', label: 'Deposit Expired', status: 'deposit_expired',  outcome: '' },
+  { value: 'cancelled',       label: 'Cancelled',       status: 'cancelled',        outcome: '' },
+];
+
+const COMPLETED_TAB = 'completed,cancelled,deposit_expired';
 
 const DEFAULT_FILTER = 'pending';
 
@@ -33,6 +42,7 @@ function AppointmentsInner() {
     ? searchParams.get('status')
     : DEFAULT_FILTER;
   const [activeFilter, setActiveFilter] = useState(initialFilter);
+  const [completedSubFilter, setCompletedSubFilter] = useState('all');
   const [sortDir, setSortDir] = useState('desc');
   const [search, setSearch] = useState('');
   const [bookings, setBookings] = useState([]);
@@ -67,7 +77,11 @@ function AppointmentsInner() {
   const [studioArtists, setStudioArtists] = useState([]);
   const [stripeConnected, setStripeConnected] = useState(false);
 
-  const combinedStatus = activeFilter;
+  const activeSub = activeFilter === COMPLETED_TAB
+    ? (COMPLETED_SUB_FILTERS.find(f => f.value === completedSubFilter) ?? COMPLETED_SUB_FILTERS[0])
+    : null;
+  const effectiveStatus  = activeSub ? activeSub.status  : activeFilter;
+  const effectiveOutcome = activeSub ? activeSub.outcome  : '';
 
   function showToast(msg) {
     setToast(msg);
@@ -76,6 +90,7 @@ function AppointmentsInner() {
 
   function selectFilter(value) {
     setActiveFilter(value);
+    setCompletedSubFilter('all');
     setSelected(null);
   }
 
@@ -86,7 +101,7 @@ function AppointmentsInner() {
 
   const load = useCallback(async (bust = false) => {
     if (bust) invalidatePrefix('bookings:');
-    const key = `bookings:${combinedStatus}:${sortDir}`;
+    const key = `bookings:${effectiveStatus}:${effectiveOutcome}:${sortDir}`;
     const cached = getCached(key);
     if (cached) {
       setBookings(cached.bookings);
@@ -98,7 +113,7 @@ function AppointmentsInner() {
     setError('');
     setNextCursor('');
     try {
-      const data = await listStudioBookings(combinedStatus, '', sortDir);
+      const data = await listStudioBookings(effectiveStatus, '', sortDir, effectiveOutcome);
       const b = data.bookings ?? [];
       const next = data.next_cursor ?? '';
       setCached(key, { bookings: b, next });
@@ -109,7 +124,7 @@ function AppointmentsInner() {
     } finally {
       setLoading(false);
     }
-  }, [combinedStatus, sortDir]);
+  }, [effectiveStatus, effectiveOutcome, sortDir]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -123,7 +138,7 @@ function AppointmentsInner() {
     if (!nextCursor || loadingMore) return;
     setLoadingMore(true);
     try {
-      const data = await listStudioBookings(combinedStatus, nextCursor, sortDir);
+      const data = await listStudioBookings(effectiveStatus, nextCursor, sortDir, effectiveOutcome);
       const more = data.bookings ?? [];
       const next = data.next_cursor ?? '';
       setBookings(prev => [...prev, ...more]);
@@ -458,6 +473,21 @@ function AppointmentsInner() {
         </div>
       </div>
 
+      {activeFilter === COMPLETED_TAB && (
+        <div style={s.subFilterRow}>
+          {COMPLETED_SUB_FILTERS.map(f => (
+            <button
+              key={f.value}
+              onMouseDown={e => e.preventDefault()}
+              onClick={() => { setCompletedSubFilter(f.value); setSelected(null); }}
+              style={{ ...s.subFilterBtn, ...(completedSubFilter === f.value ? s.subFilterActive : {}) }}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+      )}
+
       <div style={s.body}>
         {loading && <SkeletonList />}
         {error && <p style={{ ...s.msg, color: '#e86f6f' }}>{error}</p>}
@@ -715,6 +745,21 @@ const s = {
   },
   filterActive: {
     background: 'var(--accent-tint)', border: '1px solid var(--accent-tint-border)', color: 'var(--accent)',
+  },
+  subFilterRow: {
+    display: 'flex', gap: '0.35rem', flexWrap: 'wrap',
+    padding: '0.6rem 2rem',
+    borderBottom: '1px solid var(--border-faint)',
+    flexShrink: 0,
+  },
+  subFilterBtn: {
+    padding: '0.2rem 0.7rem', borderRadius: 20,
+    border: '1px solid var(--border-faint)',
+    background: 'transparent', color: 'var(--text-ghost)',
+    fontSize: '0.73rem', fontWeight: 500, cursor: 'pointer',
+  },
+  subFilterActive: {
+    background: 'var(--bg-chip)', border: '1px solid var(--border)', color: 'var(--text-muted)',
   },
   body: {
     flex: 1, overflowY: 'auto', padding: '1rem 2rem',
