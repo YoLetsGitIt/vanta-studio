@@ -35,7 +35,7 @@ const inputStyle = {
 
 const selectStyle = { ...inputStyle, cursor: 'pointer', colorScheme: 'auto' };
 
-export default function CompleteBookingModal({ outcome = 'completed', initialPrice, onConfirm, onCancel, saving }) {
+export default function CompleteBookingModal({ outcome = 'completed', initialPrice, depositAmount, onConfirm, onCancel, saving }) {
   const { t } = useLanguage();
   const [finalPrice, setFinalPrice] = useState(initialPrice != null ? String(initialPrice) : '');
   const [splits, setSplits] = useState([{ method: '', amount: '' }]);
@@ -96,6 +96,18 @@ export default function CompleteBookingModal({ outcome = 'completed', initialPri
             ? t('noshow_desc')
             : t('complete_desc')}
         </p>
+
+        {!isNoShow && depositAmount != null && (
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: '0.65rem 0.85rem', marginBottom: '1rem',
+            background: 'var(--bg-input)', border: '1px solid var(--border)',
+            borderRadius: 8,
+          }}>
+            <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Deposit:</span>
+            <span style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text)' }}>${Number(depositAmount).toFixed(2)}</span>
+          </div>
+        )}
 
         {!isNoShow && (
           <>

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { listStudioBookings, getStudioClients, getClientConsents, getNotes, addNote, deleteNote, ensureStudioClient, patchStudioClient, generateConsentLink, listConsentTemplates, getClientConsentSubmissions } from '@/lib/api';
+import { listStudioBookings, getStudioClients, getClientConsents, getNotes, addNote, deleteNote, ensureStudioClient, patchStudioClient, generateConsentLink, listConsentTemplates, getClientConsentSubmissions, getBatchClientConsentSubmissions } from '@/lib/api';
 
 const TATTOO_STYLES = [
   'Traditional', 'Neo Traditional', 'Blackwork', 'Fine Line', 'Realism',
@@ -26,6 +26,7 @@ function ClientsInner() {
   const [consents, setConsents] = useState({});
   const [consentVersion, setConsentVersion] = useState('1');
   const [consentTemplates, setConsentTemplates] = useState([]);
+  const [submissionsByEmail, setSubmissionsByEmail] = useState({});
 
   // Auto-select a client when navigated from booking detail.
   useEffect(() => {
@@ -67,7 +68,7 @@ function ClientsInner() {
     load();
   }, []);
 
-  // Once bookings load, batch-fetch consent statuses.
+  // Once bookings load, batch-fetch consent statuses from both systems.
   useEffect(() => {
     if (bookings.length === 0) return;
     const emails = [...new Set(bookings.map(b => b.requester_email).filter(Boolean))];
@@ -76,6 +77,17 @@ function ClientsInner() {
       .then(data => {
         setConsents(data.consents ?? {});
         setConsentVersion(data.current_version ?? '1');
+      })
+      .catch(() => {});
+    getBatchClientConsentSubmissions(emails)
+      .then(data => {
+        const map = {};
+        for (const sub of (data.submissions ?? [])) {
+          if (!sub.client_email) continue;
+          if (!map[sub.client_email]) map[sub.client_email] = [];
+          map[sub.client_email].push(sub);
+        }
+        setSubmissionsByEmail(map);
       })
       .catch(() => {});
   }, [bookings]);
@@ -219,7 +231,8 @@ function ClientsInner() {
             const key = client.email || client.name;
             const active = selected === key;
             const consent = client.email ? consents[client.email] : null;
-            const consentStatus = getConsentStatus(consent, consentVersion);
+            const clientSubs = client.email ? (submissionsByEmail[client.email] ?? []) : [];
+            const consentStatus = getConsentStatus(consent, consentVersion, clientSubs, consentTemplates);
             return (
               <div
                 key={key}
@@ -266,7 +279,21 @@ export default function ClientsPage() {
   );
 }
 
-function getConsentStatus(consent, currentVersion) {
+function getConsentStatus(consent, currentVersion, submissions = [], templates = []) {
+  // New system (template-based submissions) takes priority.
+  if (submissions.length > 0) {
+    const activeTemplate = templates[0];
+    if (activeTemplate) {
+      const sub = submissions.find(s => s.template_id === activeTemplate.id);
+      if (sub) {
+        const outdated = new Date(sub.submitted_at) < new Date(activeTemplate.updated_at);
+        return outdated ? 'outdated' : 'current';
+      }
+    }
+    // Has submissions but none match the active template — treat as current.
+    return 'current';
+  }
+  // Fall back to old version-based system.
   if (!consent) return 'none';
   if (consent.consent_version === currentVersion) return 'current';
   return 'outdated';

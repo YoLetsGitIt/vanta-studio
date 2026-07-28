@@ -144,7 +144,6 @@ export default function NewAppointmentPanel({ open, onClose, onCreated }) {
   const [pastBookings, setPastBookings] = useState([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -262,7 +261,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated }) {
   const clientName = clientMode === 'search'
     ? (selectedClient?.name || '')
     : [firstName.trim(), lastName.trim()].filter(Boolean).join(' ');
-  const canSubmit = !!clientName && !!artistId && !!bookingDate && !!startTime && !timeError;
+  const canSubmit = !!clientName && !!artistId && !!bookingDate && !!startTime && !timeError && !!stationId;
 
   function resetForm() {
     setClientMode('search');
@@ -278,7 +277,6 @@ export default function NewAppointmentPanel({ open, onClose, onCreated }) {
     setFinalPrice(''); setDepositAmount('');
     setBookingType('personal');
     setNotes(''); setError('');
-    setAvailableStations(null);
   }
 
   function handleClose() { resetForm(); onClose(); }
@@ -289,6 +287,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated }) {
     if (!artistId) { setError(t('nap_err_artist')); return; }
     if (!bookingDate || !startTime) { setError(t('nap_err_datetime')); return; }
     if (timeError) { setError(timeError); return; }
+    if (!stationId) { setError('Please select a station.'); return; }
     setSaving(true); setError('');
     try {
       const chosenTime = new Date(`${bookingDate}T${startTime}:00`).toISOString();
@@ -315,13 +314,9 @@ export default function NewAppointmentPanel({ open, onClose, onCreated }) {
       invalidatePrefix('bookings:');
       invalidatePrefix('schedule:');
       window.dispatchEvent(new CustomEvent('booking-created'));
-      setSaved(true);
-      setTimeout(() => {
-        setSaved(false);
-        resetForm();
-        onCreated?.();
-        onClose();
-      }, 1200);
+      resetForm();
+      onCreated?.();
+      onClose();
     } catch (err) {
       setError(err.message);
     } finally {
@@ -658,10 +653,10 @@ export default function NewAppointmentPanel({ open, onClose, onCreated }) {
 
             <button
               type="submit"
-              style={{ ...bd.submitBtn, opacity: saving ? 0.6 : 1, background: saved ? '#4cc98a' : bd.submitBtn.background, color: saved ? '#0b0f16' : bd.submitBtn.color }}
-              disabled={saving || saved}
+              style={{ ...bd.submitBtn, opacity: canSubmit && !saving ? 1 : 0.4 }}
+              disabled={!canSubmit || saving}
             >
-              {saved ? t('nap_created') : saving ? t('sched_creating') : t('nap_create')}
+              {saving ? t('sched_creating') : t('nap_create')}
             </button>
 
           </form>

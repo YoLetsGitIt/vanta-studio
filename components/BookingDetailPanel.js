@@ -97,7 +97,7 @@ export default function BookingDetailPanel({
   const email       = booking?.requester_email   ?? entry?.requesterEmail ?? null;
   const phone       = booking?.requester_phone   ?? entry?.phone          ?? null;
   const dob         = booking?.dob               ?? null;
-  const artistName  = entry?.artistName          ?? null;
+  const artistName  = booking?.artist_name        ?? entry?.artistName ?? null;
   const sessionType = booking?.session_type      ?? entry?.sessionType    ?? null;
   const placement   = booking?.body_location     ?? entry?.placement      ?? null;
   const sizeRaw     = booking?.size              ?? entry?.size           ?? null;
@@ -145,7 +145,7 @@ export default function BookingDetailPanel({
   const canSendLink       = status === 'pending' || status === 'awaiting_payment';
   const canAcceptReject   = canAccept || canReject; // kept for layout gate
   const canConfirm        = status === 'requires_confirmation';
-  const canReschedule     = status === 'confirmed';
+  const canReschedule     = status === 'confirmed' && chosenDate && chosenDate > today;
 
   const displayStatus = isNoShow ? 'no_show' : status;
   const sc = statusColors(displayStatus);
@@ -445,21 +445,30 @@ export default function BookingDetailPanel({
           </div>
         )}
 
-        {quote != null && <Row label={t('bdp_quoted')} value={`$${Number(quote).toLocaleString()}`} />}
+        {(status === 'confirmed' || quote != null) && (
+          <Row label={t('bdp_quoted')} value={quote != null ? `$${Number(quote).toLocaleString()}` : '—'} />
+        )}
         {durationLabel && <Row label={t('bdp_duration')} value={durationLabel} />}
 
         {/* Deposit */}
-        {depositRequired && (
+        {(status === 'confirmed' || depositRequired || depositPaid) && (
           <div style={p.depositBox}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={p.label}>{t('bdp_deposit')}</span>
-              <span style={{
-                fontSize: '0.68rem', fontWeight: 700, padding: '0.1rem 0.4rem', borderRadius: 4,
-                background: depositConfirmedAt ? 'rgba(76,201,138,0.12)' : depositPaid ? 'rgba(250,204,21,0.12)' : 'rgba(232,111,111,0.1)',
-                color: depositConfirmedAt ? '#4cc98a' : depositPaid ? '#facc15' : '#e86f6f',
-              }}>
-                {depositConfirmedAt ? t('bdp_deposit_confirmed') : depositPaid ? t('bdp_deposit_unconfirmed') : t('bdp_deposit_unpaid')}
-              </span>
+              {!depositRequired && !depositPaid ? (
+                <span style={{ fontSize: '0.68rem', fontWeight: 700, padding: '0.1rem 0.4rem', borderRadius: 4,
+                  background: 'var(--bg-chip)', color: 'var(--text-ghost)', border: '1px solid var(--border-faint)' }}>
+                  Not required
+                </span>
+              ) : (
+                <span style={{
+                  fontSize: '0.68rem', fontWeight: 700, padding: '0.1rem 0.4rem', borderRadius: 4,
+                  background: depositConfirmedAt ? 'rgba(76,201,138,0.12)' : depositPaid ? 'rgba(250,204,21,0.12)' : 'rgba(232,111,111,0.1)',
+                  color: depositConfirmedAt ? '#4cc98a' : depositPaid ? '#facc15' : '#e86f6f',
+                }}>
+                  {depositConfirmedAt ? t('bdp_deposit_confirmed') : depositPaid ? t('bdp_deposit_unconfirmed') : t('bdp_deposit_unpaid')}
+                </span>
+              )}
             </div>
             {depositAmount != null && (() => {
               const feeCents = Math.round(depositAmount * 0.03 * 100) + 50;

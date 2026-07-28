@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { listStudioBookings, acceptBookingWithStation, rejectBooking, cancelBooking, recordOutcome, createFollowUpBooking, sendSelectionLink, confirmBooking, reassignArtist, rescheduleBooking, getStudioArtists, getStripeStatus } from '@/lib/api';
 import { getCached, setCached, invalidatePrefix } from '@/lib/cache';
 import { statusColors, statusLabel, capitalise } from '@/lib/status';
@@ -15,14 +16,23 @@ const STATUS_FILTERS = [
   { value: 'awaiting_payment',      tKey: 'status_awaiting_payment' },
   { value: 'requires_confirmation', tKey: 'status_needs_confirmation' },
   { value: 'confirmed',             tKey: 'status_confirmed' },
+  { value: 'deposit_expired',       label: 'Deposit Expired' },
   { value: 'completed,cancelled',   tKey: 'status_completed' },
 ];
 
 const DEFAULT_FILTER = 'pending';
 
 export default function AppointmentsPage() {
+  return <Suspense><AppointmentsInner /></Suspense>;
+}
+
+function AppointmentsInner() {
   const { t } = useLanguage();
-  const [activeFilter, setActiveFilter] = useState(DEFAULT_FILTER);
+  const searchParams = useSearchParams();
+  const initialFilter = STATUS_FILTERS.some(f => f.value === searchParams.get('status'))
+    ? searchParams.get('status')
+    : DEFAULT_FILTER;
+  const [activeFilter, setActiveFilter] = useState(initialFilter);
   const [sortDir, setSortDir] = useState('desc');
   const [search, setSearch] = useState('');
   const [bookings, setBookings] = useState([]);
@@ -141,7 +151,7 @@ export default function AppointmentsPage() {
     finally { setActionLoading(false); }
   }
 
-  function handleComplete(id, price) { setCompleteTarget({ id, price }); }
+  function handleComplete(id, price, depositAmount) { setCompleteTarget({ id, price, depositAmount }); }
   function handleNoShow(id) { setNoShowTarget(id); }
   function handleCancel(id) { setCancelTarget(id); }
 
@@ -236,6 +246,9 @@ export default function AppointmentsPage() {
 
   function openReschedule(booking) {
     const currentTime = booking?.chosen_time ?? booking?.proposed_time_primary ?? null;
+    const chosenDate = currentTime ? currentTime.slice(0, 10) : null;
+    const today = new Date().toLocaleDateString('en-CA');
+    if (chosenDate && chosenDate <= today) return;
     const dt = currentTime ? new Date(currentTime) : new Date();
     const pad = n => String(n).padStart(2, '0');
     const dateStr = `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`;
@@ -291,6 +304,7 @@ export default function AppointmentsPage() {
         <CompleteBookingModal
           outcome="completed"
           initialPrice={completeTarget.price}
+          depositAmount={completeTarget.depositAmount}
           saving={actionLoading}
           onConfirm={confirmComplete}
           onCancel={() => setCompleteTarget(null)}
@@ -434,7 +448,7 @@ export default function AppointmentsPage() {
                 onClick={() => selectFilter(f.value)}
                 style={{ ...s.filterBtn, ...(activeFilter === f.value ? s.filterActive : {}) }}
               >
-                {t(f.tKey)}
+                {f.label ?? t(f.tKey)}
               </button>
             ))}
           </div>
@@ -473,7 +487,7 @@ export default function AppointmentsPage() {
           onAccept={(stationId) => handleAccept(selectedBooking.id, stationId)}
           onReject={() => handleReject(selectedBooking.id)}
           onCancel={() => handleCancel(selectedBooking.id)}
-          onComplete={() => handleComplete(selectedBooking.id, selectedBooking.estimated_quote ?? selectedBooking.final_price)}
+          onComplete={() => handleComplete(selectedBooking.id, selectedBooking.estimated_quote ?? selectedBooking.final_price, selectedBooking.deposit_amount ?? null)}
           onNoShow={() => handleNoShow(selectedBooking.id)}
           onSendLink={() => handleSendLink(selectedBooking.id)}
           onConfirm={() => handleConfirm(selectedBooking.id)}

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getStudioArtists, getStudioSchedule, getStudioScheduleRange, getStudioBooking, acceptBookingWithStation, createManualBooking, createFollowUpBooking, rejectBooking, recordOutcome, rescheduleBooking, getStations } from '@/lib/api';
+import { getStudioArtists, getStudioSchedule, getStudioScheduleRange, getStudioBooking, acceptBookingWithStation, createManualBooking, createFollowUpBooking, rejectBooking, cancelBooking, recordOutcome, rescheduleBooking, getStations, sendSelectionLink, confirmBooking, reassignArtist, getStripeStatus } from '@/lib/api';
 import { getBookingStyle, TYPE_STYLE } from '@/lib/bookingType';
 import BookingDetailPanel from '@/components/BookingDetailPanel';
 import { getCached, setCached, invalidatePrefix } from '@/lib/cache';
@@ -61,15 +61,33 @@ function useBookingActions(afterChange) {
   const [detailBooking,  setDetailBooking]  = useState(null);
   const [detailLoading,  setDetailLoading]  = useState(false);
   const [actionLoading,  setActionLoading]  = useState(false);
-  const [completeTarget,  setCompleteTarget]  = useState(null);
-  const [noShowTarget,    setNoShowTarget]    = useState(null);
-  const [rejectTarget,    setRejectTarget]    = useState(null);
+  const [completeTarget,   setCompleteTarget]   = useState(null);
+  const [noShowTarget,     setNoShowTarget]     = useState(null);
+  const [rejectTarget,     setRejectTarget]     = useState(null);
+  const [cancelTarget,     setCancelTarget]     = useState(null);
+  const [sendLinkTarget,   setSendLinkTarget]   = useState(null);
+  const [sendLinkHours,    setSendLinkHours]    = useState(168);
+  const [sendLinkDuration, setSendLinkDuration] = useState(60);
+  const [sendLinkDeposit,  setSendLinkDeposit]  = useState(false);
+  const [sendLinkAmount,   setSendLinkAmount]   = useState('');
+  const [sendLinkQuote,    setSendLinkQuote]    = useState('');
+  const [sendLinkSaving,   setSendLinkSaving]   = useState(false);
+  const [reassignTarget,   setReassignTarget]   = useState(null);
+  const [reassignArtistId, setReassignArtistId] = useState('');
+  const [reassignResend,   setReassignResend]   = useState(true);
+  const [reassignSaving,   setReassignSaving]   = useState(false);
+  const [studioArtists,    setStudioArtists]    = useState([]);
+  const [stripeConnected,  setStripeConnected]  = useState(false);
   const [rescheduleTarget, setRescheduleTarget] = useState(null);
   const [rescheduleDate,   setRescheduleDate]   = useState('');
   const [rescheduleStart,  setRescheduleStart]  = useState('');
   const [rescheduleEnd,    setRescheduleEnd]    = useState('');
   const [rescheduleMsg,    setRescheduleMsg]    = useState('');
   const [rescheduleSaving, setRescheduleSaving] = useState(false);
+
+  useEffect(() => {
+    getStripeStatus().then(s => setStripeConnected(!!(s?.connected && s?.charges_enabled))).catch(() => {});
+  }, []);
 
   function openDetail(entry) {
     setSelectedEntry(entry);
@@ -101,11 +119,31 @@ function useBookingActions(afterChange) {
     if (!selectedEntry) return;
     if (action === 'complete') {
       const price = detailBooking?.final_price ?? detailBooking?.estimated_quote ?? selectedEntry?.estimatedQuote;
-      setCompleteTarget({ id: selectedEntry.bookingId, price });
+      setCompleteTarget({
+        id: selectedEntry.bookingId,
+        price,
+        depositAmount: detailBooking?.deposit_amount ?? null,
+      });
       return;
     }
     if (action === 'no_show') { setNoShowTarget(selectedEntry.bookingId); return; }
     if (action === 'reject')  { setRejectTarget(selectedEntry.bookingId); return; }
+    if (action === 'cancel')  { setCancelTarget(selectedEntry.bookingId); return; }
+    if (action === 'send_link') {
+      setSendLinkTarget(selectedEntry.bookingId);
+      setSendLinkHours(168); setSendLinkDuration(60);
+      setSendLinkDeposit(false); setSendLinkAmount(''); setSendLinkQuote('');
+      return;
+    }
+    if (action === 'confirm') { run(() => confirmBooking(selectedEntry.bookingId), () => {}); return; }
+    if (action === 'reassign') {
+      setReassignTarget(selectedEntry.bookingId);
+      setReassignArtistId(''); setReassignResend(true);
+      if (studioArtists.length === 0) {
+        getStudioArtists('approved').then(d => setStudioArtists(d.artists ?? [])).catch(() => {});
+      }
+      return;
+    }
     if (action === 'accept')  run(() => acceptBookingWithStation(selectedEntry.bookingId, stationId), () => {});
   }
 
@@ -118,10 +156,41 @@ function useBookingActions(afterChange) {
     run(() => recordOutcome(noShowTarget, 'no_show'), () => setNoShowTarget(null));
   const confirmReject = (reason) =>
     run(() => rejectBooking(rejectTarget, reason), () => setRejectTarget(null));
+  const confirmCancel = (reason) =>
+    run(() => cancelBooking(cancelTarget, reason), () => setCancelTarget(null));
+
+  async function confirmSendLink() {
+    setSendLinkSaving(true);
+    try {
+      const amount   = sendLinkDeposit && sendLinkAmount ? parseFloat(sendLinkAmount) : null;
+      const duration = sendLinkDuration ? Number(sendLinkDuration) : null;
+      const quote    = sendLinkQuote ? parseFloat(sendLinkQuote) : null;
+      await sendSelectionLink(sendLinkTarget, sendLinkHours, sendLinkDeposit, amount, duration, quote);
+      setSendLinkTarget(null);
+      closeDetail();
+      afterChange();
+    } catch (e) { alert(e.message); }
+    finally { setSendLinkSaving(false); }
+  }
+
+  async function confirmReassign() {
+    if (!reassignArtistId) return;
+    setReassignSaving(true);
+    try {
+      await reassignArtist(reassignTarget, reassignArtistId, reassignResend);
+      setReassignTarget(null);
+      closeDetail();
+      afterChange();
+    } catch (e) { alert(e.message); }
+    finally { setReassignSaving(false); }
+  }
 
   function openReschedule() {
     const booking = detailBooking;
     const currentTime = booking?.chosen_time ?? booking?.proposed_time_primary ?? null;
+    const chosenDate = currentTime ? currentTime.slice(0, 10) : null;
+    const today = new Date().toLocaleDateString('en-CA');
+    if (chosenDate && chosenDate <= today) return;
     const dt = currentTime ? new Date(currentTime) : new Date();
     const pad = n => String(n).padStart(2, '0');
     const dateStr = `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`;
@@ -157,12 +226,16 @@ function useBookingActions(afterChange) {
   return {
     selectedEntry, detailBooking, detailLoading, actionLoading,
     completeTarget, noShowTarget, rejectTarget,
+    cancelTarget, sendLinkTarget, sendLinkHours, sendLinkDuration, sendLinkDeposit, sendLinkAmount, sendLinkQuote, sendLinkSaving,
+    reassignTarget, reassignArtistId, reassignResend, reassignSaving, studioArtists, stripeConnected,
     rescheduleTarget, rescheduleDate, rescheduleStart, rescheduleEnd, rescheduleMsg, rescheduleSaving,
     openDetail, closeDetail, handleAction,
-    confirmComplete, confirmNoShow, confirmReject,
+    confirmComplete, confirmNoShow, confirmReject, confirmCancel, confirmSendLink, confirmReassign,
     openReschedule, confirmReschedule,
     setRescheduleStart, setRescheduleEnd, setRescheduleMsg, setRescheduleTarget,
     setCompleteTarget, setNoShowTarget, setRejectTarget,
+    setCancelTarget, setSendLinkTarget, setSendLinkHours, setSendLinkDuration, setSendLinkDeposit, setSendLinkAmount, setSendLinkQuote,
+    setReassignTarget, setReassignArtistId, setReassignResend,
   };
 }
 
@@ -179,8 +252,12 @@ function BookingOverlays({ actions: a }) {
           onClose={a.closeDetail}
           onAccept={(stationId) => a.handleAction('accept', stationId)}
           onReject={() => a.handleAction('reject')}
+          onCancel={() => a.handleAction('cancel')}
           onComplete={() => a.handleAction('complete')}
           onNoShow={() => a.handleAction('no_show')}
+          onSendLink={() => a.handleAction('send_link')}
+          onConfirm={() => a.handleAction('confirm')}
+          onReassign={() => a.handleAction('reassign')}
           onReschedule={a.openReschedule}
         />
       )}
@@ -188,6 +265,7 @@ function BookingOverlays({ actions: a }) {
         <CompleteBookingModal
           outcome="completed"
           initialPrice={a.completeTarget.price}
+          depositAmount={a.completeTarget.depositAmount}
           saving={a.actionLoading}
           onConfirm={a.confirmComplete}
           onCancel={() => a.setCompleteTarget(null)}
@@ -207,6 +285,112 @@ function BookingOverlays({ actions: a }) {
           onConfirm={a.confirmReject}
           onCancel={() => a.setRejectTarget(null)}
         />
+      )}
+      {a.cancelTarget && (
+        <RejectBookingModal
+          title={t('cancel_booking_title')}
+          placeholder="Reason for cancellation…"
+          confirmLabel={t('cancel_booking_confirm')}
+          saving={a.actionLoading}
+          onConfirm={a.confirmCancel}
+          onCancel={() => a.setCancelTarget(null)}
+        />
+      )}
+      {a.sendLinkTarget && (
+        <div style={overlayStyle} onClick={() => a.setSendLinkTarget(null)}>
+          <div style={modalStyle} onClick={e => e.stopPropagation()}>
+            <h3 style={{ margin: '0 0 0.5rem', fontSize: '0.95rem', fontWeight: 700, color: 'var(--text)' }}>
+              {t('appt_send_link')}
+            </h3>
+            <p style={{ margin: '0 0 1rem', fontSize: '0.8rem', color: 'var(--text-ghost)' }}>
+              {t('appt_send_link_desc')}
+            </p>
+            <label style={labelStyle}>{t('appt_duration')}</label>
+            <select value={a.sendLinkDuration} onChange={e => a.setSendLinkDuration(Number(e.target.value))} style={{ ...inputStyle, cursor: 'pointer', colorScheme: 'auto', marginBottom: '0.75rem' }}>
+              <option value={60}>1 hour</option>
+              <option value={90}>1.5 hours</option>
+              <option value={120}>2 hours</option>
+              <option value={180}>3 hours</option>
+              <option value={240}>4 hours</option>
+              <option value={300}>5 hours</option>
+              <option value={360}>6 hours</option>
+              <option value={480}>Full day (8 hrs)</option>
+            </select>
+            <label style={labelStyle}>{t('appt_quote')}</label>
+            <input
+              type="number" inputMode="numeric" placeholder="e.g. 350" min="0"
+              value={a.sendLinkQuote} onChange={e => a.setSendLinkQuote(e.target.value)}
+              onKeyDown={e => ['e','E','+','-','.'].includes(e.key) && e.preventDefault()}
+              style={{ ...inputStyle, marginBottom: '0.75rem' }}
+            />
+            <label style={labelStyle}>{t('appt_expires')}</label>
+            <select value={a.sendLinkHours} onChange={e => a.setSendLinkHours(Number(e.target.value))} style={{ ...inputStyle, cursor: 'pointer', colorScheme: 'auto', marginBottom: '0.75rem' }}>
+              <option value={24}>24 hours</option>
+              <option value={48}>48 hours</option>
+              <option value={72}>72 hours</option>
+              <option value={168}>7 days</option>
+              <option value={336}>14 days</option>
+            </select>
+            {a.stripeConnected ? (
+              <>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', cursor: 'pointer' }}>
+                  <input type="checkbox" checked={a.sendLinkDeposit} onChange={e => a.setSendLinkDeposit(e.target.checked)} style={{ accentColor: 'var(--accent)' }} />
+                  <span style={{ fontSize: '0.85rem', color: 'var(--text-dim)' }}>{t('appt_deposit')}</span>
+                </label>
+                {a.sendLinkDeposit && (
+                  <input
+                    type="number" inputMode="decimal" placeholder="Deposit amount ($)" min="0"
+                    value={a.sendLinkAmount} onChange={e => a.setSendLinkAmount(e.target.value)}
+                    onKeyDown={e => ['e','E','+','-'].includes(e.key) && e.preventDefault()}
+                    style={{ ...inputStyle, marginBottom: '0.75rem' }}
+                  />
+                )}
+              </>
+            ) : (
+              <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: '0 0 0.75rem', padding: '0.5rem 0.65rem', background: 'rgba(255,255,255,0.04)', borderRadius: 6 }}>
+                {t('appt_stripe_hint')}
+              </p>
+            )}
+            <div style={{ display: 'flex', gap: '0.6rem', marginTop: '0.25rem' }}>
+              <button style={cancelBtnStyle} onClick={() => a.setSendLinkTarget(null)}>{t('cancel')}</button>
+              <button
+                style={{ ...saveBtnStyle, opacity: a.sendLinkSaving ? 0.5 : 1 }}
+                onClick={a.confirmSendLink} disabled={a.sendLinkSaving}
+              >
+                {t(a.sendLinkSaving ? 'sending' : 'appt_send_link_btn')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {a.reassignTarget && (
+        <div style={overlayStyle} onClick={() => a.setReassignTarget(null)}>
+          <div style={modalStyle} onClick={e => e.stopPropagation()}>
+            <h3 style={{ margin: '0 0 1rem', fontSize: '0.95rem', fontWeight: 700, color: 'var(--text)' }}>
+              {t('appt_reassign')}
+            </h3>
+            <label style={labelStyle}>{t('appt_new_artist')}</label>
+            <select value={a.reassignArtistId} onChange={e => a.setReassignArtistId(e.target.value)} style={{ ...inputStyle, cursor: 'pointer', colorScheme: 'auto', marginBottom: '0.75rem' }}>
+              <option value="">{t('appt_select_artist')}</option>
+              {a.studioArtists.map(ar => (
+                <option key={ar.artistId ?? ar.id} value={ar.artistId ?? ar.id}>{ar.name}</option>
+              ))}
+            </select>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', cursor: 'pointer' }}>
+              <input type="checkbox" checked={a.reassignResend} onChange={e => a.setReassignResend(e.target.checked)} style={{ accentColor: 'var(--accent)' }} />
+              <span style={{ fontSize: '0.85rem', color: 'var(--text-dim)' }}>{t('appt_resend_link')}</span>
+            </label>
+            <div style={{ display: 'flex', gap: '0.6rem' }}>
+              <button style={cancelBtnStyle} onClick={() => a.setReassignTarget(null)}>{t('cancel')}</button>
+              <button
+                style={{ ...saveBtnStyle, opacity: (!a.reassignArtistId || a.reassignSaving) ? 0.5 : 1 }}
+                onClick={a.confirmReassign} disabled={!a.reassignArtistId || a.reassignSaving}
+              >
+                {t(a.reassignSaving ? 'saving' : 'appt_reassign_btn')}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
       {a.rescheduleTarget && (
         <div style={overlayStyle} onClick={e => e.target === e.currentTarget && a.setRescheduleTarget(null)}>
@@ -853,19 +1037,19 @@ function StationMonthView({ monthStart, onDayClick }) {
   );
 }
 
-// ── Station utilization view ──────────────────────────────────────────────────
-
-
-const UNASSIGNED_ID = '__unassigned__';
+// ── Station day view ──────────────────────────────────────────────────────────
 
 function StationView({ date }) {
   const { t } = useLanguage();
   const dateStr = toISO(date);
-  const [entries,      setEntries]      = useState([]);
-  const [allStations,  setAllStations]  = useState([]);
-  const [loading,      setLoading]      = useState(true);
-  const [refreshKey,   setRefreshKey]   = useState(0);
-  const [activeId,     setActiveId]     = useState(null);
+  const [entries,     setEntries]     = useState([]);
+  const [allStations, setAllStations] = useState([]);
+  const [loading,     setLoading]     = useState(true);
+  const [refreshKey,  setRefreshKey]  = useState(0);
+  const actions = useBookingActions(() => {
+    invalidatePrefix('schedule:');
+    setRefreshKey(k => k + 1);
+  });
 
   useEffect(() => {
     function handler() { invalidatePrefix('schedule:'); setRefreshKey(k => k + 1); }
@@ -877,158 +1061,103 @@ function StationView({ date }) {
     setLoading(true);
     const key = `schedule:${dateStr}`;
     const cached = getCached(key);
-    if (cached) { setEntries(cached); setLoading(false); }
+    if (cached) { setEntries(cached); }
     Promise.all([
       getStudioSchedule(dateStr).then(d => d.entries ?? []),
-      getStations().then(d => d.stations ?? []),
+      getStations().then(d => (d.stations ?? []).filter(s => s.is_active !== false)),
     ])
-      .then(([e, st]) => {
-        setCached(key, e);
-        setEntries(e);
-        setAllStations(st.filter(s => s.is_active !== false));
-      })
+      .then(([e, st]) => { setCached(key, e); setEntries(e); setAllStations(st); })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [dateStr, refreshKey]); // eslint-disable-line
 
-  // Reset active station when day changes
-  useEffect(() => { setActiveId(null); }, [dateStr]);
+  useEffect(() => { actions.closeDetail(); }, [dateStr]); // eslint-disable-line
 
-  const assigned   = entries.filter(e => e.stationName);
-  const unassigned = entries.filter(e => !e.stationName);
+  const unassigned = entries.filter(e => !e.stationId);
+  const byStation  = {};
+  for (const e of entries) {
+    if (!e.stationId) continue;
+    if (!byStation[e.stationId]) byStation[e.stationId] = [];
+    byStation[e.stationId].push(e);
+  }
 
-  const stations = allStations.length > 0
-    ? allStations.map(s => ({ id: s.id, name: s.name }))
-    : [...new Map(assigned.map(e => [e.stationId, e.stationName])).entries()].map(([id, name]) => ({ id, name }));
-
-  const pills = [
-    ...stations,
-    ...(unassigned.length > 0 ? [{ id: UNASSIGNED_ID, name: `No station (${unassigned.length})` }] : []),
+  // All stations always visible; append unassigned col if needed
+  const cols = [
+    ...allStations.map(s => ({ id: s.id, name: s.name })),
+    ...(unassigned.length > 0 ? [{ id: '__unassigned__', name: t('sched_unassigned') }] : []),
   ];
 
-  const currentId = activeId ?? pills[0]?.id ?? null;
-
-  if (loading) return <p style={{ padding: '2rem', fontSize: '0.875rem', color: 'var(--text-faint)' }}>{t('loading')}</p>;
-  if (!pills.length) return <p style={{ padding: '2rem', fontSize: '0.875rem', color: 'var(--text-faint)' }}>{t('sched_no_stations')}</p>;
-
-  const col = currentId === UNASSIGNED_ID
-    ? null
-    : assigned.filter(e => e.stationId === currentId);
+  if (loading) return <p style={s.msg}>{t('loading')}</p>;
+  if (!cols.length) return <p style={s.msg}>{t('sched_no_stations')}</p>;
 
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+    <div style={{ display: 'flex', flex: 1, overflow: 'hidden', position: 'relative' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+      <div style={s.calWrap}>
+      <div style={{ ...s.grid, gridTemplateColumns: `52px repeat(${cols.length}, minmax(160px, 1fr))` }}>
+        <div style={s.cornerCell} />
 
-      {/* Station pill selector */}
-      <div style={{
-        display: 'flex', gap: '0.4rem',
-        padding: '0.6rem 1rem',
-        overflowX: 'auto', flexShrink: 0,
-        borderBottom: '1px solid var(--border-faint)',
-        scrollbarWidth: 'none',
-      }}>
-        {pills.map(st => {
-          const active = st.id === currentId;
-          return (
-            <button key={st.id} onClick={() => setActiveId(st.id)} style={{
-              padding: '0.3rem 0.9rem', borderRadius: 20, flexShrink: 0, cursor: 'pointer',
-              border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
-              background: active ? 'var(--accent-tint)' : 'var(--bg-chip)',
-              color: active ? 'var(--accent)' : 'var(--text-muted)',
-              fontSize: '0.78rem', fontWeight: 600,
-              transition: 'background 0.15s, color 0.15s, border-color 0.15s',
-            }}>
-              {st.name}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Unassigned list */}
-      {currentId === UNASSIGNED_ID && (
-        <div style={{ flex: 1, overflowY: 'auto', padding: '0.75rem 1rem 2rem' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-            {unassigned.map(e => (
-              <div key={e.bookingId} style={{
-                display: 'flex', alignItems: 'center', gap: '0.75rem',
-                padding: '0.65rem 0.85rem',
-                background: 'var(--bg-chip)', border: '1px solid var(--border-faint)', borderRadius: 9,
-              }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {e.clientName}
-                  </div>
-                  <div style={{ fontSize: '0.72rem', color: 'var(--text-ghost)', marginTop: 2 }}>
-                    {fmtTime(e.chosenTime)}{e.durationMins ? ` · ${fmtDuration(e.durationMins)}` : ''}
-                    {e.artistName ? ` · ${e.artistName}` : ''}
-                  </div>
-                </div>
-              </div>
-            ))}
+        {cols.map(col => (
+          <div key={col.id} style={s.artistHeader}>
+            <span style={s.artistName}>{col.name}</span>
           </div>
-        </div>
-      )}
+        ))}
 
-      {/* Station timeline — single-axis vertical scroll only */}
-      {currentId !== UNASSIGNED_ID && (
-        <div style={{ flex: 1, overflowY: 'auto', padding: '0 1rem 2rem' }}>
-          {col.length === 0 ? (
-            <p style={{ padding: '2rem 0', textAlign: 'center', fontSize: '0.875rem', color: 'var(--text-faint)' }}>
-              No bookings today
-            </p>
-          ) : (
-            <div style={{ position: 'relative', height: GRID_H + HOUR_PX }}>
-              {/* Hour rows */}
-              {HOURS.map(h => (
-                <div key={h} style={{
-                  position: 'absolute', top: (h - DAY_START) * HOUR_PX,
-                  left: 0, right: 0,
-                  display: 'flex', alignItems: 'flex-start', gap: '0.6rem',
-                }}>
-                  <span style={{
-                    fontSize: '0.65rem', color: 'var(--text-ghost)',
-                    width: 36, flexShrink: 0, lineHeight: 1, paddingTop: 2,
-                  }}>
-                    {h % 12 || 12}{h < 12 ? 'am' : 'pm'}
-                  </span>
-                  <div style={{ flex: 1, borderTop: '1px solid var(--border-faint)', marginTop: 7, opacity: 0.6 }} />
-                </div>
-              ))}
-              {/* Booking blocks */}
-              {col.map(e => {
-                const startMin = minutesFromMidnight(e.chosenTime);
-                const topPx    = ((startMin - DAY_START * 60) / 60) * HOUR_PX;
-                const durMins  = e.durationMins ?? 60;
-                const heightPx = Math.max((durMins / 60) * HOUR_PX, 44);
-                const ss = srcStyle(e.source);
-                const unconfirmed = e.status === 'requires_confirmation' || e.status === 'awaiting_payment';
-                const blockBg     = unconfirmed ? 'rgba(255,255,255,0.04)' : ss.bg;
+        <div style={{ ...s.gutterCol, height: GRID_H }}>
+          {HOURS.map(h => (
+            <div key={h} style={{ ...s.hourLabel, top: (h - DAY_START) * HOUR_PX }}>
+              {h === 12 ? '12pm' : h < 12 ? `${h}am` : `${h-12}pm`}
+            </div>
+          ))}
+        </div>
+
+        {cols.map(col => {
+          const bookings = col.id === '__unassigned__' ? unassigned : (byStation[col.id] ?? []);
+          return (
+            <div key={col.id} style={{ ...s.dayCol, height: GRID_H }}>
+              {HOURS.map(h => <div key={h} style={{ ...s.gridLine, top: (h - DAY_START) * HOUR_PX }} />)}
+              {bookings.map(b => {
+                const startMin = minutesFromMidnight(b.chosenTime);
+                const durMin   = b.durationMins ?? 60;
+                const top      = (startMin - DAY_START * 60) * (HOUR_PX / 60);
+                const height   = Math.max(durMin * (HOUR_PX / 60), 24);
+                if (top < 0 || top > GRID_H) return null;
+                const isSelected = actions.selectedEntry?.bookingId === b.bookingId;
+                const ss = srcStyle(b.source);
+                const unconfirmed = b.status === 'requires_confirmation' || b.status === 'awaiting_payment';
                 const blockBorder = unconfirmed ? 'rgba(255,255,255,0.18)' : ss.border;
-                const nameColor   = unconfirmed ? 'rgba(255,255,255,0.45)' : (ss.tagColor ?? 'var(--text)');
+                const blockBg     = unconfirmed ? 'rgba(255,255,255,0.04)' : ss.bg;
+                const nameColor   = unconfirmed ? 'rgba(255,255,255,0.4)'  : 'var(--text-dim)';
                 return (
-                  <div key={e.bookingId} style={{
-                    position: 'absolute', top: topPx, left: 44, right: 0, height: heightPx,
-                    background: blockBg,
-                    border: `1px ${unconfirmed ? 'dashed' : 'solid'} ${blockBorder}`,
-                    borderLeft: `3px ${unconfirmed ? 'dashed' : 'solid'} ${blockBorder}`,
-                    borderRadius: 8,
-                    padding: '0.4rem 0.65rem',
-                    overflow: 'hidden',
-                    display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '0.1rem',
-                  }}>
-                    <div style={{ fontSize: '0.82rem', fontWeight: 700, color: nameColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {e.clientName}
-                    </div>
-                    <div style={{ fontSize: '0.7rem', color: 'var(--text-ghost)', whiteSpace: 'nowrap' }}>
-                      {fmtTime(e.chosenTime)} · {fmtDuration(durMins)}
-                      {e.artistName ? <span style={{ opacity: 0.7 }}> · {e.artistName}</span> : null}
-                    </div>
+                  <div
+                    key={b.bookingId}
+                    onClick={() => actions.openDetail(b)}
+                    style={{
+                      ...s.block, top, height, left: 4, right: 4, width: undefined,
+                      background: blockBg,
+                      border: `1px ${unconfirmed ? 'dashed' : 'solid'} ${blockBorder}55`,
+                      borderLeft: `3px ${unconfirmed ? 'dashed' : 'solid'} ${blockBorder}`,
+                      cursor: 'pointer',
+                      ...(isSelected ? s.blockSelected : {}),
+                    }}
+                  >
+                    <span style={{ ...s.blockClient, color: nameColor }}>{b.clientName}</span>
+                    {height >= 28 && ss.tag && !unconfirmed && (
+                      <span style={{ fontSize: '0.6rem', fontWeight: 700, color: ss.tagColor, lineHeight: 1, letterSpacing: '0.03em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ss.tag}</span>
+                    )}
+                    {height >= 44 && b.artistName && <span style={s.blockMeta}>{b.artistName}</span>}
+                    {height >= 56 && durMin && <span style={s.blockMeta}>{fmtDuration(durMin)}</span>}
                   </div>
                 );
               })}
             </div>
-          )}
-        </div>
-      )}
+          );
+        })}
+      </div>
+      </div>
+    </div>
+
+    <BookingOverlays actions={actions} />
     </div>
   );
 }
