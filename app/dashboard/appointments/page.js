@@ -19,6 +19,8 @@ const STATUS_FILTERS = [
   { value: 'completed,cancelled,deposit_expired',  tKey: 'status_completed' },
 ];
 
+const COMPLETED_TAB = 'completed,cancelled,deposit_expired';
+
 const COMPLETED_SUB_FILTERS = [
   { value: 'all',             label: 'All',             status: COMPLETED_TAB,      outcome: '' },
   { value: 'completed',       label: 'Completed',       status: 'completed',        outcome: 'completed' },
@@ -26,8 +28,6 @@ const COMPLETED_SUB_FILTERS = [
   { value: 'deposit_expired', label: 'Deposit Expired', status: 'deposit_expired',  outcome: '' },
   { value: 'cancelled',       label: 'Cancelled',       status: 'cancelled',        outcome: '' },
 ];
-
-const COMPLETED_TAB = 'completed,cancelled,deposit_expired';
 
 const DEFAULT_FILTER = 'pending';
 
