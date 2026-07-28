@@ -274,7 +274,7 @@ function ArtistRow({ artist, onClick, onApprove, onReject, onRemove, actionLoadi
               disabled={actionLoading}
               style={{ ...s.actionBtn, ...s.removeBtn, opacity: actionLoading ? 0.5 : 1 }}
             >
-              {actionLoading ? '…' : artist.endDate ? 'Change date' : 'Set last day'}
+              {actionLoading ? '…' : artist.endDate ? 'Change last day' : 'Set last day'}
             </button>
             <span style={s.chevron}>›</span>
           </div>
@@ -563,9 +563,9 @@ function ArtistDetail({ artist, onBack, onApprove, onReject, onRemove, onToggleA
           </div>
         )}
         {artist.status === 'approved' && (
-          <div style={s.detailActions}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
             {/* Accepting bookings toggle */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem 1rem', background: 'var(--bg-chip)', border: '1px solid var(--border-faint)', borderRadius: 10, marginBottom: '0.75rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem 1rem', background: 'var(--bg-chip)', border: '1px solid var(--border-faint)', borderRadius: 10 }}>
               <div>
                 <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text)' }}>Accepting bookings</span>
                 <p style={{ margin: '0.1rem 0 0', fontSize: '0.72rem', color: 'var(--text-ghost)', lineHeight: 1.4 }}>
@@ -589,18 +589,24 @@ function ArtistDetail({ artist, onBack, onApprove, onReject, onRemove, onToggleA
                 }} />
               </button>
             </div>
-            {artist.endDate && (
-              <p style={{ margin: '0 0 0.5rem', fontSize: '0.78rem', color: '#f59e3a', textAlign: 'center' }}>
-                Last day: {new Date(artist.endDate + 'T00:00:00').toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' })}
-              </p>
-            )}
-            <button
-              onClick={onRemove}
-              disabled={actionLoading}
-              style={{ ...s.detailActionBtn, ...s.removeBtn, opacity: actionLoading ? 0.5 : 1 }}
-            >
-              {actionLoading ? '…' : artist.endDate ? 'Change last day' : 'Set last day'}
-            </button>
+            {/* Last day */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem 1rem', background: 'var(--bg-chip)', border: '1px solid var(--border-faint)', borderRadius: 10 }}>
+              <div>
+                <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text)' }}>Last day</span>
+                <p style={{ margin: '0.1rem 0 0', fontSize: '0.72rem', color: 'var(--text-ghost)', lineHeight: 1.4 }}>
+                  {artist.endDate
+                    ? new Date(artist.endDate + 'T00:00:00').toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' })
+                    : 'No departure scheduled'}
+                </p>
+              </div>
+              <button
+                onClick={onRemove}
+                disabled={actionLoading}
+                style={{ fontSize: '0.78rem', fontWeight: 600, padding: '0.35rem 0.8rem', borderRadius: 7, border: '1px solid var(--border-strong)', background: 'transparent', color: 'var(--text-muted)', cursor: actionLoading ? 'default' : 'pointer', opacity: actionLoading ? 0.5 : 1, whiteSpace: 'nowrap', fontFamily: 'inherit' }}
+              >
+                {actionLoading ? '…' : artist.endDate ? 'Change' : 'Set'}
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -650,15 +656,24 @@ function ArtistRejectModal({ onConfirm, onCancel, saving }) {
 
 function ArtistRemoveModal({ onConfirm, onCancel, saving, existingEndDate }) {
   const todayStr = new Date().toISOString().split('T')[0];
-  const [lastDay, setLastDay] = useState(existingEndDate ?? todayStr);
+  const defaultDate = (() => {
+    if (existingEndDate) return existingEndDate;
+    const d = new Date(); d.setDate(d.getDate() + 14);
+    return d.toISOString().split('T')[0];
+  })();
+  const [lastDay, setLastDay] = useState(defaultDate);
   const isToday = lastDay === todayStr;
+  const isChanging = !!existingEndDate;
+
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
       onClick={e => e.target === e.currentTarget && onCancel()}>
       <div style={{ background: 'var(--bg-modal)', border: '1px solid var(--border)', borderRadius: 16, padding: '1.5rem', width: '100%', maxWidth: 400 }}>
-        <h2 style={{ margin: '0 0 0.25rem', fontSize: '1.1rem', fontWeight: 700, color: 'var(--text)' }}>Set artist's last day</h2>
+        <h2 style={{ margin: '0 0 0.25rem', fontSize: '1.1rem', fontWeight: 700, color: 'var(--text)' }}>
+          {isChanging ? 'Change last day' : "Set artist's last day"}
+        </h2>
         <p style={{ margin: '0 0 1.25rem', fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-          Clients won't be able to book this artist after their last day. Setting today removes them immediately.
+          Clients won't be able to book on or after their last day. The artist stays listed until then.
         </p>
         <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '0.4rem' }}>
           Last day
@@ -668,14 +683,28 @@ function ArtistRemoveModal({ onConfirm, onCancel, saving, existingEndDate }) {
           min={todayStr}
           value={lastDay}
           onChange={e => setLastDay(e.target.value)}
-          style={{ width: '100%', boxSizing: 'border-box', background: 'var(--bg-input)', border: '1px solid var(--border-strong)', borderRadius: 8, padding: '0.65rem 0.85rem', fontSize: '0.9rem', color: 'var(--text)', outline: 'none', fontFamily: 'inherit', colorScheme: 'dark', marginBottom: '1.25rem' }}
+          style={{ width: '100%', boxSizing: 'border-box', background: 'var(--bg-input)', border: `1px solid ${isToday ? 'rgba(232,111,111,0.5)' : 'var(--border-strong)'}`, borderRadius: 8, padding: '0.65rem 0.85rem', fontSize: '0.9rem', color: 'var(--text)', outline: 'none', fontFamily: 'inherit', colorScheme: 'dark', marginBottom: isToday ? '0.5rem' : '1.25rem' }}
         />
+        {isToday && (
+          <p style={{ margin: '0 0 1.25rem', fontSize: '0.78rem', color: '#e86f6f', lineHeight: 1.4 }}>
+            Setting today will remove this artist from your studio immediately.
+          </p>
+        )}
         <div style={{ display: 'flex', gap: '0.75rem' }}>
-          <button onClick={onCancel} disabled={saving} style={{ flex: 1, padding: '0.7rem', borderRadius: 8, border: '1px solid var(--border-strong)', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '0.9rem', fontWeight: 600 }}>
+          <button onClick={onCancel} disabled={saving} style={{ flex: 1, padding: '0.7rem', borderRadius: 8, border: '1px solid var(--border-strong)', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '0.9rem', fontWeight: 600, fontFamily: 'inherit' }}>
             Cancel
           </button>
-          <button onClick={() => onConfirm(lastDay)} disabled={saving} style={{ flex: 2, padding: '0.7rem', borderRadius: 8, border: 'none', background: saving ? 'var(--bg-chip)' : 'rgba(232,111,111,0.85)', color: saving ? 'var(--text-ghost)' : '#fff', cursor: saving ? 'default' : 'pointer', fontSize: '0.9rem', fontWeight: 700 }}>
-            {saving ? 'Saving…' : isToday ? 'Remove now' : 'Set last day'}
+          <button
+            onClick={() => onConfirm(lastDay)}
+            disabled={saving}
+            style={{
+              flex: 2, padding: '0.7rem', borderRadius: 8, border: 'none',
+              background: saving ? 'var(--bg-chip)' : isToday ? 'rgba(232,111,111,0.85)' : 'var(--accent)',
+              color: saving ? 'var(--text-ghost)' : isToday ? '#fff' : '#0d1017',
+              cursor: saving ? 'default' : 'pointer', fontSize: '0.9rem', fontWeight: 700, fontFamily: 'inherit',
+            }}
+          >
+            {saving ? 'Saving…' : isToday ? 'Remove from studio' : isChanging ? 'Update last day' : 'Set last day'}
           </button>
         </div>
       </div>
