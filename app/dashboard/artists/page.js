@@ -299,16 +299,7 @@ function ArtistRow({ artist, onClick, onApprove, onReject, onRemove, actionLoadi
             </button>
           </div>
         ) : artist.status === 'approved' ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <button
-              onClick={onRemove}
-              disabled={actionLoading}
-              style={{ ...s.actionBtn, ...s.removeBtn, opacity: actionLoading ? 0.5 : 1 }}
-            >
-              {actionLoading ? '…' : artist.endDate ? 'Change last day' : 'Set last day'}
-            </button>
-            <span style={s.chevron}>›</span>
-          </div>
+          <span style={s.chevron}>›</span>
         ) : (
           <span style={s.chevron}>›</span>
         )}
