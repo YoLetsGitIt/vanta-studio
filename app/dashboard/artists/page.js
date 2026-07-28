@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, Suspense, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { getStudioArtists, approveStudioArtist, rejectStudioArtist, getStudioArtistStats, getStudioScheduleRange, getArtistWorkSchedule, updateArtistWorkSchedule } from '@/lib/api';
+import { getStudioArtists, approveStudioArtist, rejectStudioArtist, setArtistLastDay, getStudioArtistStats, getStudioScheduleRange, getArtistWorkSchedule, updateArtistWorkSchedule } from '@/lib/api';
 import { getCached, setCached, invalidatePrefix } from '@/lib/cache';
 import { APPROVAL_STATUS_COLORS } from '@/lib/status';
 import { initials } from '@/lib/format';
@@ -36,7 +36,8 @@ function ArtistsInner() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [actionLoading, setActionLoading] = useState(null);
-  const [rejectTarget,  setRejectTarget]  = useState(null); // id to reject
+  const [rejectTarget,  setRejectTarget]  = useState(null);
+  const [removeTarget,  setRemoveTarget]  = useState(null);
 
   const load = useCallback(async (bust = false) => {
     if (bust) invalidatePrefix('artists:');
@@ -89,6 +90,23 @@ function ArtistsInner() {
     finally { setActionLoading(null); }
   }
 
+  function handleRemove(id, endDate) {
+    setRemoveTarget({ id, endDate });
+  }
+
+  async function confirmRemove(lastDay) {
+    if (!removeTarget) return;
+    setActionLoading(removeTarget.id);
+    try {
+      await setArtistLastDay(removeTarget.id, lastDay ?? null);
+      setRemoveTarget(null);
+      await load(true);
+      router.push('/dashboard/artists');
+    }
+    catch (e) { alert(e.message); }
+    finally { setActionLoading(null); }
+  }
+
   const allArtists = [...approved, ...pending];
   const selectedArtist = selectedId ? allArtists.find(a => a.id === selectedId) : null;
 
@@ -102,11 +120,20 @@ function ArtistsInner() {
             onCancel={() => setRejectTarget(null)}
           />
         )}
+        {removeTarget && (
+          <ArtistRemoveModal
+            saving={!!actionLoading}
+            existingEndDate={removeTarget.endDate}
+            onConfirm={confirmRemove}
+            onCancel={() => setRemoveTarget(null)}
+          />
+        )}
         <ArtistDetail
           artist={selectedArtist}
           onBack={() => router.push('/dashboard/artists')}
           onApprove={() => handleApprove(selectedArtist.id)}
           onReject={() => handleReject(selectedArtist.id)}
+          onRemove={() => handleRemove(selectedArtist.id, selectedArtist.endDate)}
           actionLoading={actionLoading === selectedArtist.id}
         />
       </>
@@ -122,6 +149,14 @@ function ArtistsInner() {
           saving={!!actionLoading}
           onConfirm={confirmReject}
           onCancel={() => setRejectTarget(null)}
+        />
+      )}
+      {removeTarget && (
+        <ArtistRemoveModal
+          saving={!!actionLoading}
+          existingEndDate={removeTarget.endDate}
+          onConfirm={confirmRemove}
+          onCancel={() => setRemoveTarget(null)}
         />
       )}
       <div style={s.header}>
@@ -158,6 +193,7 @@ function ArtistsInner() {
             onClick={() => router.push(`/dashboard/artists?id=${artist.id}`)}
             onApprove={e => { e.stopPropagation(); handleApprove(artist.id); }}
             onReject={e => { e.stopPropagation(); handleReject(artist.id); }}
+            onRemove={e => { e.stopPropagation(); handleRemove(artist.id, artist.endDate); }}
             actionLoading={actionLoading === artist.id}
           />
         ))}
@@ -166,7 +202,7 @@ function ArtistsInner() {
   );
 }
 
-function ArtistRow({ artist, onClick, onApprove, onReject, actionLoading }) {
+function ArtistRow({ artist, onClick, onApprove, onReject, onRemove, actionLoading }) {
   const { t } = useLanguage();
   const sc = APPROVAL_STATUS_COLORS[artist.status] ?? APPROVAL_STATUS_COLORS.approved;
   const artistInitials = initials(artist.name);
@@ -187,6 +223,11 @@ function ArtistRow({ artist, onClick, onApprove, onReject, actionLoading }) {
             {artist.status !== 'approved' && (
               <span style={{ ...s.statusBadge, background: sc.bg, color: sc.text, border: `1px solid ${sc.border}` }}>
                 {artist.status.charAt(0).toUpperCase() + artist.status.slice(1)}
+              </span>
+            )}
+            {artist.endDate && (
+              <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#f59e3a', background: 'rgba(245,158,58,0.1)', border: '1px solid rgba(245,158,58,0.25)', borderRadius: 20, padding: '0.12rem 0.5rem', whiteSpace: 'nowrap' }}>
+                Last day {new Date(artist.endDate + 'T00:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}
               </span>
             )}
           </div>
@@ -213,6 +254,17 @@ function ArtistRow({ artist, onClick, onApprove, onReject, actionLoading }) {
               {actionLoading ? '…' : t('reject')}
             </button>
           </div>
+        ) : artist.status === 'approved' ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <button
+              onClick={onRemove}
+              disabled={actionLoading}
+              style={{ ...s.actionBtn, ...s.removeBtn, opacity: actionLoading ? 0.5 : 1 }}
+            >
+              {actionLoading ? '…' : artist.endDate ? 'Change date' : 'Set last day'}
+            </button>
+            <span style={s.chevron}>›</span>
+          </div>
         ) : (
           <span style={s.chevron}>›</span>
         )}
@@ -227,7 +279,7 @@ function ArtistRow({ artist, onClick, onApprove, onReject, actionLoading }) {
   );
 }
 
-function ArtistDetail({ artist, onBack, onApprove, onReject, actionLoading }) {
+function ArtistDetail({ artist, onBack, onApprove, onReject, onRemove, actionLoading }) {
   const { t } = useLanguage();
   const sc = APPROVAL_STATUS_COLORS[artist.status] ?? APPROVAL_STATUS_COLORS.approved;
   const artistInitials = initials(artist.name);
@@ -497,6 +549,22 @@ function ArtistDetail({ artist, onBack, onApprove, onReject, actionLoading }) {
             </button>
           </div>
         )}
+        {artist.status === 'approved' && (
+          <div style={s.detailActions}>
+            {artist.endDate && (
+              <p style={{ margin: '0 0 0.5rem', fontSize: '0.78rem', color: '#f59e3a', textAlign: 'center' }}>
+                Last day: {new Date(artist.endDate + 'T00:00:00').toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' })}
+              </p>
+            )}
+            <button
+              onClick={onRemove}
+              disabled={actionLoading}
+              style={{ ...s.detailActionBtn, ...s.removeBtn, opacity: actionLoading ? 0.5 : 1 }}
+            >
+              {actionLoading ? '…' : artist.endDate ? 'Change last day' : 'Set last day'}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -535,6 +603,41 @@ function ArtistRejectModal({ onConfirm, onCancel, saving }) {
           </button>
           <button onClick={() => onConfirm(reason.trim())} disabled={saving} style={{ flex: 2, padding: '0.7rem', borderRadius: 8, border: 'none', background: saving ? 'var(--bg-chip)' : 'rgba(232,111,111,0.85)', color: saving ? 'var(--text-ghost)' : '#fff', cursor: saving ? 'default' : 'pointer', fontSize: '0.9rem', fontWeight: 700 }}>
             {saving ? t('saving') : t('artists_reject')}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ArtistRemoveModal({ onConfirm, onCancel, saving, existingEndDate }) {
+  const todayStr = new Date().toISOString().split('T')[0];
+  const [lastDay, setLastDay] = useState(existingEndDate ?? todayStr);
+  const isToday = lastDay === todayStr;
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
+      onClick={e => e.target === e.currentTarget && onCancel()}>
+      <div style={{ background: 'var(--bg-modal)', border: '1px solid var(--border)', borderRadius: 16, padding: '1.5rem', width: '100%', maxWidth: 400 }}>
+        <h2 style={{ margin: '0 0 0.25rem', fontSize: '1.1rem', fontWeight: 700, color: 'var(--text)' }}>Set artist's last day</h2>
+        <p style={{ margin: '0 0 1.25rem', fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+          Clients won't be able to book this artist after their last day. Setting today removes them immediately.
+        </p>
+        <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '0.4rem' }}>
+          Last day
+        </label>
+        <input
+          type="date"
+          min={todayStr}
+          value={lastDay}
+          onChange={e => setLastDay(e.target.value)}
+          style={{ width: '100%', boxSizing: 'border-box', background: 'var(--bg-input)', border: '1px solid var(--border-strong)', borderRadius: 8, padding: '0.65rem 0.85rem', fontSize: '0.9rem', color: 'var(--text)', outline: 'none', fontFamily: 'inherit', colorScheme: 'dark', marginBottom: '1.25rem' }}
+        />
+        <div style={{ display: 'flex', gap: '0.75rem' }}>
+          <button onClick={onCancel} disabled={saving} style={{ flex: 1, padding: '0.7rem', borderRadius: 8, border: '1px solid var(--border-strong)', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '0.9rem', fontWeight: 600 }}>
+            Cancel
+          </button>
+          <button onClick={() => onConfirm(lastDay)} disabled={saving} style={{ flex: 2, padding: '0.7rem', borderRadius: 8, border: 'none', background: saving ? 'var(--bg-chip)' : 'rgba(232,111,111,0.85)', color: saving ? 'var(--text-ghost)' : '#fff', cursor: saving ? 'default' : 'pointer', fontSize: '0.9rem', fontWeight: 700 }}>
+            {saving ? 'Saving…' : isToday ? 'Remove now' : 'Set last day'}
           </button>
         </div>
       </div>
@@ -716,6 +819,11 @@ const s = {
     color: '#4cc98a',
   },
   rejectBtn: {
+    background: 'rgba(232,111,111,0.08)',
+    borderColor: 'rgba(232,111,111,0.2)',
+    color: '#e86f6f',
+  },
+  removeBtn: {
     background: 'rgba(232,111,111,0.08)',
     borderColor: 'rgba(232,111,111,0.2)',
     color: '#e86f6f',
