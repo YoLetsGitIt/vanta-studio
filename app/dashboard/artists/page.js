@@ -395,242 +395,250 @@ function ArtistDetail({ artist, onBack, onApprove, onReject, onRemove, onToggleA
       </div>
 
       <div style={s.detailBody}>
-        <div style={s.detailHero}>
-          {artist.profileImage ? (
-            <img src={artist.profileImage} alt={artist.name} style={s.detailAvatar} />
-          ) : (
-            <div style={{ ...s.detailAvatar, ...s.detailAvatarFallback }}>{artistInitials}</div>
-          )}
-          <div style={s.detailMeta}>
-            <div style={s.detailNameRow}>
-              <span style={s.detailName}>{artist.name || t('artists_unnamed')}</span>
-              {artist.studioType === 'guest' && <span style={s.guestBadge}>{t('artists_guest')}</span>}
-              {artist.status !== 'approved' && (
-                <span style={{ ...s.statusBadge, background: sc.bg, color: sc.text, border: `1px solid ${sc.border}` }}>
-                  {artist.status.charAt(0).toUpperCase() + artist.status.slice(1)}
-                </span>
+        <div style={{ display: 'flex', gap: '2rem', alignItems: 'flex-start' }}>
+
+          {/* Left column — profile + content */}
+          <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            <div style={s.detailHero}>
+              {artist.profileImage ? (
+                <img src={artist.profileImage} alt={artist.name} style={s.detailAvatar} />
+              ) : (
+                <div style={{ ...s.detailAvatar, ...s.detailAvatarFallback }}>{artistInitials}</div>
+              )}
+              <div style={s.detailMeta}>
+                <div style={s.detailNameRow}>
+                  <span style={s.detailName}>{artist.name || t('artists_unnamed')}</span>
+                  {artist.studioType === 'guest' && <span style={s.guestBadge}>{t('artists_guest')}</span>}
+                  {artist.status !== 'approved' && (
+                    <span style={{ ...s.statusBadge, background: sc.bg, color: sc.text, border: `1px solid ${sc.border}` }}>
+                      {artist.status.charAt(0).toUpperCase() + artist.status.slice(1)}
+                    </span>
+                  )}
+                </div>
+                <span style={s.detailEmail}>{artist.email}</span>
+                {artist.instagram && <span style={s.detailInstagram}>@{artist.instagram}</span>}
+              </div>
+            </div>
+
+            <div style={s.statsGrid}>
+              <StatCard label={t('artists_total_sessions')} value={stats ? stats.totalBookings : '—'} />
+              <StatCard label={t('status_completed')} value={stats ? stats.completed : '—'} />
+              <StatCard label={t('artists_upcoming_stat')} value={stats ? stats.upcoming : '—'} />
+              <StatCard label={t('artists_revenue')} value={stats ? `$${Math.round(stats.totalRevenue).toLocaleString()}` : '—'} />
+            </div>
+
+            {artist.bio && (
+              <div style={s.detailSection}>
+                <span style={s.sectionLabel}>{t('artists_bio')}</span>
+                <p style={s.bio}>{artist.bio}</p>
+              </div>
+            )}
+
+            {artist.speciality?.length > 0 && (
+              <div style={s.detailSection}>
+                <span style={s.sectionLabel}>{t('artists_specialities')}</span>
+                <div style={s.tags}>
+                  {artist.speciality.map(tag => (
+                    <span key={tag} style={s.tag}>{tag}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Work timetable */}
+            <div style={s.detailSection}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={s.sectionLabel}>{t('artists_timetable')}</span>
+                {!editingSchedule && workSchedule !== null && (
+                  <button onClick={openScheduleEdit} style={s.editSchedBtn}>{t('edit')}</button>
+                )}
+              </div>
+
+              {workSchedule === null && (
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-ghost)', margin: '0.4rem 0 0' }}>{t('loading')}</p>
+              )}
+
+              {!editingSchedule && workSchedule !== null && (
+                workSchedule.length === 0 ? (
+                  <p style={{ fontSize: '0.8rem', color: 'var(--text-ghost)', margin: '0.4rem 0 0' }}>{t('artists_no_timetable')}</p>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', marginTop: '0.5rem' }}>
+                    {SCHED_DAYS.map(({ label, dow }) => {
+                      const day = workSchedule.find(d => d.day_of_week === dow);
+                      return (
+                        <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                          <span style={{ fontSize: '0.75rem', fontWeight: 600, color: day ? 'var(--text)' : 'var(--text-ghost)', width: 28 }}>{label}</span>
+                          {day ? (
+                            <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                              {fmtHHMM(day.start_time)} – {fmtHHMM(day.end_time)}
+                            </span>
+                          ) : (
+                            <span style={{ fontSize: '0.75rem', color: 'var(--text-ghost)' }}>{t('artists_off')}</span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )
+              )}
+
+              {editingSchedule && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.75rem' }}>
+                  {SCHED_DAYS.map(({ label, dow }) => {
+                    const e = scheduleEdits[dow] || { on: false, start: '10:00', end: '18:00' };
+                    return (
+                      <div key={dow} style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer', width: 52 }}>
+                          <input
+                            type="checkbox"
+                            checked={e.on}
+                            onChange={ev => setScheduleEdits(prev => ({ ...prev, [dow]: { ...prev[dow], on: ev.target.checked } }))}
+                            style={{ accentColor: 'var(--accent)', width: 13, height: 13 }}
+                          />
+                          <span style={{ fontSize: '0.75rem', fontWeight: 600, color: e.on ? 'var(--text)' : 'var(--text-ghost)' }}>{label}</span>
+                        </label>
+                        {e.on ? (
+                          <>
+                            <input
+                              type="time"
+                              value={e.start}
+                              onChange={ev => setScheduleEdits(prev => ({ ...prev, [dow]: { ...prev[dow], start: ev.target.value } }))}
+                              style={s.schedTimeInput}
+                            />
+                            <span style={{ fontSize: '0.72rem', color: 'var(--text-ghost)' }}>–</span>
+                            <input
+                              type="time"
+                              value={e.end}
+                              onChange={ev => setScheduleEdits(prev => ({ ...prev, [dow]: { ...prev[dow], end: ev.target.value } }))}
+                              style={s.schedTimeInput}
+                            />
+                          </>
+                        ) : (
+                          <span style={{ fontSize: '0.75rem', color: 'var(--text-ghost)' }}>{t('artists_off')}</span>
+                        )}
+                      </div>
+                    );
+                  })}
+                  {scheduleError && <p style={{ fontSize: '0.75rem', color: 'var(--error)', margin: 0 }}>{scheduleError}</p>}
+                  <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem' }}>
+                    <button onClick={saveSchedule} disabled={scheduleSaving} style={s.schedSaveBtn}>
+                      {t(scheduleSaving ? 'saving' : 'save')}
+                    </button>
+                    <button onClick={() => setEditingSchedule(false)} style={s.schedCancelBtn}>{t('cancel')}</button>
+                  </div>
+                </div>
               )}
             </div>
-            <span style={s.detailEmail}>{artist.email}</span>
-            {artist.instagram && <span style={s.detailInstagram}>@{artist.instagram}</span>}
-          </div>
-        </div>
 
-        <div style={s.statsGrid}>
-          <StatCard label={t('artists_total_sessions')} value={stats ? stats.totalBookings : '—'} />
-          <StatCard label={t('status_completed')} value={stats ? stats.completed : '—'} />
-          <StatCard label={t('artists_upcoming_stat')} value={stats ? stats.upcoming : '—'} />
-          <StatCard label={t('artists_revenue')} value={stats ? `$${Math.round(stats.totalRevenue).toLocaleString()}` : '—'} />
-        </div>
-
-        {artist.bio && (
-          <div style={s.detailSection}>
-            <span style={s.sectionLabel}>{t('artists_bio')}</span>
-            <p style={s.bio}>{artist.bio}</p>
-          </div>
-        )}
-
-        {artist.speciality?.length > 0 && (
-          <div style={s.detailSection}>
-            <span style={s.sectionLabel}>{t('artists_specialities')}</span>
-            <div style={s.tags}>
-              {artist.speciality.map(tag => (
-                <span key={tag} style={s.tag}>{tag}</span>
-              ))}
+            {/* Upcoming schedule */}
+            <div style={s.detailSection}>
+              <span style={s.sectionLabel}>{t('artists_upcoming')}</span>
+              {schedule === null && (
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-ghost)', margin: '0.4rem 0 0' }}>{t('loading')}</p>
+              )}
+              {schedule !== null && schedule.length === 0 && (
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-ghost)', margin: '0.4rem 0 0' }}>{t('artists_no_bookings')}</p>
+              )}
+              {schedule !== null && schedule.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.5rem' }}>
+                  {schedule.map(e => (
+                    <div key={e.bookingId} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem 0.75rem', background: 'var(--bg-chip)', border: '1px solid var(--border-faint)', borderRadius: 7 }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
+                        <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text)' }}>{e.clientName}</span>
+                        {e.sessionType && <span style={{ fontSize: '0.72rem', color: 'var(--text-ghost)' }}>{e.sessionType}</span>}
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block' }}>
+                          {new Date(e.chosenTime).toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' })}
+                        </span>
+                        <span style={{ fontSize: '0.72rem', color: 'var(--text-ghost)' }}>
+                          {new Date(e.chosenTime).toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit', hour12: true })}
+                          {e.stationName ? ` · ${e.stationName}` : ''}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-          </div>
-        )}
 
-        {/* Work timetable */}
-        <div style={s.detailSection}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={s.sectionLabel}>{t('artists_timetable')}</span>
-            {!editingSchedule && workSchedule !== null && (
-              <button onClick={openScheduleEdit} style={s.editSchedBtn}>{t('edit')}</button>
+            {artist.rejectionReason && (
+              <div style={{ ...s.rejectionNote, marginTop: '0.5rem' }}>
+                <span style={s.rejectionLabel}>Rejection reason:</span> {artist.rejectionReason}
+              </div>
+            )}
+
+            {artist.status === 'pending' && (
+              <div style={s.detailActions}>
+                <button
+                  onClick={onApprove}
+                  disabled={actionLoading}
+                  style={{ ...s.detailActionBtn, ...s.approveBtn, opacity: actionLoading ? 0.5 : 1 }}
+                >
+                  {actionLoading ? '…' : t('approve')}
+                </button>
+                <button
+                  onClick={onReject}
+                  disabled={actionLoading}
+                  style={{ ...s.detailActionBtn, ...s.rejectBtn, opacity: actionLoading ? 0.5 : 1 }}
+                >
+                  {actionLoading ? '…' : t('reject')}
+                </button>
+              </div>
             )}
           </div>
 
-          {workSchedule === null && (
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-ghost)', margin: '0.4rem 0 0' }}>{t('loading')}</p>
-          )}
-
-          {/* Read-only view */}
-          {!editingSchedule && workSchedule !== null && (
-            workSchedule.length === 0 ? (
-              <p style={{ fontSize: '0.8rem', color: 'var(--text-ghost)', margin: '0.4rem 0 0' }}>{t('artists_no_timetable')}</p>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', marginTop: '0.5rem' }}>
-                {SCHED_DAYS.map(({ label, dow }) => {
-                  const day = workSchedule.find(d => d.day_of_week === dow);
-                  return (
-                    <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                      <span style={{ fontSize: '0.75rem', fontWeight: 600, color: day ? 'var(--text)' : 'var(--text-ghost)', width: 28 }}>{label}</span>
-                      {day ? (
-                        <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-                          {fmtHHMM(day.start_time)} – {fmtHHMM(day.end_time)}
-                        </span>
-                      ) : (
-                        <span style={{ fontSize: '0.75rem', color: 'var(--text-ghost)' }}>{t('artists_off')}</span>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )
-          )}
-
-          {/* Edit mode */}
-          {editingSchedule && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.75rem' }}>
-              {SCHED_DAYS.map(({ label, dow }) => {
-                const e = scheduleEdits[dow] || { on: false, start: '10:00', end: '18:00' };
-                return (
-                  <div key={dow} style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer', width: 52 }}>
-                      <input
-                        type="checkbox"
-                        checked={e.on}
-                        onChange={ev => setScheduleEdits(prev => ({ ...prev, [dow]: { ...prev[dow], on: ev.target.checked } }))}
-                        style={{ accentColor: 'var(--accent)', width: 13, height: 13 }}
-                      />
-                      <span style={{ fontSize: '0.75rem', fontWeight: 600, color: e.on ? 'var(--text)' : 'var(--text-ghost)' }}>{label}</span>
-                    </label>
-                    {e.on ? (
-                      <>
-                        <input
-                          type="time"
-                          value={e.start}
-                          onChange={ev => setScheduleEdits(prev => ({ ...prev, [dow]: { ...prev[dow], start: ev.target.value } }))}
-                          style={s.schedTimeInput}
-                        />
-                        <span style={{ fontSize: '0.72rem', color: 'var(--text-ghost)' }}>–</span>
-                        <input
-                          type="time"
-                          value={e.end}
-                          onChange={ev => setScheduleEdits(prev => ({ ...prev, [dow]: { ...prev[dow], end: ev.target.value } }))}
-                          style={s.schedTimeInput}
-                        />
-                      </>
-                    ) : (
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-ghost)' }}>{t('artists_off')}</span>
-                    )}
-                  </div>
-                );
-              })}
-              {scheduleError && <p style={{ fontSize: '0.75rem', color: 'var(--error)', margin: 0 }}>{scheduleError}</p>}
-              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem' }}>
-                <button onClick={saveSchedule} disabled={scheduleSaving} style={s.schedSaveBtn}>
-                  {t(scheduleSaving ? 'saving' : 'save')}
-                </button>
-                <button onClick={() => setEditingSchedule(false)} style={s.schedCancelBtn}>{t('cancel')}</button>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Upcoming schedule */}
-        <div style={s.detailSection}>
-          <span style={s.sectionLabel}>{t('artists_upcoming')}</span>
-          {schedule === null && (
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-ghost)', margin: '0.4rem 0 0' }}>{t('loading')}</p>
-          )}
-          {schedule !== null && schedule.length === 0 && (
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-ghost)', margin: '0.4rem 0 0' }}>{t('artists_no_bookings')}</p>
-          )}
-          {schedule !== null && schedule.length > 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.5rem' }}>
-              {schedule.map(e => (
-                <div key={e.bookingId} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem 0.75rem', background: 'var(--bg-chip)', border: '1px solid var(--border-faint)', borderRadius: 7 }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
-                    <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text)' }}>{e.clientName}</span>
-                    {e.sessionType && <span style={{ fontSize: '0.72rem', color: 'var(--text-ghost)' }}>{e.sessionType}</span>}
-                  </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block' }}>
-                      {new Date(e.chosenTime).toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' })}
-                    </span>
-                    <span style={{ fontSize: '0.72rem', color: 'var(--text-ghost)' }}>
-                      {new Date(e.chosenTime).toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit', hour12: true })}
-                      {e.stationName ? ` · ${e.stationName}` : ''}
-                    </span>
-                  </div>
+          {/* Right column — settings (approved only) */}
+          {artist.status === 'approved' && (
+            <div style={{ width: 220, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '0.5rem', position: 'sticky', top: 0 }}>
+              <span style={s.sectionLabel}>Settings</span>
+              {/* Accepting bookings toggle */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem 1rem', background: 'var(--bg-chip)', border: '1px solid var(--border-faint)', borderRadius: 10 }}>
+                <div>
+                  <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text)' }}>Accepting bookings</span>
+                  <p style={{ margin: '0.1rem 0 0', fontSize: '0.7rem', color: 'var(--text-ghost)', lineHeight: 1.4 }}>
+                    {artist.acceptingBookings ? 'Clients can book' : 'Hidden from booking'}
+                  </p>
                 </div>
-              ))}
+                <button
+                  onClick={onToggleAccepting}
+                  disabled={actionLoading}
+                  style={{
+                    flexShrink: 0,
+                    width: 44, height: 24, borderRadius: 12, border: 'none', cursor: actionLoading ? 'default' : 'pointer',
+                    background: artist.acceptingBookings ? 'var(--accent)' : 'var(--border-strong)',
+                    position: 'relative', transition: 'background 0.2s', opacity: actionLoading ? 0.5 : 1,
+                  }}
+                >
+                  <span style={{
+                    position: 'absolute', top: 3, left: artist.acceptingBookings ? 22 : 3,
+                    width: 18, height: 18, borderRadius: '50%', background: '#fff',
+                    transition: 'left 0.2s', display: 'block',
+                  }} />
+                </button>
+              </div>
+              {/* Last day */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem 1rem', background: 'var(--bg-chip)', border: '1px solid var(--border-faint)', borderRadius: 10 }}>
+                <div>
+                  <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text)' }}>Last day</span>
+                  <p style={{ margin: '0.1rem 0 0', fontSize: '0.7rem', color: 'var(--text-ghost)', lineHeight: 1.4 }}>
+                    {artist.endDate
+                      ? new Date(artist.endDate + 'T00:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })
+                      : 'Not scheduled'}
+                  </p>
+                </div>
+                <button
+                  onClick={onRemove}
+                  disabled={actionLoading}
+                  style={{ fontSize: '0.75rem', fontWeight: 600, padding: '0.3rem 0.65rem', borderRadius: 7, border: '1px solid var(--border-strong)', background: 'transparent', color: 'var(--text-muted)', cursor: actionLoading ? 'default' : 'pointer', opacity: actionLoading ? 0.5 : 1, whiteSpace: 'nowrap', fontFamily: 'inherit' }}
+                >
+                  {actionLoading ? '…' : artist.endDate ? 'Change' : 'Set'}
+                </button>
+              </div>
             </div>
           )}
+
         </div>
-
-        {artist.rejectionReason && (
-          <div style={{ ...s.rejectionNote, marginTop: '0.5rem' }}>
-            <span style={s.rejectionLabel}>Rejection reason:</span> {artist.rejectionReason}
-          </div>
-        )}
-
-        {artist.status === 'pending' && (
-          <div style={s.detailActions}>
-            <button
-              onClick={onApprove}
-              disabled={actionLoading}
-              style={{ ...s.detailActionBtn, ...s.approveBtn, opacity: actionLoading ? 0.5 : 1 }}
-            >
-              {actionLoading ? '…' : t('approve')}
-            </button>
-            <button
-              onClick={onReject}
-              disabled={actionLoading}
-              style={{ ...s.detailActionBtn, ...s.rejectBtn, opacity: actionLoading ? 0.5 : 1 }}
-            >
-              {actionLoading ? '…' : t('reject')}
-            </button>
-          </div>
-        )}
-        {artist.status === 'approved' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            {/* Accepting bookings toggle */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem 1rem', background: 'var(--bg-chip)', border: '1px solid var(--border-faint)', borderRadius: 10 }}>
-              <div>
-                <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text)' }}>Accepting bookings</span>
-                <p style={{ margin: '0.1rem 0 0', fontSize: '0.72rem', color: 'var(--text-ghost)', lineHeight: 1.4 }}>
-                  {artist.acceptingBookings ? 'Clients can select this artist' : 'Hidden from booking selection'}
-                </p>
-              </div>
-              <button
-                onClick={onToggleAccepting}
-                disabled={actionLoading}
-                style={{
-                  flexShrink: 0,
-                  width: 44, height: 24, borderRadius: 12, border: 'none', cursor: actionLoading ? 'default' : 'pointer',
-                  background: artist.acceptingBookings ? 'var(--accent)' : 'var(--border-strong)',
-                  position: 'relative', transition: 'background 0.2s', opacity: actionLoading ? 0.5 : 1,
-                }}
-              >
-                <span style={{
-                  position: 'absolute', top: 3, left: artist.acceptingBookings ? 22 : 3,
-                  width: 18, height: 18, borderRadius: '50%', background: '#fff',
-                  transition: 'left 0.2s', display: 'block',
-                }} />
-              </button>
-            </div>
-            {/* Last day */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem 1rem', background: 'var(--bg-chip)', border: '1px solid var(--border-faint)', borderRadius: 10 }}>
-              <div>
-                <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text)' }}>Last day</span>
-                <p style={{ margin: '0.1rem 0 0', fontSize: '0.72rem', color: 'var(--text-ghost)', lineHeight: 1.4 }}>
-                  {artist.endDate
-                    ? new Date(artist.endDate + 'T00:00:00').toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' })
-                    : 'No departure scheduled'}
-                </p>
-              </div>
-              <button
-                onClick={onRemove}
-                disabled={actionLoading}
-                style={{ fontSize: '0.78rem', fontWeight: 600, padding: '0.35rem 0.8rem', borderRadius: 7, border: '1px solid var(--border-strong)', background: 'transparent', color: 'var(--text-muted)', cursor: actionLoading ? 'default' : 'pointer', opacity: actionLoading ? 0.5 : 1, whiteSpace: 'nowrap', fontFamily: 'inherit' }}
-              >
-                {actionLoading ? '…' : artist.endDate ? 'Change' : 'Set'}
-              </button>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
@@ -937,10 +945,6 @@ const s = {
     flex: 1,
     overflowY: 'auto',
     padding: '2rem',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '1.5rem',
-    maxWidth: 560,
   },
   detailHero: {
     display: 'flex',
