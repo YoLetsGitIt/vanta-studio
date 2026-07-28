@@ -30,7 +30,7 @@ function fmt(n) {
   return '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 function fmtHours(h) { return h ? Number(h).toFixed(1) + 'h' : '—'; }
-function formatSource(s) { return ({ app: 'App', studio: 'Studio', personal: 'Manual', import: 'Imported' })[s] ?? s; }
+function formatSource(s) { return ({ app: 'App', studio: 'Studio', personal: 'Personal', walkin: 'Studio', import: 'Imported' })[s] ?? s; }
 function formatDate(d) {
   if (!d) return '—';
   return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
