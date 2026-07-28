@@ -33,6 +33,8 @@ function ArtistsInner() {
   const [showPending, setShowPending] = useState(false);
   const [approved, setApproved] = useState([]);
   const [pending, setPending] = useState([]);
+  const [removed, setRemoved] = useState([]);
+  const [showPast, setShowPast] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [actionLoading, setActionLoading] = useState(null);
@@ -43,25 +45,31 @@ function ArtistsInner() {
     if (bust) invalidatePrefix('artists:');
     const cachedApproved = getCached('artists:approved');
     const cachedPending  = getCached('artists:pending');
-    if (cachedApproved && cachedPending) {
+    const cachedRemoved  = getCached('artists:removed');
+    if (cachedApproved && cachedPending && cachedRemoved) {
       setApproved(cachedApproved);
       setPending(cachedPending);
+      setRemoved(cachedRemoved);
       setLoading(false);
       return;
     }
     setLoading(true);
     setError('');
     try {
-      const [approvedData, pendingData] = await Promise.all([
+      const [approvedData, pendingData, removedData] = await Promise.all([
         getStudioArtists('approved'),
         getStudioArtists('pending'),
+        getStudioArtists('removed'),
       ]);
       const a = approvedData.artists ?? [];
       const p = pendingData.artists ?? [];
+      const r = removedData.artists ?? [];
       setCached('artists:approved', a);
       setCached('artists:pending', p);
+      setCached('artists:removed', r);
       setApproved(a);
       setPending(p);
+      setRemoved(r);
     } catch (e) {
       setError(e.message);
     } finally {
@@ -114,7 +122,7 @@ function ArtistsInner() {
     finally { setActionLoading(null); }
   }
 
-  const allArtists = [...approved, ...pending];
+  const allArtists = [...approved, ...pending, ...removed];
   const selectedArtist = selectedId ? allArtists.find(a => a.id === selectedId) : null;
 
   if (selectedArtist) {
@@ -205,6 +213,29 @@ function ArtistsInner() {
             actionLoading={actionLoading === artist.id}
           />
         ))}
+        {!loading && !showPending && removed.length > 0 && (
+          <div style={{ marginTop: '1rem' }}>
+            <button
+              onClick={() => setShowPast(v => !v)}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', background: 'none', border: 'none', cursor: 'pointer', padding: '0.25rem 0', color: 'var(--text-ghost)', fontSize: '0.75rem', fontWeight: 600, fontFamily: 'inherit', letterSpacing: '0.04em', textTransform: 'uppercase' }}
+            >
+              <span style={{ display: 'inline-block', transform: showPast ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s', lineHeight: 1 }}>›</span>
+              Past artists ({removed.length})
+            </button>
+            {showPast && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
+                {removed.map(artist => (
+                  <ArtistRow
+                    key={artist.id}
+                    artist={artist}
+                    onClick={() => router.push(`/dashboard/artists?id=${artist.id}`)}
+                    actionLoading={false}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
