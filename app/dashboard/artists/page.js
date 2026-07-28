@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, Suspense, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { getStudioArtists, approveStudioArtist, rejectStudioArtist, setArtistLastDay, getStudioArtistStats, getStudioScheduleRange, getArtistWorkSchedule, updateArtistWorkSchedule } from '@/lib/api';
+import { getStudioArtists, approveStudioArtist, rejectStudioArtist, setArtistLastDay, setArtistAcceptingBookings, getStudioArtistStats, getStudioScheduleRange, getArtistWorkSchedule, updateArtistWorkSchedule } from '@/lib/api';
 import { getCached, setCached, invalidatePrefix } from '@/lib/cache';
 import { APPROVAL_STATUS_COLORS } from '@/lib/status';
 import { initials } from '@/lib/format';
@@ -90,6 +90,13 @@ function ArtistsInner() {
     finally { setActionLoading(null); }
   }
 
+  async function handleToggleAccepting(id, currentValue) {
+    setActionLoading(id);
+    try { await setArtistAcceptingBookings(id, !currentValue); await load(true); }
+    catch (e) { alert(e.message); }
+    finally { setActionLoading(null); }
+  }
+
   function handleRemove(id, endDate) {
     setRemoveTarget({ id, endDate });
   }
@@ -133,6 +140,7 @@ function ArtistsInner() {
           onBack={() => router.push('/dashboard/artists')}
           onApprove={() => handleApprove(selectedArtist.id)}
           onReject={() => handleReject(selectedArtist.id)}
+          onToggleAccepting={() => handleToggleAccepting(selectedArtist.id, selectedArtist.acceptingBookings)}
           onRemove={() => handleRemove(selectedArtist.id, selectedArtist.endDate)}
           actionLoading={actionLoading === selectedArtist.id}
         />
@@ -225,6 +233,11 @@ function ArtistRow({ artist, onClick, onApprove, onReject, onRemove, actionLoadi
                 {artist.status.charAt(0).toUpperCase() + artist.status.slice(1)}
               </span>
             )}
+            {!artist.acceptingBookings && (
+              <span style={{ fontSize: '0.68rem', fontWeight: 600, color: 'var(--text-ghost)', background: 'var(--bg-chip)', border: '1px solid var(--border)', borderRadius: 20, padding: '0.12rem 0.5rem', whiteSpace: 'nowrap' }}>
+                Paused
+              </span>
+            )}
             {artist.endDate && (
               <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#f59e3a', background: 'rgba(245,158,58,0.1)', border: '1px solid rgba(245,158,58,0.25)', borderRadius: 20, padding: '0.12rem 0.5rem', whiteSpace: 'nowrap' }}>
                 Last day {new Date(artist.endDate + 'T00:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}
@@ -279,7 +292,7 @@ function ArtistRow({ artist, onClick, onApprove, onReject, onRemove, actionLoadi
   );
 }
 
-function ArtistDetail({ artist, onBack, onApprove, onReject, onRemove, actionLoading }) {
+function ArtistDetail({ artist, onBack, onApprove, onReject, onRemove, onToggleAccepting, actionLoading }) {
   const { t } = useLanguage();
   const sc = APPROVAL_STATUS_COLORS[artist.status] ?? APPROVAL_STATUS_COLORS.approved;
   const artistInitials = initials(artist.name);
@@ -551,6 +564,31 @@ function ArtistDetail({ artist, onBack, onApprove, onReject, onRemove, actionLoa
         )}
         {artist.status === 'approved' && (
           <div style={s.detailActions}>
+            {/* Accepting bookings toggle */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem 1rem', background: 'var(--bg-chip)', border: '1px solid var(--border-faint)', borderRadius: 10, marginBottom: '0.75rem' }}>
+              <div>
+                <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text)' }}>Accepting bookings</span>
+                <p style={{ margin: '0.1rem 0 0', fontSize: '0.72rem', color: 'var(--text-ghost)', lineHeight: 1.4 }}>
+                  {artist.acceptingBookings ? 'Clients can select this artist' : 'Hidden from booking selection'}
+                </p>
+              </div>
+              <button
+                onClick={onToggleAccepting}
+                disabled={actionLoading}
+                style={{
+                  flexShrink: 0,
+                  width: 44, height: 24, borderRadius: 12, border: 'none', cursor: actionLoading ? 'default' : 'pointer',
+                  background: artist.acceptingBookings ? 'var(--accent)' : 'var(--border-strong)',
+                  position: 'relative', transition: 'background 0.2s', opacity: actionLoading ? 0.5 : 1,
+                }}
+              >
+                <span style={{
+                  position: 'absolute', top: 3, left: artist.acceptingBookings ? 22 : 3,
+                  width: 18, height: 18, borderRadius: '50%', background: '#fff',
+                  transition: 'left 0.2s', display: 'block',
+                }} />
+              </button>
+            </div>
             {artist.endDate && (
               <p style={{ margin: '0 0 0.5rem', fontSize: '0.78rem', color: '#f59e3a', textAlign: 'center' }}>
                 Last day: {new Date(artist.endDate + 'T00:00:00').toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' })}
