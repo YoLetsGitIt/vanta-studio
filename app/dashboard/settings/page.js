@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import {
   getMyStudioAccount, updateStudioProfile,
   getStudioHours, updateStudioHours,
-  getStations, addStation, removeStation,
+  getStations, addStation, removeStation, setStationLastDay,
   setStationUnavailability, clearStationUnavailability,
   listConsentTemplates, createConsentTemplate, updateConsentTemplate, deleteConsentTemplate,
   getStripeStatus, startStripeOnboarding, disconnectStripe,
@@ -505,6 +505,7 @@ export default function SettingsPage() {
   const [stationLoading, setStationLoading] = useState(false);
   const [expandedStation, setExpandedStation] = useState(null);
   const [unavailDate, setUnavailDate] = useState('');
+  const [stationLastDayTarget, setStationLastDayTarget] = useState(null); // { id, endDate }
 
   useEffect(() => {
     async function load() {
@@ -635,6 +636,21 @@ export default function SettingsPage() {
       await removeStation(id);
       setStations(s => s.filter(st => st.id !== id));
       if (expandedStation === id) setExpandedStation(null);
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setStationLoading(false);
+    }
+  }
+
+  async function confirmStationLastDay(lastDay) {
+    if (!stationLastDayTarget) return;
+    setStationLoading(true);
+    try {
+      await setStationLastDay(stationLastDayTarget.id, lastDay ?? null);
+      setStationLastDayTarget(null);
+      const data = await getStations();
+      setStations(data.stations ?? []);
     } catch (e) {
       alert(e.message);
     } finally {
@@ -1217,20 +1233,34 @@ export default function SettingsPage() {
         <section style={s.card}>
           <h2 style={s.sectionTitle}>{t('stations')}</h2>
           <p style={s.sectionDesc}>Artists are assigned to a free station when a booking is accepted.</p>
+          {stationLastDayTarget && (
+            <StationLastDayModal
+              saving={stationLoading}
+              existingEndDate={stationLastDayTarget.endDate}
+              onConfirm={confirmStationLastDay}
+              onCancel={() => setStationLastDayTarget(null)}
+            />
+          )}
           <div style={s.stationList}>
             {stations.map(st => (
               <div key={st.id} style={s.stationRow}>
                 <div style={s.stationTop}>
-                  <span style={s.stationName}>{st.name}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    <span style={s.stationName}>{st.name}</span>
+                    {st.endDate && (
+                      <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#f59e3a', background: 'rgba(245,158,58,0.1)', border: '1px solid rgba(245,158,58,0.25)', borderRadius: 20, padding: '0.12rem 0.5rem', whiteSpace: 'nowrap' }}>
+                        Last day {new Date(st.endDate + 'T00:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}
+                      </span>
+                    )}
+                  </div>
                   <div style={s.stationActions}>
-                    {/* Unavailability button — re-enable when station unavailability is needed
                     <button
                       style={s.stationToggleBtn}
-                      onClick={() => setExpandedStation(expandedStation === st.id ? null : st.id)}
+                      onClick={() => setStationLastDayTarget({ id: st.id, endDate: st.endDate ?? null })}
+                      disabled={stationLoading}
                     >
-                      {expandedStation === st.id ? 'Hide' : 'Unavailability'}
+                      {st.endDate ? 'Change last day' : 'Set last day'}
                     </button>
-                    */}
                     <button
                       style={s.stationRemoveBtn}
                       onClick={() => handleRemoveStation(st.id)}
@@ -1605,3 +1635,61 @@ const s = {
     transition: 'transform 0.2s, background 0.2s',
   }),
 };
+
+function StationLastDayModal({ onConfirm, onCancel, saving, existingEndDate }) {
+  const todayStr = new Date().toISOString().split('T')[0];
+  const defaultDate = (() => {
+    if (existingEndDate) return existingEndDate;
+    const d = new Date(); d.setDate(d.getDate() + 14);
+    return d.toISOString().split('T')[0];
+  })();
+  const [lastDay, setLastDay] = useState(defaultDate);
+  const isToday = lastDay === todayStr;
+  const isChanging = !!existingEndDate;
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
+      onClick={e => e.target === e.currentTarget && onCancel()}>
+      <div style={{ background: 'var(--bg-modal)', border: '1px solid var(--border)', borderRadius: 16, padding: '1.5rem', width: '100%', maxWidth: 400 }}>
+        <h2 style={{ margin: '0 0 0.25rem', fontSize: '1.1rem', fontWeight: 700, color: 'var(--text)' }}>
+          {isChanging ? 'Change last day' : "Set station's last day"}
+        </h2>
+        <p style={{ margin: '0 0 1.25rem', fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+          No bookings will be available on or after the station's last day.
+        </p>
+        <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '0.4rem' }}>
+          Last day
+        </label>
+        <input
+          type="date"
+          min={todayStr}
+          value={lastDay}
+          onChange={e => setLastDay(e.target.value)}
+          style={{ width: '100%', boxSizing: 'border-box', background: 'var(--bg-input)', border: `1px solid ${isToday ? 'rgba(232,111,111,0.5)' : 'var(--border-strong)'}`, borderRadius: 8, padding: '0.65rem 0.85rem', fontSize: '0.9rem', color: 'var(--text)', outline: 'none', fontFamily: 'inherit', colorScheme: 'dark', marginBottom: isToday ? '0.5rem' : '1.25rem' }}
+        />
+        {isToday && (
+          <p style={{ margin: '0 0 1.25rem', fontSize: '0.78rem', color: '#e86f6f', lineHeight: 1.4 }}>
+            Setting today will deactivate this station immediately.
+          </p>
+        )}
+        <div style={{ display: 'flex', gap: '0.75rem' }}>
+          <button onClick={onCancel} disabled={saving} style={{ flex: 1, padding: '0.7rem', borderRadius: 8, border: '1px solid var(--border-strong)', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '0.9rem', fontWeight: 600, fontFamily: 'inherit' }}>
+            Cancel
+          </button>
+          <button
+            onClick={() => onConfirm(lastDay)}
+            disabled={saving}
+            style={{
+              flex: 2, padding: '0.7rem', borderRadius: 8, border: 'none',
+              background: saving ? 'var(--bg-chip)' : isToday ? 'rgba(232,111,111,0.85)' : 'var(--accent)',
+              color: saving ? 'var(--text-ghost)' : isToday ? '#fff' : '#0d1017',
+              cursor: saving ? 'default' : 'pointer', fontSize: '0.9rem', fontWeight: 700, fontFamily: 'inherit',
+            }}
+          >
+            {saving ? 'Saving…' : isToday ? 'Deactivate now' : isChanging ? 'Update last day' : 'Set last day'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
