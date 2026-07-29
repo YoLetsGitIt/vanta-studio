@@ -395,37 +395,40 @@ function ArtistDetail({ artist, onBack, onApprove, onReject, onRemove, onToggleA
       </div>
 
       <div style={s.detailBody}>
-        <div style={{ display: 'flex', gap: '2rem', alignItems: 'flex-start' }}>
-
-          {/* Left column — profile + content */}
-          <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-            <div style={s.detailHero}>
-              {artist.profileImage ? (
-                <img src={artist.profileImage} alt={artist.name} style={s.detailAvatar} />
-              ) : (
-                <div style={{ ...s.detailAvatar, ...s.detailAvatarFallback }}>{artistInitials}</div>
-              )}
-              <div style={s.detailMeta}>
-                <div style={s.detailNameRow}>
-                  <span style={s.detailName}>{artist.name || t('artists_unnamed')}</span>
-                  {artist.studioType === 'guest' && <span style={s.guestBadge}>{t('artists_guest')}</span>}
-                  {artist.status !== 'approved' && (
-                    <span style={{ ...s.statusBadge, background: sc.bg, color: sc.text, border: `1px solid ${sc.border}` }}>
-                      {artist.status.charAt(0).toUpperCase() + artist.status.slice(1)}
-                    </span>
-                  )}
-                </div>
-                <span style={s.detailEmail}>{artist.email}</span>
-                {artist.instagram && <span style={s.detailInstagram}>@{artist.instagram}</span>}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          {/* Hero — full width above the columns */}
+          <div style={s.detailHero}>
+            {artist.profileImage ? (
+              <img src={artist.profileImage} alt={artist.name} style={s.detailAvatar} />
+            ) : (
+              <div style={{ ...s.detailAvatar, ...s.detailAvatarFallback }}>{artistInitials}</div>
+            )}
+            <div style={s.detailMeta}>
+              <div style={s.detailNameRow}>
+                <span style={s.detailName}>{artist.name || t('artists_unnamed')}</span>
+                {artist.studioType === 'guest' && <span style={s.guestBadge}>{t('artists_guest')}</span>}
+                {artist.status !== 'approved' && (
+                  <span style={{ ...s.statusBadge, background: sc.bg, color: sc.text, border: `1px solid ${sc.border}` }}>
+                    {artist.status.charAt(0).toUpperCase() + artist.status.slice(1)}
+                  </span>
+                )}
               </div>
+              <span style={s.detailEmail}>{artist.email}</span>
+              {artist.instagram && <span style={s.detailInstagram}>@{artist.instagram}</span>}
             </div>
+          </div>
 
-            <div style={s.statsGrid}>
-              <StatCard label={t('artists_total_sessions')} value={stats ? stats.totalBookings : '—'} />
-              <StatCard label={t('status_completed')} value={stats ? stats.completed : '—'} />
-              <StatCard label={t('artists_upcoming_stat')} value={stats ? stats.upcoming : '—'} />
-              <StatCard label={t('artists_revenue')} value={stats ? `$${Math.round(stats.totalRevenue).toLocaleString()}` : '—'} />
-            </div>
+          {/* Two-column row: content left, settings right */}
+          <div style={{ display: 'flex', gap: '2rem', alignItems: 'flex-start' }}>
+
+            {/* Left column */}
+            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              <div style={s.statsGrid}>
+                <StatCard label={t('artists_total_sessions')} value={stats ? stats.totalBookings : '—'} />
+                <StatCard label={t('status_completed')} value={stats ? stats.completed : '—'} />
+                <StatCard label={t('artists_upcoming_stat')} value={stats ? stats.upcoming : '—'} />
+                <StatCard label={t('artists_revenue')} value={stats ? `$${Math.round(stats.totalRevenue).toLocaleString()}` : '—'} />
+              </div>
 
             {artist.bio && (
               <div style={s.detailSection}>
@@ -641,6 +644,7 @@ function ArtistDetail({ artist, onBack, onApprove, onReject, onRemove, onToggleA
         </div>
       </div>
     </div>
+  </div>
   );
 }
 
