@@ -395,35 +395,32 @@ function ArtistDetail({ artist, onBack, onApprove, onReject, onRemove, onToggleA
       </div>
 
       <div style={s.detailBody}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-          {/* Hero — full width above the columns */}
-          <div style={s.detailHero}>
-            {artist.profileImage ? (
-              <img src={artist.profileImage} alt={artist.name} style={s.detailAvatar} />
-            ) : (
-              <div style={{ ...s.detailAvatar, ...s.detailAvatarFallback }}>{artistInitials}</div>
-            )}
-            <div style={s.detailMeta}>
-              <div style={s.detailNameRow}>
-                <span style={s.detailName}>{artist.name || t('artists_unnamed')}</span>
-                {artist.studioType === 'guest' && <span style={s.guestBadge}>{t('artists_guest')}</span>}
-                {artist.status !== 'approved' && (
-                  <span style={{ ...s.statusBadge, background: sc.bg, color: sc.text, border: `1px solid ${sc.border}` }}>
-                    {artist.status.charAt(0).toUpperCase() + artist.status.slice(1)}
-                  </span>
-                )}
+        <div style={{ display: 'flex', gap: '2rem', alignItems: 'flex-start' }}>
+
+          {/* Left column */}
+          <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            <div style={s.detailHero}>
+              {artist.profileImage ? (
+                <img src={artist.profileImage} alt={artist.name} style={s.detailAvatar} />
+              ) : (
+                <div style={{ ...s.detailAvatar, ...s.detailAvatarFallback }}>{artistInitials}</div>
+              )}
+              <div style={s.detailMeta}>
+                <div style={s.detailNameRow}>
+                  <span style={s.detailName}>{artist.name || t('artists_unnamed')}</span>
+                  {artist.studioType === 'guest' && <span style={s.guestBadge}>{t('artists_guest')}</span>}
+                  {artist.status !== 'approved' && (
+                    <span style={{ ...s.statusBadge, background: sc.bg, color: sc.text, border: `1px solid ${sc.border}` }}>
+                      {artist.status.charAt(0).toUpperCase() + artist.status.slice(1)}
+                    </span>
+                  )}
+                </div>
+                <span style={s.detailEmail}>{artist.email}</span>
+                {artist.instagram && <span style={s.detailInstagram}>@{artist.instagram}</span>}
               </div>
-              <span style={s.detailEmail}>{artist.email}</span>
-              {artist.instagram && <span style={s.detailInstagram}>@{artist.instagram}</span>}
             </div>
-          </div>
 
-          {/* Two-column row: content left, settings right */}
-          <div style={{ display: 'flex', gap: '2rem', alignItems: 'flex-start' }}>
-
-            {/* Left column */}
-            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-              <div style={s.statsGrid}>
+            <div style={s.statsGrid}>
                 <StatCard label={t('artists_total_sessions')} value={stats ? stats.totalBookings : '—'} />
                 <StatCard label={t('status_completed')} value={stats ? stats.completed : '—'} />
                 <StatCard label={t('artists_upcoming_stat')} value={stats ? stats.upcoming : '—'} />
@@ -593,13 +590,15 @@ function ArtistDetail({ artist, onBack, onApprove, onReject, onRemove, onToggleA
 
           {/* Right column — settings (approved only) */}
           {artist.status === 'approved' && (
-            <div style={{ width: 220, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '0.5rem', position: 'sticky', top: 0 }}>
-              <span style={s.sectionLabel}>Settings</span>
+            <div style={{ width: 220, flexShrink: 0, position: 'sticky', top: 0, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
+              <div style={{ padding: '0.65rem 1rem', borderBottom: '1px solid var(--border-faint)' }}>
+                <span style={s.sectionLabel}>Settings</span>
+              </div>
               {/* Accepting bookings toggle */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem 1rem', background: 'var(--bg-chip)', border: '1px solid var(--border-faint)', borderRadius: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.85rem 1rem', borderBottom: '1px solid var(--border-faint)' }}>
                 <div>
                   <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text)' }}>Accepting bookings</span>
-                  <p style={{ margin: '0.1rem 0 0', fontSize: '0.7rem', color: 'var(--text-ghost)', lineHeight: 1.4 }}>
+                  <p style={{ margin: '0.15rem 0 0', fontSize: '0.7rem', color: 'var(--text-ghost)', lineHeight: 1.4 }}>
                     {artist.acceptingBookings ? 'Clients can book' : 'Hidden from booking'}
                   </p>
                 </div>
@@ -621,10 +620,10 @@ function ArtistDetail({ artist, onBack, onApprove, onReject, onRemove, onToggleA
                 </button>
               </div>
               {/* Last day */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem 1rem', background: 'var(--bg-chip)', border: '1px solid var(--border-faint)', borderRadius: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.85rem 1rem' }}>
                 <div>
                   <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text)' }}>Last day</span>
-                  <p style={{ margin: '0.1rem 0 0', fontSize: '0.7rem', color: 'var(--text-ghost)', lineHeight: 1.4 }}>
+                  <p style={{ margin: '0.15rem 0 0', fontSize: '0.7rem', color: artist.endDate ? '#f59e3a' : 'var(--text-ghost)', lineHeight: 1.4 }}>
                     {artist.endDate
                       ? new Date(artist.endDate + 'T00:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })
                       : 'Not scheduled'}
@@ -644,7 +643,6 @@ function ArtistDetail({ artist, onBack, onApprove, onReject, onRemove, onToggleA
         </div>
       </div>
     </div>
-  </div>
   );
 }
 
