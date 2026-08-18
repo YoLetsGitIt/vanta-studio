@@ -7,7 +7,7 @@ import BookingDetailPanel from '@/components/BookingDetailPanel';
 import { getCached, setCached, invalidatePrefix } from '@/lib/cache';
 import CompleteBookingModal from '@/components/CompleteBookingModal';
 import RejectBookingModal from '@/components/RejectBookingModal';
-import { initials, toISODate } from '@/lib/format';
+import { initials, toISODate, hasArtist } from '@/lib/format';
 import { useLanguage } from '@/lib/i18n';
 
 const HOUR_PX   = 64;
@@ -71,6 +71,7 @@ function useBookingActions(afterChange) {
   const [sendLinkDeposit,  setSendLinkDeposit]  = useState(false);
   const [sendLinkAmount,   setSendLinkAmount]   = useState('');
   const [sendLinkQuote,    setSendLinkQuote]    = useState('');
+  const [sendLinkArtistId, setSendLinkArtistId] = useState('');
   const [sendLinkSaving,   setSendLinkSaving]   = useState(false);
   const [reassignTarget,   setReassignTarget]   = useState(null);
   const [reassignArtistId, setReassignArtistId] = useState('');
@@ -133,6 +134,10 @@ function useBookingActions(afterChange) {
       setSendLinkTarget(selectedEntry.bookingId);
       setSendLinkHours(168); setSendLinkDuration(60);
       setSendLinkDeposit(false); setSendLinkAmount(''); setSendLinkQuote('');
+      setSendLinkArtistId('');
+      if (studioArtists.length === 0) {
+        getStudioArtists('approved').then(d => setStudioArtists(d.artists ?? [])).catch(() => {});
+      }
       return;
     }
     if (action === 'confirm') { run(() => confirmBooking(selectedEntry.bookingId), () => {}); return; }
@@ -165,7 +170,7 @@ function useBookingActions(afterChange) {
       const amount   = sendLinkDeposit && sendLinkAmount ? parseFloat(sendLinkAmount) : null;
       const duration = sendLinkDuration ? Number(sendLinkDuration) : null;
       const quote    = sendLinkQuote ? parseFloat(sendLinkQuote) : null;
-      await sendSelectionLink(sendLinkTarget, sendLinkHours, sendLinkDeposit, amount, duration, quote);
+      await sendSelectionLink(sendLinkTarget, sendLinkHours, sendLinkDeposit, amount, duration, quote, sendLinkArtistId || null);
       setSendLinkTarget(null);
       closeDetail();
       afterChange();
@@ -226,7 +231,7 @@ function useBookingActions(afterChange) {
   return {
     selectedEntry, detailBooking, detailLoading, actionLoading,
     completeTarget, noShowTarget, rejectTarget,
-    cancelTarget, sendLinkTarget, sendLinkHours, sendLinkDuration, sendLinkDeposit, sendLinkAmount, sendLinkQuote, sendLinkSaving,
+    cancelTarget, sendLinkTarget, sendLinkHours, sendLinkDuration, sendLinkDeposit, sendLinkAmount, sendLinkQuote, sendLinkArtistId, sendLinkSaving,
     reassignTarget, reassignArtistId, reassignResend, reassignSaving, studioArtists, stripeConnected,
     rescheduleTarget, rescheduleDate, rescheduleStart, rescheduleEnd, rescheduleMsg, rescheduleSaving,
     openDetail, closeDetail, handleAction,
@@ -234,7 +239,7 @@ function useBookingActions(afterChange) {
     openReschedule, confirmReschedule,
     setRescheduleStart, setRescheduleEnd, setRescheduleMsg, setRescheduleTarget,
     setCompleteTarget, setNoShowTarget, setRejectTarget,
-    setCancelTarget, setSendLinkTarget, setSendLinkHours, setSendLinkDuration, setSendLinkDeposit, setSendLinkAmount, setSendLinkQuote,
+    setCancelTarget, setSendLinkTarget, setSendLinkHours, setSendLinkDuration, setSendLinkDeposit, setSendLinkAmount, setSendLinkQuote, setSendLinkArtistId,
     setReassignTarget, setReassignArtistId, setReassignResend,
   };
 }
@@ -305,6 +310,17 @@ function BookingOverlays({ actions: a }) {
             <p style={{ margin: '0 0 1rem', fontSize: '0.8rem', color: 'var(--text-ghost)' }}>
               {t('appt_send_link_desc')}
             </p>
+            {!hasArtist(a.detailBooking?.artist_id) && (
+              <>
+                <label style={labelStyle}>{t('bdp_artist')}</label>
+                <select value={a.sendLinkArtistId} onChange={e => a.setSendLinkArtistId(e.target.value)} style={{ ...inputStyle, cursor: 'pointer', colorScheme: 'auto', marginBottom: '0.75rem' }}>
+                  <option value="">{t('appt_select_artist')}</option>
+                  {a.studioArtists.map(art => (
+                    <option key={art.artistId ?? art.id} value={art.artistId ?? art.id}>{art.name}</option>
+                  ))}
+                </select>
+              </>
+            )}
             <label style={labelStyle}>{t('appt_duration')}</label>
             <select value={a.sendLinkDuration} onChange={e => a.setSendLinkDuration(Number(e.target.value))} style={{ ...inputStyle, cursor: 'pointer', colorScheme: 'auto', marginBottom: '0.75rem' }}>
               <option value={60}>1 hour</option>
@@ -354,8 +370,8 @@ function BookingOverlays({ actions: a }) {
             <div style={{ display: 'flex', gap: '0.6rem', marginTop: '0.25rem' }}>
               <button style={cancelBtnStyle} onClick={() => a.setSendLinkTarget(null)}>{t('cancel')}</button>
               <button
-                style={{ ...saveBtnStyle, opacity: a.sendLinkSaving ? 0.5 : 1 }}
-                onClick={a.confirmSendLink} disabled={a.sendLinkSaving}
+                style={{ ...saveBtnStyle, opacity: (a.sendLinkSaving || (!hasArtist(a.detailBooking?.artist_id) && !a.sendLinkArtistId)) ? 0.5 : 1 }}
+                onClick={a.confirmSendLink} disabled={a.sendLinkSaving || (!hasArtist(a.detailBooking?.artist_id) && !a.sendLinkArtistId)}
               >
                 {t(a.sendLinkSaving ? 'sending' : 'appt_send_link_btn')}
               </button>

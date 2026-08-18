@@ -460,6 +460,8 @@ export default function SettingsPage() {
   const [personalCut, setPersonalCut] = useState('0');
   const [paymentRecordingReq, setPaymentRecordingReq] = useState('studio_only');
   const [rescheduleWindow, setRescheduleWindow] = useState(null);
+  const [sendReminder7d, setSendReminder7d] = useState(true);
+  const [sendReminder24h, setSendReminder24h] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [profileError, setProfileError] = useState('');
@@ -532,6 +534,8 @@ export default function SettingsPage() {
         setPersonalCut(String(account.studio?.personal_cut_percent ?? account.studio?.studio_cut_percent ?? 0));
         setPaymentRecordingReq(account.studio?.payment_recording_requirement ?? 'studio_only');
         setRescheduleWindow(account.studio?.reschedule_window_hours ?? null);
+        setSendReminder7d(account.studio?.send_reminder_7d ?? true);
+        setSendReminder24h(account.studio?.send_reminder_24h ?? true);
         setEmail(session?.user?.email ?? '');
         setStudioId(account.studio_id);
         setWalkInUrl(window.location.origin + '/studio-booking?s=' + account.studio_id);
@@ -580,7 +584,7 @@ export default function SettingsPage() {
     try {
       const wc = parseFloat(walkinCut);
       const pc = parseFloat(personalCut);
-      await updateStudioProfile(name.trim(), address.trim(), widgetBgColor, widgetAccentColor, isNaN(wc) ? 0 : wc, isNaN(pc) ? 0 : pc, aftercareInstructions, timezone, addressLat, addressLng, paymentRecordingReq, rescheduleWindow, widgetConsentTemplateId || null);
+      await updateStudioProfile(name.trim(), address.trim(), widgetBgColor, widgetAccentColor, isNaN(wc) ? 0 : wc, isNaN(pc) ? 0 : pc, aftercareInstructions, timezone, addressLat, addressLng, paymentRecordingReq, rescheduleWindow, widgetConsentTemplateId || null, sendReminder7d, sendReminder24h);
       invalidate('studio-account');
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
@@ -1077,6 +1081,54 @@ export default function SettingsPage() {
             <option value="72">{t('reschedule_window_72h')}</option>
             <option value="168">{t('reschedule_window_1w')}</option>
           </select>
+          <button onClick={saveProfile} style={s.saveBtn} disabled={saving}>
+            {saving ? t('saving') : saved ? t('saved') : t('save')}
+          </button>
+        </section>
+
+        <section style={{ ...s.card, gridColumn: '1 / -1' }}>
+          <h2 style={s.sectionTitle}>Emails</h2>
+          <p style={s.sectionDesc}>Booking confirmation is always sent. Choose which reminder emails your clients receive.</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 0', borderBottom: '1px solid var(--border)' }}>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text)' }}>7-day reminder</div>
+                <div style={{ fontSize: 13, color: 'var(--text-ghost)', marginTop: 2 }}>Sent to clients 7 days before their appointment</div>
+              </div>
+              <button
+                onClick={() => { setSendReminder7d(v => !v); }}
+                style={{
+                  width: 44, height: 24, borderRadius: 12, border: 'none', cursor: 'pointer',
+                  background: sendReminder7d ? 'var(--accent)' : 'var(--bg-chip)',
+                  position: 'relative', transition: 'background 0.2s', flexShrink: 0,
+                }}
+              >
+                <span style={{
+                  position: 'absolute', top: 3, left: sendReminder7d ? 23 : 3, width: 18, height: 18,
+                  borderRadius: '50%', background: '#fff', transition: 'left 0.2s',
+                }} />
+              </button>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 0' }}>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text)' }}>24-hour reminder</div>
+                <div style={{ fontSize: 13, color: 'var(--text-ghost)', marginTop: 2 }}>Sent to clients 24 hours before their appointment</div>
+              </div>
+              <button
+                onClick={() => { setSendReminder24h(v => !v); }}
+                style={{
+                  width: 44, height: 24, borderRadius: 12, border: 'none', cursor: 'pointer',
+                  background: sendReminder24h ? 'var(--accent)' : 'var(--bg-chip)',
+                  position: 'relative', transition: 'background 0.2s', flexShrink: 0,
+                }}
+              >
+                <span style={{
+                  position: 'absolute', top: 3, left: sendReminder24h ? 23 : 3, width: 18, height: 18,
+                  borderRadius: '50%', background: '#fff', transition: 'left 0.2s',
+                }} />
+              </button>
+            </div>
+          </div>
           <button onClick={saveProfile} style={s.saveBtn} disabled={saving}>
             {saving ? t('saving') : saved ? t('saved') : t('save')}
           </button>

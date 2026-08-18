@@ -552,7 +552,7 @@ function LockIcon({ locked }) {
 
 const REIMB_STATUS_STYLE = {
   pending:  { color: '#f59e3a', bg: 'rgba(245,158,58,0.12)',  label: 'Pending'  },
-  approved: { color: '#4cc98a', bg: 'rgba(76,201,138,0.12)',  label: 'Approved' },
+  approved: { color: '#4cc98a', bg: 'rgba(76,201,138,0.12)',  label: 'Paid out' },
   rejected: { color: '#e86f6f', bg: 'rgba(232,111,111,0.12)', label: 'Rejected' },
 };
 
@@ -584,7 +584,7 @@ function ReimbursementsSection({ reimbursements, reviewingId, onReview }) {
                           disabled={busy}
                           style={{ ...st.payBtn, opacity: busy ? 0.5 : 1 }}
                         >
-                          {t('approve')}
+                          Mark paid
                         </button>
                         <button
                           onClick={() => onReview(rb.id, 'reject')}

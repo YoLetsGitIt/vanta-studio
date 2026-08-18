@@ -6,6 +6,7 @@ import { listStudioBookings, acceptBookingWithStation, rejectBooking, cancelBook
 import { getCached, setCached, invalidatePrefix } from '@/lib/cache';
 import { statusColors, statusLabel, capitalise } from '@/lib/status';
 import { getBookingType } from '@/lib/bookingType';
+import { hasArtist } from '@/lib/format';
 import CompleteBookingModal from '@/components/CompleteBookingModal';
 import RejectBookingModal from '@/components/RejectBookingModal';
 import BookingDetailPanel from '@/components/BookingDetailPanel';
@@ -20,6 +21,13 @@ const STATUS_FILTERS = [
 ];
 
 const COMPLETED_TAB = 'completed,cancelled,deposit_expired';
+
+const CONFIRMED_SUB_FILTERS = [
+  { value: 'all',            label: 'All' },
+  { value: 'record_payment', label: 'Record payment' },
+];
+
+const CONFIRMED_TAB = 'confirmed';
 
 const COMPLETED_SUB_FILTERS = [
   { value: 'all',             label: 'All',             status: COMPLETED_TAB,      outcome: '' },
@@ -43,6 +51,7 @@ function AppointmentsInner() {
     : DEFAULT_FILTER;
   const [activeFilter, setActiveFilter] = useState(initialFilter);
   const [completedSubFilter, setCompletedSubFilter] = useState('all');
+  const [confirmedSubFilter, setConfirmedSubFilter] = useState('all');
   const [sortDir, setSortDir] = useState('desc');
   const [search, setSearch] = useState('');
   const [bookings, setBookings] = useState([]);
@@ -63,6 +72,7 @@ function AppointmentsInner() {
   const [sendLinkDeposit,  setSendLinkDeposit]  = useState(false);
   const [sendLinkAmount,   setSendLinkAmount]   = useState('');
   const [sendLinkQuote,    setSendLinkQuote]    = useState('');
+  const [sendLinkArtistId, setSendLinkArtistId] = useState('');
   const [sendLinkSaving,   setSendLinkSaving]   = useState(false);
   const [reassignTarget, setReassignTarget] = useState(null); // booking id
   const [reassignArtistId, setReassignArtistId] = useState('');
@@ -91,6 +101,7 @@ function AppointmentsInner() {
   function selectFilter(value) {
     setActiveFilter(value);
     setCompletedSubFilter('all');
+    setConfirmedSubFilter('all');
     setSelected(null);
   }
 
@@ -211,6 +222,10 @@ function AppointmentsInner() {
     setSendLinkDeposit(false);
     setSendLinkAmount('');
     setSendLinkQuote('');
+    setSendLinkArtistId('');
+    if (studioArtists.length === 0) {
+      getStudioArtists('approved').then(d => setStudioArtists(d.artists ?? [])).catch(() => {});
+    }
   }
 
   async function confirmSendLink() {
@@ -219,7 +234,7 @@ function AppointmentsInner() {
       const amount   = sendLinkDeposit && sendLinkAmount ? parseFloat(sendLinkAmount) : null;
       const duration = sendLinkDuration ? Number(sendLinkDuration) : null;
       const quote    = sendLinkQuote ? parseFloat(sendLinkQuote) : null;
-      await sendSelectionLink(sendLinkTarget, sendLinkHours, sendLinkDeposit, amount, duration, quote);
+      await sendSelectionLink(sendLinkTarget, sendLinkHours, sendLinkDeposit, amount, duration, quote, sendLinkArtistId || null);
       await load(true);
       setSendLinkTarget(null);
       showToast('Selection link sent to client');
@@ -296,15 +311,22 @@ function AppointmentsInner() {
   }
 
   const filteredBookings = useMemo(() => {
-    if (!search.trim()) return bookings;
+    let list = bookings;
+    if (activeFilter === CONFIRMED_TAB && confirmedSubFilter === 'record_payment') {
+      const now = new Date();
+      list = list.filter(b => b.chosen_time && new Date(b.chosen_time) < now);
+    }
+    if (!search.trim()) return list;
     const q = search.trim().toLowerCase();
-    return bookings.filter(b =>
+    return list.filter(b =>
       b.requester_name?.toLowerCase().includes(q) ||
       b.requester_email?.toLowerCase().includes(q)
     );
-  }, [bookings, search]);
+  }, [bookings, search, activeFilter, confirmedSubFilter]);
 
   const selectedBooking = selected ? bookings.find(b => b.id === selected) : null;
+  const sendLinkBooking = sendLinkTarget ? bookings.find(b => b.id === sendLinkTarget) : null;
+  const sendLinkNeedsArtist = !!sendLinkTarget && !hasArtist(sendLinkBooking?.artist_id);
 
   return (
     <div style={s.page}>
@@ -356,6 +378,17 @@ function AppointmentsInner() {
           <div style={s.modal} onClick={e => e.stopPropagation()}>
             <h3 style={s.modalTitle}>{t('appt_send_link')}</h3>
             <p style={s.modalSub}>{t('appt_send_link_desc')}</p>
+            {sendLinkNeedsArtist && (
+              <>
+                <label style={s.modalLabel}>{t('bdp_artist')}</label>
+                <select value={sendLinkArtistId} onChange={e => setSendLinkArtistId(e.target.value)} style={s.modalSelect}>
+                  <option value="">{t('appt_select_artist')}</option>
+                  {studioArtists.map(a => (
+                    <option key={a.artistId ?? a.id} value={a.artistId ?? a.id}>{a.name}</option>
+                  ))}
+                </select>
+              </>
+            )}
             <label style={s.modalLabel}>{t('appt_duration')}</label>
             <select value={sendLinkDuration} onChange={e => setSendLinkDuration(Number(e.target.value))} style={s.modalSelect}>
               <option value={60}>1 hour</option>
@@ -412,7 +445,11 @@ function AppointmentsInner() {
             )}
             <div style={s.modalActions}>
               <button style={s.modalCancel} onClick={() => setSendLinkTarget(null)}>{t('cancel')}</button>
-              <button style={{ ...s.modalConfirm, opacity: sendLinkSaving ? 0.5 : 1 }} onClick={confirmSendLink} disabled={sendLinkSaving}>
+              <button
+                style={{ ...s.modalConfirm, opacity: (sendLinkSaving || (sendLinkNeedsArtist && !sendLinkArtistId)) ? 0.5 : 1 }}
+                onClick={confirmSendLink}
+                disabled={sendLinkSaving || (sendLinkNeedsArtist && !sendLinkArtistId)}
+              >
                 {t(sendLinkSaving ? 'sending' : 'appt_send_link_btn')}
               </button>
             </div>
@@ -473,6 +510,21 @@ function AppointmentsInner() {
         </div>
       </div>
 
+      {activeFilter === CONFIRMED_TAB && (
+        <div style={s.subFilterRow}>
+          {CONFIRMED_SUB_FILTERS.map(f => (
+            <button
+              key={f.value}
+              onMouseDown={e => e.preventDefault()}
+              onClick={() => { setConfirmedSubFilter(f.value); setSelected(null); }}
+              style={{ ...s.subFilterBtn, ...(confirmedSubFilter === f.value ? s.subFilterActive : {}) }}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+      )}
+
       {activeFilter === COMPLETED_TAB && (
         <div style={s.subFilterRow}>
           {COMPLETED_SUB_FILTERS.map(f => (
@@ -500,6 +552,7 @@ function AppointmentsInner() {
             booking={b}
             selected={selected === b.id}
             onSelect={() => setSelected(prev => prev === b.id ? null : b.id)}
+            labelOverride={b.status === 'confirmed' && b.chosen_time && new Date(b.chosen_time) < new Date() ? 'Record payment' : undefined}
           />
         ))}
         {nextCursor && !loading && (
@@ -625,7 +678,7 @@ function SkeletonList() {
   );
 }
 
-function BookingRow({ booking: b, selected, onSelect }) {
+function BookingRow({ booking: b, selected, onSelect, labelOverride }) {
   const { t } = useLanguage();
   const displayStatus = b.status === 'completed' && b.outcome === 'no_show' ? 'no_show' : b.status;
   const sc = statusColors(displayStatus);
@@ -696,7 +749,7 @@ function BookingRow({ booking: b, selected, onSelect }) {
       {/* Right */}
       <div style={s.rowRight}>
         <span style={{ ...s.statusBadge, background: sc.bg, color: sc.text, border: `1px solid ${sc.border}` }}>
-          {statusLabel(displayStatus)}
+          {labelOverride ?? statusLabel(displayStatus)}
         </span>
         {price && <span style={s.priceText}>{price}</span>}
       </div>

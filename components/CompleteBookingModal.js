@@ -205,32 +205,61 @@ export default function CompleteBookingModal({ outcome = 'completed', initialPri
           <p style={{ margin: '0 0 1rem', fontSize: '0.82rem', color: '#e86f6f' }}>{error}</p>
         )}
 
-        <div style={{ display: 'flex', gap: '0.75rem' }}>
-          <button
-            onClick={onCancel}
-            disabled={saving}
-            style={{
-              flex: 1, padding: '0.7rem', borderRadius: 8, border: '1px solid var(--border-strong)',
-              background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer',
-              fontSize: '0.9rem', fontWeight: 600,
-            }}
-          >
-            {t('cancel')}
-          </button>
-          <button
-            onClick={handleSubmit}
-            disabled={saving}
-            style={{
-              flex: 2, padding: '0.7rem', borderRadius: 8, border: 'none',
-              background: saving ? 'var(--bg-chip)' : (isNoShow ? 'rgba(232,111,111,0.85)' : '#4ade80'),
-              color: saving ? 'var(--text-ghost)' : (isNoShow ? '#fff' : '#000'),
-              cursor: saving ? 'default' : 'pointer',
-              fontSize: '0.9rem', fontWeight: 700,
-            }}
-          >
-            {saving ? t('saving') : t('confirm')}
-          </button>
-        </div>
+        {isNoShow ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            <button
+              onClick={handleSubmit}
+              disabled={saving}
+              style={{
+                width: '100%', padding: '0.85rem', borderRadius: 8, border: 'none',
+                background: saving ? 'var(--bg-chip)' : 'rgba(232,111,111,0.9)',
+                color: saving ? 'var(--text-ghost)' : '#fff',
+                cursor: saving ? 'default' : 'pointer',
+                fontSize: '0.95rem', fontWeight: 700,
+              }}
+            >
+              {saving ? t('saving') : 'Record no-show'}
+            </button>
+            <button
+              onClick={onCancel}
+              disabled={saving}
+              style={{
+                width: '100%', padding: '0.7rem', borderRadius: 8, border: '1px solid var(--border-strong)',
+                background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer',
+                fontSize: '0.9rem', fontWeight: 600,
+              }}
+            >
+              Go back
+            </button>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', gap: '0.75rem' }}>
+            <button
+              onClick={onCancel}
+              disabled={saving}
+              style={{
+                flex: 1, padding: '0.7rem', borderRadius: 8, border: '1px solid var(--border-strong)',
+                background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer',
+                fontSize: '0.9rem', fontWeight: 600,
+              }}
+            >
+              {t('cancel')}
+            </button>
+            <button
+              onClick={handleSubmit}
+              disabled={saving}
+              style={{
+                flex: 2, padding: '0.7rem', borderRadius: 8, border: 'none',
+                background: saving ? 'var(--bg-chip)' : '#4ade80',
+                color: saving ? 'var(--text-ghost)' : '#000',
+                cursor: saving ? 'default' : 'pointer',
+                fontSize: '0.9rem', fontWeight: 700,
+              }}
+            >
+              {saving ? t('saving') : t('confirm')}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
