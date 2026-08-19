@@ -694,6 +694,7 @@ function BookingRow({ booking: b, selected, onSelect, labelOverride }) {
   const sessionParts = [
     b.session_type ? capitalise(b.session_type.replace(/_/g, ' ')) : null,
     b.body_location || null,
+    hasArtist(b.artist_id) ? b.artist_name : t('bdp_artist_unspecified'),
   ].filter(Boolean);
 
   const bookingType = getBookingType(b.source);

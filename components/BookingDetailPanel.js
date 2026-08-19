@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { getStations, getClientConsents, getNotes, addNote, deleteNote, getBookingConsentSubmissions, getStudioClients, generateConsentLink, getStudioBookingPayment, listConsentTemplates } from '@/lib/api';
 import { useStationAvailability } from '@/lib/useStationAvailability';
 import { statusColors, statusLabel, capitalise as cap } from '@/lib/status';
-import { formatDob as fmtDob } from '@/lib/format';
+import { formatDob as fmtDob, hasArtist } from '@/lib/format';
 import { getCached, setCached } from '@/lib/cache';
 import { useLanguage } from '@/lib/i18n';
 
@@ -97,6 +97,7 @@ export default function BookingDetailPanel({
   const email       = booking?.requester_email   ?? entry?.requesterEmail ?? null;
   const phone       = booking?.requester_phone   ?? entry?.phone          ?? null;
   const dob         = booking?.dob               ?? null;
+  const artistId    = booking?.artist_id          ?? entry?.artistId   ?? null;
   const artistName  = booking?.artist_name        ?? entry?.artistName ?? null;
   const sessionType = booking?.session_type      ?? entry?.sessionType    ?? null;
   const placement   = booking?.body_location     ?? entry?.placement      ?? null;
@@ -421,7 +422,7 @@ export default function BookingDetailPanel({
             </div>
           </Row>
         )}
-        {artistName && <Row label={t('bdp_artist')} value={artistName} />}
+        <Row label={t('bdp_artist')} value={hasArtist(artistId) ? artistName : t('bdp_artist_unspecified')} />
         {sessionType && <Row label={t('bdp_session')} value={cap(sessionType.replace(/_/g, ' '))} />}
         {placement   && <Row label={t('bdp_placement')} value={placement} />}
         {size        && <Row label={t('bdp_size')} value={size} />}
