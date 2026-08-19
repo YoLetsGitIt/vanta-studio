@@ -39,6 +39,7 @@ export default function HomePage() {
   const [oldConsents, setOldConsents] = useState({ consents: {}, version: '1' });
   const [loading, setLoading] = useState(true);
   const [pendingCount, setPendingCount] = useState(0);
+  const [unconfirmedCount, setUnconfirmedCount] = useState(0);
   const [overdueBookings, setOverdueBookings] = useState([]);
   const [paymentRecordingReq, setPaymentRecordingReq] = useState(null);
   const [sendingLink, setSendingLink] = useState(null);
@@ -79,6 +80,10 @@ export default function HomePage() {
 
         // Fetch pending bookings count.
         listStudioBookings('pending').then(d => setPendingCount(d.bookings?.length ?? 0)).catch(() => {});
+
+        // Fetch bookings needing confirmation — across all dates, not just today,
+        // so ones scheduled for later in the week don't go unnoticed until overdue.
+        listStudioBookings('requires_confirmation').then(d => setUnconfirmedCount(d.bookings?.length ?? 0)).catch(() => {});
 
         // Fetch overdue confirmed bookings (oldest first so past ones surface first).
         if (req && req !== 'none' && req !== 'artist_only') {
@@ -181,7 +186,6 @@ export default function HomePage() {
     .map(a => ({ artist: a, count: weekByArtist[a.artistId ?? a.id] ?? 0 }))
     .sort((a, b) => b.count - a.count);
 
-  const unconfirmedCount = todayEntries.filter(e => e.status === 'requires_confirmation').length;
   const awaitingPaymentCount = todayEntries.filter(e => e.status === 'awaiting_payment').length;
 
   // Clients today missing consent (deduped by email)
@@ -224,13 +228,14 @@ export default function HomePage() {
               )}
 
               {unconfirmedCount > 0 && (
-                <div style={{ ...s.attentionRow, cursor: 'default' }}>
+                <button style={s.attentionRow} onClick={() => router.push('/dashboard/appointments?status=requires_confirmation')}>
                   <div style={s.attentionDot('#f59e3a')} />
                   <div style={s.attentionBody}>
-                    <span style={s.attentionTitle}>{unconfirmedCount} unconfirmed today</span>
+                    <span style={s.attentionTitle}>{unconfirmedCount} need{unconfirmedCount === 1 ? 's' : ''} confirmation</span>
                     <span style={s.attentionSub}>Bookings awaiting studio confirmation</span>
                   </div>
-                </div>
+                  <span style={s.attentionChevron}>→</span>
+                </button>
               )}
 
               {awaitingPaymentCount > 0 && (
