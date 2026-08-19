@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useLanguage } from '@/lib/i18n';
 
 const PAYMENT_METHODS = [
@@ -41,12 +41,31 @@ export default function CompleteBookingModal({ outcome = 'completed', initialPri
   const [splits, setSplits] = useState([{ method: '', amount: '' }]);
   const [followUp, setFollowUp] = useState(false);
   const [error, setError] = useState('');
+  // While there's a single payment method and its amount hasn't been hand-edited,
+  // keep it mirroring Final Price so the user never has to type the number twice.
+  const [amountAutoLinked, setAmountAutoLinked] = useState(true);
 
   const isNoShow = outcome === 'no_show';
 
   function updateSplit(idx, field, value) {
-    setSplits(prev => prev.map((s, i) => i === idx ? { ...s, [field]: value } : s));
+    setSplits(prev => prev.map((s, i) => {
+      if (i !== idx) return s;
+      const next = { ...s, [field]: value };
+      if (field === 'method' && prev.length === 1 && amountAutoLinked) {
+        next.amount = finalPrice;
+      }
+      return next;
+    }));
+    if (field === 'amount') setAmountAutoLinked(false);
   }
+
+  // Single payment method: keep its amount synced to Final Price as it changes,
+  // as long as the user hasn't manually overridden the amount.
+  useEffect(() => {
+    setSplits(prev => (prev.length === 1 && prev[0].method && amountAutoLinked)
+      ? [{ ...prev[0], amount: finalPrice }]
+      : prev);
+  }, [finalPrice, amountAutoLinked]);
 
   function addSplit() {
     setSplits(prev => [...prev, { method: '', amount: '' }]);
