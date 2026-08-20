@@ -1630,12 +1630,11 @@ export default function SettingsPage() {
         </section>
 
         <section style={{ ...s.card, gridColumn: '1 / -1' }}>
-          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
-            <h2 style={s.sectionTitle}>Billing</h2>
-            <span style={s.billingPlanBadge}>
-              {formatCents(billingDetails?.base_tier_cents ?? 6000)}/mo · up to {billingDetails?.base_tier_seats ?? 6} artists · +{formatCents(billingDetails?.per_extra_seat_cents ?? 1500)}/artist after
-            </span>
-          </div>
+          <h2 style={s.sectionTitle}>Billing</h2>
+          <p style={s.sectionDesc}>
+            {formatCents(billingDetails?.base_tier_cents ?? 6000)}/mo AUD covers up to {billingDetails?.base_tier_seats ?? 6} artists,
+            then {formatCents(billingDetails?.per_extra_seat_cents ?? 1500)}/artist beyond that.
+          </p>
 
           {billingNotice && <p style={{ fontSize: '0.82rem', color: 'var(--accent)', margin: 0 }}>{billingNotice}</p>}
 
@@ -1710,22 +1709,24 @@ export default function SettingsPage() {
             </div>
 
             {billingDetails?.card_last4 && (
-              <div style={s.paymentMethodCard}>
-                <div style={{ ...s.cardChip, background: cardBrandColor(billingDetails.card_brand) }}>
-                  <span style={s.cardChipBrand}>{cardBrandLabel(billingDetails.card_brand)}</span>
-                  <span style={s.cardChipNumber}>•••• •••• •••• {billingDetails.card_last4}</span>
-                </div>
-                <button onClick={handleUpdateCard} style={s.updateCardBtn} disabled={portalLoading}>
-                  {portalLoading ? (billingDetails.stripe_managed ? 'Opening…' : 'Updating…') : 'Update card'}
-                </button>
+              <div style={{ ...s.cardChip, background: cardBrandColor(billingDetails.card_brand) }}>
+                <span style={s.cardChipBrand}>{cardBrandLabel(billingDetails.card_brand)}</span>
+                <span style={s.cardChipNumber}>•••• •••• •••• {billingDetails.card_last4}</span>
               </div>
             )}
           </div>
 
-          {subscriptionStatus === 'active' && !isCanceling && (
-            <button onClick={() => { setCancelError(''); setCancelModalOpen(true); }} style={s.cancelSubscriptionLink}>
-              Cancel subscription
-            </button>
+          {billingDetails?.card_last4 && (
+            <div style={s.billingActionsRow}>
+              <button onClick={handleUpdateCard} style={s.updateCardBtn} disabled={portalLoading}>
+                {portalLoading ? (billingDetails.stripe_managed ? 'Opening…' : 'Updating…') : 'Update card'}
+              </button>
+              {subscriptionStatus === 'active' && !isCanceling && (
+                <button onClick={() => { setCancelError(''); setCancelModalOpen(true); }} style={s.cancelSubscriptionLink}>
+                  Cancel subscription
+                </button>
+              )}
+            </div>
           )}
         </section>
 
@@ -1823,16 +1824,16 @@ const s = {
   billingStatLabel: { fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-ghost)', textTransform: 'uppercase', letterSpacing: '0.04em' },
   billingStatValue: { fontSize: '1.1rem', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.01em' },
   billingStatSub: { fontSize: '0.72rem', color: 'var(--text-secondary)' },
-  cancelSubscriptionLink: { alignSelf: 'flex-start', background: 'none', border: 'none', padding: 0, fontSize: '0.78rem', color: 'var(--text-ghost)', textDecoration: 'underline', cursor: 'pointer', fontFamily: 'inherit' },
-  billingPlanBadge: { fontSize: '0.72rem', color: 'var(--text-secondary)', background: 'var(--bg-base)', border: '1px solid var(--border-faint)', borderRadius: 20, padding: '0.3rem 0.75rem', whiteSpace: 'nowrap' },
+  cancelSubscriptionLink: { background: 'none', border: 'none', padding: 0, fontSize: '0.78rem', color: 'var(--text-ghost)', textDecoration: 'underline', cursor: 'pointer', fontFamily: 'inherit' },
   billingBodyRow: { display: 'flex', gap: '0.75rem', alignItems: 'stretch', flexWrap: 'wrap' },
-  paymentMethodCard: { display: 'flex', flexDirection: 'column', gap: '0.6rem', flex: '0 0 200px' },
   cardChip: {
     display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '0.9rem',
-    borderRadius: 10, padding: '0.85rem 0.9rem', minHeight: 78, boxShadow: '0 4px 14px rgba(0,0,0,0.25)',
+    flex: '0 0 200px', borderRadius: 10, padding: '0.85rem 0.9rem', minHeight: 78,
+    boxShadow: '0 4px 14px rgba(0,0,0,0.25)',
   },
   cardChipBrand: { fontSize: '0.68rem', fontWeight: 700, color: 'rgba(255,255,255,0.85)', textTransform: 'uppercase', letterSpacing: '0.06em' },
   cardChipNumber: { fontSize: '0.85rem', fontWeight: 600, color: '#fff', letterSpacing: '0.03em' },
+  billingActionsRow: { display: 'flex', alignItems: 'center', gap: '1.1rem', paddingTop: '0.9rem', borderTop: '1px solid var(--border-faint)' },
   updateCardBtn: { background: 'var(--bg-base)', border: '1px solid var(--border-faint)', borderRadius: 8, padding: '0.5rem 0.85rem', fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-dim)', cursor: 'pointer', fontFamily: 'inherit' },
   // Hours
   hoursGrid: { display: 'flex', flexDirection: 'column', gap: '6px' },
