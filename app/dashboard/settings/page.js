@@ -11,7 +11,7 @@ import {
   listConsentTemplates, createConsentTemplate, updateConsentTemplate, deleteConsentTemplate,
   getStripeStatus, startStripeOnboarding, disconnectStripe,
   getFormConfig, updateFormConfig,
-  startBillingCheckout, getBillingDetails, cancelBillingSubscription,
+  startBillingCheckout, getBillingDetails, cancelBillingSubscription, openBillingPortal,
 } from '@/lib/api';
 import { getSupabase } from '@/lib/supabase';
 import { invalidate } from '@/lib/cache';
@@ -67,6 +67,16 @@ function cardBrandLabel(brand) {
     diners: 'Diners Club', jcb: 'JCB', unionpay: 'UnionPay', cartes_bancaires: 'Cartes Bancaires',
   };
   return labels[brand] ?? (brand ? brand.charAt(0).toUpperCase() + brand.slice(1) : 'Card');
+}
+
+function cardBrandColor(brand) {
+  const colors = {
+    visa: 'linear-gradient(135deg, #1a1f71, #2d3fa8)',
+    mastercard: 'linear-gradient(135deg, #3a2418, #6b3a1f)',
+    amex: 'linear-gradient(135deg, #006fcf, #00a8e8)',
+    discover: 'linear-gradient(135deg, #86592d, #d97b29)',
+  };
+  return colors[brand] ?? 'linear-gradient(135deg, #2a2a2e, #444448)';
 }
 
 function AddressAutocomplete({ value, onChange, onSelect, inputStyle }) {
@@ -519,6 +529,7 @@ export default function SettingsPage() {
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
   const [cancelLoading, setCancelLoading] = useState(false);
   const [cancelError, setCancelError] = useState('');
+  const [portalLoading, setPortalLoading] = useState(false);
 
   const [formFields, setFormFields] = useState(null); // null = loading
   const [formFieldsSaving, setFormFieldsSaving] = useState(false);
@@ -841,6 +852,18 @@ export default function SettingsPage() {
       setCancelError(e.message);
     } finally {
       setCancelLoading(false);
+    }
+  }
+
+  async function handleUpdateCard() {
+    setPortalLoading(true);
+    setBillingError('');
+    try {
+      const { portal_url } = await openBillingPortal();
+      window.location.href = portal_url;
+    } catch (e) {
+      setBillingError(e.message);
+      setPortalLoading(false);
     }
   }
 
@@ -1600,11 +1623,12 @@ export default function SettingsPage() {
         </section>
 
         <section style={{ ...s.card, gridColumn: '1 / -1' }}>
-          <h2 style={s.sectionTitle}>Billing</h2>
-          <p style={s.sectionDesc}>
-            {formatCents(billingDetails?.base_tier_cents ?? 6000)}/mo AUD covers up to {billingDetails?.base_tier_seats ?? 6} artists,
-            then {formatCents(billingDetails?.per_extra_seat_cents ?? 1500)}/artist beyond that.
-          </p>
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
+            <h2 style={s.sectionTitle}>Billing</h2>
+            <span style={s.billingPlanBadge}>
+              {formatCents(billingDetails?.base_tier_cents ?? 6000)}/mo · up to {billingDetails?.base_tier_seats ?? 6} artists · +{formatCents(billingDetails?.per_extra_seat_cents ?? 1500)}/artist after
+            </span>
+          </div>
 
           {billingNotice && <p style={{ fontSize: '0.82rem', color: 'var(--accent)', margin: 0 }}>{billingNotice}</p>}
 
@@ -1650,41 +1674,50 @@ export default function SettingsPage() {
           </div>
           {billingError && <p style={s.errorText}>{billingError}</p>}
 
-          <div style={s.billingStatsGrid}>
-            <div style={s.billingStat}>
-              <span style={s.billingStatLabel}>Seats</span>
-              <span style={s.billingStatValue}>{billingDetails?.seat_count ?? 0}</span>
-              <span style={s.billingStatSub}>approved artist{(billingDetails?.seat_count ?? 0) === 1 ? '' : 's'}</span>
-            </div>
-            <div style={s.billingStat}>
-              <span style={s.billingStatLabel}>Est. monthly</span>
-              <span style={s.billingStatValue}>{formatCents(billingDetails?.estimated_monthly_cents ?? 6000)}</span>
-              <span style={s.billingStatSub}>AUD</span>
-            </div>
-            {billingDetails?.current_period_end && isCanceling && (
+          <div style={s.billingBodyRow}>
+            <div style={s.billingStatsGrid}>
               <div style={s.billingStat}>
-                <span style={s.billingStatLabel}>Access ends</span>
-                <span style={s.billingStatValue}>{periodEndLabel}</span>
-                <span style={s.billingStatSub}>no further charges</span>
+                <span style={s.billingStatLabel}>Seats</span>
+                <span style={s.billingStatValue}>{billingDetails?.seat_count ?? 0}</span>
+                <span style={s.billingStatSub}>approved artist{(billingDetails?.seat_count ?? 0) === 1 ? '' : 's'}</span>
               </div>
-            )}
-            {billingDetails?.current_period_end && !isCanceling && (
               <div style={s.billingStat}>
-                <span style={s.billingStatLabel}>Next payment</span>
-                <span style={s.billingStatValue}>{formatCents(billingDetails.next_amount_due_cents ?? 0)}</span>
-                <span style={s.billingStatSub}>{periodEndLabel}</span>
+                <span style={s.billingStatLabel}>Est. monthly</span>
+                <span style={s.billingStatValue}>{formatCents(billingDetails?.estimated_monthly_cents ?? 6000)}</span>
+                <span style={s.billingStatSub}>AUD</span>
               </div>
-            )}
+              {billingDetails?.current_period_end && isCanceling && (
+                <div style={s.billingStat}>
+                  <span style={s.billingStatLabel}>Access ends</span>
+                  <span style={s.billingStatValue}>{periodEndLabel}</span>
+                  <span style={s.billingStatSub}>no further charges</span>
+                </div>
+              )}
+              {billingDetails?.current_period_end && !isCanceling && (
+                <div style={s.billingStat}>
+                  <span style={s.billingStatLabel}>Next payment</span>
+                  <span style={s.billingStatValue}>{formatCents(billingDetails.next_amount_due_cents ?? 0)}</span>
+                  <span style={s.billingStatSub}>{periodEndLabel}</span>
+                </div>
+              )}
+            </div>
+
             {billingDetails?.card_last4 && (
-              <div style={s.billingStat}>
-                <span style={s.billingStatLabel}>Card on file</span>
-                <span style={s.billingStatValue}>•••• {billingDetails.card_last4}</span>
-                <span style={s.billingStatSub}>{cardBrandLabel(billingDetails.card_brand)}</span>
+              <div style={s.paymentMethodCard}>
+                <div style={{ ...s.cardChip, background: cardBrandColor(billingDetails.card_brand) }}>
+                  <span style={s.cardChipBrand}>{cardBrandLabel(billingDetails.card_brand)}</span>
+                  <span style={s.cardChipNumber}>•••• •••• •••• {billingDetails.card_last4}</span>
+                </div>
+                {billingDetails.stripe_managed && (
+                  <button onClick={handleUpdateCard} style={s.updateCardBtn} disabled={portalLoading}>
+                    {portalLoading ? 'Opening…' : 'Update card'}
+                  </button>
+                )}
               </div>
             )}
           </div>
 
-          {subscriptionStatus === 'active' && !isCanceling && (
+          {billingDetails?.stripe_managed && subscriptionStatus === 'active' && !isCanceling && (
             <button onClick={() => { setCancelError(''); setCancelModalOpen(true); }} style={s.cancelSubscriptionLink}>
               Cancel subscription
             </button>
@@ -1780,12 +1813,22 @@ const s = {
     const glow = status === 'active' ? 'rgba(76,201,138,0.5)' : status === 'canceling' ? 'rgba(232,176,79,0.4)' : status === 'past_due' ? 'rgba(232,176,79,0.4)' : status === 'canceled' ? 'rgba(232,111,111,0.4)' : 'transparent';
     return { width: 10, height: 10, borderRadius: '50%', flexShrink: 0, background: color, boxShadow: `0 0 6px ${glow}` };
   },
-  billingStatsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.75rem' },
+  billingStatsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.75rem', flex: 1, minWidth: 260 },
   billingStat: { display: 'flex', flexDirection: 'column', gap: 3, background: 'var(--bg-base)', border: '1px solid var(--border-faint)', borderRadius: 10, padding: '0.75rem 0.9rem' },
   billingStatLabel: { fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-ghost)', textTransform: 'uppercase', letterSpacing: '0.04em' },
   billingStatValue: { fontSize: '1.1rem', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.01em' },
   billingStatSub: { fontSize: '0.72rem', color: 'var(--text-secondary)' },
   cancelSubscriptionLink: { alignSelf: 'flex-start', background: 'none', border: 'none', padding: 0, fontSize: '0.78rem', color: 'var(--text-ghost)', textDecoration: 'underline', cursor: 'pointer', fontFamily: 'inherit' },
+  billingPlanBadge: { fontSize: '0.72rem', color: 'var(--text-secondary)', background: 'var(--bg-base)', border: '1px solid var(--border-faint)', borderRadius: 20, padding: '0.3rem 0.75rem', whiteSpace: 'nowrap' },
+  billingBodyRow: { display: 'flex', gap: '0.75rem', alignItems: 'stretch', flexWrap: 'wrap' },
+  paymentMethodCard: { display: 'flex', flexDirection: 'column', gap: '0.6rem', flex: '0 0 200px' },
+  cardChip: {
+    display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '0.9rem',
+    borderRadius: 10, padding: '0.85rem 0.9rem', minHeight: 78, boxShadow: '0 4px 14px rgba(0,0,0,0.25)',
+  },
+  cardChipBrand: { fontSize: '0.68rem', fontWeight: 700, color: 'rgba(255,255,255,0.85)', textTransform: 'uppercase', letterSpacing: '0.06em' },
+  cardChipNumber: { fontSize: '0.85rem', fontWeight: 600, color: '#fff', letterSpacing: '0.03em' },
+  updateCardBtn: { background: 'var(--bg-base)', border: '1px solid var(--border-faint)', borderRadius: 8, padding: '0.5rem 0.85rem', fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-dim)', cursor: 'pointer', fontFamily: 'inherit' },
   // Hours
   hoursGrid: { display: 'flex', flexDirection: 'column', gap: '6px' },
   hoursRow: { display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.5rem 0.75rem', background: 'var(--bg-base)', borderRadius: 8 },
