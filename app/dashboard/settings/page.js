@@ -832,9 +832,11 @@ export default function SettingsPage() {
     setCancelError('');
     try {
       await cancelBillingSubscription(reason);
-      setSubscriptionStatus('canceled');
+      // subscription_status stays "active" — Stripe keeps access live until the
+      // current period ends. Refetch to pick up cancel_at_period_end.
+      const fresh = await getBillingDetails();
+      setBillingDetails(fresh);
       setCancelModalOpen(false);
-      getBillingDetails().then(setBillingDetails).catch(() => {});
     } catch (e) {
       setCancelError(e.message);
     } finally {
@@ -878,6 +880,11 @@ export default function SettingsPage() {
       setTimeout(() => setCopied(false), 2000);
     });
   }
+
+  const isCanceling = billingDetails?.cancel_at_period_end === true;
+  const periodEndLabel = billingDetails?.current_period_end
+    ? new Date(billingDetails.current_period_end).toLocaleDateString()
+    : '';
 
   const embedSnippet = studioId
     ? `<div data-vanta-studio="${studioId}"></div>\n<script src="https://studio.vanta.tattoo/embed.js"><\/script>`
@@ -1602,31 +1609,35 @@ export default function SettingsPage() {
           {billingNotice && <p style={{ fontSize: '0.82rem', color: 'var(--accent)', margin: 0 }}>{billingNotice}</p>}
 
           <div style={s.stripeStatusRow}>
-            <div style={s.billingStatusDot(subscriptionStatus)} />
+            <div style={s.billingStatusDot(isCanceling ? 'canceling' : subscriptionStatus)} />
             <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               <span style={{ fontSize: '0.87rem', fontWeight: 600, color: 'var(--text)' }}>
-                {subscriptionStatus === 'active'
-                  ? 'Active'
-                  : trialEndsAt
-                    ? (new Date(trialEndsAt).getTime() > Date.now() ? 'Free trial' : 'Trial ended')
-                    : subscriptionStatus === 'past_due'
-                      ? 'Payment failed'
-                      : subscriptionStatus === 'canceled'
-                        ? 'Canceled'
-                        : 'No billing set up'}
+                {isCanceling
+                  ? 'Canceling'
+                  : subscriptionStatus === 'active'
+                    ? 'Active'
+                    : trialEndsAt
+                      ? (new Date(trialEndsAt).getTime() > Date.now() ? 'Free trial' : 'Trial ended')
+                      : subscriptionStatus === 'past_due'
+                        ? 'Payment failed'
+                        : subscriptionStatus === 'canceled'
+                          ? 'Canceled'
+                          : 'No billing set up'}
               </span>
               <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                {subscriptionStatus === 'active'
-                  ? 'Your subscription is active — thanks for being a Vanta studio.'
-                  : trialEndsAt
-                    ? (new Date(trialEndsAt).getTime() > Date.now()
-                        ? `Trial ends ${new Date(trialEndsAt).toLocaleDateString()}. Add billing any time to continue seamlessly.`
-                        : 'Your trial has ended — add billing to unlock your dashboard again.')
-                    : subscriptionStatus === 'past_due'
-                      ? 'Your last payment failed. Update your card to keep your dashboard active.'
-                      : subscriptionStatus === 'canceled'
-                        ? 'Your subscription was canceled. Add billing to reactivate.'
-                        : 'Add a card to activate billing for this studio.'}
+                {isCanceling
+                  ? `You'll keep full access until ${periodEndLabel}, then your dashboard will lock.`
+                  : subscriptionStatus === 'active'
+                    ? 'Your subscription is active — thanks for being a Vanta studio.'
+                    : trialEndsAt
+                      ? (new Date(trialEndsAt).getTime() > Date.now()
+                          ? `Trial ends ${new Date(trialEndsAt).toLocaleDateString()}. Add billing any time to continue seamlessly.`
+                          : 'Your trial has ended — add billing to unlock your dashboard again.')
+                      : subscriptionStatus === 'past_due'
+                        ? 'Your last payment failed. Update your card to keep your dashboard active.'
+                        : subscriptionStatus === 'canceled'
+                          ? 'Your subscription was canceled. Add billing to reactivate.'
+                          : 'Add a card to activate billing for this studio.'}
               </span>
             </div>
             {subscriptionStatus !== 'active' && (
@@ -1650,11 +1661,18 @@ export default function SettingsPage() {
               <span style={s.billingStatValue}>{formatCents(billingDetails?.estimated_monthly_cents ?? 6000)}</span>
               <span style={s.billingStatSub}>AUD</span>
             </div>
-            {billingDetails?.next_billing_date && (
+            {billingDetails?.current_period_end && isCanceling && (
+              <div style={s.billingStat}>
+                <span style={s.billingStatLabel}>Access ends</span>
+                <span style={s.billingStatValue}>{periodEndLabel}</span>
+                <span style={s.billingStatSub}>no further charges</span>
+              </div>
+            )}
+            {billingDetails?.current_period_end && !isCanceling && (
               <div style={s.billingStat}>
                 <span style={s.billingStatLabel}>Next payment</span>
                 <span style={s.billingStatValue}>{formatCents(billingDetails.next_amount_due_cents ?? 0)}</span>
-                <span style={s.billingStatSub}>{new Date(billingDetails.next_billing_date).toLocaleDateString()}</span>
+                <span style={s.billingStatSub}>{periodEndLabel}</span>
               </div>
             )}
             {billingDetails?.card_last4 && (
@@ -1666,7 +1684,7 @@ export default function SettingsPage() {
             )}
           </div>
 
-          {subscriptionStatus === 'active' && (
+          {subscriptionStatus === 'active' && !isCanceling && (
             <button onClick={() => { setCancelError(''); setCancelModalOpen(true); }} style={s.cancelSubscriptionLink}>
               Cancel subscription
             </button>
@@ -1758,8 +1776,8 @@ const s = {
   errorText: { fontSize: '0.8rem', color: '#ff6b6b', margin: 0 },
   saveBtn: { alignSelf: 'flex-start', background: 'var(--accent-tint)', border: '1px solid var(--accent-tint-border)', borderRadius: 8, padding: '0.55rem 1.25rem', fontSize: '0.85rem', fontWeight: 600, color: 'var(--accent)', cursor: 'pointer' },
   billingStatusDot: (status) => {
-    const color = status === 'active' ? '#4cc98a' : status === 'past_due' ? '#e8b04f' : status === 'canceled' ? '#e86f6f' : 'var(--text-ghost)';
-    const glow = status === 'active' ? 'rgba(76,201,138,0.5)' : status === 'past_due' ? 'rgba(232,176,79,0.4)' : status === 'canceled' ? 'rgba(232,111,111,0.4)' : 'transparent';
+    const color = status === 'active' ? '#4cc98a' : status === 'canceling' ? '#e8b04f' : status === 'past_due' ? '#e8b04f' : status === 'canceled' ? '#e86f6f' : 'var(--text-ghost)';
+    const glow = status === 'active' ? 'rgba(76,201,138,0.5)' : status === 'canceling' ? 'rgba(232,176,79,0.4)' : status === 'past_due' ? 'rgba(232,176,79,0.4)' : status === 'canceled' ? 'rgba(232,111,111,0.4)' : 'transparent';
     return { width: 10, height: 10, borderRadius: '50%', flexShrink: 0, background: color, boxShadow: `0 0 6px ${glow}` };
   },
   billingStatsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.75rem' },
@@ -1927,8 +1945,8 @@ function CancelSubscriptionModal({ onConfirm, onCancel, saving, error }) {
           Cancel subscription
         </h2>
         <p style={{ margin: '0 0 1.25rem', fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-          Your subscription will be canceled immediately and your dashboard will lock until billing is added again.
-          Please tell us why you're canceling — it helps us improve.
+          You'll keep full access through the end of your current billing period — no refund, but no early lockout either.
+          After that, your dashboard will lock until billing is added again. Please tell us why you're canceling — it helps us improve.
         </p>
         <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '0.4rem' }}>
           Reason for canceling
