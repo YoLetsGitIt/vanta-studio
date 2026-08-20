@@ -859,8 +859,15 @@ export default function SettingsPage() {
     setPortalLoading(true);
     setBillingError('');
     try {
-      const { portal_url } = await openBillingPortal();
-      window.location.href = portal_url;
+      const result = await openBillingPortal();
+      if (result.portal_url) {
+        window.location.href = result.portal_url;
+        return;
+      }
+      // Mock studio (e.g. demo account) — card was cycled locally, no redirect.
+      const fresh = await getBillingDetails();
+      setBillingDetails(fresh);
+      setPortalLoading(false);
     } catch (e) {
       setBillingError(e.message);
       setPortalLoading(false);
@@ -1708,16 +1715,14 @@ export default function SettingsPage() {
                   <span style={s.cardChipBrand}>{cardBrandLabel(billingDetails.card_brand)}</span>
                   <span style={s.cardChipNumber}>•••• •••• •••• {billingDetails.card_last4}</span>
                 </div>
-                {billingDetails.stripe_managed && (
-                  <button onClick={handleUpdateCard} style={s.updateCardBtn} disabled={portalLoading}>
-                    {portalLoading ? 'Opening…' : 'Update card'}
-                  </button>
-                )}
+                <button onClick={handleUpdateCard} style={s.updateCardBtn} disabled={portalLoading}>
+                  {portalLoading ? (billingDetails.stripe_managed ? 'Opening…' : 'Updating…') : 'Update card'}
+                </button>
               </div>
             )}
           </div>
 
-          {billingDetails?.stripe_managed && subscriptionStatus === 'active' && !isCanceling && (
+          {subscriptionStatus === 'active' && !isCanceling && (
             <button onClick={() => { setCancelError(''); setCancelModalOpen(true); }} style={s.cancelSubscriptionLink}>
               Cancel subscription
             </button>
