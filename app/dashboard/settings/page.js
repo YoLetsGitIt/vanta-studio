@@ -915,6 +915,10 @@ export default function SettingsPage() {
   const periodEndLabel = billingDetails?.current_period_end
     ? new Date(billingDetails.current_period_end).toLocaleDateString()
     : '';
+  const hasBillingPeriod = !!billingDetails?.current_period_end;
+  const billingHeroLabel = isCanceling ? 'Access ends' : hasBillingPeriod ? 'Next payment' : 'Estimated monthly';
+  const billingHeroCents = hasBillingPeriod ? (billingDetails?.next_amount_due_cents ?? 0) : (billingDetails?.estimated_monthly_cents ?? 6000);
+  const billingSeatCount = billingDetails?.seat_count ?? 0;
 
   const embedSnippet = studioId
     ? `<div data-vanta-studio="${studioId}"></div>\n<script src="https://studio.vanta.tattoo/embed.js"><\/script>`
@@ -1680,52 +1684,33 @@ export default function SettingsPage() {
           </div>
           {billingError && <p style={s.errorText}>{billingError}</p>}
 
-          <div style={s.billingBodyRow}>
-            <div style={s.billingStatsGrid}>
-              <div style={s.billingStat}>
-                <span style={s.billingStatLabel}>Seats</span>
-                <span style={s.billingStatValue}>{billingDetails?.seat_count ?? 0}</span>
-                <span style={s.billingStatSub}>approved artist{(billingDetails?.seat_count ?? 0) === 1 ? '' : 's'}</span>
-              </div>
-              <div style={s.billingStat}>
-                <span style={s.billingStatLabel}>Est. monthly</span>
-                <span style={s.billingStatValue}>{formatCents(billingDetails?.estimated_monthly_cents ?? 6000)}</span>
-                <span style={s.billingStatSub}>AUD</span>
-              </div>
-              {billingDetails?.current_period_end && isCanceling && (
-                <div style={s.billingStat}>
-                  <span style={s.billingStatLabel}>Access ends</span>
-                  <span style={s.billingStatValue}>{periodEndLabel}</span>
-                  <span style={s.billingStatSub}>no further charges</span>
-                </div>
-              )}
-              {billingDetails?.current_period_end && !isCanceling && (
-                <div style={s.billingStat}>
-                  <span style={s.billingStatLabel}>Next payment</span>
-                  <span style={s.billingStatValue}>{formatCents(billingDetails.next_amount_due_cents ?? 0)}</span>
-                  <span style={s.billingStatSub}>{periodEndLabel}</span>
-                </div>
-              )}
+          <div style={s.billingHero}>
+            <span style={s.billingHeroLabel}>{billingHeroLabel}</span>
+            <div style={s.billingHeroValueRow}>
+              <span style={s.billingHeroValue}>{isCanceling ? periodEndLabel : formatCents(billingHeroCents)}</span>
+              {!isCanceling && hasBillingPeriod && <span style={s.billingHeroDate}>on {periodEndLabel}</span>}
             </div>
-
-            {billingDetails?.card_last4 && (
-              <div style={{ ...s.cardChip, background: cardBrandColor(billingDetails.card_brand) }}>
-                <span style={s.cardChipBrand}>{cardBrandLabel(billingDetails.card_brand)}</span>
-                <span style={s.cardChipNumber}>•••• •••• •••• {billingDetails.card_last4}</span>
-              </div>
-            )}
+            <span style={s.billingHeroSub}>
+              {isCanceling ? 'No further charges' : `For ${billingSeatCount} approved artist${billingSeatCount === 1 ? '' : 's'}`}
+            </span>
           </div>
 
           {billingDetails?.card_last4 && (
-            <div style={s.billingActionsRow}>
-              <button onClick={handleUpdateCard} style={s.updateCardBtn} disabled={portalLoading}>
-                {portalLoading ? (billingDetails.stripe_managed ? 'Opening…' : 'Updating…') : 'Update card'}
-              </button>
-              {subscriptionStatus === 'active' && !isCanceling && (
-                <button onClick={() => { setCancelError(''); setCancelModalOpen(true); }} style={s.cancelSubscriptionLink}>
-                  Cancel subscription
+            <div style={s.paymentMethodRow}>
+              <div style={{ ...s.cardBadge, background: cardBrandColor(billingDetails.card_brand) }}>
+                {cardBrandLabel(billingDetails.card_brand)}
+              </div>
+              <span style={s.paymentMethodNumber}>•••• {billingDetails.card_last4}</span>
+              <div style={s.billingActionsRow}>
+                <button onClick={handleUpdateCard} style={s.updateCardBtn} disabled={portalLoading}>
+                  {portalLoading ? (billingDetails.stripe_managed ? 'Opening…' : 'Updating…') : 'Update card'}
                 </button>
-              )}
+                {subscriptionStatus === 'active' && !isCanceling && (
+                  <button onClick={() => { setCancelError(''); setCancelModalOpen(true); }} style={s.cancelSubscriptionLink}>
+                    Cancel subscription
+                  </button>
+                )}
+              </div>
             </div>
           )}
         </section>
@@ -1819,22 +1804,22 @@ const s = {
     const glow = status === 'active' ? 'rgba(76,201,138,0.5)' : status === 'canceling' ? 'rgba(232,176,79,0.4)' : status === 'past_due' ? 'rgba(232,176,79,0.4)' : status === 'canceled' ? 'rgba(232,111,111,0.4)' : 'transparent';
     return { width: 10, height: 10, borderRadius: '50%', flexShrink: 0, background: color, boxShadow: `0 0 6px ${glow}` };
   },
-  billingStatsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.75rem', flex: 1, minWidth: 260 },
-  billingStat: { display: 'flex', flexDirection: 'column', gap: 3, background: 'var(--bg-base)', border: '1px solid var(--border-faint)', borderRadius: 10, padding: '0.75rem 0.9rem' },
-  billingStatLabel: { fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-ghost)', textTransform: 'uppercase', letterSpacing: '0.04em' },
-  billingStatValue: { fontSize: '1.1rem', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.01em' },
-  billingStatSub: { fontSize: '0.72rem', color: 'var(--text-secondary)' },
   cancelSubscriptionLink: { background: 'none', border: 'none', padding: 0, fontSize: '0.78rem', color: 'var(--text-ghost)', textDecoration: 'underline', cursor: 'pointer', fontFamily: 'inherit' },
-  billingBodyRow: { display: 'flex', gap: '0.75rem', alignItems: 'stretch', flexWrap: 'wrap' },
-  cardChip: {
-    display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '0.9rem',
-    flex: '0 0 200px', borderRadius: 10, padding: '0.85rem 0.9rem', minHeight: 78,
-    boxShadow: '0 4px 14px rgba(0,0,0,0.25)',
-  },
-  cardChipBrand: { fontSize: '0.68rem', fontWeight: 700, color: 'rgba(255,255,255,0.85)', textTransform: 'uppercase', letterSpacing: '0.06em' },
-  cardChipNumber: { fontSize: '0.85rem', fontWeight: 600, color: '#fff', letterSpacing: '0.03em' },
-  billingActionsRow: { display: 'flex', alignItems: 'center', gap: '1.1rem', paddingTop: '0.9rem', borderTop: '1px solid var(--border-faint)' },
-  updateCardBtn: { background: 'var(--bg-base)', border: '1px solid var(--border-faint)', borderRadius: 8, padding: '0.5rem 0.85rem', fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-dim)', cursor: 'pointer', fontFamily: 'inherit' },
+  // Billing — the primary "what/when" number gets a hero treatment; seats are
+  // supporting context underneath it rather than a competing tile.
+  billingHero: { display: 'flex', flexDirection: 'column', gap: 3, background: 'var(--bg-base)', border: '1px solid var(--border-faint)', borderRadius: 10, padding: '0.9rem 1rem' },
+  billingHeroLabel: { fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-ghost)', textTransform: 'uppercase', letterSpacing: '0.04em' },
+  billingHeroValueRow: { display: 'flex', alignItems: 'baseline', gap: '0.5rem', flexWrap: 'wrap' },
+  billingHeroValue: { fontSize: '1.5rem', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em' },
+  billingHeroDate: { fontSize: '0.8rem', color: 'var(--text-secondary)' },
+  billingHeroSub: { fontSize: '0.78rem', color: 'var(--text-secondary)' },
+  // Payment method — a compact settings-style row, not another stat tile, since it's a
+  // different kind of information (identity, not a number) and a lower priority.
+  paymentMethodRow: { display: 'flex', alignItems: 'center', gap: '0.7rem', background: 'var(--bg-base)', border: '1px solid var(--border-faint)', borderRadius: 10, padding: '0.7rem 0.9rem', flexWrap: 'wrap' },
+  cardBadge: { fontSize: '0.62rem', fontWeight: 700, color: '#fff', textTransform: 'uppercase', letterSpacing: '0.04em', borderRadius: 5, padding: '0.3rem 0.45rem' },
+  paymentMethodNumber: { fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-dim)', letterSpacing: '0.02em' },
+  billingActionsRow: { display: 'flex', alignItems: 'center', gap: '1.1rem', marginLeft: 'auto' },
+  updateCardBtn: { background: 'var(--bg-card)', border: '1px solid var(--border-faint)', borderRadius: 8, padding: '0.4rem 0.75rem', fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-dim)', cursor: 'pointer', fontFamily: 'inherit' },
   // Hours
   hoursGrid: { display: 'flex', flexDirection: 'column', gap: '6px' },
   hoursRow: { display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.5rem 0.75rem', background: 'var(--bg-base)', borderRadius: 8 },
