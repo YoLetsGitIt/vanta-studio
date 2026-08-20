@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { getSupabase } from '@/lib/supabase';
-import { getMyStudioAccount, demoLogin } from '@/lib/api';
+import { getMyStudioAccount } from '@/lib/api';
 import { isDemoMode, setDemoMode } from '@/lib/mode';
 import SignUpFlow from '@/components/SignUpFlow';
 
@@ -27,24 +27,6 @@ export default function HomePage() {
         else setChecking(false);
       });
   }, [router]);
-
-  async function handleEnterDemo() {
-    setLoading(true);
-    setError('');
-    try {
-      const session = await demoLogin();
-      await getSupabase().auth.setSession({
-        access_token: session.access_token,
-        refresh_token: session.refresh_token,
-      });
-      setDemoMode(true);
-      setDemoModeState(true);
-      router.replace('/dashboard');
-    } catch {
-      setError('Demo unavailable. Please try again later.');
-      setLoading(false);
-    }
-  }
 
   function handleExitDemo() {
     setDemoMode(false);
@@ -150,11 +132,6 @@ export default function HomePage() {
             <button type="submit" disabled={loading} style={{ ...s.btn, opacity: loading ? 0.6 : 1 }}>
               {loading ? 'Signing in…' : 'Sign in'}
             </button>
-            {!demoMode && (
-              <button type="button" onClick={handleEnterDemo} style={s.demoBtn}>
-                Enter demo
-              </button>
-            )}
           </form>
         ) : (
           <SignUpFlow onSwitchToSignIn={() => setTab('signin')} />
@@ -278,18 +255,6 @@ const s = {
     padding: '0.75rem',
     fontSize: '0.9rem',
     fontWeight: 600,
-    cursor: 'pointer',
-    width: '100%',
-  },
-  demoBtn: {
-    marginTop: '0.5rem',
-    background: 'transparent',
-    border: '1px solid rgba(255,200,60,0.25)',
-    borderRadius: 8,
-    padding: '0.6rem',
-    fontSize: '0.83rem',
-    fontWeight: 500,
-    color: 'rgba(255,200,60,0.7)',
     cursor: 'pointer',
     width: '100%',
   },

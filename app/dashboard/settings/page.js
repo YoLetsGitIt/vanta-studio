@@ -11,6 +11,7 @@ import {
   listConsentTemplates, createConsentTemplate, updateConsentTemplate, deleteConsentTemplate,
   getStripeStatus, startStripeOnboarding, disconnectStripe,
   getFormConfig, updateFormConfig,
+  startBillingCheckout,
 } from '@/lib/api';
 import { getSupabase } from '@/lib/supabase';
 import { invalidate } from '@/lib/cache';
@@ -496,6 +497,12 @@ export default function SettingsPage() {
   const [stripeConnecting, setStripeConnecting] = useState(false);
   const [stripeError, setStripeError] = useState('');
 
+  const [subscriptionStatus, setSubscriptionStatus] = useState('');
+  const [trialEndsAt, setTrialEndsAt] = useState(null);
+  const [billingLoading, setBillingLoading] = useState(false);
+  const [billingError, setBillingError] = useState('');
+  const [billingNotice, setBillingNotice] = useState('');
+
   const [formFields, setFormFields] = useState(null); // null = loading
   const [formFieldsSaving, setFormFieldsSaving] = useState(false);
 
@@ -545,6 +552,18 @@ export default function SettingsPage() {
         setWidgetConsentTemplateId(account.studio?.widget_consent_template_id ?? '');
         setStripeStatus(stripeData ?? { connected: false, charges_enabled: false });
         setFormFields(formConfigData?.fields ?? {});
+        setSubscriptionStatus(account.studio?.subscription_status ?? '');
+        setTrialEndsAt(account.studio?.trial_ends_at ?? null);
+
+        // Handle return from the self-serve billing checkout.
+        const billingParam = new URLSearchParams(window.location.search).get('billing');
+        if (billingParam === 'success' || billingParam === 'canceled') {
+          const params2 = new URLSearchParams(window.location.search);
+          params2.delete('billing');
+          const newSearch2 = params2.toString();
+          window.history.replaceState({}, '', window.location.pathname + (newSearch2 ? '?' + newSearch2 : ''));
+          setBillingNotice(billingParam === 'success' ? 'Billing added — thank you!' : 'Billing setup was canceled.');
+        }
 
         // Handle return from Stripe onboarding.
         const params = new URLSearchParams(window.location.search);
@@ -774,6 +793,18 @@ export default function SettingsPage() {
       alert(e.message);
     } finally {
       setFormFieldsSaving(false);
+    }
+  }
+
+  async function handleAddBilling() {
+    setBillingLoading(true);
+    setBillingError('');
+    try {
+      const { checkout_url } = await startBillingCheckout();
+      window.location.href = checkout_url;
+    } catch (e) {
+      setBillingError(e.message);
+      setBillingLoading(false);
     }
   }
 
@@ -1525,6 +1556,26 @@ export default function SettingsPage() {
             <input style={{ ...s.input, ...s.inputReadonly }} value={email} readOnly />
           </div>
           <button onClick={handleSignOut} style={s.signOutBtn}>{t('sign_out')}</button>
+        </section>
+
+        <section style={s.card}>
+          <h2 style={s.sectionTitle}>Billing</h2>
+          {billingNotice && <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: 0 }}>{billingNotice}</p>}
+          <p style={{ fontSize: '0.85rem', color: 'var(--text-dim)', margin: 0 }}>
+            {subscriptionStatus === 'active'
+              ? 'Your subscription is active.'
+              : trialEndsAt
+                ? (new Date(trialEndsAt).getTime() > Date.now()
+                    ? `Free trial — ends ${new Date(trialEndsAt).toLocaleDateString()}.`
+                    : 'Your free trial has ended.')
+                : 'No billing set up yet.'}
+          </p>
+          {billingError && <p style={s.errorText}>{billingError}</p>}
+          {subscriptionStatus !== 'active' && (
+            <button onClick={handleAddBilling} style={s.saveBtn} disabled={billingLoading}>
+              {billingLoading ? 'Starting checkout…' : 'Add billing'}
+            </button>
+          )}
         </section>
 
         <section style={s.card}>

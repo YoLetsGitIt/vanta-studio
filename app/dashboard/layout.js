@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { getSupabase } from '@/lib/supabase';
-import { getArtistProfile, getMyStudioAccount } from '@/lib/api';
+import { getArtistProfile, getMyStudioAccount, startBillingCheckout } from '@/lib/api';
 import { isDemoMode, setDemoMode } from '@/lib/mode';
 import { initTheme } from '@/lib/theme';
 import { useLanguage, LanguageProvider } from '@/lib/i18n';
@@ -22,6 +22,18 @@ const NAV = [
 
 const ADMIN_EMAIL = process.env.NEXT_PUBLIC_ADMIN_EMAIL ?? '';
 
+// Mirrors the backend's trialExpired() (internal/handlers/studio.go) exactly —
+// a studio never on a trial (trial_ends_at null) is never gated, and an active
+// subscription always wins regardless of trial_ends_at.
+function trialStatus(studio) {
+  if (!studio?.trial_ends_at || studio.subscription_status === 'active') {
+    return { expired: false, daysLeft: null };
+  }
+  const msLeft = new Date(studio.trial_ends_at).getTime() - Date.now();
+  const daysLeft = Math.ceil(msLeft / (24 * 60 * 60 * 1000));
+  return { expired: msLeft <= 0, daysLeft };
+}
+
 export default function DashboardLayout({ children }) {
   return (
     <LanguageProvider>
@@ -37,6 +49,7 @@ function DashboardShell({ children }) {
   const [user, setUser] = useState(null);
   const [artist, setArtist] = useState(null);
   const [studioName, setStudioName] = useState('');
+  const [trial, setTrial] = useState({ expired: false, daysLeft: null });
   const [ready, setReady] = useState(false);
   const [demo, setDemo] = useState(false);
   const [appointmentPanelOpen, setAppointmentPanelOpen] = useState(false);
@@ -55,6 +68,7 @@ function DashboardShell({ children }) {
         if (studioAccount.status === 'pending') { router.replace('/pending'); return; }
         if (studioAccount.status === 'rejected') { router.replace('/pending'); return; }
         setStudioName(studioAccount.studio?.name ?? '');
+        setTrial(trialStatus(studioAccount.studio));
       } catch {
         await getSupabase().auth.signOut();
         router.replace('/');
@@ -86,13 +100,29 @@ function DashboardShell({ children }) {
     );
   }
 
+  if (trial.expired) {
+    return <TrialExpiredBlock studioName={studioName} onSignOut={handleSignOut} />;
+  }
+
   const displayName = studioName || 'Studio';
+  const trialWarning = trial.daysLeft !== null && trial.daysLeft <= 3;
 
   return (
     <div style={s.shell}>
       {demo && (
         <div style={s.demoBanner}>
           <span style={s.demoBannerText}>DEMO — data is isolated from production</span>
+        </div>
+      )}
+
+      {trialWarning && (
+        <div style={s.trialBanner}>
+          <span style={s.trialBannerText}>
+            {trial.daysLeft <= 0
+              ? 'Your free trial ends today'
+              : `Your free trial ends in ${trial.daysLeft} day${trial.daysLeft === 1 ? '' : 's'}`}
+          </span>
+          <Link href="/dashboard/settings" style={s.trialBannerLink}>Add billing</Link>
         </div>
       )}
 
@@ -159,6 +189,44 @@ function DashboardShell({ children }) {
         onClose={() => setAppointmentPanelOpen(false)}
         onCreated={() => {}}
       />
+    </div>
+  );
+}
+
+function TrialExpiredBlock({ studioName, onSignOut }) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  async function handleAddBilling() {
+    setLoading(true);
+    setError('');
+    try {
+      const { checkout_url } = await startBillingCheckout();
+      window.location.href = checkout_url;
+    } catch (e) {
+      setError(e.message);
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div style={s.blockPage}>
+      <div style={s.blockCard}>
+        <div style={s.brand}>
+          <span style={s.logoMark}>vanta</span>
+          <span style={s.logoSub}>studio</span>
+        </div>
+        <h1 style={s.blockHeading}>Your free trial has ended</h1>
+        <p style={s.blockBody}>
+          {(studioName || 'Your studio')}'s 14-day trial is over. Add billing to keep using your dashboard —
+          nothing else has changed, your data is exactly as you left it.
+        </p>
+        {error && <p style={s.blockError}>{error}</p>}
+        <button onClick={handleAddBilling} disabled={loading} style={{ ...s.blockBtn, opacity: loading ? 0.6 : 1 }}>
+          {loading ? 'Starting checkout…' : 'Add billing'}
+        </button>
+        <button onClick={onSignOut} style={s.blockSignOutBtn}>Sign out</button>
+      </div>
     </div>
   );
 }
@@ -309,6 +377,79 @@ const s = {
     fontWeight: 600,
     color: '#ffc83c',
     letterSpacing: '0.04em',
+  },
+  trialBanner: {
+    flexShrink: 0,
+    height: 36,
+    background: 'rgba(232,111,111,0.1)',
+    borderBottom: '1px solid rgba(232,111,111,0.25)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '0.75rem',
+  },
+  trialBannerText: {
+    fontSize: '0.78rem',
+    fontWeight: 600,
+    color: '#e86f6f',
+  },
+  trialBannerLink: {
+    fontSize: '0.78rem',
+    fontWeight: 700,
+    color: '#e86f6f',
+    textDecoration: 'underline',
+  },
+  blockPage: {
+    minHeight: '100vh',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    background: 'var(--bg-base)',
+    padding: '1.5rem',
+  },
+  blockCard: {
+    width: '100%',
+    maxWidth: 420,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '1rem',
+    textAlign: 'center',
+    alignItems: 'center',
+  },
+  blockHeading: {
+    fontSize: '1.3rem',
+    fontWeight: 700,
+    color: 'var(--text)',
+    margin: 0,
+  },
+  blockBody: {
+    fontSize: '0.9rem',
+    color: 'var(--text-muted)',
+    lineHeight: 1.6,
+    margin: 0,
+  },
+  blockError: {
+    fontSize: '0.8rem',
+    color: '#e86f6f',
+    margin: 0,
+  },
+  blockBtn: {
+    background: 'var(--accent)',
+    color: 'var(--bg-sidebar)',
+    border: 'none',
+    borderRadius: 8,
+    padding: '0.75rem 1.5rem',
+    fontSize: '0.9rem',
+    fontWeight: 700,
+    cursor: 'pointer',
+    width: '100%',
+  },
+  blockSignOutBtn: {
+    background: 'none',
+    border: 'none',
+    fontSize: '0.8rem',
+    color: 'var(--text-ghost)',
+    cursor: 'pointer',
   },
   body: {
     flex: 1,

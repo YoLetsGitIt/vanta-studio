@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { registerStudio, searchStudios } from '@/lib/api';
+import { getSupabase } from '@/lib/supabase';
 
 // ── Main flow ─────────────────────────────────────────────────────────────────
 
@@ -24,7 +25,7 @@ export default function SignUpFlow({ onSwitchToSignIn }) {
     setError('');
     setLoading(true);
     try {
-      await registerStudio({
+      const result = await registerStudio({
         email: account.email,
         password: account.password,
         studioId: selectedStudio.id ?? null,
@@ -33,6 +34,16 @@ export default function SignUpFlow({ onSwitchToSignIn }) {
         latitude: selectedStudio.latitude ?? null,
         longitude: selectedStudio.longitude ?? null,
       });
+      if (result.status === 'approved') {
+        // New studio — trial started, no review needed. Sign in and go straight in.
+        const { error: signInError } = await getSupabase().auth.signInWithPassword({
+          email: account.email,
+          password: account.password,
+        });
+        if (signInError) { router.replace('/'); return; }
+        router.replace('/dashboard');
+        return;
+      }
       router.replace('/pending');
     } catch (e) {
       setError(e.message);
