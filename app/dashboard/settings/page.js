@@ -11,7 +11,7 @@ import {
   listConsentTemplates, createConsentTemplate, updateConsentTemplate, deleteConsentTemplate,
   getStripeStatus, startStripeOnboarding, disconnectStripe,
   getFormConfig, updateFormConfig,
-  startBillingCheckout,
+  startBillingCheckout, getBillingDetails,
 } from '@/lib/api';
 import { getSupabase } from '@/lib/supabase';
 import { invalidate } from '@/lib/cache';
@@ -54,6 +54,19 @@ function hexToRgbaStr(hex, alpha) {
     : hex.slice(1);
   const r = parseInt(h.slice(0,2),16), g = parseInt(h.slice(2,4),16), b = parseInt(h.slice(4,6),16);
   return `rgba(${r},${g},${b},${alpha})`;
+}
+
+function formatCents(cents) {
+  const dollars = (cents ?? 0) / 100;
+  return dollars % 1 === 0 ? `$${dollars.toFixed(0)}` : `$${dollars.toFixed(2)}`;
+}
+
+function cardBrandLabel(brand) {
+  const labels = {
+    visa: 'Visa', mastercard: 'Mastercard', amex: 'Amex', discover: 'Discover',
+    diners: 'Diners Club', jcb: 'JCB', unionpay: 'UnionPay', cartes_bancaires: 'Cartes Bancaires',
+  };
+  return labels[brand] ?? (brand ? brand.charAt(0).toUpperCase() + brand.slice(1) : 'Card');
 }
 
 function AddressAutocomplete({ value, onChange, onSelect, inputStyle }) {
@@ -502,6 +515,7 @@ export default function SettingsPage() {
   const [billingLoading, setBillingLoading] = useState(false);
   const [billingError, setBillingError] = useState('');
   const [billingNotice, setBillingNotice] = useState('');
+  const [billingDetails, setBillingDetails] = useState(null); // full response from getBillingDetails()
 
   const [formFields, setFormFields] = useState(null); // null = loading
   const [formFieldsSaving, setFormFieldsSaving] = useState(false);
@@ -519,7 +533,7 @@ export default function SettingsPage() {
   useEffect(() => {
     async function load() {
       try {
-        const [account, { data: { session } }, hoursData, stationsData, templateData, stripeData, formConfigData] = await Promise.all([
+        const [account, { data: { session } }, hoursData, stationsData, templateData, stripeData, formConfigData, billingData] = await Promise.all([
           getMyStudioAccount(),
           getSupabase().auth.getSession(),
           getStudioHours().catch(() => ({ hours: [] })),
@@ -527,6 +541,7 @@ export default function SettingsPage() {
           listConsentTemplates().catch(() => ({ templates: [] })),
           getStripeStatus().catch(() => null),
           getFormConfig().catch(() => ({ fields: {} })),
+          getBillingDetails().catch(() => null),
         ]);
         setName(account.studio?.name ?? '');
         const addr = account.studio?.addressString ?? '';
@@ -554,6 +569,7 @@ export default function SettingsPage() {
         setFormFields(formConfigData?.fields ?? {});
         setSubscriptionStatus(account.studio?.subscription_status ?? '');
         setTrialEndsAt(account.studio?.trial_ends_at ?? null);
+        setBillingDetails(billingData);
 
         // Handle return from the self-serve billing checkout.
         const billingParam = new URLSearchParams(window.location.search).get('billing');
@@ -1561,15 +1577,62 @@ export default function SettingsPage() {
         <section style={s.card}>
           <h2 style={s.sectionTitle}>Billing</h2>
           {billingNotice && <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: 0 }}>{billingNotice}</p>}
-          <p style={{ fontSize: '0.85rem', color: 'var(--text-dim)', margin: 0 }}>
-            {subscriptionStatus === 'active'
-              ? 'Your subscription is active.'
-              : trialEndsAt
-                ? (new Date(trialEndsAt).getTime() > Date.now()
-                    ? `Free trial — ends ${new Date(trialEndsAt).toLocaleDateString()}.`
-                    : 'Your free trial has ended.')
-                : 'No billing set up yet.'}
-          </p>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <span style={s.billingStatusDot(subscriptionStatus)} />
+            <p style={{ fontSize: '0.85rem', color: 'var(--text-dim)', margin: 0, fontWeight: 600 }}>
+              {subscriptionStatus === 'active'
+                ? 'Active'
+                : trialEndsAt
+                  ? (new Date(trialEndsAt).getTime() > Date.now() ? 'Free trial' : 'Trial ended')
+                  : subscriptionStatus === 'past_due'
+                    ? 'Payment failed'
+                    : subscriptionStatus === 'canceled'
+                      ? 'Canceled'
+                      : 'No billing set up'}
+            </p>
+          </div>
+
+          {trialEndsAt && subscriptionStatus !== 'active' && (
+            <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: 0 }}>
+              {new Date(trialEndsAt).getTime() > Date.now()
+                ? `Trial ends ${new Date(trialEndsAt).toLocaleDateString()}.`
+                : `Trial ended ${new Date(trialEndsAt).toLocaleDateString()}.`}
+            </p>
+          )}
+
+          <div style={s.billingPlanBox}>
+            <div style={s.billingPlanRow}>
+              <span style={s.billingPlanLabel}>Plan</span>
+              <span style={s.billingPlanValue}>
+                {formatCents(billingDetails?.base_tier_cents ?? 6000)}/mo AUD for up to {billingDetails?.base_tier_seats ?? 6} artists,
+                then {formatCents(billingDetails?.per_extra_seat_cents ?? 1500)}/artist
+              </span>
+            </div>
+            <div style={s.billingPlanRow}>
+              <span style={s.billingPlanLabel}>Current seats</span>
+              <span style={s.billingPlanValue}>{billingDetails?.seat_count ?? 0} approved artist{(billingDetails?.seat_count ?? 0) === 1 ? '' : 's'}</span>
+            </div>
+            <div style={s.billingPlanRow}>
+              <span style={s.billingPlanLabel}>Estimated cost</span>
+              <span style={s.billingPlanValue}>{formatCents(billingDetails?.estimated_monthly_cents ?? 6000)}/mo AUD</span>
+            </div>
+            {billingDetails?.next_billing_date && (
+              <div style={s.billingPlanRow}>
+                <span style={s.billingPlanLabel}>Next payment</span>
+                <span style={s.billingPlanValue}>
+                  {formatCents(billingDetails.next_amount_due_cents ?? 0)} on {new Date(billingDetails.next_billing_date).toLocaleDateString()}
+                </span>
+              </div>
+            )}
+            {billingDetails?.card_last4 && (
+              <div style={s.billingPlanRow}>
+                <span style={s.billingPlanLabel}>Card on file</span>
+                <span style={s.billingPlanValue}>{cardBrandLabel(billingDetails.card_brand)} •••• {billingDetails.card_last4}</span>
+              </div>
+            )}
+          </div>
+
           {billingError && <p style={s.errorText}>{billingError}</p>}
           {subscriptionStatus !== 'active' && (
             <button onClick={handleAddBilling} style={s.saveBtn} disabled={billingLoading}>
@@ -1653,6 +1716,14 @@ const s = {
   inputReadonly: { color: 'var(--text-faint)', cursor: 'default' },
   errorText: { fontSize: '0.8rem', color: '#ff6b6b', margin: 0 },
   saveBtn: { alignSelf: 'flex-start', background: 'var(--accent-tint)', border: '1px solid var(--accent-tint-border)', borderRadius: 8, padding: '0.55rem 1.25rem', fontSize: '0.85rem', fontWeight: 600, color: 'var(--accent)', cursor: 'pointer' },
+  billingStatusDot: (status) => ({
+    width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
+    background: status === 'active' ? '#4cc98a' : status === 'past_due' ? '#e8b04f' : status === 'canceled' ? '#e86f6f' : 'var(--text-ghost)',
+  }),
+  billingPlanBox: { display: 'flex', flexDirection: 'column', gap: '0.45rem', background: 'var(--bg-base)', border: '1px solid var(--border-faint)', borderRadius: 8, padding: '0.75rem 0.9rem' },
+  billingPlanRow: { display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '1rem' },
+  billingPlanLabel: { fontSize: '0.75rem', color: 'var(--text-secondary)', flexShrink: 0 },
+  billingPlanValue: { fontSize: '0.8rem', color: 'var(--text-dim)', fontWeight: 500, textAlign: 'right' },
   // Hours
   hoursGrid: { display: 'flex', flexDirection: 'column', gap: '6px' },
   hoursRow: { display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.5rem 0.75rem', background: 'var(--bg-base)', borderRadius: 8 },
