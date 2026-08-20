@@ -11,7 +11,7 @@ import {
   listConsentTemplates, createConsentTemplate, updateConsentTemplate, deleteConsentTemplate,
   getStripeStatus, startStripeOnboarding, disconnectStripe,
   getFormConfig, updateFormConfig,
-  startBillingCheckout, getBillingDetails,
+  startBillingCheckout, getBillingDetails, cancelBillingSubscription,
 } from '@/lib/api';
 import { getSupabase } from '@/lib/supabase';
 import { invalidate } from '@/lib/cache';
@@ -516,6 +516,9 @@ export default function SettingsPage() {
   const [billingError, setBillingError] = useState('');
   const [billingNotice, setBillingNotice] = useState('');
   const [billingDetails, setBillingDetails] = useState(null); // full response from getBillingDetails()
+  const [cancelModalOpen, setCancelModalOpen] = useState(false);
+  const [cancelLoading, setCancelLoading] = useState(false);
+  const [cancelError, setCancelError] = useState('');
 
   const [formFields, setFormFields] = useState(null); // null = loading
   const [formFieldsSaving, setFormFieldsSaving] = useState(false);
@@ -821,6 +824,21 @@ export default function SettingsPage() {
     } catch (e) {
       setBillingError(e.message);
       setBillingLoading(false);
+    }
+  }
+
+  async function handleCancelSubscription(reason) {
+    setCancelLoading(true);
+    setCancelError('');
+    try {
+      await cancelBillingSubscription(reason);
+      setSubscriptionStatus('canceled');
+      setCancelModalOpen(false);
+      getBillingDetails().then(setBillingDetails).catch(() => {});
+    } catch (e) {
+      setCancelError(e.message);
+    } finally {
+      setCancelLoading(false);
     }
   }
 
@@ -1647,7 +1665,22 @@ export default function SettingsPage() {
               </div>
             )}
           </div>
+
+          {subscriptionStatus === 'active' && (
+            <button onClick={() => { setCancelError(''); setCancelModalOpen(true); }} style={s.cancelSubscriptionLink}>
+              Cancel subscription
+            </button>
+          )}
         </section>
+
+        {cancelModalOpen && (
+          <CancelSubscriptionModal
+            saving={cancelLoading}
+            error={cancelError}
+            onConfirm={handleCancelSubscription}
+            onCancel={() => setCancelModalOpen(false)}
+          />
+        )}
 
         <section style={s.card}>
           <h2 style={s.sectionTitle}>{t('appearance')}</h2>
@@ -1710,7 +1743,7 @@ const s = {
   tabBar: { display: 'flex', gap: '0.35rem' },
   tabBtn: { padding: '0.35rem 0.9rem', borderRadius: 20, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-muted)', fontSize: '0.82rem', fontWeight: 500, cursor: 'pointer' },
   tabBtnActive: { background: 'var(--accent-tint)', border: '1px solid var(--accent-tint-border)', color: 'var(--accent)' },
-  grid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', alignItems: 'start' },
+  grid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gridAutoFlow: 'dense', gap: '1.25rem', alignItems: 'start' },
   groupLabel: { gridColumn: '1 / -1', margin: '0 0 -0.25rem', fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-ghost)', letterSpacing: '0.08em', textTransform: 'uppercase' },
   card: { display: 'flex', flexDirection: 'column', gap: '1rem', background: 'var(--bg-card)', border: '1px solid var(--border-faint)', borderRadius: 12, padding: '1.25rem' },
   loadingDot: { width: 8, height: 8, borderRadius: '50%', background: 'var(--border)', margin: '4rem auto' },
@@ -1734,6 +1767,7 @@ const s = {
   billingStatLabel: { fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-ghost)', textTransform: 'uppercase', letterSpacing: '0.04em' },
   billingStatValue: { fontSize: '1.1rem', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.01em' },
   billingStatSub: { fontSize: '0.72rem', color: 'var(--text-secondary)' },
+  cancelSubscriptionLink: { alignSelf: 'flex-start', background: 'none', border: 'none', padding: 0, fontSize: '0.78rem', color: 'var(--text-ghost)', textDecoration: 'underline', cursor: 'pointer', fontFamily: 'inherit' },
   // Hours
   hoursGrid: { display: 'flex', flexDirection: 'column', gap: '6px' },
   hoursRow: { display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.5rem 0.75rem', background: 'var(--bg-base)', borderRadius: 8 },
@@ -1871,6 +1905,65 @@ function StationLastDayModal({ onConfirm, onCancel, saving, existingEndDate }) {
             }}
           >
             {saving ? 'Saving…' : isToday ? 'Deactivate now' : isChanging ? 'Update last day' : 'Set last day'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const CANCEL_REASON_MIN_LEN = 20;
+
+function CancelSubscriptionModal({ onConfirm, onCancel, saving, error }) {
+  const [reason, setReason] = useState('');
+  const remaining = CANCEL_REASON_MIN_LEN - reason.trim().length;
+  const canSubmit = reason.trim().length >= CANCEL_REASON_MIN_LEN;
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
+      onClick={e => e.target === e.currentTarget && !saving && onCancel()}>
+      <div style={{ background: 'var(--bg-modal)', border: '1px solid var(--border)', borderRadius: 16, padding: '1.5rem', width: '100%', maxWidth: 440 }}>
+        <h2 style={{ margin: '0 0 0.25rem', fontSize: '1.1rem', fontWeight: 700, color: 'var(--text)' }}>
+          Cancel subscription
+        </h2>
+        <p style={{ margin: '0 0 1.25rem', fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+          Your subscription will be canceled immediately and your dashboard will lock until billing is added again.
+          Please tell us why you're canceling — it helps us improve.
+        </p>
+        <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '0.4rem' }}>
+          Reason for canceling
+        </label>
+        <textarea
+          value={reason}
+          onChange={e => setReason(e.target.value)}
+          placeholder="Tell us what's not working, or why you're leaving…"
+          rows={4}
+          style={{
+            width: '100%', boxSizing: 'border-box', background: 'var(--bg-input)',
+            border: `1px solid ${reason.length > 0 && !canSubmit ? 'rgba(232,111,111,0.5)' : 'var(--border-strong)'}`,
+            borderRadius: 8, padding: '0.65rem 0.85rem', fontSize: '0.87rem', color: 'var(--text)',
+            outline: 'none', fontFamily: 'inherit', resize: 'vertical', minHeight: 90,
+          }}
+        />
+        <p style={{ margin: '0.4rem 0 1.1rem', fontSize: '0.75rem', color: canSubmit ? 'var(--text-ghost)' : '#e86f6f' }}>
+          {canSubmit ? `${reason.trim().length} characters` : `${remaining} more character${remaining === 1 ? '' : 's'} required`}
+        </p>
+        {error && <p style={{ margin: '0 0 1rem', fontSize: '0.8rem', color: '#e86f6f' }}>{error}</p>}
+        <div style={{ display: 'flex', gap: '0.75rem' }}>
+          <button onClick={onCancel} disabled={saving} style={{ flex: 1, padding: '0.7rem', borderRadius: 8, border: '1px solid var(--border-strong)', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '0.9rem', fontWeight: 600, fontFamily: 'inherit' }}>
+            Keep subscription
+          </button>
+          <button
+            onClick={() => onConfirm(reason.trim())}
+            disabled={saving || !canSubmit}
+            style={{
+              flex: 2, padding: '0.7rem', borderRadius: 8, border: 'none',
+              background: saving || !canSubmit ? 'var(--bg-chip)' : 'rgba(232,111,111,0.85)',
+              color: saving || !canSubmit ? 'var(--text-ghost)' : '#fff',
+              cursor: saving || !canSubmit ? 'default' : 'pointer', fontSize: '0.9rem', fontWeight: 700, fontFamily: 'inherit',
+            }}
+          >
+            {saving ? 'Canceling…' : 'Cancel subscription'}
           </button>
         </div>
       </div>
