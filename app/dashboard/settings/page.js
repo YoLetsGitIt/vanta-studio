@@ -1574,71 +1574,79 @@ export default function SettingsPage() {
           <button onClick={handleSignOut} style={s.signOutBtn}>{t('sign_out')}</button>
         </section>
 
-        <section style={s.card}>
+        <section style={{ ...s.card, gridColumn: '1 / -1' }}>
           <h2 style={s.sectionTitle}>Billing</h2>
-          {billingNotice && <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: 0 }}>{billingNotice}</p>}
+          <p style={s.sectionDesc}>
+            {formatCents(billingDetails?.base_tier_cents ?? 6000)}/mo AUD covers up to {billingDetails?.base_tier_seats ?? 6} artists,
+            then {formatCents(billingDetails?.per_extra_seat_cents ?? 1500)}/artist beyond that.
+          </p>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <span style={s.billingStatusDot(subscriptionStatus)} />
-            <p style={{ fontSize: '0.85rem', color: 'var(--text-dim)', margin: 0, fontWeight: 600 }}>
-              {subscriptionStatus === 'active'
-                ? 'Active'
-                : trialEndsAt
-                  ? (new Date(trialEndsAt).getTime() > Date.now() ? 'Free trial' : 'Trial ended')
-                  : subscriptionStatus === 'past_due'
-                    ? 'Payment failed'
-                    : subscriptionStatus === 'canceled'
-                      ? 'Canceled'
-                      : 'No billing set up'}
-            </p>
-          </div>
+          {billingNotice && <p style={{ fontSize: '0.82rem', color: 'var(--accent)', margin: 0 }}>{billingNotice}</p>}
 
-          {trialEndsAt && subscriptionStatus !== 'active' && (
-            <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: 0 }}>
-              {new Date(trialEndsAt).getTime() > Date.now()
-                ? `Trial ends ${new Date(trialEndsAt).toLocaleDateString()}.`
-                : `Trial ended ${new Date(trialEndsAt).toLocaleDateString()}.`}
-            </p>
-          )}
-
-          <div style={s.billingPlanBox}>
-            <div style={s.billingPlanRow}>
-              <span style={s.billingPlanLabel}>Plan</span>
-              <span style={s.billingPlanValue}>
-                {formatCents(billingDetails?.base_tier_cents ?? 6000)}/mo AUD for up to {billingDetails?.base_tier_seats ?? 6} artists,
-                then {formatCents(billingDetails?.per_extra_seat_cents ?? 1500)}/artist
+          <div style={s.stripeStatusRow}>
+            <div style={s.billingStatusDot(subscriptionStatus)} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <span style={{ fontSize: '0.87rem', fontWeight: 600, color: 'var(--text)' }}>
+                {subscriptionStatus === 'active'
+                  ? 'Active'
+                  : trialEndsAt
+                    ? (new Date(trialEndsAt).getTime() > Date.now() ? 'Free trial' : 'Trial ended')
+                    : subscriptionStatus === 'past_due'
+                      ? 'Payment failed'
+                      : subscriptionStatus === 'canceled'
+                        ? 'Canceled'
+                        : 'No billing set up'}
+              </span>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                {subscriptionStatus === 'active'
+                  ? 'Your subscription is active — thanks for being a Vanta studio.'
+                  : trialEndsAt
+                    ? (new Date(trialEndsAt).getTime() > Date.now()
+                        ? `Trial ends ${new Date(trialEndsAt).toLocaleDateString()}. Add billing any time to continue seamlessly.`
+                        : 'Your trial has ended — add billing to unlock your dashboard again.')
+                    : subscriptionStatus === 'past_due'
+                      ? 'Your last payment failed. Update your card to keep your dashboard active.'
+                      : subscriptionStatus === 'canceled'
+                        ? 'Your subscription was canceled. Add billing to reactivate.'
+                        : 'Add a card to activate billing for this studio.'}
               </span>
             </div>
-            <div style={s.billingPlanRow}>
-              <span style={s.billingPlanLabel}>Current seats</span>
-              <span style={s.billingPlanValue}>{billingDetails?.seat_count ?? 0} approved artist{(billingDetails?.seat_count ?? 0) === 1 ? '' : 's'}</span>
+            {subscriptionStatus !== 'active' && (
+              <div style={{ marginLeft: 'auto', flexShrink: 0 }}>
+                <button style={s.saveBtn} onClick={handleAddBilling} disabled={billingLoading}>
+                  {billingLoading ? 'Starting checkout…' : 'Add billing'}
+                </button>
+              </div>
+            )}
+          </div>
+          {billingError && <p style={s.errorText}>{billingError}</p>}
+
+          <div style={s.billingStatsGrid}>
+            <div style={s.billingStat}>
+              <span style={s.billingStatLabel}>Seats</span>
+              <span style={s.billingStatValue}>{billingDetails?.seat_count ?? 0}</span>
+              <span style={s.billingStatSub}>approved artist{(billingDetails?.seat_count ?? 0) === 1 ? '' : 's'}</span>
             </div>
-            <div style={s.billingPlanRow}>
-              <span style={s.billingPlanLabel}>Estimated cost</span>
-              <span style={s.billingPlanValue}>{formatCents(billingDetails?.estimated_monthly_cents ?? 6000)}/mo AUD</span>
+            <div style={s.billingStat}>
+              <span style={s.billingStatLabel}>Est. monthly</span>
+              <span style={s.billingStatValue}>{formatCents(billingDetails?.estimated_monthly_cents ?? 6000)}</span>
+              <span style={s.billingStatSub}>AUD</span>
             </div>
             {billingDetails?.next_billing_date && (
-              <div style={s.billingPlanRow}>
-                <span style={s.billingPlanLabel}>Next payment</span>
-                <span style={s.billingPlanValue}>
-                  {formatCents(billingDetails.next_amount_due_cents ?? 0)} on {new Date(billingDetails.next_billing_date).toLocaleDateString()}
-                </span>
+              <div style={s.billingStat}>
+                <span style={s.billingStatLabel}>Next payment</span>
+                <span style={s.billingStatValue}>{formatCents(billingDetails.next_amount_due_cents ?? 0)}</span>
+                <span style={s.billingStatSub}>{new Date(billingDetails.next_billing_date).toLocaleDateString()}</span>
               </div>
             )}
             {billingDetails?.card_last4 && (
-              <div style={s.billingPlanRow}>
-                <span style={s.billingPlanLabel}>Card on file</span>
-                <span style={s.billingPlanValue}>{cardBrandLabel(billingDetails.card_brand)} •••• {billingDetails.card_last4}</span>
+              <div style={s.billingStat}>
+                <span style={s.billingStatLabel}>Card on file</span>
+                <span style={s.billingStatValue}>•••• {billingDetails.card_last4}</span>
+                <span style={s.billingStatSub}>{cardBrandLabel(billingDetails.card_brand)}</span>
               </div>
             )}
           </div>
-
-          {billingError && <p style={s.errorText}>{billingError}</p>}
-          {subscriptionStatus !== 'active' && (
-            <button onClick={handleAddBilling} style={s.saveBtn} disabled={billingLoading}>
-              {billingLoading ? 'Starting checkout…' : 'Add billing'}
-            </button>
-          )}
         </section>
 
         <section style={s.card}>
@@ -1716,14 +1724,16 @@ const s = {
   inputReadonly: { color: 'var(--text-faint)', cursor: 'default' },
   errorText: { fontSize: '0.8rem', color: '#ff6b6b', margin: 0 },
   saveBtn: { alignSelf: 'flex-start', background: 'var(--accent-tint)', border: '1px solid var(--accent-tint-border)', borderRadius: 8, padding: '0.55rem 1.25rem', fontSize: '0.85rem', fontWeight: 600, color: 'var(--accent)', cursor: 'pointer' },
-  billingStatusDot: (status) => ({
-    width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
-    background: status === 'active' ? '#4cc98a' : status === 'past_due' ? '#e8b04f' : status === 'canceled' ? '#e86f6f' : 'var(--text-ghost)',
-  }),
-  billingPlanBox: { display: 'flex', flexDirection: 'column', gap: '0.45rem', background: 'var(--bg-base)', border: '1px solid var(--border-faint)', borderRadius: 8, padding: '0.75rem 0.9rem' },
-  billingPlanRow: { display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '1rem' },
-  billingPlanLabel: { fontSize: '0.75rem', color: 'var(--text-secondary)', flexShrink: 0 },
-  billingPlanValue: { fontSize: '0.8rem', color: 'var(--text-dim)', fontWeight: 500, textAlign: 'right' },
+  billingStatusDot: (status) => {
+    const color = status === 'active' ? '#4cc98a' : status === 'past_due' ? '#e8b04f' : status === 'canceled' ? '#e86f6f' : 'var(--text-ghost)';
+    const glow = status === 'active' ? 'rgba(76,201,138,0.5)' : status === 'past_due' ? 'rgba(232,176,79,0.4)' : status === 'canceled' ? 'rgba(232,111,111,0.4)' : 'transparent';
+    return { width: 10, height: 10, borderRadius: '50%', flexShrink: 0, background: color, boxShadow: `0 0 6px ${glow}` };
+  },
+  billingStatsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.75rem' },
+  billingStat: { display: 'flex', flexDirection: 'column', gap: 3, background: 'var(--bg-base)', border: '1px solid var(--border-faint)', borderRadius: 10, padding: '0.75rem 0.9rem' },
+  billingStatLabel: { fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-ghost)', textTransform: 'uppercase', letterSpacing: '0.04em' },
+  billingStatValue: { fontSize: '1.1rem', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.01em' },
+  billingStatSub: { fontSize: '0.72rem', color: 'var(--text-secondary)' },
   // Hours
   hoursGrid: { display: 'flex', flexDirection: 'column', gap: '6px' },
   hoursRow: { display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.5rem 0.75rem', background: 'var(--bg-base)', borderRadius: 8 },
