@@ -15,7 +15,8 @@ const NAV = [
   { href: '/dashboard/artists',      tKey: 'nav_artists',   icon: UsersIcon },
   { href: '/dashboard/clients',      tKey: 'nav_clients',   icon: PersonIcon },
   { href: '/dashboard/appointments', tKey: 'nav_bookings',  icon: CalendarIcon },
-  { href: '/dashboard/revenue',      tKey: 'nav_analytics', icon: RevenueIcon },
+  { href: '/dashboard/revenue',      tKey: 'nav_analytics', icon: ChartIcon },
+  { href: '/dashboard/financial',    tKey: 'revenue_financial', icon: RevenueIcon },
   { href: '/dashboard/studios',      tKey: 'nav_studios',   icon: BuildingIcon, adminOnly: true },
 ];
 
