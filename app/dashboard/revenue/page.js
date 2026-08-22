@@ -699,7 +699,6 @@ function PayoutPanel({ artist, onClose, onPaid }) {
   const [error,    setError]    = useState('');
   const [history,  setHistory]  = useState(null); // null = loading
   const [deleting, setDeleting] = useState(null); // payout id being deleted
-  const [expanded, setExpanded] = useState(null);  // payout id whose covered bookings are shown
 
   function loadHistory() {
     getArtistPayoutHistory(artist.artist_id)
@@ -742,6 +741,11 @@ function PayoutPanel({ artist, onClose, onPaid }) {
   function fmtShortDate(iso) {
     if (!iso) return '—';
     return new Date(iso).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
+  }
+
+  function fmtLongDate(iso) {
+    if (!iso) return '—';
+    return new Date(iso).toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
   }
 
   return (
@@ -840,45 +844,50 @@ function PayoutPanel({ artist, onClose, onPaid }) {
               <p style={{ fontSize: '0.8rem', color: 'var(--text-ghost)' }}>{t('revenue_no_payouts')}</p>
             )}
             {history !== null && history.length > 0 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '260px', overflowY: 'auto', paddingRight: '0.25rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', maxHeight: '400px', overflowY: 'auto', paddingRight: '0.25rem' }}>
                 {history.map(p => {
                   const bookings = p.bookings ?? [];
-                  const isOpen = expanded === p.id;
                   return (
-                    <div key={p.id} style={{ background: 'var(--bg-chip)', borderRadius: 7, border: '1px solid var(--border-faint)' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem 0.65rem' }}>
-                        <div
-                          style={{ flex: 1, cursor: bookings.length > 0 ? 'pointer' : 'default' }}
-                          onClick={() => bookings.length > 0 && setExpanded(isOpen ? null : p.id)}
-                        >
-                          <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text)' }}>{fmt(p.amount)}</span>
-                          {p.note && <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginLeft: '0.5rem' }}>{p.note}</span>}
-                          <span style={{ fontSize: '0.72rem', color: 'var(--text-ghost)', marginLeft: '0.5rem' }}>{fmtShortDate(p.paid_at)}</span>
-                          {bookings.length > 0 && (
-                            <span style={{ fontSize: '0.72rem', color: 'var(--accent)', marginLeft: '0.5rem' }}>
-                              {bookings.length} booking{bookings.length > 1 ? 's' : ''} {isOpen ? '▴' : '▾'}
-                            </span>
-                          )}
+                    <div key={p.id} style={{ background: 'var(--bg-chip)', borderRadius: 8, border: '1px solid var(--border-faint)', overflow: 'hidden' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '0.65rem 0.75rem' }}>
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem', flexWrap: 'wrap' }}>
+                            <span style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text)' }}>{fmt(p.amount)}</span>
+                            <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Paid {fmtLongDate(p.paid_at)}</span>
+                          </div>
+                          {p.note && <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>{p.note}</div>}
                         </div>
                         <button
                           onClick={() => handleDelete(p.id)}
                           disabled={deleting === p.id}
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-ghost)', fontSize: '0.75rem', padding: '0.2rem 0.4rem', opacity: deleting === p.id ? 0.4 : 1 }}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-ghost)', fontSize: '0.75rem', padding: '0.2rem 0.4rem', opacity: deleting === p.id ? 0.4 : 1, flexShrink: 0 }}
                           title="Delete payout record"
                         >✕</button>
                       </div>
-                      {isOpen && bookings.length > 0 && (
-                        <div style={{ borderTop: '1px solid var(--border-faint)', padding: '0.4rem 0.65rem 0.55rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-                          {bookings.map(b => (
-                            <div key={b.booking_id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem' }}>
-                              <span style={{ color: 'var(--text-secondary)' }}>
-                                {fmtShortDate(b.chosen_time)} · {b.client_name}
-                              </span>
-                              <span style={{ color: 'var(--text-ghost)', fontWeight: 500 }}>{fmt(b.artist_cut)}</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                      <div style={{ borderTop: '1px solid var(--border-faint)', padding: '0.5rem 0.75rem 0.6rem' }}>
+                        <p style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-ghost)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 0.4rem' }}>
+                          {bookings.length > 0
+                            ? `Covers ${bookings.length} booking${bookings.length > 1 ? 's' : ''}`
+                            : 'Bookings covered'}
+                        </p>
+                        {bookings.length === 0 && (
+                          <p style={{ fontSize: '0.75rem', color: 'var(--text-ghost)', margin: 0 }}>
+                            Not linked to specific bookings (recorded before per-booking tracking, or a manual adjustment).
+                          </p>
+                        )}
+                        {bookings.length > 0 && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                            {bookings.map(b => (
+                              <div key={b.booking_id} style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', fontSize: '0.78rem' }}>
+                                <span style={{ color: 'var(--text-secondary)' }}>
+                                  {fmtShortDate(b.chosen_time)} · {b.client_name}
+                                </span>
+                                <span style={{ color: 'var(--text)', fontWeight: 500, whiteSpace: 'nowrap' }}>{fmt(b.artist_cut)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   );
                 })}
