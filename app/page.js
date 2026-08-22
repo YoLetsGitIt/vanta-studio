@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { getSupabase } from '@/lib/supabase';
 import { getMyStudioAccount } from '@/lib/api';
-import { isDemoMode, setDemoMode } from '@/lib/mode';
 import SignUpFlow from '@/components/SignUpFlow';
 
 
@@ -16,10 +15,8 @@ export default function HomePage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(true);
-  const [demoMode, setDemoModeState] = useState(false);
 
   useEffect(() => {
-    setDemoModeState(isDemoMode());
     getSupabase()
       .auth.getSession()
       .then(({ data: { session } }) => {
@@ -27,14 +24,6 @@ export default function HomePage() {
         else setChecking(false);
       });
   }, [router]);
-
-  function handleExitDemo() {
-    setDemoMode(false);
-    setDemoModeState(false);
-    setEmail('');
-    setPassword('');
-    setError('');
-  }
 
   async function handleSignIn(e) {
     e.preventDefault();
@@ -76,17 +65,7 @@ export default function HomePage() {
         <div style={s.brand}>
           <span style={s.wordmark}>vanta</span>
           <span style={s.wordmarkSub}>studio</span>
-          {demoMode && (
-            <span style={s.demoBadge}>DEMO</span>
-          )}
         </div>
-
-        {demoMode && (
-          <div style={s.demoBar}>
-            <span style={s.demoBarText}>Demo mode — data is isolated from production</span>
-            <button onClick={handleExitDemo} style={s.demoBarExit}>Exit</button>
-          </div>
-        )}
 
         {/* Tab switcher */}
         <div style={s.tabs}>
@@ -257,40 +236,5 @@ const s = {
     fontWeight: 600,
     cursor: 'pointer',
     width: '100%',
-  },
-  demoBadge: {
-    marginLeft: '0.5rem',
-    fontSize: '0.6rem',
-    fontWeight: 700,
-    color: '#ffc83c',
-    background: 'rgba(255,200,60,0.12)',
-    border: '1px solid rgba(255,200,60,0.3)',
-    borderRadius: 4,
-    padding: '2px 6px',
-    letterSpacing: '0.06em',
-    alignSelf: 'center',
-  },
-  demoBar: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    background: 'rgba(255,200,60,0.07)',
-    border: '1px solid rgba(255,200,60,0.2)',
-    borderRadius: 8,
-    padding: '0.5rem 0.75rem',
-    marginBottom: '1rem',
-  },
-  demoBarText: {
-    fontSize: '0.75rem',
-    color: 'rgba(255,200,60,0.8)',
-  },
-  demoBarExit: {
-    background: 'transparent',
-    border: 'none',
-    fontSize: '0.75rem',
-    fontWeight: 600,
-    color: 'rgba(255,200,60,0.7)',
-    cursor: 'pointer',
-    padding: 0,
   },
 };

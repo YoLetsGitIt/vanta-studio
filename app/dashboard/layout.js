@@ -5,7 +5,6 @@ import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { getSupabase } from '@/lib/supabase';
 import { getArtistProfile, getMyStudioAccount, startBillingCheckout } from '@/lib/api';
-import { isDemoMode, setDemoMode } from '@/lib/mode';
 import { initTheme } from '@/lib/theme';
 import { useLanguage, LanguageProvider } from '@/lib/i18n';
 import NewAppointmentPanel from '@/components/NewAppointmentPanel';
@@ -51,10 +50,9 @@ function DashboardShell({ children }) {
   const [studioName, setStudioName] = useState('');
   const [trial, setTrial] = useState({ expired: false, daysLeft: null });
   const [ready, setReady] = useState(false);
-  const [demo, setDemo] = useState(false);
   const [appointmentPanelOpen, setAppointmentPanelOpen] = useState(false);
 
-  useEffect(() => { setDemo(isDemoMode()); initTheme(); }, []);
+  useEffect(() => { initTheme(); }, []);
 
   useEffect(() => {
     async function init() {
@@ -88,7 +86,6 @@ function DashboardShell({ children }) {
 
   async function handleSignOut() {
     await getSupabase().auth.signOut();
-    setDemoMode(false);
     router.replace('/');
   }
 
@@ -109,12 +106,6 @@ function DashboardShell({ children }) {
 
   return (
     <div style={s.shell}>
-      {demo && (
-        <div style={s.demoBanner}>
-          <span style={s.demoBannerText}>DEMO — data is isolated from production</span>
-        </div>
-      )}
-
       {trialWarning && (
         <div style={s.trialBanner}>
           <span style={s.trialBannerText}>
@@ -362,21 +353,6 @@ const s = {
     height: '100vh',
     overflow: 'hidden',
     background: 'var(--bg-base)',
-  },
-  demoBanner: {
-    flexShrink: 0,
-    height: 32,
-    background: 'rgba(255,200,60,0.1)',
-    borderBottom: '1px solid rgba(255,200,60,0.2)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  demoBannerText: {
-    fontSize: '0.72rem',
-    fontWeight: 600,
-    color: '#ffc83c',
-    letterSpacing: '0.04em',
   },
   trialBanner: {
     flexShrink: 0,

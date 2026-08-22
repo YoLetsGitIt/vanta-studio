@@ -15,7 +15,6 @@ import {
 } from '@/lib/api';
 import { getSupabase } from '@/lib/supabase';
 import { invalidate } from '@/lib/cache';
-import { setDemoMode } from '@/lib/mode';
 import { getTheme, setTheme } from '@/lib/theme';
 import { useLanguage, LANGUAGES } from '@/lib/i18n';
 
@@ -900,7 +899,6 @@ export default function SettingsPage() {
 
   async function handleSignOut() {
     await getSupabase().auth.signOut();
-    setDemoMode(false);
     router.replace('/');
   }
 
