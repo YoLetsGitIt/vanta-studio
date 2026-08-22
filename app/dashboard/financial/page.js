@@ -533,7 +533,14 @@ function PayoutsSection({ payouts, onPay, onViewEarnings }) {
                     )}
                   </td>
                   {hasCut && (
-                    <td style={{ ...st.td, fontWeight: 600, color: '#4cc98a' }}>{fmt(p.artist_payout)}</td>
+                    <td style={{ ...st.td, fontWeight: 600, color: '#4cc98a' }}>
+                      {fmt(p.artist_payout)}
+                      {p.reimbursed > 0 && (
+                        <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: 2, fontWeight: 500 }}>
+                          + {fmt(p.reimbursed)} reimbursed
+                        </div>
+                      )}
+                    </td>
                   )}
                   <td style={st.td}>{fmt(p.total_paid)}</td>
                   <td style={{
