@@ -572,6 +572,7 @@ function PayoutPanel({ artist, onClose, onPaid }) {
   const [custom,   setCustom]   = useState('');
   const [saving,   setSaving]   = useState(false);
   const [note,     setNote]     = useState('');
+  const [method,   setMethod]   = useState('bank_transfer');
   const [error,    setError]    = useState('');
   const [history,  setHistory]  = useState(null); // null = loading
   const [deleting, setDeleting] = useState(null); // payout id being deleted
@@ -592,7 +593,7 @@ function PayoutPanel({ artist, onClose, onPaid }) {
     setSaving(true);
     setError('');
     try {
-      await createPayout(artist.artist_id, amount, note || null);
+      await createPayout(artist.artist_id, amount, note || null, method);
       onPaid();
     } catch (e) {
       setError(e.message);
@@ -622,6 +623,15 @@ function PayoutPanel({ artist, onClose, onPaid }) {
   function fmtLongDate(iso) {
     if (!iso) return '—';
     return new Date(iso).toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+  }
+
+  function fmtMethod(m) {
+    return ({ cash: 'Cash', bank_transfer: 'Bank transfer', card: 'Card', online: 'Online', other: 'Other' })[m] ?? m;
+  }
+
+  function fmtSessionType(s) {
+    if (!s) return null;
+    return s.charAt(0).toUpperCase() + s.slice(1).replace(/_/g, ' ');
   }
 
   return (
@@ -691,6 +701,14 @@ function PayoutPanel({ artist, onClose, onPaid }) {
               </div>
             )}
 
+            <select value={method} onChange={e => setMethod(e.target.value)} style={st.noteInput}>
+              <option value="bank_transfer">Bank transfer</option>
+              <option value="cash">Cash</option>
+              <option value="card">Card</option>
+              <option value="online">Online</option>
+              <option value="other">Other</option>
+            </select>
+
             <input
               type="text"
               value={note}
@@ -731,6 +749,10 @@ function PayoutPanel({ artist, onClose, onPaid }) {
                             <span style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text)' }}>{fmt(p.amount)}</span>
                             <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Paid {fmtLongDate(p.paid_at)}</span>
                           </div>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-ghost)', marginTop: '0.15rem' }}>
+                            {p.payment_method ? fmtMethod(p.payment_method) : 'Method not recorded'}
+                            {p.recorded_by_email && <> · Recorded by {p.recorded_by_email}</>}
+                          </div>
                           {p.note && <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>{p.note}</div>}
                         </div>
                         <button
@@ -752,13 +774,20 @@ function PayoutPanel({ artist, onClose, onPaid }) {
                           </p>
                         )}
                         {bookings.length > 0 && (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                             {bookings.map(b => (
-                              <div key={b.booking_id} style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', fontSize: '0.78rem' }}>
-                                <span style={{ color: 'var(--text-secondary)' }}>
-                                  {fmtShortDate(b.chosen_time)} · {b.client_name}
-                                </span>
-                                <span style={{ color: 'var(--text)', fontWeight: 500, whiteSpace: 'nowrap' }}>{fmt(b.artist_cut)}</span>
+                              <div key={b.booking_id} style={{ paddingBottom: '0.4rem', borderBottom: '1px solid var(--border-faint)' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', fontSize: '0.78rem' }}>
+                                  <span style={{ color: 'var(--text)', fontWeight: 500 }}>
+                                    {fmtShortDate(b.chosen_time)} · {b.client_name}
+                                  </span>
+                                  <span style={{ color: 'var(--text)', fontWeight: 600, whiteSpace: 'nowrap' }}>{fmt(b.artist_cut)}</span>
+                                </div>
+                                <div style={{ fontSize: '0.72rem', color: 'var(--text-ghost)', marginTop: '0.15rem' }}>
+                                  {fmtSessionType(b.session_type) && <>{fmtSessionType(b.session_type)} · </>}
+                                  Gross {fmt(b.gross)}
+                                  {b.payment_method && <> · {fmtMethod(b.payment_method)}</>}
+                                </div>
                               </div>
                             ))}
                           </div>
