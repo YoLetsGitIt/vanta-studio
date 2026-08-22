@@ -988,7 +988,7 @@ function EarningsPanel({ artist, onClose }) {
                 </thead>
                 <tbody>
                   {entries.map(e => (
-                    <tr key={e.booking_id} style={st.tr}>
+                    <tr key={e.booking_id} style={{ ...st.tr, background: e.paid ? 'transparent' : 'rgba(245,158,58,0.05)' }}>
                       <td style={{ ...st.td, whiteSpace: 'nowrap' }}>{fmtDate(e.chosen_time)}</td>
                       <td style={{ ...st.td, color: 'var(--text)', fontWeight: 500 }}>{e.client_name}</td>
                       <td style={st.td}>{fmtSource(e.source)}</td>
@@ -997,8 +997,8 @@ function EarningsPanel({ artist, onClose }) {
                       <td style={{ ...st.td, fontWeight: 600, color: '#4cc98a' }}>{fmt(e.artist_cut)}</td>
                       <td style={st.td}>
                         {e.paid
-                          ? <span style={st.paidBadge}>Paid out</span>
-                          : <span style={st.unpaidBadge}>Outstanding</span>}
+                          ? <span style={st.paidBadge}>● Paid out</span>
+                          : <span style={st.unpaidBadge}>● Outstanding</span>}
                       </td>
                     </tr>
                   ))}
@@ -1130,14 +1130,16 @@ const st = {
     fontSize: '0.75rem', color: 'var(--text-ghost)', fontWeight: 500,
   },
   paidBadge: {
-    fontSize: '0.7rem', fontWeight: 600, color: '#4cc98a',
-    background: 'rgba(76,201,138,0.1)', border: '1px solid rgba(76,201,138,0.25)',
-    borderRadius: 5, padding: '0.15rem 0.5rem', whiteSpace: 'nowrap',
+    display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
+    fontSize: '0.72rem', fontWeight: 700, color: '#4cc98a',
+    background: 'rgba(76,201,138,0.1)', border: '1px solid rgba(76,201,138,0.3)',
+    borderRadius: 6, padding: '0.25rem 0.6rem', whiteSpace: 'nowrap',
   },
   unpaidBadge: {
-    fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-ghost)',
-    background: 'var(--bg-chip)', border: '1px solid var(--border-faint)',
-    borderRadius: 5, padding: '0.15rem 0.5rem', whiteSpace: 'nowrap',
+    display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
+    fontSize: '0.72rem', fontWeight: 700, color: '#f59e3a',
+    background: 'rgba(245,158,58,0.12)', border: '1px solid rgba(245,158,58,0.35)',
+    borderRadius: 6, padding: '0.25rem 0.6rem', whiteSpace: 'nowrap',
   },
 
   overlay: {
