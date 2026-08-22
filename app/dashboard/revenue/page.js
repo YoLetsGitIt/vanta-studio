@@ -665,10 +665,9 @@ function PayoutsSection({ payouts, onPay, onViewEarnings }) {
                     color: p.outstanding > 0 ? 'var(--accent)' : 'var(--text-secondary)',
                     fontWeight: 600,
                   }}>
-                    {p.outstanding > 0
-                      ? <span onClick={e => { e.stopPropagation(); onViewEarnings(p); }} style={st.earningsLink} title="View breakdown">{fmt(p.outstanding)}</span>
-                      : fmt(p.outstanding)
-                    }
+                    <span onClick={e => { e.stopPropagation(); onViewEarnings(p); }} style={st.earningsLink} title="View per-booking payout status">
+                      {fmt(p.outstanding)}
+                    </span>
                   </td>
                   <td style={{ ...st.td, textAlign: 'right' }}>
                     {p.outstanding > 0
