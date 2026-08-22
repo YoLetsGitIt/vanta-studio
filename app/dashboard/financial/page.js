@@ -9,10 +9,10 @@ import {
 } from 'recharts';
 import { useLanguage } from '@/lib/i18n';
 
-// This entire page (Financial + Artists & Payouts) requires re-authenticating
-// with the account password every time it's visited — unlock state is plain
-// component state, not persisted to sessionStorage, so navigating away and
-// back always re-locks it.
+// This entire page (Financial + Artists & Payouts) is password-protected, but
+// only for the initial entry each browser session — unlock state persists in
+// sessionStorage so navigating away and back doesn't re-prompt. It re-locks
+// on "Lock" or once the browser tab is closed.
 
 const QUICK_OPTIONS = [
   { label: '1w',  days: 7 },
@@ -61,11 +61,20 @@ export default function FinancialPage() {
     return () => obs.disconnect();
   }, []);
 
+  // Restore unlock state from sessionStorage on mount. Also grab the logged-in email.
   useEffect(() => {
+    if (typeof window !== 'undefined' && sessionStorage.getItem('financial_unlocked') === '1') {
+      setUnlocked(true);
+    }
     getSupabase().auth.getSession().then(({ data: { session } }) => {
       if (session?.user?.email) setUserEmail(session.user.email);
     });
   }, []);
+
+  function handleUnlock() {
+    setUnlocked(true);
+    sessionStorage.setItem('financial_unlocked', '1');
+  }
 
   // Load payout summaries + reimbursement requests once unlocked.
   useEffect(() => {
@@ -122,6 +131,7 @@ export default function FinancialPage() {
 
   function handleLock() {
     setUnlocked(false);
+    sessionStorage.removeItem('financial_unlocked');
   }
 
   const weeklyChart = useMemo(() => {
@@ -141,7 +151,7 @@ export default function FinancialPage() {
         <div style={st.header}>
           <h1 style={st.title}>{t('revenue_financial')}</h1>
         </div>
-        <PasswordGate email={userEmail} onUnlock={() => setUnlocked(true)} />
+        <PasswordGate email={userEmail} onUnlock={handleUnlock} />
       </div>
     );
   }
