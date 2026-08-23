@@ -1110,8 +1110,7 @@ export default function SettingsPage() {
                 onChange={e => setPaymentRecordingReq(e.target.value)}
               >
                 <option value="studio_only">Studio only</option>
-                <option value="artist_only">Artist only</option>
-                <option value="both">Both artist and studio</option>
+                <option value="both">Studio and Artist</option>
               </select>
             </div>
             {profileError && <p style={s.errorText}>{profileError}</p>}
