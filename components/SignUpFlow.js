@@ -129,17 +129,19 @@ function StudioStep({ onBack, onSubmit, submitting }) {
   const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false);
   const [claimed, setClaimed] = useState(null); // existing studio found in search — already signed up
+  const [prefill, setPrefill] = useState(null); // studio found off-platform (e.g. Nominatim) — not yet claimed
   const [mode, setMode] = useState('search'); // 'search' | 'create'
   const debounceRef = useRef(null);
 
   const doSearch = useCallback(async (q) => {
     if (!q.trim()) { setResults([]); return; }
     setSearching(true);
-    try {
-      const studios = await searchStudios(q);
-      setResults(studios);
-    } catch { setResults([]); }
-    finally { setSearching(false); }
+    const [backendStudios, externalStudios] = await Promise.all([
+      searchStudios(q).catch(() => []),
+      searchExternalStudios(q).catch(() => []),
+    ]);
+    setResults(mergeStudioResults(backendStudios, externalStudios));
+    setSearching(false);
   }, []);
 
   useEffect(() => {
@@ -154,11 +156,23 @@ function StudioStep({ onBack, onSubmit, submitting }) {
     setResults([]);
   }
 
+  function selectResult(studio) {
+    // Backend results have an id — that studio is already signed up with Vanta.
+    // External (Nominatim) results don't — carry them into the create form as a prefill.
+    if (studio.id) {
+      setClaimed(studio);
+    } else {
+      setPrefill(studio);
+      setMode('create');
+    }
+  }
+
   if (mode === 'create') {
     return (
       <CreateStudioForm
-        initialName={query}
-        onBack={() => setMode('search')}
+        initialName={prefill?.name ?? query}
+        initialResolved={prefill ? { address: prefill.addressString, latitude: prefill.latitude, longitude: prefill.longitude } : null}
+        onBack={() => { setMode('search'); setPrefill(null); }}
         onSubmit={onSubmit}
         submitting={submitting}
       />
@@ -183,14 +197,14 @@ function StudioStep({ onBack, onSubmit, submitting }) {
           />
           {searching && <span style={s.searchSpinner}>·</span>}
 
-          {/* Results dropdown — selecting one means it's already registered */}
+          {/* Results dropdown — backend hits are already registered; others are found nearby and prefill the create form */}
           {results.length > 0 && (
             <div style={s.dropdown}>
-              {results.map(studio => (
+              {results.map((studio, i) => (
                 <button
-                  key={studio.id}
+                  key={studio.id ?? `ext-${i}`}
                   type="button"
-                  onClick={() => setClaimed(studio)}
+                  onClick={() => selectResult(studio)}
                   style={s.dropdownItem}
                 >
                   <span style={s.dropdownName}>{studio.name}</span>
@@ -224,6 +238,64 @@ function StudioStep({ onBack, onSubmit, submitting }) {
   );
 }
 
+// Nominatim-backed fallback so studios that haven't been added to Vanta yet are still
+// findable by name — mirrors the backend + MapKit merge the iOS app does in StudioSearchField.
+async function searchExternalStudios(query) {
+  const res = await fetch(
+    `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=8&q=${encodeURIComponent(query + ' tattoo')}`,
+    { headers: { 'Accept-Language': 'en' } }
+  );
+  const data = await res.json();
+  return data
+    .filter(place => place.name) // skip plain address hits Nominatim couldn't attach a place name to
+    .map(place => ({
+      id: null,
+      name: place.name,
+      addressString: buildAddressString(place.address),
+      latitude: parseFloat(place.lat),
+      longitude: parseFloat(place.lon),
+    }));
+}
+
+// Street-level address only (no business name) — built from Nominatim's address components,
+// same shape as the iOS app builds from MKPlacemark (subThoroughfare/thoroughfare/locality/state).
+function buildAddressString(address) {
+  if (!address) return '';
+  const parts = [];
+  if (address.house_number) parts.push(address.house_number);
+  if (address.road) parts.push(address.road);
+  const locality = address.suburb ?? address.city ?? address.town ?? address.village;
+  if (locality) parts.push(locality);
+  if (address.state) parts.push(address.state);
+  return parts.join(', ');
+}
+
+// Strips unit designators so "4/358 Main St" == "358 Main St" for dedup purposes.
+function stripUnit(street) {
+  let s = (street ?? '').trim();
+  s = s.replace(/^\d+\/(?=\d)/, '');
+  s = s.replace(/\s+(suite|ste\.?|unit|apt\.?|apartment|floor|fl\.?|#)\s*\w*/i, '');
+  return s.toLowerCase();
+}
+
+// Backend results first; append external results not already covered by a backend entry
+// (same name + same street-level address).
+function mergeStudioResults(backend, external) {
+  const merged = [...backend];
+  for (const ext of external) {
+    const isDuplicate = backend.some(b => {
+      const bName = (b.name ?? '').trim().toLowerCase();
+      const eName = (ext.name ?? '').trim().toLowerCase();
+      if (bName !== eName) return false;
+      const bStreet = stripUnit((b.addressString ?? b.address_string ?? '').split(',')[0]);
+      const eStreet = stripUnit((ext.addressString ?? '').split(',')[0]);
+      return bStreet === eStreet;
+    });
+    if (!isDuplicate) merged.push(ext);
+  }
+  return merged;
+}
+
 // ── Studio already claimed notice ─────────────────────────────────────────────
 
 function AlreadyClaimedNotice({ studio, onBack }) {
@@ -247,11 +319,11 @@ function AlreadyClaimedNotice({ studio, onBack }) {
 
 // ── Create new studio form ────────────────────────────────────────────────────
 
-function CreateStudioForm({ initialName, onBack, onSubmit, submitting }) {
+function CreateStudioForm({ initialName, initialResolved, onBack, onSubmit, submitting }) {
   const [name, setName] = useState(initialName ?? '');
-  const [addressQuery, setAddressQuery] = useState('');
+  const [addressQuery, setAddressQuery] = useState(initialResolved?.address ?? '');
   const [suggestions, setSuggestions] = useState([]);
-  const [resolved, setResolved] = useState(null); // { address, latitude, longitude }
+  const [resolved, setResolved] = useState(initialResolved ?? null); // { address, latitude, longitude }
   const [error, setError] = useState('');
   const debounceRef = useRef(null);
 
