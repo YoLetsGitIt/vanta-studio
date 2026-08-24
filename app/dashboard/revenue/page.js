@@ -105,7 +105,7 @@ export default function RevenuePage() {
                 <KpiCard label={t('status_completed')}             value={a?.completed ?? 0} color="#4cc98a" />
                 <KpiCard label={t('revenue_upcoming')}  value={a?.confirmed ?? 0} color="#6fa3e8" />
                 <KpiCard label={t('status_pending')}               value={a?.pending ?? 0}   color="#f59e3a" />
-                <KpiCard label={t('status_cancelled')}             value={a?.cancelled ?? 0} color="rgba(255,255,255,0.3)" />
+                <KpiCard label={t('status_cancelled')}             value={a?.cancelled ?? 0} color="#a0a0a0" />
                 <KpiCard label="No-shows"              value={a?.no_shows ?? 0}  color="#e86f6f" />
                 <KpiCard label={t('revenue_avg_value')} value={fmt(a?.avg_value)} accent />
                 <KpiCard label={t('revenue_appt_revenue')}   value={fmt(a?.revenue)} />
@@ -156,14 +156,21 @@ export default function RevenuePage() {
 
 // ── Small components ──────────────────────────────────────────────────────────
 
-const SOURCE_COLORS = { app: '#6fa3e8', studio: '#4cc98a', personal: '#f59e3a' };
+const SOURCE_COLORS = { App: '#6fa3e8', Studio: '#4cc98a', Personal: '#f59e3a', Imported: '#a78bfa' };
 
 function SourceBreakdown({ data }) {
   const total = data.reduce((s, d) => s + d.count, 0);
-  const chartData = data.map(d => ({
-    name: formatSource(d.source),
-    value: d.count,
-    color: SOURCE_COLORS[d.source] ?? '#a78bfa',
+  // Multiple raw sources (e.g. 'studio' and 'walkin') share the same display
+  // label, so group by label here rather than charting each raw source row.
+  const grouped = new Map();
+  for (const d of data) {
+    const name = formatSource(d.source);
+    grouped.set(name, (grouped.get(name) ?? 0) + d.count);
+  }
+  const chartData = Array.from(grouped, ([name, value]) => ({
+    name,
+    value,
+    color: SOURCE_COLORS[name] ?? '#a78bfa',
   }));
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '2rem', marginTop: '1rem', flexWrap: 'wrap' }}>

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { getStudioRevenueStats, getPayoutSummaries, createPayout, deletePayout, getArtistPayoutHistory, getArtistEarningsBreakdown, getReimbursements, reviewReimbursement } from '@/lib/api';
+import { getStudioRevenueStats, getPayoutSummaries, createPayout, deletePayout, getArtistPayoutHistory, getArtistEarningsBreakdown, getReimbursements, reviewReimbursement, getMyStudioAccount } from '@/lib/api';
 import { getSupabase } from '@/lib/supabase';
 import { toISODate } from '@/lib/format';
 import {
@@ -52,6 +52,7 @@ export default function FinancialPage() {
   const [reviewingReimbursement, setReviewingReimbursement] = useState(null); // id being reviewed
   const [payTarget,    setPayTarget]    = useState(null); // ArtistPayoutSummary being paid
   const [earningsTarget, setEarningsTarget] = useState(null); // { artist_id, artist_name } for earnings breakdown
+  const [paymentRequirement, setPaymentRequirement] = useState('studio_only');
   const [isLight,     setIsLight]     = useState(false);
   useEffect(() => {
     const check = () => setIsLight(document.documentElement.getAttribute('data-theme') === 'light');
@@ -81,6 +82,7 @@ export default function FinancialPage() {
     if (!unlocked) return;
     getPayoutSummaries().then(d => setPayouts(d.payouts ?? [])).catch(() => {});
     getReimbursements().then(d => setReimbursements(d.reimbursements ?? [])).catch(() => {});
+    getMyStudioAccount().then(d => setPaymentRequirement(d.studio?.payment_recording_requirement ?? 'studio_only')).catch(() => {});
   }, [unlocked]);
 
   async function handleReviewReimbursement(id, action) {
@@ -214,6 +216,7 @@ export default function FinancialPage() {
       {earningsTarget && (
         <EarningsPanel
           artist={earningsTarget}
+          requirement={paymentRequirement}
           onClose={() => setEarningsTarget(null)}
         />
       )}
@@ -824,7 +827,7 @@ function PayoutPanel({ artist, onClose, onPaid }) {
 
 // ── Earnings breakdown panel ──────────────────────────────────────────────────
 
-function EarningsPanel({ artist, onClose }) {
+function EarningsPanel({ artist, requirement, onClose }) {
   const { t } = useLanguage();
   const [entries, setEntries] = useState(null);
 
@@ -871,12 +874,14 @@ function EarningsPanel({ artist, onClose }) {
 
   function PaymentCell({ entry }) {
     if (entry.splits && entry.splits.length > 0) {
+      const showArtist = requirement !== 'studio_only';
+      const showStudio = requirement !== 'artist_only';
       const artistSplits = entry.splits.filter(s => s.recorded_by === 'artist');
       const studioSplits = entry.splits.filter(s => s.recorded_by === 'studio');
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-          <SplitGroup label="Artist" splits={artistSplits} />
-          <SplitGroup label="Studio" splits={studioSplits} />
+          {showArtist && <SplitGroup label="Artist" splits={artistSplits} />}
+          {showStudio && <SplitGroup label="Studio" splits={studioSplits} />}
         </div>
       );
     }

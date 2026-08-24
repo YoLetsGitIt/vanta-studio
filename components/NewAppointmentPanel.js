@@ -37,6 +37,16 @@ function nextHalfHour() {
   return d.toTimeString().slice(0, 5);
 }
 
+function getDefaultSizeUnit() {
+  if (typeof navigator === 'undefined') return 'cm';
+  try {
+    const region = new Intl.Locale(navigator.language).region ?? '';
+    return ['US', 'LR', 'MM'].includes(region) ? 'in' : 'cm';
+  } catch {
+    return 'cm';
+  }
+}
+
 const selectStyle = {
   background: 'var(--bg-input)',
   border: '1px solid var(--border)',
@@ -118,13 +128,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated }) {
 
   // ── Details
   const [size, setSize] = useState('');
-  const [sizeUnit, setSizeUnit] = useState(() => {
-    if (typeof navigator === 'undefined') return 'cm';
-    try {
-      const region = new Intl.Locale(navigator.language).region ?? '';
-      return ['US', 'LR', 'MM'].includes(region) ? 'in' : 'cm';
-    } catch { return 'cm'; }
-  });
+  const [sizeUnit, setSizeUnit] = useState(getDefaultSizeUnit);
   const [retouch, setRetouch] = useState(false);
 
   // ── Pricing

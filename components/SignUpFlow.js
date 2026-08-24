@@ -20,31 +20,27 @@ export default function SignUpFlow({ onSwitchToSignIn }) {
     setStep(2);
   }
 
-  async function handleSubmit(selectedStudio) {
-    setStudio(selectedStudio);
+  async function handleSubmit(newStudio) {
+    setStudio(newStudio);
     setError('');
     setLoading(true);
     try {
-      const result = await registerStudio({
+      const { checkout_url } = await registerStudio({
         email: account.email,
         password: account.password,
-        studioId: selectedStudio.id ?? null,
-        studioName: selectedStudio.name,
-        address: selectedStudio.address,
-        latitude: selectedStudio.latitude ?? null,
-        longitude: selectedStudio.longitude ?? null,
+        studioName: newStudio.name,
+        address: newStudio.address,
+        latitude: newStudio.latitude ?? null,
+        longitude: newStudio.longitude ?? null,
       });
-      if (result.status === 'approved') {
-        // New studio — trial started, no review needed. Sign in and go straight in.
-        const { error: signInError } = await getSupabase().auth.signInWithPassword({
-          email: account.email,
-          password: account.password,
-        });
-        if (signInError) { router.replace('/'); return; }
-        router.replace('/dashboard');
-        return;
-      }
-      router.replace('/pending');
+      // No review needed — sign in, then hand off to Stripe Checkout to collect the
+      // card and start the 14-day trial. The account stays pending until Stripe confirms.
+      const { error: signInError } = await getSupabase().auth.signInWithPassword({
+        email: account.email,
+        password: account.password,
+      });
+      if (signInError) { router.replace('/'); return; }
+      window.location.href = checkout_url;
     } catch (e) {
       setError(e.message);
       setLoading(false);
@@ -132,7 +128,7 @@ function StudioStep({ onBack, onSubmit, submitting }) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false);
-  const [selected, setSelected] = useState(null); // existing studio
+  const [claimed, setClaimed] = useState(null); // existing studio found in search — already signed up
   const [mode, setMode] = useState('search'); // 'search' | 'create'
   const debounceRef = useRef(null);
 
@@ -152,20 +148,10 @@ function StudioStep({ onBack, onSubmit, submitting }) {
     return () => clearTimeout(debounceRef.current);
   }, [query, doSearch]);
 
-  function selectExisting(studio) {
-    setSelected(studio);
-    setQuery(studio.name);
+  function searchAgain() {
+    setClaimed(null);
+    setQuery('');
     setResults([]);
-  }
-
-  function handleContinueWithSelected() {
-    onSubmit({
-      id: selected.id,
-      name: selected.name,
-      address: selected.addressString ?? selected.address_string ?? '',
-      latitude: selected.latitude,
-      longitude: selected.longitude,
-    });
   }
 
   if (mode === 'create') {
@@ -179,6 +165,10 @@ function StudioStep({ onBack, onSubmit, submitting }) {
     );
   }
 
+  if (claimed) {
+    return <AlreadyClaimedNotice studio={claimed} onBack={searchAgain} />;
+  }
+
   return (
     <div style={s.form}>
       <Field label="Search for your studio">
@@ -186,55 +176,42 @@ function StudioStep({ onBack, onSubmit, submitting }) {
           <input
             type="text"
             value={query}
-            onChange={e => { setQuery(e.target.value); setSelected(null); }}
+            onChange={e => setQuery(e.target.value)}
             style={s.input}
             placeholder="Studio name or address…"
             autoComplete="off"
           />
           {searching && <span style={s.searchSpinner}>·</span>}
-        </div>
 
-        {/* Results dropdown */}
-        {results.length > 0 && !selected && (
-          <div style={s.dropdown}>
-            {results.map(studio => (
-              <button
-                key={studio.id}
-                type="button"
-                onClick={() => selectExisting(studio)}
-                style={s.dropdownItem}
-              >
-                <span style={s.dropdownName}>{studio.name}</span>
-                {(studio.addressString ?? studio.address_string) && (
-                  <span style={s.dropdownAddr}>{studio.addressString ?? studio.address_string}</span>
-                )}
-              </button>
-            ))}
-          </div>
-        )}
+          {/* Results dropdown — selecting one means it's already registered */}
+          {results.length > 0 && (
+            <div style={s.dropdown}>
+              {results.map(studio => (
+                <button
+                  key={studio.id}
+                  type="button"
+                  onClick={() => setClaimed(studio)}
+                  style={s.dropdownItem}
+                >
+                  <span style={s.dropdownName}>{studio.name}</span>
+                  {(studio.addressString ?? studio.address_string) && (
+                    <span style={s.dropdownAddr}>{studio.addressString ?? studio.address_string}</span>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </Field>
 
-      {/* Selected studio confirmation */}
-      {selected && (
-        <div style={s.selectedCard}>
-          <div>
-            <div style={s.selectedName}>{selected.name}</div>
-            {(selected.addressString ?? selected.address_string) && (
-              <div style={s.selectedAddr}>{selected.addressString ?? selected.address_string}</div>
-            )}
-          </div>
-          <button type="button" onClick={() => { setSelected(null); setQuery(''); }} style={s.clearBtn}>Change</button>
-        </div>
-      )}
-
       {/* Add new studio option */}
-      {!selected && query.trim().length > 0 && results.length === 0 && !searching && (
+      {query.trim().length > 0 && results.length === 0 && !searching && (
         <button type="button" onClick={() => setMode('create')} style={s.addNewBtn}>
           <span style={{ fontSize: '1rem', lineHeight: 1 }}>+</span>
           Add "{query}" as a new studio
         </button>
       )}
-      {!selected && (results.length > 0 || query.trim().length === 0) && (
+      {(results.length > 0 || query.trim().length === 0) && (
         <button type="button" onClick={() => setMode('create')} style={s.addNewBtnSecondary}>
           My studio isn't listed — add it
         </button>
@@ -242,15 +219,28 @@ function StudioStep({ onBack, onSubmit, submitting }) {
 
       <div style={s.rowBtns}>
         <button type="button" onClick={onBack} style={s.backBtn}>Back</button>
-        <button
-          type="button"
-          disabled={!selected || submitting}
-          onClick={handleContinueWithSelected}
-          style={{ ...s.btn, flex: 1, opacity: (!selected || submitting) ? 0.5 : 1 }}
-        >
-          {submitting ? 'Submitting…' : 'Submit application'}
-        </button>
       </div>
+    </div>
+  );
+}
+
+// ── Studio already claimed notice ─────────────────────────────────────────────
+
+function AlreadyClaimedNotice({ studio, onBack }) {
+  return (
+    <div style={s.form}>
+      <div style={s.claimedNotice}>
+        <div style={s.selectedName}>{studio.name}</div>
+        {(studio.addressString ?? studio.address_string) && (
+          <div style={s.selectedAddr}>{studio.addressString ?? studio.address_string}</div>
+        )}
+        <p style={s.claimedBody}>
+          This studio is already signed up with Vanta. If this isn't right, contact{' '}
+          <a href="mailto:support@vanta.tattoo" style={s.claimedLink}>support@vanta.tattoo</a>{' '}
+          right away to dispute it.
+        </p>
+      </div>
+      <button type="button" onClick={onBack} style={s.backBtn}>Search again</button>
     </div>
   );
 }
@@ -346,10 +336,14 @@ function CreateStudioForm({ initialName, onBack, onSubmit, submitting }) {
 
       {error && <p style={s.errorBox}>{error}</p>}
 
+      <p style={s.trialNote}>
+        Next, add a card to start your 14-day free trial — you won't be charged until it ends.
+      </p>
+
       <div style={s.rowBtns}>
         <button type="button" onClick={onBack} style={s.backBtn}>Back</button>
         <button type="submit" disabled={submitting} style={{ ...s.btn, flex: 1, opacity: submitting ? 0.5 : 1 }}>
-          {submitting ? 'Submitting…' : 'Submit application'}
+          {submitting ? 'Redirecting to checkout…' : 'Continue to payment'}
         </button>
       </div>
     </form>
@@ -436,6 +430,12 @@ const s = {
     flexShrink: 0,
   },
   rowBtns: { display: 'flex', gap: '0.6rem', marginTop: '0.25rem' },
+  trialNote: {
+    fontSize: '0.78rem',
+    color: 'rgba(255,255,255,0.4)',
+    lineHeight: 1.5,
+    margin: 0,
+  },
   errorBox: {
     fontSize: '0.8rem',
     color: '#e86f6f',
@@ -472,18 +472,19 @@ const s = {
   },
   dropdownName: { fontSize: '0.875rem', color: '#ffffff', fontWeight: 500 },
   dropdownAddr: { fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)' },
-  selectedCard: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: '0.75rem',
-    background: 'rgba(76,201,138,0.07)',
-    border: '1px solid rgba(76,201,138,0.2)',
-    borderRadius: 8,
-    padding: '0.75rem',
-  },
   selectedName: { fontSize: '0.875rem', fontWeight: 600, color: '#ffffff' },
   selectedAddr: { fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)', marginTop: 2 },
+  claimedNotice: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '0.4rem',
+    background: 'rgba(232,111,111,0.06)',
+    border: '1px solid rgba(232,111,111,0.2)',
+    borderRadius: 8,
+    padding: '0.9rem',
+  },
+  claimedBody: { fontSize: '0.82rem', color: 'rgba(255,255,255,0.6)', lineHeight: 1.5, margin: '0.4rem 0 0' },
+  claimedLink: { color: '#f5ecd9' },
   clearBtn: {
     background: 'none',
     border: 'none',

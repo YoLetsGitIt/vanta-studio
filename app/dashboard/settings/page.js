@@ -482,6 +482,7 @@ export default function SettingsPage() {
   const [walkinCut, setWalkinCut] = useState('0');
   const [personalCut, setPersonalCut] = useState('0');
   const [paymentRecordingReq, setPaymentRecordingReq] = useState('studio_only');
+  const [payForfeitedDeposits, setPayForfeitedDeposits] = useState(false);
   const [rescheduleWindow, setRescheduleWindow] = useState(null);
   const [sendReminder7d, setSendReminder7d] = useState(true);
   const [sendReminder24h, setSendReminder24h] = useState(true);
@@ -520,7 +521,6 @@ export default function SettingsPage() {
   const [stripeError, setStripeError] = useState('');
 
   const [subscriptionStatus, setSubscriptionStatus] = useState('');
-  const [trialEndsAt, setTrialEndsAt] = useState(null);
   const [billingLoading, setBillingLoading] = useState(false);
   const [billingError, setBillingError] = useState('');
   const [billingNotice, setBillingNotice] = useState('');
@@ -568,6 +568,7 @@ export default function SettingsPage() {
         setWalkinCut(String(account.studio?.walkin_cut_percent ?? account.studio?.studio_cut_percent ?? 0));
         setPersonalCut(String(account.studio?.personal_cut_percent ?? account.studio?.studio_cut_percent ?? 0));
         setPaymentRecordingReq(account.studio?.payment_recording_requirement ?? 'studio_only');
+        setPayForfeitedDeposits(account.studio?.pay_artist_on_forfeited_deposits ?? false);
         setRescheduleWindow(account.studio?.reschedule_window_hours ?? null);
         setSendReminder7d(account.studio?.send_reminder_7d ?? true);
         setSendReminder24h(account.studio?.send_reminder_24h ?? true);
@@ -581,7 +582,6 @@ export default function SettingsPage() {
         setStripeStatus(stripeData ?? { connected: false, charges_enabled: false });
         setFormFields(formConfigData?.fields ?? {});
         setSubscriptionStatus(account.studio?.subscription_status ?? '');
-        setTrialEndsAt(account.studio?.trial_ends_at ?? null);
         setBillingDetails(billingData);
 
         // Handle return from the self-serve billing checkout.
@@ -632,7 +632,7 @@ export default function SettingsPage() {
     try {
       const wc = parseFloat(walkinCut);
       const pc = parseFloat(personalCut);
-      await updateStudioProfile(name.trim(), address.trim(), widgetBgColor, widgetAccentColor, isNaN(wc) ? 0 : wc, isNaN(pc) ? 0 : pc, aftercareInstructions, timezone, addressLat, addressLng, paymentRecordingReq, rescheduleWindow, widgetConsentTemplateId || null, sendReminder7d, sendReminder24h);
+      await updateStudioProfile(name.trim(), address.trim(), widgetBgColor, widgetAccentColor, isNaN(wc) ? 0 : wc, isNaN(pc) ? 0 : pc, aftercareInstructions, timezone, addressLat, addressLng, paymentRecordingReq, rescheduleWindow, widgetConsentTemplateId || null, sendReminder7d, sendReminder24h, payForfeitedDeposits);
       invalidate('studio-account');
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
@@ -1102,7 +1102,9 @@ export default function SettingsPage() {
             <div style={s.field}>
               <label style={s.label}>Payment recording requirement</label>
               <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: '0 0 0.5rem' }}>
-                Which parties must record payment before a payout can be processed.
+                Which parties must record payment before a payout can be processed. Only applies
+                to bookings completed from when you change this — it won&apos;t require artists to
+                go back and record payment on past bookings.
               </p>
               <select
                 style={{ ...s.input, cursor: 'pointer', colorScheme: 'auto' }}
@@ -1112,6 +1114,28 @@ export default function SettingsPage() {
                 <option value="studio_only">Studio only</option>
                 <option value="both">Studio and Artist</option>
               </select>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 0', borderTop: '1px solid var(--border)' }}>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text)' }}>Pay artist on forfeited deposits</div>
+                <div style={{ fontSize: 13, color: 'var(--text-ghost)', marginTop: 2, maxWidth: 420 }}>
+                  When a client cancels after paying a deposit that isn&apos;t refunded, credit the assigned artist their commission on it. Only applies to cancellations from when this is turned on — it won&apos;t backdate past forfeitures.
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPayForfeitedDeposits(v => !v)}
+                style={{
+                  width: 44, height: 24, borderRadius: 12, border: 'none', cursor: 'pointer',
+                  background: payForfeitedDeposits ? 'var(--accent)' : 'var(--bg-chip)',
+                  position: 'relative', transition: 'background 0.2s', flexShrink: 0,
+                }}
+              >
+                <span style={{
+                  position: 'absolute', top: 3, left: payForfeitedDeposits ? 23 : 3, width: 18, height: 18,
+                  borderRadius: '50%', background: '#fff', transition: 'left 0.2s',
+                }} />
+              </button>
             </div>
             {profileError && <p style={s.errorText}>{profileError}</p>}
             <button type="submit" style={s.saveBtn} disabled={saving}>
@@ -1647,8 +1671,8 @@ export default function SettingsPage() {
                   ? 'Canceling'
                   : subscriptionStatus === 'active'
                     ? 'Active'
-                    : trialEndsAt
-                      ? (new Date(trialEndsAt).getTime() > Date.now() ? 'Free trial' : 'Trial ended')
+                    : subscriptionStatus === 'trialing'
+                      ? 'Free trial'
                       : subscriptionStatus === 'past_due'
                         ? 'Payment failed'
                         : subscriptionStatus === 'canceled'
@@ -1660,10 +1684,8 @@ export default function SettingsPage() {
                   ? `You'll keep full access until ${periodEndLabel}, then your dashboard will lock.`
                   : subscriptionStatus === 'active'
                     ? 'Your subscription is active — thanks for being a Vanta studio.'
-                    : trialEndsAt
-                      ? (new Date(trialEndsAt).getTime() > Date.now()
-                          ? `Trial ends ${new Date(trialEndsAt).toLocaleDateString()}. Add billing any time to continue seamlessly.`
-                          : 'Your trial has ended — add billing to unlock your dashboard again.')
+                    : subscriptionStatus === 'trialing'
+                      ? "You're in your free trial period."
                       : subscriptionStatus === 'past_due'
                         ? 'Your last payment failed. Update your card to keep your dashboard active.'
                         : subscriptionStatus === 'canceled'

@@ -38,15 +38,8 @@ export default function HomePage() {
     }
     // Verify this is a studio account
     try {
-      const account = await getMyStudioAccount();
-      if (account.status === 'pending') {
-        router.replace('/pending');
-      } else if (account.status === 'approved') {
-        router.replace('/dashboard');
-      } else {
-        // rejected
-        router.replace('/pending');
-      }
+      await getMyStudioAccount();
+      router.replace('/dashboard');
     } catch {
       // No studio account — sign them out and block access
       await supabase.auth.signOut();

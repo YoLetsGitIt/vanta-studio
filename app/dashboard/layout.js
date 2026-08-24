@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { getSupabase } from '@/lib/supabase';
-import { getArtistProfile, getMyStudioAccount, startBillingCheckout } from '@/lib/api';
+import { getMyStudioAccount, startBillingCheckout, openBillingPortal } from '@/lib/api';
 import { initTheme } from '@/lib/theme';
 import { useLanguage, LanguageProvider } from '@/lib/i18n';
 import NewAppointmentPanel from '@/components/NewAppointmentPanel';
@@ -17,21 +17,66 @@ const NAV = [
   { href: '/dashboard/appointments', tKey: 'nav_bookings',  icon: CalendarIcon },
   { href: '/dashboard/revenue',      tKey: 'nav_analytics', icon: ChartIcon },
   { href: '/dashboard/financial',    tKey: 'revenue_financial', icon: RevenueIcon },
-  { href: '/dashboard/studios',      tKey: 'nav_studios',   icon: BuildingIcon, adminOnly: true },
 ];
 
-const ADMIN_EMAIL = process.env.NEXT_PUBLIC_ADMIN_EMAIL ?? '';
+// Mirrors the backend's subscriptionInactive() (internal/handlers/studio.go) exactly —
+// subscription_status is kept live by Stripe's customer.subscription.updated/deleted
+// webhooks, so this checks that directly rather than comparing trial_ends_at to now.
+// No reminder is shown ahead of time; this only ever renders once the dashboard is
+// actually locked.
+function subscriptionInactive(studio) {
+  return studio?.subscription_status !== 'trialing' && studio?.subscription_status !== 'active';
+}
 
-// Mirrors the backend's trialExpired() (internal/handlers/studio.go) exactly —
-// a studio never on a trial (trial_ends_at null) is never gated, and an active
-// subscription always wins regardless of trial_ends_at.
-function trialStatus(studio) {
-  if (!studio?.trial_ends_at || studio.subscription_status === 'active') {
-    return { expired: false, daysLeft: null };
-  }
-  const msLeft = new Date(studio.trial_ends_at).getTime() - Date.now();
-  const daysLeft = Math.ceil(msLeft / (24 * 60 * 60 * 1000));
-  return { expired: msLeft <= 0, daysLeft };
+// These are deliberately customer-friendly descriptions of Stripe's subscription
+// states. The raw subscription status remains the source of truth; we don't expose
+// provider error details such as card-decline codes in the dashboard.
+const BILLING_ISSUES = {
+  past_due: {
+    heading: 'Your latest payment failed',
+    message: 'Update your payment method to restore access to your dashboard.',
+    action: 'Update payment method',
+    recovery: 'portal',
+  },
+  unpaid: {
+    heading: 'Your subscription payment is overdue',
+    message: 'Stripe was unable to collect payment. Update your payment method to restore access.',
+    action: 'Update payment method',
+    recovery: 'portal',
+  },
+  incomplete: {
+    heading: 'Your billing setup is incomplete',
+    message: 'Add a payment method to finish setting up your subscription and continue using your dashboard.',
+    action: 'Finish billing setup',
+    recovery: 'checkout',
+  },
+  incomplete_expired: {
+    heading: 'Your billing setup expired',
+    message: 'Your initial billing setup was not completed in time. Start it again to restore access.',
+    action: 'Restart billing setup',
+    recovery: 'checkout',
+  },
+  canceled: {
+    heading: 'Your subscription has ended',
+    message: 'Start a new subscription to regain access to your dashboard.',
+    action: 'Restart subscription',
+    recovery: 'checkout',
+  },
+  paused: {
+    heading: 'Your subscription is paused',
+    message: 'Update your billing to restore access to your dashboard.',
+    action: 'Update billing',
+    recovery: 'portal',
+  },
+};
+
+function getBillingIssue(subscriptionStatus) {
+  return BILLING_ISSUES[subscriptionStatus] ?? {
+    heading: "There's an issue with your billing",
+    message: 'Your subscription needs attention before you can keep using your dashboard.',
+    action: 'Update billing',
+    recovery: 'checkout',
+  };
 }
 
 export default function DashboardLayout({ children }) {
@@ -47,9 +92,9 @@ function DashboardShell({ children }) {
   const pathname = usePathname();
   const { t } = useLanguage();
   const [user, setUser] = useState(null);
-  const [artist, setArtist] = useState(null);
   const [studioName, setStudioName] = useState('');
-  const [trial, setTrial] = useState({ expired: false, daysLeft: null });
+  const [billingBlocked, setBillingBlocked] = useState(false);
+  const [subscriptionStatus, setSubscriptionStatus] = useState('');
   const [ready, setReady] = useState(false);
   const [appointmentPanelOpen, setAppointmentPanelOpen] = useState(false);
 
@@ -62,24 +107,19 @@ function DashboardShell({ children }) {
       if (!session) { router.replace('/'); return; }
       setUser(session.user);
 
+      let studioAccount;
       try {
-        const studioAccount = await getMyStudioAccount();
-        if (studioAccount.status === 'pending') { router.replace('/pending'); return; }
-        if (studioAccount.status === 'rejected') { router.replace('/pending'); return; }
-        setStudioName(studioAccount.studio?.name ?? '');
-        setTrial(trialStatus(studioAccount.studio));
+        studioAccount = await getMyStudioAccount();
       } catch {
         await getSupabase().auth.signOut();
         router.replace('/');
         return;
       }
 
-      try {
-        const profile = await getArtistProfile(session.user.id);
-        setArtist(profile);
-      } catch {
-        // not an artist — fine
-      }
+      setStudioName(studioAccount.studio?.name ?? '');
+      setSubscriptionStatus(studioAccount.studio?.subscription_status ?? '');
+
+      setBillingBlocked(subscriptionInactive(studioAccount.studio));
       setReady(true);
     }
     init();
@@ -98,26 +138,14 @@ function DashboardShell({ children }) {
     );
   }
 
-  if (trial.expired) {
-    return <TrialExpiredBlock studioName={studioName} onSignOut={handleSignOut} />;
+  if (billingBlocked) {
+    return <BillingInactiveBlock studioName={studioName} subscriptionStatus={subscriptionStatus} onSignOut={handleSignOut} />;
   }
 
   const displayName = studioName || 'Studio';
-  const trialWarning = trial.daysLeft !== null && trial.daysLeft <= 3;
 
   return (
     <div style={s.shell}>
-      {trialWarning && (
-        <div style={s.trialBanner}>
-          <span style={s.trialBannerText}>
-            {trial.daysLeft <= 0
-              ? 'Your free trial ends today'
-              : `Your free trial ends in ${trial.daysLeft} day${trial.daysLeft === 1 ? '' : 's'}`}
-          </span>
-          <Link href="/dashboard/settings" style={s.trialBannerLink}>Add billing</Link>
-        </div>
-      )}
-
       <div style={s.body}>
         <aside style={s.sidebar}>
           <div style={s.sidebarTop}>
@@ -132,7 +160,7 @@ function DashboardShell({ children }) {
             </button>
 
             <nav style={s.nav}>
-              {NAV.filter(item => !item.adminOnly || user?.email === ADMIN_EMAIL).map(({ href, tKey, icon: Icon }) => {
+              {NAV.map(({ href, tKey, icon: Icon }) => {
                 const active = pathname.startsWith(href);
                 return (
                   <Link
@@ -185,16 +213,22 @@ function DashboardShell({ children }) {
   );
 }
 
-function TrialExpiredBlock({ studioName, onSignOut }) {
+function BillingInactiveBlock({ studioName, subscriptionStatus, onSignOut }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const issue = getBillingIssue(subscriptionStatus);
 
-  async function handleAddBilling() {
+  async function handleUpdateBilling() {
     setLoading(true);
     setError('');
     try {
-      const { checkout_url } = await startBillingCheckout();
-      window.location.href = checkout_url;
+      if (issue.recovery === 'portal') {
+        const { portal_url } = await openBillingPortal();
+        window.location.href = portal_url;
+      } else {
+        const { checkout_url } = await startBillingCheckout();
+        window.location.href = checkout_url;
+      }
     } catch (e) {
       setError(e.message);
       setLoading(false);
@@ -208,14 +242,13 @@ function TrialExpiredBlock({ studioName, onSignOut }) {
           <span style={s.logoMark}>vanta</span>
           <span style={s.logoSub}>studio</span>
         </div>
-        <h1 style={s.blockHeading}>Your free trial has ended</h1>
+        <h1 style={s.blockHeading}>{issue.heading}</h1>
         <p style={s.blockBody}>
-          {(studioName || 'Your studio')}'s 14-day trial is over. Add billing to keep using your dashboard —
-          nothing else has changed, your data is exactly as you left it.
+          {(studioName || 'Your studio')}: {issue.message} Nothing else has changed; your data is exactly as you left it.
         </p>
         {error && <p style={s.blockError}>{error}</p>}
-        <button onClick={handleAddBilling} disabled={loading} style={{ ...s.blockBtn, opacity: loading ? 0.6 : 1 }}>
-          {loading ? 'Starting checkout…' : 'Add billing'}
+        <button onClick={handleUpdateBilling} disabled={loading} style={{ ...s.blockBtn, opacity: loading ? 0.6 : 1 }}>
+          {loading ? 'Starting checkout…' : issue.action}
         </button>
         <button onClick={onSignOut} style={s.blockSignOutBtn}>Sign out</button>
       </div>
@@ -320,17 +353,6 @@ function ImportIcon({ size = 16 }) {
   );
 }
 
-function BuildingIcon({ size = 16 }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
-      <rect x="2" y="3" width="12" height="11" rx="1.5" stroke="currentColor" strokeWidth="1.2" />
-      <path d="M5 14V10h6v4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-      <path d="M5 7h1.5M9.5 7H11M5 5h1.5M9.5 5H11" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-      <path d="M2 6.5h12" stroke="currentColor" strokeWidth="1.2" />
-    </svg>
-  );
-}
-
 // ── Styles ────────────────────────────────────────────────────────────────────
 
 const s = {
@@ -354,27 +376,6 @@ const s = {
     height: '100vh',
     overflow: 'hidden',
     background: 'var(--bg-base)',
-  },
-  trialBanner: {
-    flexShrink: 0,
-    height: 36,
-    background: 'rgba(232,111,111,0.1)',
-    borderBottom: '1px solid rgba(232,111,111,0.25)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '0.75rem',
-  },
-  trialBannerText: {
-    fontSize: '0.78rem',
-    fontWeight: 600,
-    color: '#e86f6f',
-  },
-  trialBannerLink: {
-    fontSize: '0.78rem',
-    fontWeight: 700,
-    color: '#e86f6f',
-    textDecoration: 'underline',
   },
   blockPage: {
     minHeight: '100vh',
