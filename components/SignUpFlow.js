@@ -169,7 +169,9 @@ function IntroStep({ onNext }) {
 // Stylized, clickable preview of the studio dashboard — an illustration, not a literal
 // screenshot, so it needs no signed-in account or seeded data to render truthfully. The
 // sidebar icons and the feature cards below both drive the same `tab` state, so exploring
-// either one updates the mockup panel.
+// either one updates the mockup panel. Left alone, it auto-advances through all four on a
+// timer — the progress bar in the chrome row shows how long until the next flip — and
+// restarts that timer on every change so a manual click doesn't fight the next auto-flip.
 const PREVIEW_NAV = [
   { key: 'schedule', icon: HomeIcon },
   { key: 'schedule', icon: GridCalIcon },
@@ -178,14 +180,34 @@ const PREVIEW_NAV = [
   { key: 'analytics', icon: ChartIcon },
 ];
 
+const TAB_ORDER = ['schedule', 'clients', 'artists', 'analytics'];
+const PREVIEW_CYCLE_MS = 3200;
+
+const PREVIEW_KEYFRAMES = `
+@keyframes vantaPreviewProgress { from { width: 0%; } to { width: 100%; } }
+@keyframes vantaPreviewFade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+.vanta-preview-progress { animation: vantaPreviewProgress ${PREVIEW_CYCLE_MS}ms linear; }
+.vanta-preview-panel { animation: vantaPreviewFade 320ms ease; }
+`;
+
 function DashboardPreview({ tab, onTabChange }) {
-  const scheduleFilled = new Set([3, 9, 14, 18, 23]);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      onTabChange(TAB_ORDER[(TAB_ORDER.indexOf(tab) + 1) % TAB_ORDER.length]);
+    }, PREVIEW_CYCLE_MS);
+    return () => clearTimeout(timer);
+  }, [tab, onTabChange]);
+
   return (
     <div style={s.previewFrame}>
+      <style>{PREVIEW_KEYFRAMES}</style>
       <div style={s.previewChrome}>
         <span style={{ ...s.previewDot, background: '#e8756f' }} />
         <span style={{ ...s.previewDot, background: '#e8c56f' }} />
         <span style={{ ...s.previewDot, background: '#6fbf8a' }} />
+        <div style={s.previewProgressTrack}>
+          <div key={tab} className="vanta-preview-progress" style={s.previewProgressFill} />
+        </div>
       </div>
       <div style={s.previewBody}>
         <div style={s.previewSidebar}>
@@ -201,43 +223,117 @@ function DashboardPreview({ tab, onTabChange }) {
           ))}
         </div>
         <div style={s.previewMain}>
-          {tab === 'schedule' && (
-            <div style={s.previewCalGrid}>
-              {Array.from({ length: 28 }).map((_, i) => (
-                <div key={i} style={{ ...s.previewCalCell, ...(scheduleFilled.has(i) ? s.previewCalCellFilled : {}) }} />
-              ))}
-            </div>
-          )}
-          {tab === 'artists' && (
-            <div style={s.previewList}>
-              {[78, 52, 90].map((pct, i) => (
-                <div key={i} style={s.previewListRow}>
-                  <span style={s.previewAvatar} />
-                  <span style={s.previewBarTrack}><span style={{ ...s.previewBarFill, width: `${pct}%` }} /></span>
-                  <span style={s.previewListTag}>{pct}%</span>
-                </div>
-              ))}
-            </div>
-          )}
-          {tab === 'clients' && (
-            <div style={s.previewList}>
-              {[65, 88, 42].map((w, i) => (
-                <div key={i} style={s.previewListRow}>
-                  <span style={s.previewAvatar} />
-                  <span style={s.previewBarTrack}><span style={{ ...s.previewBarFill, width: `${w}%` }} /></span>
-                  <span style={s.previewListTagGood}>✓</span>
-                </div>
-              ))}
-            </div>
-          )}
-          {tab === 'analytics' && (
-            <div style={s.previewBarChart}>
-              {[35, 55, 40, 72, 50, 85, 60].map((h, i) => (
-                <span key={i} style={{ ...s.previewChartBar, height: `${h}%` }} />
-              ))}
-            </div>
-          )}
+          <div key={tab} className="vanta-preview-panel" style={{ height: '100%' }}>
+            {tab === 'schedule' && <SchedulePanel />}
+            {tab === 'artists' && <ArtistsPanel />}
+            {tab === 'clients' && <ClientsPanel />}
+            {tab === 'analytics' && <AnalyticsPanel />}
+          </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// A week view with a few colored appointment blocks of varying day/duration — reads as a
+// real schedule rather than a uniform grid of identical cells.
+function SchedulePanel() {
+  const events = [
+    { col: 0, row: 0, span: 2, color: 'rgba(245,236,217,0.6)' },
+    { col: 1, row: 2, span: 1, color: 'rgba(111,191,138,0.55)' },
+    { col: 2, row: 0, span: 3, color: 'rgba(245,236,217,0.6)' },
+    { col: 3, row: 1, span: 2, color: 'rgba(130,170,220,0.55)' },
+    { col: 4, row: 0, span: 1, color: 'rgba(111,191,138,0.55)' },
+    { col: 4, row: 2, span: 2, color: 'rgba(245,236,217,0.6)' },
+  ];
+  return (
+    <div style={s.scheduleGrid}>
+      <div style={s.scheduleBg}>
+        {Array.from({ length: 25 }).map((_, i) => <div key={i} style={s.scheduleBgCell} />)}
+      </div>
+      {events.map((e, i) => (
+        <div
+          key={i}
+          style={{
+            ...s.scheduleEvent,
+            left: `${e.col * 20 + 1}%`,
+            top: `${e.row * 20 + 2}%`,
+            height: `${e.span * 20 - 4}%`,
+            background: e.color,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+// Each row: avatar, name bar, station badge, commission %  — a dimmed row stands in for an
+// artist who's toggled off "accepting bookings".
+function ArtistsPanel() {
+  const rows = [
+    { name: 62, station: 'St. 1', pct: 78, active: true },
+    { name: 45, station: 'St. 2', pct: 52, active: true },
+    { name: 70, station: 'St. 3', pct: 90, active: false },
+  ];
+  return (
+    <div style={s.previewList}>
+      {rows.map((r, i) => (
+        <div key={i} style={{ ...s.previewListRow, opacity: r.active ? 1 : 0.4 }}>
+          <span style={s.previewAvatar} />
+          <span style={s.previewBarTrack}><span style={{ ...s.previewBarFill, width: `${r.name}%` }} /></span>
+          <span style={s.previewStationTag}>{r.station}</span>
+          <span style={s.previewListTag}>{r.pct}%</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Each row: avatar, name bar, then one of three consent/allergy states — showing the range
+// of statuses the real client list badges (consented / outdated / allergy note).
+function ClientsPanel() {
+  const rows = [
+    { name: 65, status: 'good' },
+    { name: 88, status: 'warn' },
+    { name: 42, status: 'allergy' },
+  ];
+  return (
+    <div style={s.previewList}>
+      {rows.map((r, i) => (
+        <div key={i} style={s.previewListRow}>
+          <span style={s.previewAvatar} />
+          <span style={s.previewBarTrack}><span style={{ ...s.previewBarFill, width: `${r.name}%` }} /></span>
+          {r.status === 'good' && <span style={s.previewListTagGood}>✓</span>}
+          {r.status === 'warn' && <span style={s.previewListTagWarn}>!</span>}
+          {r.status === 'allergy' && <span style={s.previewListTagAllergy}>⚠</span>}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// KPI chips (gross / net / payouts) above a bar chart — mirrors the real financial page's
+// top row plus its per-artist sales breakdown.
+function AnalyticsPanel() {
+  const bars = [35, 55, 40, 72, 50, 85, 60];
+  return (
+    <div style={s.analyticsWrap}>
+      <div style={s.analyticsKpiRow}>
+        <div style={s.analyticsKpi}>
+          <span style={s.analyticsKpiValue}>$12.4k</span>
+          <span style={s.analyticsKpiLabel}>Gross</span>
+        </div>
+        <div style={s.analyticsKpi}>
+          <span style={s.analyticsKpiValue}>$9.1k</span>
+          <span style={s.analyticsKpiLabel}>Net</span>
+        </div>
+        <div style={s.analyticsKpi}>
+          <span style={s.analyticsKpiValue}>$3.2k</span>
+          <span style={s.analyticsKpiLabel}>Payouts</span>
+        </div>
+      </div>
+      <div style={{ ...s.previewBarChart, flex: 1 }}>
+        {bars.map((h, i) => <span key={i} style={{ ...s.previewChartBar, height: `${h}%` }} />)}
       </div>
     </div>
   );
@@ -843,7 +939,21 @@ const s = {
     borderBottom: '1px solid rgba(255,255,255,0.06)',
   },
   previewDot: { width: 7, height: 7, borderRadius: '50%' },
-  previewBody: { display: 'flex', height: 118 },
+  previewProgressTrack: {
+    marginLeft: 'auto',
+    width: 56,
+    height: 3,
+    borderRadius: 2,
+    background: 'rgba(255,255,255,0.08)',
+    overflow: 'hidden',
+  },
+  previewProgressFill: {
+    display: 'block',
+    height: '100%',
+    width: '0%',
+    background: 'rgba(245,236,217,0.65)',
+  },
+  previewBody: { display: 'flex', height: 136 },
   previewSidebar: {
     display: 'flex',
     flexDirection: 'column',
@@ -872,18 +982,23 @@ const s = {
     color: '#f5ecd9',
   },
   previewMain: { flex: 1, padding: '0.65rem', display: 'flex', flexDirection: 'column', justifyContent: 'center' },
-  previewCalGrid: {
+  scheduleGrid: { position: 'relative', height: '100%' },
+  scheduleBg: {
+    position: 'absolute',
+    inset: 0,
     display: 'grid',
-    gridTemplateColumns: 'repeat(7, 1fr)',
-    gap: '4px',
-    height: '100%',
+    gridTemplateColumns: 'repeat(5, 1fr)',
+    gridTemplateRows: 'repeat(5, 1fr)',
+    gap: '3px',
   },
-  previewCalCell: {
+  scheduleBgCell: {
+    background: 'rgba(255,255,255,0.04)',
+    borderRadius: 2,
+  },
+  scheduleEvent: {
+    position: 'absolute',
+    width: '18%',
     borderRadius: 3,
-    background: 'rgba(255,255,255,0.05)',
-  },
-  previewCalCellFilled: {
-    background: 'rgba(245,236,217,0.55)',
   },
   previewList: {
     display: 'flex',
@@ -929,6 +1044,29 @@ const s = {
     width: 24,
     textAlign: 'right',
   },
+  previewListTagWarn: {
+    fontSize: '0.6rem',
+    fontWeight: 700,
+    color: '#e8c56f',
+    flexShrink: 0,
+    width: 24,
+    textAlign: 'right',
+  },
+  previewListTagAllergy: {
+    fontSize: '0.6rem',
+    color: '#e8756f',
+    flexShrink: 0,
+    width: 24,
+    textAlign: 'right',
+  },
+  previewStationTag: {
+    fontSize: '0.5rem',
+    color: 'rgba(255,255,255,0.4)',
+    background: 'rgba(255,255,255,0.06)',
+    borderRadius: 4,
+    padding: '0.1rem 0.35rem',
+    flexShrink: 0,
+  },
   previewBarChart: {
     display: 'flex',
     alignItems: 'flex-end',
@@ -939,6 +1077,33 @@ const s = {
     flex: 1,
     borderRadius: '2px 2px 0 0',
     background: 'rgba(245,236,217,0.5)',
+  },
+  analyticsWrap: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '0.5rem',
+    height: '100%',
+  },
+  analyticsKpiRow: {
+    display: 'flex',
+    gap: '0.6rem',
+  },
+  analyticsKpi: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 1,
+  },
+  analyticsKpiValue: {
+    fontSize: '0.65rem',
+    fontWeight: 700,
+    color: '#ffffff',
+  },
+  analyticsKpiLabel: {
+    fontSize: '0.45rem',
+    color: 'rgba(255,255,255,0.35)',
+    textTransform: 'uppercase',
+    letterSpacing: '0.03em',
   },
   errorBox: {
     fontSize: '0.8rem',
