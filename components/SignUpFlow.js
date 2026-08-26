@@ -7,12 +7,19 @@ import { getSupabase } from '@/lib/supabase';
 
 // ── Main flow ─────────────────────────────────────────────────────────────────
 
-export default function SignUpFlow({ onSwitchToSignIn }) {
+export default function SignUpFlow({ onSwitchToSignIn, onWideChange }) {
   const router = useRouter();
   const [step, setStep] = useState(0); // 0: intro, 1: account, 2: studio
   const [account, setAccount] = useState({ email: '', password: '', confirmPassword: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // The intro step has enough content (preview + feature grid) to earn a wider card;
+  // Account/Studio stay narrow, so tell the parent page which width to render.
+  useEffect(() => {
+    onWideChange?.(step === 0);
+    return () => onWideChange?.(false);
+  }, [step, onWideChange]);
 
   function handleAccountNext(data) {
     setAccount(data);
@@ -120,48 +127,69 @@ const PLAN_FEATURES = [
   },
 ];
 
+// Below ~620px viewport width the left/right columns stack (same as the old single-column
+// layout); above it, the preview + price/CTA sit beside the heading + feature list instead
+// of everything running in one long vertical stack.
+const INTRO_LAYOUT_CSS = `
+.vanta-intro-top { display: flex; flex-direction: column; gap: 1.5rem; }
+.vanta-intro-left { display: flex; flex-direction: column; gap: 1rem; }
+.vanta-intro-right { display: flex; flex-direction: column; gap: 1.1rem; }
+@media (min-width: 620px) {
+  .vanta-intro-top { flex-direction: row; align-items: flex-start; }
+  .vanta-intro-left { width: 270px; flex-shrink: 0; }
+  .vanta-intro-right { flex: 1; padding-top: 0.15rem; }
+}
+`;
+
 function IntroStep({ onNext }) {
   const [tab, setTab] = useState('schedule');
   return (
     <div style={s.introWrap}>
-      <DashboardPreview tab={tab} onTabChange={setTab} />
+      <style>{INTRO_LAYOUT_CSS}</style>
+      <div className="vanta-intro-top">
+        <div className="vanta-intro-left">
+          <DashboardPreview tab={tab} onTabChange={setTab} />
 
-      <div>
-        <h3 style={s.introTitle}>Everything your studio needs</h3>
-        <p style={s.introSubtitle}>Booking, clients, artists, and payouts — all in one dashboard.</p>
-      </div>
-
-      <div style={s.featureGrid}>
-        {PLAN_FEATURES.map(f => (
-          <button
-            type="button"
-            key={f.title}
-            onClick={() => setTab(f.key)}
-            style={{ ...s.featureCard, ...(tab === f.key ? s.featureCardActive : {}) }}
-          >
-            <div style={{ ...s.featureIconBadge, ...(tab === f.key ? s.featureIconBadgeActive : {}) }}>{f.icon}</div>
-            <div>
-              <div style={s.featureCardTitle}>{f.title}</div>
-              <div style={s.featureCardDesc}>{f.desc}</div>
+          <div style={s.planPriceCard}>
+            <span style={s.trialPill}>14-day free trial</span>
+            <div style={s.planPriceRow}>
+              <span style={s.planPriceAmount}>$60</span>
+              <span style={s.planPriceUnit}>/mo AUD</span>
             </div>
-          </button>
-        ))}
-      </div>
+            <p style={s.planPriceDetail}>Covers up to 6 artists, then $15/artist beyond that.</p>
+          </div>
 
-      <div style={s.planPriceCard}>
-        <span style={s.trialPill}>14-day free trial</span>
-        <div style={s.planPriceRow}>
-          <span style={s.planPriceAmount}>$60</span>
-          <span style={s.planPriceUnit}>/mo AUD</span>
+          <p style={s.trialNote}>
+            You won't be charged until the trial ends, and you can cancel anytime from Settings.
+          </p>
+
+          <button type="button" onClick={onNext} style={s.btn}>Get started</button>
         </div>
-        <p style={s.planPriceDetail}>Covers up to 6 artists, then $15/artist beyond that.</p>
+
+        <div className="vanta-intro-right">
+          <div>
+            <h3 style={s.introTitle}>Everything your studio needs</h3>
+            <p style={s.introSubtitle}>Booking, clients, artists, and payouts — all in one dashboard.</p>
+          </div>
+
+          <div style={s.featureGrid}>
+            {PLAN_FEATURES.map(f => (
+              <button
+                type="button"
+                key={f.title}
+                onClick={() => setTab(f.key)}
+                style={{ ...s.featureCard, ...(tab === f.key ? s.featureCardActive : {}) }}
+              >
+                <div style={{ ...s.featureIconBadge, ...(tab === f.key ? s.featureIconBadgeActive : {}) }}>{f.icon}</div>
+                <div>
+                  <div style={s.featureCardTitle}>{f.title}</div>
+                  <div style={s.featureCardDesc}>{f.desc}</div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
-
-      <p style={s.trialNote}>
-        You won't be charged until the trial ends, and you can cancel anytime from Settings.
-      </p>
-
-      <button type="button" onClick={onNext} style={s.btn}>Get started</button>
     </div>
   );
 }

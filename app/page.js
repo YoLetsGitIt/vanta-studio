@@ -15,6 +15,7 @@ export default function HomePage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(true);
+  const [wide, setWide] = useState(false); // sign-up's intro step has enough content to earn a wider card
 
   useEffect(() => {
     getSupabase()
@@ -54,7 +55,7 @@ export default function HomePage() {
     <div style={s.page}>
       <div style={s.noise} />
 
-      <div style={s.card}>
+      <div style={{ ...s.card, maxWidth: wide ? 720 : 420 }}>
         <div style={s.brand}>
           <span style={s.wordmark}>vanta</span>
           <span style={s.wordmarkSub}>studio</span>
@@ -63,7 +64,7 @@ export default function HomePage() {
         {/* Tab switcher */}
         <div style={s.tabs}>
           <button
-            onClick={() => { setTab('signin'); setError(''); }}
+            onClick={() => { setTab('signin'); setError(''); setWide(false); }}
             style={{ ...s.tab, ...(tab === 'signin' ? s.tabActive : {}) }}
           >
             Sign in
@@ -106,7 +107,7 @@ export default function HomePage() {
             </button>
           </form>
         ) : (
-          <SignUpFlow onSwitchToSignIn={() => setTab('signin')} />
+          <SignUpFlow onSwitchToSignIn={() => setTab('signin')} onWideChange={setWide} />
         )}
       </div>
     </div>
@@ -143,7 +144,6 @@ const s = {
   },
   card: {
     width: '100%',
-    maxWidth: 420,
     background: 'rgba(255,255,255,0.03)',
     border: '1px solid rgba(255,255,255,0.08)',
     borderRadius: 16,
@@ -151,6 +151,7 @@ const s = {
     backdropFilter: 'blur(12px)',
     position: 'relative',
     zIndex: 1,
+    transition: 'max-width 0.25s ease',
   },
   brand: {
     display: 'flex',
