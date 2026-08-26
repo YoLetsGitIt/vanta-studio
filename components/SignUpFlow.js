@@ -109,77 +109,63 @@ export default function SignUpFlow({ onSwitchToSignIn, onWideChange }) {
 
 const PLAN_FEATURES = [
   {
-    key: 'schedule',
     icon: <WidgetIcon />,
     title: 'Booking widget',
-    desc: 'A shareable link clients use to request a session, with deposits, 7-day/24-hour reminders, and a reschedule cutoff you control.',
+    desc: 'Shareable booking link with deposits, reminders, and a reschedule cutoff you control.',
   },
   {
-    key: 'branding',
     icon: <PaletteIcon />,
     title: 'Widget branding',
-    desc: 'Match the booking widget to your studio with custom colors, live-previewed, then drop a one-line embed snippet into your own site.',
+    desc: 'Match your site with custom colors, then drop in a one-line embed snippet.',
   },
   {
-    key: 'clients',
     icon: <PersonIcon />,
     title: 'Client records',
-    desc: 'Consent status, allergies, and full booking history per client — plus CSV import from your old system.',
+    desc: 'Consent status, allergies, and full booking history per client.',
   },
   {
-    key: 'consent',
     icon: <DocumentIcon />,
     title: 'Consent builder',
-    desc: 'Build your own consent and waiver forms from headings, checkboxes, and e-signature fields — guardian fields appear automatically for minors.',
+    desc: 'Build your own waiver forms with e-signatures and automatic guardian fields for minors.',
   },
   {
-    key: 'import',
     icon: <UploadIcon />,
     title: 'Migration import',
-    desc: 'Bring your history over from Square, Acuity, or Fresha with built-in column mapping, not just a blank CSV template.',
+    desc: 'Bring your history over from Square, Acuity, or Fresha — not just a blank CSV.',
   },
   {
-    key: 'artists',
     icon: <UsersIcon />,
     title: 'Artist management',
-    desc: 'Approve artists, assign stations, and set separate walk-in vs. personal commission splits — payouts track automatically.',
+    desc: 'Approve artists, assign stations, and split commissions — payouts track automatically.',
   },
   {
-    key: 'analytics',
     icon: <ChartIcon />,
     title: 'Analytics',
-    desc: 'Gross and net sales, sales-per-hour by artist, and payout/reimbursement tracking — always current.',
+    desc: 'Gross/net sales and payouts by artist, always current.',
   },
   {
-    key: 'billing',
     icon: <CardIcon />,
     title: 'Self-serve billing',
-    desc: 'Manage your own Vanta subscription — update the card on file, see your next payment, or cancel — separate from client payments entirely.',
+    desc: 'Manage your own subscription — separate from client payments entirely.',
   },
   {
-    key: 'language',
     icon: <GlobeIcon />,
     title: 'Multi-language',
-    desc: 'The full dashboard ships translated into English and Korean, with more languages to come as the studio base grows.',
+    desc: 'The full dashboard ships in English and Korean.',
   },
   {
-    key: 'push',
     icon: <BellIcon />,
     title: 'Push alerts',
-    desc: 'New bookings and payments reach your phone the moment they happen, so you never have to keep the dashboard open to stay on top of things.',
+    desc: 'New bookings and payments reach your phone the moment they happen.',
   },
 ];
 
-// The feature tabs drive everything below them (the sliding highlight, the preview panel,
-// and the description text) via a single activeIndex, auto-advancing on a timer unless the
-// visitor clicks a tab directly — clicking restarts the timer so it never fights them. Below
-// ~480px viewport width the tab labels drop to icon-only so more tabs fit before scrolling
-// kicks in. `.vanta-tabs-scroll` hides its native scrollbar since the row's own arrow
-// buttons (shown only when there's more to scroll to) are the intended affordance.
+// A responsive grid rather than a click-through carousel — with 10 features, showing them
+// all at once beats making a visitor hunt for the ones they care about. Two columns below
+// 680px, three above (matches the wide card's own breakpoint in app/page.js).
 const INTRO_LAYOUT_CSS = `
-@media (max-width: 480px) { .vanta-tab-label { display: none; } }
-.vanta-tabs-scroll { scrollbar-width: none; -ms-overflow-style: none; }
-.vanta-tabs-scroll::-webkit-scrollbar { display: none; }
+.vanta-feature-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.7rem; }
+@media (min-width: 680px) { .vanta-feature-grid { grid-template-columns: repeat(3, 1fr); } }
 .vanta-cta-bar { display: flex; flex-direction: column; gap: 1rem; }
 .vanta-cta-action { display: flex; flex-direction: column; gap: 0.6rem; }
 @media (min-width: 560px) {
@@ -189,31 +175,24 @@ const INTRO_LAYOUT_CSS = `
 }
 `;
 
-const PREVIEW_CYCLE_MS = 3400;
-
 function IntroStep({ onNext }) {
-  const [activeIndex, setActiveIndex] = useState(0);
-  const active = PLAN_FEATURES[activeIndex];
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setActiveIndex(i => (i + 1) % PLAN_FEATURES.length);
-    }, PREVIEW_CYCLE_MS);
-    return () => clearTimeout(timer);
-  }, [activeIndex]);
-
   return (
     <div style={s.introWrap}>
       <style>{INTRO_LAYOUT_CSS}</style>
 
-      <FeatureTabs features={PLAN_FEATURES} activeIndex={activeIndex} onSelect={setActiveIndex} />
+      <div>
+        <h3 style={s.introTitle}>Everything your studio needs</h3>
+        <p style={s.introSubtitle}>Booking, clients, artists, and payouts — all in one dashboard.</p>
+      </div>
 
-      <div style={s.explanationArea}>
-        <DashboardPreview tab={active.key} />
-        <div key={active.key} className="vanta-preview-panel">
-          <h3 style={s.introTitle}>{active.title}</h3>
-          <p style={s.introSubtitle}>{active.desc}</p>
-        </div>
+      <div className="vanta-feature-grid">
+        {PLAN_FEATURES.map(f => (
+          <div key={f.title} style={s.featureGridCard}>
+            <div style={s.featureIconBadge}>{f.icon}</div>
+            <div style={s.featureCardTitle}>{f.title}</div>
+            <div style={s.featureCardDesc}>{f.desc}</div>
+          </div>
+        ))}
       </div>
 
       <div className="vanta-cta-bar" style={s.ctaBar}>
@@ -233,381 +212,6 @@ function IntroStep({ onNext }) {
           <button type="button" onClick={onNext} className="vanta-btn" style={s.btn}>Get started</button>
         </div>
       </div>
-    </div>
-  );
-}
-
-// A segmented control whose highlight slides to sit behind whichever feature is active —
-// driven either by a click here or by IntroStep's auto-advance. With enough tabs to overflow
-// the card width, the row scrolls horizontally (native touch/trackpad scroll, plus arrow
-// buttons that only appear when there's more to scroll to); the active tab auto-scrolls into
-// view so auto-advance never leaves it hidden off-screen. The highlight's position is
-// measured from the actual DOM rather than computed as a fixed fraction, since tabs are
-// sized to their own content instead of stretched to equal widths.
-function FeatureTabs({ features, activeIndex, onSelect }) {
-  const tabRefs = useRef([]);
-  const scrollRef = useRef(null);
-  const [highlight, setHighlight] = useState({ left: 0, width: 0 });
-  const [canScrollLeft, setCanScrollLeft] = useState(false);
-  const [canScrollRight, setCanScrollRight] = useState(false);
-
-  const updateScrollButtons = useCallback(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    setCanScrollLeft(el.scrollLeft > 4);
-    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 4);
-  }, []);
-
-  useEffect(() => {
-    const el = tabRefs.current[activeIndex];
-    if (el) setHighlight({ left: el.offsetLeft, width: el.offsetWidth });
-    el?.scrollIntoView({ behavior: 'smooth', inline: 'nearest', block: 'nearest' });
-  }, [activeIndex, features]);
-
-  useEffect(() => {
-    updateScrollButtons();
-    window.addEventListener('resize', updateScrollButtons);
-    return () => window.removeEventListener('resize', updateScrollButtons);
-  }, [updateScrollButtons, features]);
-
-  function scrollByAmount(dir) {
-    scrollRef.current?.scrollBy({ left: dir * 180, behavior: 'smooth' });
-  }
-
-  return (
-    <div style={s.tabsOuter}>
-      {canScrollLeft && (
-        <button type="button" onClick={() => scrollByAmount(-1)} style={{ ...s.tabsArrow, left: -4 }} aria-label="Scroll tabs left">
-          <ChevronIcon direction="left" />
-        </button>
-      )}
-      <div ref={scrollRef} className="vanta-tabs-scroll" style={s.tabsScroll} onScroll={updateScrollButtons}>
-        <div style={s.tabsRow}>
-          <div style={{ ...s.tabsHighlight, left: highlight.left, width: highlight.width }} />
-          {features.map((f, i) => (
-            <button
-              key={f.title}
-              ref={el => { tabRefs.current[i] = el; }}
-              type="button"
-              onClick={() => onSelect(i)}
-              style={{ ...s.tabItem, ...(activeIndex === i ? s.tabItemActive : {}) }}
-            >
-              <span style={s.tabIcon}>{f.icon}</span>
-              <span className="vanta-tab-label" style={s.tabLabel}>{f.title}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-      {canScrollRight && (
-        <button type="button" onClick={() => scrollByAmount(1)} style={{ ...s.tabsArrow, right: -4 }} aria-label="Scroll tabs right">
-          <ChevronIcon direction="right" />
-        </button>
-      )}
-    </div>
-  );
-}
-
-function ChevronIcon({ direction = 'right', size = 12 }) {
-  const d = direction === 'left' ? 'M10 4l-4 4 4 4' : 'M6 4l4 4-4 4';
-  return (
-    <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
-      <path d={d} stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-// Stylized preview of the studio dashboard — an illustration, not a literal screenshot, so
-// it needs no signed-in account or seeded data to render truthfully. Purely reflects
-// whichever feature tab is active; the progress bar in the chrome row mirrors the same
-// auto-advance timer IntroStep drives the tabs with.
-const PREVIEW_NAV = [
-  { keys: ['schedule'], icon: HomeIcon },
-  { keys: ['schedule'], icon: GridCalIcon },
-  { keys: ['artists'], icon: UsersIcon },
-  { keys: ['clients', 'consent', 'import'], icon: PersonIcon },
-  { keys: ['analytics', 'billing'], icon: ChartIcon },
-  { keys: ['branding', 'language'], icon: GearIcon },
-];
-
-const PREVIEW_KEYFRAMES = `
-@keyframes vantaPreviewProgress { from { width: 0%; } to { width: 100%; } }
-@keyframes vantaPreviewFade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
-.vanta-preview-progress { animation: vantaPreviewProgress ${PREVIEW_CYCLE_MS}ms linear; }
-.vanta-preview-panel { animation: vantaPreviewFade 320ms ease; }
-`;
-
-function DashboardPreview({ tab }) {
-  return (
-    <div style={s.previewFrame}>
-      <style>{PREVIEW_KEYFRAMES}</style>
-      <div style={s.previewChrome}>
-        <span style={{ ...s.previewDot, background: '#e8756f' }} />
-        <span style={{ ...s.previewDot, background: '#e8c56f' }} />
-        <span style={{ ...s.previewDot, background: '#6fbf8a' }} />
-        <div style={s.previewProgressTrack}>
-          <div key={tab} className="vanta-preview-progress" style={s.previewProgressFill} />
-        </div>
-      </div>
-      <div style={s.previewBody}>
-        <div style={s.previewSidebar}>
-          {PREVIEW_NAV.map(({ keys, icon: Icon }, i) => (
-            <div key={i} style={{ ...s.previewSidebarIcon, ...(keys.includes(tab) ? s.previewSidebarIconActive : {}) }}>
-              <Icon size={11} />
-            </div>
-          ))}
-        </div>
-        <div style={s.previewMain}>
-          <div key={tab} className="vanta-preview-panel" style={{ height: '100%' }}>
-            {tab === 'schedule' && <SchedulePanel />}
-            {tab === 'artists' && <ArtistsPanel />}
-            {tab === 'clients' && <ClientsPanel />}
-            {tab === 'analytics' && <AnalyticsPanel />}
-            {tab === 'branding' && <BrandingPanel />}
-            {tab === 'consent' && <ConsentBuilderPanel />}
-            {tab === 'import' && <ImportPanel />}
-            {tab === 'billing' && <BillingPanel />}
-            {tab === 'language' && <LanguagePanel />}
-            {tab === 'push' && <PushPanel />}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// A week view with a few colored appointment blocks of varying day/duration — reads as a
-// real schedule rather than a uniform grid of identical cells.
-function SchedulePanel() {
-  const events = [
-    { col: 0, row: 0, span: 2, color: 'rgba(245,236,217,0.6)' },
-    { col: 1, row: 2, span: 1, color: 'rgba(111,191,138,0.55)' },
-    { col: 2, row: 0, span: 3, color: 'rgba(245,236,217,0.6)' },
-    { col: 3, row: 1, span: 2, color: 'rgba(130,170,220,0.55)' },
-    { col: 4, row: 0, span: 1, color: 'rgba(111,191,138,0.55)' },
-    { col: 4, row: 2, span: 2, color: 'rgba(245,236,217,0.6)' },
-  ];
-  return (
-    <div style={s.scheduleGrid}>
-      <div style={s.scheduleBg}>
-        {Array.from({ length: 25 }).map((_, i) => <div key={i} style={s.scheduleBgCell} />)}
-      </div>
-      {events.map((e, i) => (
-        <div
-          key={i}
-          style={{
-            ...s.scheduleEvent,
-            left: `${e.col * 20 + 1}%`,
-            top: `${e.row * 20 + 2}%`,
-            height: `${e.span * 20 - 4}%`,
-            background: e.color,
-          }}
-        />
-      ))}
-    </div>
-  );
-}
-
-// Each row: avatar, name bar, station badge, commission %  — a dimmed row stands in for an
-// artist who's toggled off "accepting bookings".
-function ArtistsPanel() {
-  const rows = [
-    { name: 62, station: 'St. 1', pct: 78, active: true },
-    { name: 45, station: 'St. 2', pct: 52, active: true },
-    { name: 70, station: 'St. 3', pct: 90, active: false },
-  ];
-  return (
-    <div style={s.previewList}>
-      {rows.map((r, i) => (
-        <div key={i} style={{ ...s.previewListRow, opacity: r.active ? 1 : 0.4 }}>
-          <span style={s.previewAvatar} />
-          <span style={s.previewBarTrack}><span style={{ ...s.previewBarFill, width: `${r.name}%` }} /></span>
-          <span style={s.previewStationTag}>{r.station}</span>
-          <span style={s.previewListTag}>{r.pct}%</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// Each row: avatar, name bar, then one of three consent/allergy states — showing the range
-// of statuses the real client list badges (consented / outdated / allergy note).
-function ClientsPanel() {
-  const rows = [
-    { name: 65, status: 'good' },
-    { name: 88, status: 'warn' },
-    { name: 42, status: 'allergy' },
-  ];
-  return (
-    <div style={s.previewList}>
-      {rows.map((r, i) => (
-        <div key={i} style={s.previewListRow}>
-          <span style={s.previewAvatar} />
-          <span style={s.previewBarTrack}><span style={{ ...s.previewBarFill, width: `${r.name}%` }} /></span>
-          {r.status === 'good' && <span style={s.previewListTagGood}>✓</span>}
-          {r.status === 'warn' && <span style={s.previewListTagWarn}>!</span>}
-          {r.status === 'allergy' && <span style={s.previewListTagAllergy}>⚠</span>}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// KPI chips (gross / net / payouts) above a bar chart — mirrors the real financial page's
-// top row plus its per-artist sales breakdown.
-function AnalyticsPanel() {
-  const bars = [35, 55, 40, 72, 50, 85, 60];
-  return (
-    <div style={s.analyticsWrap}>
-      <div style={s.analyticsKpiRow}>
-        <div style={s.analyticsKpi}>
-          <span style={s.analyticsKpiValue}>$12.4k</span>
-          <span style={s.analyticsKpiLabel}>Gross</span>
-        </div>
-        <div style={s.analyticsKpi}>
-          <span style={s.analyticsKpiValue}>$9.1k</span>
-          <span style={s.analyticsKpiLabel}>Net</span>
-        </div>
-        <div style={s.analyticsKpi}>
-          <span style={s.analyticsKpiValue}>$3.2k</span>
-          <span style={s.analyticsKpiLabel}>Payouts</span>
-        </div>
-      </div>
-      <div style={{ ...s.previewBarChart, flex: 1 }}>
-        {bars.map((h, i) => <span key={i} style={{ ...s.previewChartBar, height: `${h}%` }} />)}
-      </div>
-    </div>
-  );
-}
-
-// A color swatch row (one selected) above a faux code snippet — the two halves of widget
-// branding: pick your colors, then embed the result.
-function BrandingPanel() {
-  const colors = ['#f5ecd9', '#6fbf8a', '#82aadc', '#e8756f', '#e8c56f'];
-  return (
-    <div style={s.brandingWrap}>
-      <div style={s.brandingSwatchRow}>
-        {colors.map((c, i) => (
-          <span key={c} style={{ ...s.brandingSwatch, background: c, ...(i === 0 ? s.brandingSwatchActive : {}) }} />
-        ))}
-      </div>
-      <div style={s.brandingCodeBlock}>
-        <div style={{ ...s.brandingCodeLine, width: '55%' }} />
-        <div style={{ ...s.brandingCodeLine, width: '80%' }} />
-        <div style={{ ...s.brandingCodeLine, width: '65%' }} />
-      </div>
-    </div>
-  );
-}
-
-// A few form-field rows (heading + two checkboxes) ending in a signature line — the shape of
-// the actual consent builder rather than an abstract document icon.
-function ConsentBuilderPanel() {
-  return (
-    <div style={s.consentWrap}>
-      <div style={s.consentFieldRow}>
-        <span style={s.consentFieldIcon}>H</span>
-        <span style={s.previewBarTrack}><span style={{ ...s.previewBarFill, width: '58%' }} /></span>
-      </div>
-      <div style={s.consentFieldRow}>
-        <span style={s.consentCheckbox} />
-        <span style={s.previewBarTrack}><span style={{ ...s.previewBarFill, width: '75%' }} /></span>
-      </div>
-      <div style={s.consentFieldRow}>
-        <span style={s.consentCheckbox} />
-        <span style={s.previewBarTrack}><span style={{ ...s.previewBarFill, width: '48%' }} /></span>
-      </div>
-      <div style={s.consentSignatureLine} />
-    </div>
-  );
-}
-
-// Three named source platforms migrating in at different completion — reads as a real
-// migration in progress rather than a generic "upload a file" icon.
-function ImportPanel() {
-  const platforms = [
-    { name: 'Square', pct: 100 },
-    { name: 'Acuity', pct: 100 },
-    { name: 'Fresha', pct: 82 },
-  ];
-  return (
-    <div style={s.previewList}>
-      {platforms.map(p => (
-        <div key={p.name} style={s.previewListRow}>
-          <span style={s.importPlatformTag}>{p.name}</span>
-          <span style={s.previewBarTrack}><span style={{ ...s.previewBarFill, width: `${p.pct}%` }} /></span>
-          <span style={s.previewListTagGood}>{p.pct === 100 ? '✓' : `${p.pct}%`}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// Card on file + an "Active" status alongside the next-payment KPI — the studio's OWN
-// subscription, deliberately styled like AnalyticsPanel's KPI row to read as "also billing,
-// but not the client-facing kind".
-function BillingPanel() {
-  return (
-    <div style={s.billingWrap}>
-      <div style={s.billingCardRow}>
-        <span style={s.billingCardBadge}>VISA</span>
-        <span style={s.billingCardNumber}>•••• 4242</span>
-        <span style={s.previewListTagGood}>Active</span>
-      </div>
-      <div style={s.analyticsKpiRow}>
-        <div style={s.analyticsKpi}>
-          <span style={s.analyticsKpiValue}>$60</span>
-          <span style={s.analyticsKpiLabel}>Next payment</span>
-        </div>
-        <div style={s.analyticsKpi}>
-          <span style={s.analyticsKpiValue}>Sep 12</span>
-          <span style={s.analyticsKpiLabel}>Renews</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// EN/KO chips above a few real translated dashboard labels — showing actual Korean glyphs
-// makes the claim concrete instead of a generic "globe" gesture.
-function LanguagePanel() {
-  const rows = [['Dashboard', '대시보드'], ['Clients', '고객'], ['Schedule', '일정']];
-  return (
-    <div style={s.languageWrap}>
-      <div style={s.languageChipRow}>
-        <span style={{ ...s.languageChip, ...s.languageChipActive }}>EN</span>
-        <span style={s.languageChip}>한국어</span>
-      </div>
-      <div style={s.previewList}>
-        {rows.map(([en, ko]) => (
-          <div key={en} style={s.languageRow}>
-            <span style={s.languageEn}>{en}</span>
-            <span style={s.languageArrow}>→</span>
-            <span style={s.languageKo}>{ko}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// Two stacked phone-style notification banners — concrete examples (a booking, a payment)
-// rather than an abstract bell.
-function PushPanel() {
-  const notifs = [
-    { title: 'New booking request', body: 'Sarah requested Sat 2:00pm' },
-    { title: 'Payment received', body: '$120 deposit — Jordan' },
-  ];
-  return (
-    <div style={s.pushWrap}>
-      {notifs.map(n => (
-        <div key={n.title} style={s.pushBanner}>
-          <span style={s.pushDot} />
-          <div>
-            <div style={s.pushTitle}>{n.title}</div>
-            <div style={s.pushBody}>{n.body}</div>
-          </div>
-        </div>
-      ))}
     </div>
   );
 }
@@ -647,26 +251,6 @@ function ChartIcon({ size = 18 }) {
     <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
       <path d="M2 12l3.5-4 3 2.5L12 5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
       <circle cx="12" cy="5" r="1.2" fill="currentColor" />
-    </svg>
-  );
-}
-
-function HomeIcon({ size = 18 }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
-      <path d="M2 6.5L8 2l6 4.5V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V6.5Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
-      <path d="M6 15v-5h4v5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-function GridCalIcon({ size = 18 }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
-      <rect x="1.5" y="2.5" width="13" height="12" rx="1.5" stroke="currentColor" strokeWidth="1.2" />
-      <path d="M1.5 6.5h13" stroke="currentColor" strokeWidth="1.2" />
-      <path d="M5.5 1.5v2M10.5 1.5v2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-      <path d="M4.5 9.5h2M9.5 9.5h2M4.5 12h2M9.5 12h2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
     </svg>
   );
 }
@@ -725,15 +309,6 @@ function BellIcon({ size = 18 }) {
     <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
       <path d="M4 6.5a4 4 0 1 1 8 0c0 3 1 4 1 4H3s1-1 1-4Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
       <path d="M6.5 12.5a1.5 1.5 0 0 0 3 0" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function GearIcon({ size = 18 }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
-      <circle cx="8" cy="8" r="2.2" stroke="currentColor" strokeWidth="1.2" />
-      <path d="M8 1.8v1.6M8 12.6v1.6M14.2 8h-1.6M3.4 8H1.8M12.3 3.7l-1.1 1.1M4.8 11.2l-1.1 1.1M12.3 12.3l-1.1-1.1M4.8 4.8 3.7 3.7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
     </svg>
   );
 }
@@ -1221,74 +796,35 @@ const s = {
     textDecoration: 'underline',
     textUnderlineOffset: 3,
   },
-  tabsOuter: {
-    position: 'relative',
-    display: 'flex',
-    alignItems: 'center',
-  },
-  tabsScroll: {
-    overflowX: 'auto',
-    flex: 1,
-  },
-  tabsArrow: {
-    position: 'absolute',
-    top: '50%',
-    transform: 'translateY(-50%)',
-    zIndex: 2,
-    width: 26,
-    height: 26,
-    borderRadius: '50%',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    background: '#151b24',
-    border: '1px solid rgba(255,255,255,0.15)',
-    boxShadow: '0 2px 10px rgba(0,0,0,0.4)',
-    color: 'rgba(255,255,255,0.7)',
-    cursor: 'pointer',
-    padding: 0,
-  },
-  tabsRow: {
-    position: 'relative',
-    display: 'flex',
-    gap: 2,
-    width: 'max-content',
-    background: 'rgba(255,255,255,0.03)',
-    border: '1px solid rgba(255,255,255,0.08)',
-    borderRadius: 10,
-    padding: 4,
-  },
-  tabsHighlight: {
-    position: 'absolute',
-    top: 4,
-    bottom: 4,
-    borderRadius: 7,
-    background: 'rgba(245,236,217,0.12)',
-    border: '1px solid rgba(245,236,217,0.28)',
-    transition: 'left 0.35s ease, width 0.35s ease',
-  },
-  tabItem: {
-    position: 'relative',
-    zIndex: 1,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '0.4rem',
-    padding: '0.65rem 0.8rem',
-    background: 'none',
-    border: 'none',
-    color: 'rgba(255,255,255,0.4)',
-    cursor: 'pointer',
-    whiteSpace: 'nowrap',
-    transition: 'color 0.2s',
-  },
-  tabItemActive: { color: '#f5ecd9' },
-  tabIcon: { display: 'flex', alignItems: 'center', flexShrink: 0 },
-  tabLabel: { fontSize: '0.78rem', fontWeight: 600, whiteSpace: 'nowrap' },
-  explanationArea: {
+  featureGridCard: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '1.1rem',
+    gap: '0.4rem',
+    padding: '0.85rem',
+    background: 'rgba(255,255,255,0.03)',
+    border: '1px solid rgba(255,255,255,0.07)',
+    borderRadius: 10,
+  },
+  featureIconBadge: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 30,
+    height: 30,
+    flexShrink: 0,
+    borderRadius: 8,
+    background: 'rgba(245,236,217,0.12)',
+    color: '#f5ecd9',
+  },
+  featureCardTitle: {
+    fontSize: '0.83rem',
+    fontWeight: 600,
+    color: '#ffffff',
+  },
+  featureCardDesc: {
+    fontSize: '0.75rem',
+    color: 'rgba(255,255,255,0.5)',
+    lineHeight: 1.45,
   },
   introTitle: {
     fontSize: '1.3rem',
@@ -1346,289 +882,6 @@ const s = {
     color: 'rgba(255,255,255,0.55)',
     margin: '0.35rem 0 0',
   },
-  previewFrame: {
-    borderRadius: 12,
-    overflow: 'hidden',
-    border: '1px solid rgba(255,255,255,0.08)',
-    background: '#11161d',
-    boxShadow: '0 12px 32px rgba(0,0,0,0.35)',
-  },
-  previewChrome: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '5px',
-    padding: '0.55rem 0.7rem',
-    background: 'rgba(255,255,255,0.03)',
-    borderBottom: '1px solid rgba(255,255,255,0.06)',
-  },
-  previewDot: { width: 7, height: 7, borderRadius: '50%' },
-  previewProgressTrack: {
-    marginLeft: 'auto',
-    width: 56,
-    height: 3,
-    borderRadius: 2,
-    background: 'rgba(255,255,255,0.08)',
-    overflow: 'hidden',
-  },
-  previewProgressFill: {
-    display: 'block',
-    height: '100%',
-    width: '0%',
-    background: 'rgba(245,236,217,0.65)',
-  },
-  previewBody: { display: 'flex', height: 210 },
-  previewSidebar: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    gap: '0.5rem',
-    padding: '0.6rem 0.45rem',
-    background: 'rgba(255,255,255,0.02)',
-    borderRight: '1px solid rgba(255,255,255,0.06)',
-  },
-  previewSidebarIcon: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: 20,
-    height: 20,
-    borderRadius: 5,
-    color: 'rgba(255,255,255,0.3)',
-    background: 'none',
-    border: 'none',
-    padding: 0,
-    cursor: 'pointer',
-    transition: 'background 0.15s, color 0.15s',
-  },
-  previewSidebarIconActive: {
-    background: 'rgba(245,236,217,0.14)',
-    color: '#f5ecd9',
-  },
-  previewMain: { flex: 1, padding: '0.65rem', display: 'flex', flexDirection: 'column', justifyContent: 'center' },
-  scheduleGrid: { position: 'relative', height: '100%' },
-  scheduleBg: {
-    position: 'absolute',
-    inset: 0,
-    display: 'grid',
-    gridTemplateColumns: 'repeat(5, 1fr)',
-    gridTemplateRows: 'repeat(5, 1fr)',
-    gap: '3px',
-  },
-  scheduleBgCell: {
-    background: 'rgba(255,255,255,0.04)',
-    borderRadius: 2,
-  },
-  scheduleEvent: {
-    position: 'absolute',
-    width: '18%',
-    borderRadius: 3,
-  },
-  previewList: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '0.55rem',
-  },
-  previewListRow: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '0.45rem',
-  },
-  previewAvatar: {
-    width: 16,
-    height: 16,
-    borderRadius: '50%',
-    flexShrink: 0,
-    background: 'rgba(255,255,255,0.12)',
-  },
-  previewBarTrack: {
-    flex: 1,
-    height: 6,
-    borderRadius: 3,
-    background: 'rgba(255,255,255,0.06)',
-    overflow: 'hidden',
-  },
-  previewBarFill: {
-    display: 'block',
-    height: '100%',
-    borderRadius: 3,
-    background: 'rgba(245,236,217,0.5)',
-  },
-  previewListTag: {
-    fontSize: '0.55rem',
-    color: 'rgba(255,255,255,0.35)',
-    flexShrink: 0,
-    width: 24,
-    textAlign: 'right',
-  },
-  previewListTagGood: {
-    fontSize: '0.6rem',
-    color: '#4cc98a',
-    flexShrink: 0,
-    width: 24,
-    textAlign: 'right',
-  },
-  previewListTagWarn: {
-    fontSize: '0.6rem',
-    fontWeight: 700,
-    color: '#e8c56f',
-    flexShrink: 0,
-    width: 24,
-    textAlign: 'right',
-  },
-  previewListTagAllergy: {
-    fontSize: '0.6rem',
-    color: '#e8756f',
-    flexShrink: 0,
-    width: 24,
-    textAlign: 'right',
-  },
-  previewStationTag: {
-    fontSize: '0.5rem',
-    color: 'rgba(255,255,255,0.4)',
-    background: 'rgba(255,255,255,0.06)',
-    borderRadius: 4,
-    padding: '0.1rem 0.35rem',
-    flexShrink: 0,
-  },
-  previewBarChart: {
-    display: 'flex',
-    alignItems: 'flex-end',
-    gap: '5px',
-    height: '100%',
-  },
-  previewChartBar: {
-    flex: 1,
-    borderRadius: '2px 2px 0 0',
-    background: 'rgba(245,236,217,0.5)',
-  },
-  analyticsWrap: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '0.5rem',
-    height: '100%',
-  },
-  analyticsKpiRow: {
-    display: 'flex',
-    gap: '0.6rem',
-  },
-  analyticsKpi: {
-    flex: 1,
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 1,
-  },
-  analyticsKpiValue: {
-    fontSize: '0.65rem',
-    fontWeight: 700,
-    color: '#ffffff',
-  },
-  analyticsKpiLabel: {
-    fontSize: '0.45rem',
-    color: 'rgba(255,255,255,0.35)',
-    textTransform: 'uppercase',
-    letterSpacing: '0.03em',
-  },
-  brandingWrap: { display: 'flex', flexDirection: 'column', gap: '0.7rem', height: '100%', justifyContent: 'center' },
-  brandingSwatchRow: { display: 'flex', gap: '0.5rem' },
-  brandingSwatch: { width: 22, height: 22, borderRadius: '50%', border: '2px solid transparent' },
-  brandingSwatchActive: { border: '2px solid #ffffff', boxShadow: '0 0 0 2px rgba(0,0,0,0.4)' },
-  brandingCodeBlock: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '0.4rem',
-    background: 'rgba(255,255,255,0.04)',
-    border: '1px solid rgba(255,255,255,0.08)',
-    borderRadius: 6,
-    padding: '0.6rem 0.7rem',
-  },
-  brandingCodeLine: { height: 6, borderRadius: 3, background: 'rgba(111,191,138,0.4)' },
-  consentWrap: { display: 'flex', flexDirection: 'column', gap: '0.55rem', height: '100%', justifyContent: 'center' },
-  consentFieldRow: { display: 'flex', alignItems: 'center', gap: '0.5rem' },
-  consentFieldIcon: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: 16,
-    height: 16,
-    borderRadius: 4,
-    fontSize: '0.6rem',
-    fontWeight: 700,
-    background: 'rgba(255,255,255,0.08)',
-    color: 'rgba(255,255,255,0.5)',
-    flexShrink: 0,
-  },
-  consentCheckbox: {
-    width: 12,
-    height: 12,
-    borderRadius: 3,
-    border: '1.5px solid rgba(245,236,217,0.5)',
-    flexShrink: 0,
-  },
-  consentSignatureLine: {
-    marginTop: '0.2rem',
-    height: 1,
-    background: 'rgba(255,255,255,0.15)',
-    position: 'relative',
-  },
-  importPlatformTag: {
-    fontSize: '0.62rem',
-    fontWeight: 600,
-    color: 'rgba(255,255,255,0.6)',
-    width: 46,
-    flexShrink: 0,
-  },
-  billingWrap: { display: 'flex', flexDirection: 'column', gap: '0.8rem', height: '100%', justifyContent: 'center' },
-  billingCardRow: { display: 'flex', alignItems: 'center', gap: '0.5rem' },
-  billingCardBadge: {
-    fontSize: '0.55rem',
-    fontWeight: 700,
-    color: '#0d1017',
-    background: '#f5ecd9',
-    borderRadius: 4,
-    padding: '0.15rem 0.35rem',
-    flexShrink: 0,
-  },
-  billingCardNumber: { fontSize: '0.72rem', color: 'rgba(255,255,255,0.6)', flex: 1 },
-  languageWrap: { display: 'flex', flexDirection: 'column', gap: '0.7rem', height: '100%', justifyContent: 'center' },
-  languageChipRow: { display: 'flex', gap: '0.4rem' },
-  languageChip: {
-    fontSize: '0.62rem',
-    fontWeight: 600,
-    color: 'rgba(255,255,255,0.4)',
-    background: 'rgba(255,255,255,0.05)',
-    border: '1px solid rgba(255,255,255,0.08)',
-    borderRadius: 999,
-    padding: '0.2rem 0.6rem',
-  },
-  languageChipActive: {
-    color: '#f5ecd9',
-    background: 'rgba(245,236,217,0.12)',
-    border: '1px solid rgba(245,236,217,0.3)',
-  },
-  languageRow: { display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.72rem' },
-  languageEn: { color: 'rgba(255,255,255,0.55)', width: 58, flexShrink: 0 },
-  languageArrow: { color: 'rgba(255,255,255,0.25)', flexShrink: 0 },
-  languageKo: { color: '#f5ecd9', fontWeight: 500 },
-  pushWrap: { display: 'flex', flexDirection: 'column', gap: '0.5rem', height: '100%', justifyContent: 'center' },
-  pushBanner: {
-    display: 'flex',
-    alignItems: 'flex-start',
-    gap: '0.5rem',
-    background: 'rgba(255,255,255,0.05)',
-    border: '1px solid rgba(255,255,255,0.08)',
-    borderRadius: 8,
-    padding: '0.5rem 0.65rem',
-  },
-  pushDot: {
-    width: 8,
-    height: 8,
-    borderRadius: '50%',
-    background: '#82aadc',
-    flexShrink: 0,
-    marginTop: 3,
-  },
-  pushTitle: { fontSize: '0.7rem', fontWeight: 600, color: '#ffffff' },
-  pushBody: { fontSize: '0.65rem', color: 'rgba(255,255,255,0.45)', marginTop: 1 },
   errorBox: {
     fontSize: '0.8rem',
     color: '#e86f6f',
