@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { registerStudio, searchStudios } from '@/lib/api';
 import { getSupabase } from '@/lib/supabase';
@@ -113,54 +114,63 @@ const PLAN_FEATURES = [
     img: '/signup/booking-widget.png',
     title: 'Booking widget',
     desc: 'A shareable link and QR code clients use to request a session — deposits, reminders, and a reschedule cutoff, all handled for you.',
+    detail: 'Clients scan a QR code or click your link to request a session straight into your calendar. Deposits, 7-day and 24-hour email reminders, and a reschedule cutoff you set are all built in — no back-and-forth DMs.',
   },
   {
     icon: <PaletteIcon />,
     img: '/signup/widget-branding.png',
     title: 'Widget branding',
     desc: 'Recolor the widget to match your studio in seconds, then drop a one-line embed snippet into your own site — no code required.',
+    detail: 'Pick a background and highlight color to match your own site, watch the live preview update instantly, then copy a single embed snippet — one div and one script tag — onto any page you control.',
   },
   {
     icon: <ChecklistIcon />,
     img: '/signup/custom-booking-form.png',
     title: 'Custom booking form',
     desc: 'Turn any field on or off — placement, size, skin tone, reference photos — and mark exactly which ones are required. Your form, your rules.',
+    detail: 'Every field beyond name, date of birth, email, and phone is optional — turn on artist preference, placement, size, skin tone, reference photos, or allergies individually, and mark any of them as required. Nothing you don\'t need, everything you do.',
   },
   {
     icon: <DocumentIcon />,
     img: '/signup/consent-builder.png',
     title: 'Consent builder',
     desc: 'Design your own waiver from headings, checkboxes, and e-signatures — guardian fields appear automatically for clients under 18.',
+    detail: 'Compose your own waiver from headings, paragraphs, checkboxes, and yes/no fields, require an e-signature, and the form automatically adds a guardian-consent section the moment a client\'s date of birth shows they\'re under 18.',
   },
   {
     icon: <PersonIcon />,
     img: '/signup/client-records.png',
     title: 'Client records',
     desc: 'Every client\'s consent status, allergies, and full booking history — searchable in seconds.',
+    detail: 'Every client gets a running profile: consent status against your current template, any noted allergies, and their full booking history — all searchable by name, email, or phone in one box.',
   },
   {
     icon: <UsersIcon />,
     art: <MiniArtists />,
     title: 'Artist management',
     desc: 'Approve artists, assign stations, and set walk-in vs. personal commission splits — payouts track themselves.',
+    detail: 'Review pending artist applications, approve or reject them, assign physical stations, and set separate commission percentages for walk-in versus artist-sourced bookings — payouts calculate themselves from there.',
   },
   {
     icon: <ChartIcon />,
     img: '/signup/analytics.png',
     title: 'Analytics',
     desc: 'Appointment counts, revenue, and a studio-vs-personal split, updated in real time.',
+    detail: 'Appointment counts broken into completed, confirmed, pending, cancelled, and no-show, plus revenue and a studio-vs-personal booking split — filterable by week, month, or a custom date range.',
   },
   {
     icon: <GlobeIcon />,
     img: '/signup/multi-language.png',
     title: 'Multi-language',
     desc: 'The entire dashboard is available in English, Simplified Chinese, and Korean — switch anytime from Settings.',
+    detail: 'Switch the entire dashboard — every label, button, and page — between English, Simplified Chinese, and Korean from Settings, no page reload required.',
   },
   {
     icon: <UploadIcon />,
     img: '/signup/migration-import.png',
     title: 'Migration import',
     desc: 'Already on Square, Acuity, or Fresha? Bring your client history over with built-in column mapping.',
+    detail: 'Export your client and appointment history from Square Appointments, Acuity, or Fresha as a CSV, and Vanta maps the columns automatically instead of leaving you to match fields by hand.',
   },
 ];
 
@@ -171,6 +181,8 @@ const PLAN_FEATURES = [
 const INTRO_LAYOUT_CSS = `
 .vanta-feature-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.7rem; }
 @media (min-width: 680px) { .vanta-feature-grid { grid-template-columns: repeat(3, 1fr); } }
+.vanta-feature-card { transition: background 0.15s ease, border-color 0.15s ease; cursor: pointer; }
+.vanta-feature-card:hover { background: rgba(255,255,255,0.05); border-color: rgba(245,236,217,0.25); }
 .vanta-cta-bar { display: flex; flex-direction: column; gap: 1rem; }
 .vanta-cta-action { display: flex; flex-direction: column; gap: 0.6rem; }
 @media (min-width: 560px) {
@@ -178,9 +190,30 @@ const INTRO_LAYOUT_CSS = `
   .vanta-cta-price { flex-shrink: 0; width: 230px; }
   .vanta-cta-action { flex: 1; }
 }
+@keyframes vantaModalIn { from { opacity: 0; transform: scale(0.96) translateY(6px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+.vanta-modal-panel { animation: vantaModalIn 0.18s ease; pointer-events: auto; }
+/* On hover-capable devices the backdrop lets the cursor pass through to whatever card is
+   underneath — otherwise the backdrop itself (which covers the hovered card) would fire
+   that card's mouseleave the instant the modal appears, closing it immediately. Touch
+   devices have no hover to protect, so the backdrop stays clickable there for "tap
+   outside to close". */
+.vanta-modal-backdrop { pointer-events: none; }
+@media (hover: none) { .vanta-modal-backdrop { pointer-events: auto; } }
 `;
 
 function IntroStep({ onNext }) {
+  const [activeFeature, setActiveFeature] = useState(null);
+  // Only wire hover handlers on devices that actually support hover. Without this gate,
+  // Playwright (and some real touch browsers) still dispatch mouseenter/mouseleave during
+  // a tap's internal pointer path, which could pop the modal for a card the finger only
+  // passed over — and once open, the touch-only backdrop (pointer-events: auto, so a real
+  // tap can dismiss it) would then swallow the actual tap meant for a different card.
+  // Touch devices get tap-to-toggle only, via onClick.
+  const [supportsHover, setSupportsHover] = useState(false);
+  useEffect(() => {
+    setSupportsHover(window.matchMedia('(hover: hover)').matches);
+  }, []);
+
   return (
     <div style={s.introWrap}>
       <style>{INTRO_LAYOUT_CSS}</style>
@@ -192,7 +225,14 @@ function IntroStep({ onNext }) {
 
       <div className="vanta-feature-grid">
         {PLAN_FEATURES.map(f => (
-          <div key={f.title} style={s.featureGridCard}>
+          <div
+            key={f.title}
+            className="vanta-feature-card"
+            style={s.featureGridCard}
+            onMouseEnter={supportsHover ? () => setActiveFeature(f) : undefined}
+            onMouseLeave={supportsHover ? () => setActiveFeature(prev => (prev === f ? null : prev)) : undefined}
+            onClick={() => setActiveFeature(prev => (prev === f ? null : f))}
+          >
             <div style={s.featureArtFrame}>
               {f.img ? <img src={f.img} alt="" style={s.featureArtImage} /> : f.art}
             </div>
@@ -204,6 +244,10 @@ function IntroStep({ onNext }) {
           </div>
         ))}
       </div>
+
+      {activeFeature && (
+        <FeatureDetailModal feature={activeFeature} onClose={() => setActiveFeature(null)} />
+      )}
 
       <div className="vanta-cta-bar" style={s.ctaBar}>
         <div className="vanta-cta-price" style={s.planPriceCard}>
@@ -223,6 +267,41 @@ function IntroStep({ onNext }) {
         </div>
       </div>
     </div>
+  );
+}
+
+// Opens on hovering a feature card (desktop) or tapping one (mobile, via onClick) — a
+// bigger version of the same art plus the longer `detail` copy. Escape and clicking the
+// backdrop both close it; clicking the panel itself doesn't, so it survives incidental
+// mouse movement while reading.
+function FeatureDetailModal({ feature, onClose }) {
+  useEffect(() => {
+    function handleKey(e) { if (e.key === 'Escape') onClose(); }
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [onClose]);
+
+  // Rendered into document.body via a portal rather than in place: the auth card this
+  // would otherwise nest inside has backdrop-filter set (for its glass effect), and per
+  // spec that makes the card — not the viewport — the containing block for any
+  // position:fixed descendant. Left in place, the "full-screen" backdrop would actually
+  // be sized/positioned relative to the card, so a tap meant for the backdrop (e.g. to
+  // close the modal) could land outside its real box and hit the page behind it instead.
+  return createPortal(
+    <div className="vanta-modal-backdrop" style={s.modalBackdrop} onClick={onClose}>
+      <div className="vanta-modal-panel" style={s.modalPanel} onClick={e => e.stopPropagation()}>
+        <button type="button" onClick={onClose} style={s.modalClose} aria-label="Close">✕</button>
+        <div style={s.modalArtFrame}>
+          {feature.img ? <img src={feature.img} alt="" style={s.featureArtImage} /> : feature.art}
+        </div>
+        <div style={s.featureCardHeader}>
+          <span style={s.modalIcon}>{feature.icon}</span>
+          <h3 style={s.modalTitle}>{feature.title}</h3>
+        </div>
+        <p style={s.modalDesc}>{feature.detail ?? feature.desc}</p>
+      </div>
+    </div>,
+    document.body
   );
 }
 
@@ -838,6 +917,74 @@ const s = {
     width: '100%',
     height: '100%',
     objectFit: 'contain',
+  },
+  modalBackdrop: {
+    position: 'fixed',
+    inset: 0,
+    background: 'rgba(0,0,0,0.6)',
+    backdropFilter: 'blur(2px)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '1.5rem',
+    zIndex: 1000,
+  },
+  modalPanel: {
+    position: 'relative',
+    width: '100%',
+    maxWidth: 460,
+    background: '#151b24',
+    border: '1px solid rgba(255,255,255,0.1)',
+    borderRadius: 16,
+    padding: '1.5rem',
+    boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
+  },
+  modalClose: {
+    position: 'absolute',
+    top: '0.85rem',
+    right: '0.85rem',
+    width: 28,
+    height: 28,
+    borderRadius: '50%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    background: 'rgba(255,255,255,0.06)',
+    border: '1px solid rgba(255,255,255,0.1)',
+    color: 'rgba(255,255,255,0.6)',
+    cursor: 'pointer',
+    fontSize: '0.75rem',
+    padding: 0,
+  },
+  modalArtFrame: {
+    height: 230,
+    borderRadius: 10,
+    border: '1px solid rgba(255,255,255,0.08)',
+    background: '#11161d',
+    padding: '0.75rem',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    marginBottom: '1.1rem',
+  },
+  modalIcon: {
+    display: 'flex',
+    alignItems: 'center',
+    color: '#f5ecd9',
+    flexShrink: 0,
+  },
+  modalTitle: {
+    fontSize: '1.1rem',
+    fontWeight: 700,
+    color: '#ffffff',
+    margin: 0,
+  },
+  modalDesc: {
+    fontSize: '0.85rem',
+    color: 'rgba(255,255,255,0.6)',
+    lineHeight: 1.6,
+    margin: '0.6rem 0 0',
   },
   featureCardHeader: {
     display: 'flex',
