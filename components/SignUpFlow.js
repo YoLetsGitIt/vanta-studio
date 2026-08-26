@@ -110,57 +110,57 @@ export default function SignUpFlow({ onSwitchToSignIn, onWideChange }) {
 const PLAN_FEATURES = [
   {
     icon: <WidgetIcon />,
-    art: <MiniSchedule />,
+    img: '/signup/booking-widget.png',
     title: 'Booking widget',
-    desc: 'Shareable booking link with deposits, reminders, and a reschedule cutoff you control.',
+    desc: 'A shareable link and QR code clients use to request a session — deposits, reminders, and a reschedule cutoff, all handled for you.',
   },
   {
     icon: <PaletteIcon />,
-    art: <MiniSwatches />,
+    img: '/signup/widget-branding.png',
     title: 'Widget branding',
-    desc: 'Match your site with custom colors, then drop in a one-line embed snippet.',
+    desc: 'Recolor the widget to match your studio in seconds, then drop a one-line embed snippet into your own site — no code required.',
   },
   {
     icon: <ChecklistIcon />,
-    art: <MiniToggles />,
+    img: '/signup/custom-booking-form.png',
     title: 'Custom booking form',
-    desc: 'Choose which fields — body location, size, photos, allergies — appear on your form.',
+    desc: 'Turn any field on or off — placement, size, skin tone, reference photos — and mark exactly which ones are required. Your form, your rules.',
   },
   {
     icon: <DocumentIcon />,
-    art: <MiniConsent />,
+    img: '/signup/consent-builder.png',
     title: 'Consent builder',
-    desc: 'Build your own waiver forms with e-signatures and automatic guardian fields for minors.',
+    desc: 'Design your own waiver from headings, checkboxes, and e-signatures — guardian fields appear automatically for clients under 18.',
   },
   {
     icon: <PersonIcon />,
-    art: <MiniClients />,
+    img: '/signup/client-records.png',
     title: 'Client records',
-    desc: 'Consent status, allergies, and full booking history per client.',
+    desc: 'Every client\'s consent status, allergies, and full booking history — searchable in seconds.',
   },
   {
     icon: <UsersIcon />,
     art: <MiniArtists />,
     title: 'Artist management',
-    desc: 'Approve artists, assign stations, and split commissions — payouts track automatically.',
+    desc: 'Approve artists, assign stations, and set walk-in vs. personal commission splits — payouts track themselves.',
   },
   {
     icon: <ChartIcon />,
-    art: <MiniBarChart />,
+    img: '/signup/analytics.png',
     title: 'Analytics',
-    desc: 'Gross/net sales and payouts by artist, always current.',
+    desc: 'Appointment counts, revenue, and a studio-vs-personal split, updated in real time.',
   },
   {
     icon: <GlobeIcon />,
-    art: <MiniLanguage />,
+    img: '/signup/multi-language.png',
     title: 'Multi-language',
-    desc: 'The full dashboard ships in English, Simplified Chinese, and Korean.',
+    desc: 'The entire dashboard is available in English, Simplified Chinese, and Korean — switch anytime from Settings.',
   },
   {
     icon: <UploadIcon />,
-    art: <MiniImport />,
+    img: '/signup/migration-import.png',
     title: 'Migration import',
-    desc: 'Bring your history over from Square, Acuity, or Fresha.',
+    desc: 'Already on Square, Acuity, or Fresha? Bring your client history over with built-in column mapping.',
   },
 ];
 
@@ -193,7 +193,9 @@ function IntroStep({ onNext }) {
       <div className="vanta-feature-grid">
         {PLAN_FEATURES.map(f => (
           <div key={f.title} style={s.featureGridCard}>
-            <div style={s.featureArtFrame}>{f.art}</div>
+            <div style={s.featureArtFrame}>
+              {f.img ? <img src={f.img} alt="" style={s.featureArtImage} /> : f.art}
+            </div>
             <div style={s.featureCardHeader}>
               <span style={s.featureCardIcon}>{f.icon}</span>
               <span style={s.featureCardTitle}>{f.title}</span>
@@ -224,72 +226,9 @@ function IntroStep({ onNext }) {
   );
 }
 
-// Small illustrations backing each feature card — abstract enough to render legibly at
-// ~70px tall, but each shaped after the real thing (a week grid, a color picker, toggles,
-// a signature line) rather than a generic icon repeated bigger.
-function MiniSchedule() {
-  const filled = new Set([2, 6, 11, 13]);
-  return (
-    <div style={s.miniGrid}>
-      {Array.from({ length: 15 }).map((_, i) => (
-        <div key={i} style={{ ...s.miniCell, ...(filled.has(i) ? s.miniCellFilled : {}) }} />
-      ))}
-    </div>
-  );
-}
-
-function MiniSwatches() {
-  const colors = ['#f5ecd9', '#6fbf8a', '#82aadc', '#e8756f'];
-  return (
-    <div style={s.miniSwatchRow}>
-      {colors.map((c, i) => (
-        <span key={c} style={{ ...s.miniSwatch, background: c, ...(i === 0 ? s.miniSwatchActive : {}) }} />
-      ))}
-    </div>
-  );
-}
-
-function MiniToggles() {
-  const rows = [true, true, false];
-  return (
-    <div style={s.miniToggleCol}>
-      {rows.map((on, i) => (
-        <div key={i} style={s.miniToggleRow}>
-          <span style={s.miniToggleLabel} />
-          <span style={{ ...s.miniToggleTrack, ...(on ? s.miniToggleTrackOn : {}) }}>
-            <span style={{ ...s.miniToggleKnob, ...(on ? s.miniToggleKnobOn : {}) }} />
-          </span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function MiniConsent() {
-  return (
-    <div style={s.miniConsentCol}>
-      <div style={s.miniLine} />
-      <div style={{ ...s.miniLine, width: '65%' }} />
-      <div style={s.miniSigLine} />
-    </div>
-  );
-}
-
-function MiniClients() {
-  const rows = [{ w: 70, status: 'good' }, { w: 48, status: 'warn' }];
-  return (
-    <div style={s.miniListCol}>
-      {rows.map((r, i) => (
-        <div key={i} style={s.miniListRow}>
-          <span style={s.miniAvatar} />
-          <span style={s.miniBarTrack}><span style={{ ...s.miniBarFill, width: `${r.w}%` }} /></span>
-          <span style={r.status === 'good' ? s.miniTagGood : s.miniTagWarn}>{r.status === 'good' ? '✓' : '!'}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
+// Artist management is the one card still backed by an illustration rather than a
+// screenshot — the real "My Artists" list has only one demo entry and shows a real email
+// address, so there's no clean shot to crop without exposing personal info.
 function MiniArtists() {
   const rows = [{ w: 62, pct: 78 }, { w: 45, pct: 52 }];
   return (
@@ -299,40 +238,6 @@ function MiniArtists() {
           <span style={s.miniAvatar} />
           <span style={s.miniBarTrack}><span style={{ ...s.miniBarFill, width: `${r.w}%` }} /></span>
           <span style={s.miniPct}>{r.pct}%</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function MiniBarChart() {
-  const bars = [40, 65, 50, 82, 60, 72];
-  return (
-    <div style={s.miniBarChartRow}>
-      {bars.map((h, i) => <span key={i} style={{ ...s.miniChartBar, height: `${h}%` }} />)}
-    </div>
-  );
-}
-
-function MiniLanguage() {
-  return (
-    <div style={s.miniChipRow}>
-      <span style={{ ...s.miniChip, ...s.miniChipActive }}>EN</span>
-      <span style={s.miniChip}>中文</span>
-      <span style={s.miniChip}>한국어</span>
-    </div>
-  );
-}
-
-function MiniImport() {
-  const platforms = ['Square', 'Acuity', 'Fresha'];
-  return (
-    <div style={s.miniListCol}>
-      {platforms.map(p => (
-        <div key={p} style={s.miniListRow}>
-          <span style={s.miniPillLabel}>{p}</span>
-          <span style={s.miniBarTrack}><span style={{ ...s.miniBarFill, width: '100%' }} /></span>
-          <span style={s.miniTagGood}>✓</span>
         </div>
       ))}
     </div>
@@ -919,13 +824,20 @@ const s = {
     borderRadius: 10,
   },
   featureArtFrame: {
-    height: 68,
+    height: 108,
     borderRadius: 8,
     border: '1px solid rgba(255,255,255,0.08)',
     background: '#11161d',
     padding: '0.5rem 0.6rem',
     display: 'flex',
     alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  featureArtImage: {
+    width: '100%',
+    height: '100%',
+    objectFit: 'contain',
   },
   featureCardHeader: {
     display: 'flex',
@@ -948,64 +860,12 @@ const s = {
     color: 'rgba(255,255,255,0.5)',
     lineHeight: 1.45,
   },
-  miniGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(5, 1fr)',
-    gridTemplateRows: 'repeat(3, 1fr)',
-    gap: 3,
-    width: '100%',
-    height: '100%',
-  },
-  miniCell: { borderRadius: 2, background: 'rgba(255,255,255,0.06)' },
-  miniCellFilled: { background: 'rgba(245,236,217,0.55)' },
-  miniSwatchRow: { display: 'flex', gap: '0.4rem', alignItems: 'center' },
-  miniSwatch: { width: 16, height: 16, borderRadius: '50%', border: '2px solid transparent' },
-  miniSwatchActive: { border: '2px solid #ffffff', boxShadow: '0 0 0 1px rgba(0,0,0,0.4)' },
-  miniToggleCol: { display: 'flex', flexDirection: 'column', gap: '0.35rem', width: '100%' },
-  miniToggleRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.4rem' },
-  miniToggleLabel: { flex: 1, height: 5, borderRadius: 3, background: 'rgba(255,255,255,0.12)' },
-  miniToggleTrack: {
-    width: 18,
-    height: 10,
-    borderRadius: 999,
-    background: 'rgba(255,255,255,0.1)',
-    display: 'flex',
-    alignItems: 'center',
-    padding: 1.5,
-    flexShrink: 0,
-  },
-  miniToggleTrackOn: { background: 'rgba(245,236,217,0.4)' },
-  miniToggleKnob: { width: 7, height: 7, borderRadius: '50%', background: 'rgba(255,255,255,0.5)', transition: 'transform 0.15s' },
-  miniToggleKnobOn: { background: '#f5ecd9', transform: 'translateX(8px)' },
-  miniConsentCol: { display: 'flex', flexDirection: 'column', gap: '0.4rem', width: '100%' },
-  miniLine: { height: 5, width: '85%', borderRadius: 3, background: 'rgba(255,255,255,0.12)' },
-  miniSigLine: { height: 1, width: '70%', background: 'rgba(255,255,255,0.2)', marginTop: '0.2rem' },
   miniListCol: { display: 'flex', flexDirection: 'column', gap: '0.4rem', width: '100%' },
   miniListRow: { display: 'flex', alignItems: 'center', gap: '0.35rem' },
   miniAvatar: { width: 12, height: 12, borderRadius: '50%', flexShrink: 0, background: 'rgba(255,255,255,0.15)' },
   miniBarTrack: { flex: 1, height: 5, borderRadius: 3, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' },
   miniBarFill: { display: 'block', height: '100%', borderRadius: 3, background: 'rgba(245,236,217,0.5)' },
-  miniTagGood: { fontSize: '0.55rem', color: '#4cc98a', flexShrink: 0 },
-  miniTagWarn: { fontSize: '0.6rem', fontWeight: 700, color: '#e8c56f', flexShrink: 0 },
   miniPct: { fontSize: '0.5rem', color: 'rgba(255,255,255,0.4)', flexShrink: 0, width: 20, textAlign: 'right' },
-  miniPillLabel: { fontSize: '0.55rem', color: 'rgba(255,255,255,0.55)', width: 34, flexShrink: 0 },
-  miniBarChartRow: { display: 'flex', alignItems: 'flex-end', gap: 3, width: '100%', height: '100%' },
-  miniChartBar: { flex: 1, borderRadius: '1px 1px 0 0', background: 'rgba(245,236,217,0.5)' },
-  miniChipRow: { display: 'flex', gap: '0.3rem', flexWrap: 'wrap' },
-  miniChip: {
-    fontSize: '0.55rem',
-    fontWeight: 600,
-    color: 'rgba(255,255,255,0.4)',
-    background: 'rgba(255,255,255,0.05)',
-    border: '1px solid rgba(255,255,255,0.08)',
-    borderRadius: 999,
-    padding: '0.15rem 0.4rem',
-  },
-  miniChipActive: {
-    color: '#f5ecd9',
-    background: 'rgba(245,236,217,0.12)',
-    border: '1px solid rgba(245,236,217,0.3)',
-  },
   introTitle: {
     fontSize: '1.3rem',
     fontWeight: 700,
