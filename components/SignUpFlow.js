@@ -9,9 +9,8 @@ import { getSupabase } from '@/lib/supabase';
 
 export default function SignUpFlow({ onSwitchToSignIn }) {
   const router = useRouter();
-  const [step, setStep] = useState(1); // 1: account, 2: studio
+  const [step, setStep] = useState(0); // 0: intro, 1: account, 2: studio
   const [account, setAccount] = useState({ email: '', password: '', confirmPassword: '' });
-  const [studio, setStudio] = useState(null); // { id?, name, address, latitude?, longitude? }
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -20,23 +19,17 @@ export default function SignUpFlow({ onSwitchToSignIn }) {
     setStep(2);
   }
 
-  function handleStudioNext(newStudio) {
-    setStudio(newStudio);
-    setError('');
-    setStep(3);
-  }
-
-  async function handleConfirmPlan() {
+  async function handleSubmit(newStudio) {
     setError('');
     setLoading(true);
     try {
       const { checkout_url } = await registerStudio({
         email: account.email,
         password: account.password,
-        studioName: studio.name,
-        address: studio.address,
-        latitude: studio.latitude ?? null,
-        longitude: studio.longitude ?? null,
+        studioName: newStudio.name,
+        address: newStudio.address,
+        latitude: newStudio.latitude ?? null,
+        longitude: newStudio.longitude ?? null,
       });
       // No review needed — sign in, then hand off to Stripe Checkout to collect the
       // card and start the 14-day trial. The account stays pending until Stripe confirms.
@@ -52,11 +45,15 @@ export default function SignUpFlow({ onSwitchToSignIn }) {
     }
   }
 
+  if (step === 0) {
+    return <IntroStep onNext={() => setStep(1)} />;
+  }
+
   return (
     <div>
       {/* Step indicator */}
       <div style={s.steps}>
-        {['Account', 'Studio', 'Plan'].map((label, i) => {
+        {['Account', 'Studio'].map((label, i) => {
           const num = i + 1;
           const active = step === num;
           const done = step > num;
@@ -81,19 +78,12 @@ export default function SignUpFlow({ onSwitchToSignIn }) {
       {error && <p style={s.errorBox}>{error}</p>}
 
       {step === 1 && (
-        <AccountStep initial={account} onNext={handleAccountNext} />
+        <AccountStep initial={account} onBack={() => setStep(0)} onNext={handleAccountNext} />
       )}
       {step === 2 && (
         <StudioStep
           onBack={() => setStep(1)}
-          onSubmit={handleStudioNext}
-        />
-      )}
-      {step === 3 && studio && (
-        <PlanStep
-          studioName={studio.name}
-          onBack={() => setStep(2)}
-          onConfirm={handleConfirmPlan}
+          onSubmit={handleSubmit}
           submitting={loading}
         />
       )}
@@ -101,9 +91,53 @@ export default function SignUpFlow({ onSwitchToSignIn }) {
   );
 }
 
+// ── Step 0: What you get ──────────────────────────────────────────────────────
+
+const PLAN_FEATURES = [
+  'A shareable booking widget clients use to request appointments',
+  'Client records, consent forms, and full booking history in one place',
+  'Artist management with schedules and automatic payout tracking',
+  'Revenue and booking analytics for the whole studio',
+];
+
+function IntroStep({ onNext }) {
+  return (
+    <div style={s.form}>
+      <div>
+        <h3 style={s.planTitle}>Everything your studio needs</h3>
+        <p style={s.planStudioName}>Booking, clients, artists, and payouts in one dashboard.</p>
+      </div>
+
+      <ul style={s.featureList}>
+        {PLAN_FEATURES.map(feature => (
+          <li key={feature} style={s.featureItem}>
+            <span style={s.featureCheck}>✓</span>
+            <span>{feature}</span>
+          </li>
+        ))}
+      </ul>
+
+      <div style={s.planPriceCard}>
+        <div style={s.planPriceRow}>
+          <span style={s.planPriceAmount}>$60</span>
+          <span style={s.planPriceUnit}>/mo AUD</span>
+        </div>
+        <p style={s.planPriceDetail}>Covers up to 6 artists, then $15/artist beyond that.</p>
+      </div>
+
+      <p style={s.trialNote}>
+        Your first 14 days are free — you won't be charged until the trial ends, and you can
+        cancel anytime from Settings.
+      </p>
+
+      <button type="button" onClick={onNext} style={s.btn}>Get started</button>
+    </div>
+  );
+}
+
 // ── Step 1: Account details ───────────────────────────────────────────────────
 
-function AccountStep({ initial, onNext }) {
+function AccountStep({ initial, onBack, onNext }) {
   const [email, setEmail] = useState(initial.email);
   const [password, setPassword] = useState(initial.password);
   const [confirmPassword, setConfirmPassword] = useState(initial.confirmPassword);
@@ -129,14 +163,17 @@ function AccountStep({ initial, onNext }) {
         <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} required style={s.input} placeholder="Re-enter password" autoComplete="new-password" />
       </Field>
       {error && <p style={s.errorBox}>{error}</p>}
-      <button type="submit" style={s.btn}>Continue</button>
+      <div style={s.rowBtns}>
+        <button type="button" onClick={onBack} style={s.backBtn}>Back</button>
+        <button type="submit" style={{ ...s.btn, flex: 1 }}>Continue</button>
+      </div>
     </form>
   );
 }
 
 // ── Step 2: Studio search / create ───────────────────────────────────────────
 
-function StudioStep({ onBack, onSubmit }) {
+function StudioStep({ onBack, onSubmit, submitting }) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false);
@@ -186,6 +223,7 @@ function StudioStep({ onBack, onSubmit }) {
         initialResolved={prefill ? { address: prefill.addressString, latitude: prefill.latitude, longitude: prefill.longitude } : null}
         onBack={() => { setMode('search'); setPrefill(null); }}
         onSubmit={onSubmit}
+        submitting={submitting}
       />
     );
   }
@@ -330,7 +368,7 @@ function AlreadyClaimedNotice({ studio, onBack }) {
 
 // ── Create new studio form ────────────────────────────────────────────────────
 
-function CreateStudioForm({ initialName, initialResolved, onBack, onSubmit }) {
+function CreateStudioForm({ initialName, initialResolved, onBack, onSubmit, submitting }) {
   const [name, setName] = useState(initialName ?? '');
   const [addressQuery, setAddressQuery] = useState(initialResolved?.address ?? '');
   const [suggestions, setSuggestions] = useState([]);
@@ -419,60 +457,17 @@ function CreateStudioForm({ initialName, initialResolved, onBack, onSubmit }) {
 
       {error && <p style={s.errorBox}>{error}</p>}
 
-      <div style={s.rowBtns}>
-        <button type="button" onClick={onBack} style={s.backBtn}>Back</button>
-        <button type="submit" style={{ ...s.btn, flex: 1 }}>Continue</button>
-      </div>
-    </form>
-  );
-}
-
-// ── Step 3: Plan & pricing ────────────────────────────────────────────────────
-
-const PLAN_FEATURES = [
-  'A shareable booking widget clients use to request appointments',
-  'Client records, consent forms, and full booking history in one place',
-  'Artist management with schedules and automatic payout tracking',
-  'Revenue and booking analytics for the whole studio',
-];
-
-function PlanStep({ studioName, onBack, onConfirm, submitting }) {
-  return (
-    <div style={s.form}>
-      <div>
-        <h3 style={s.planTitle}>Your plan</h3>
-        <p style={s.planStudioName}>{studioName}</p>
-      </div>
-
-      <ul style={s.featureList}>
-        {PLAN_FEATURES.map(feature => (
-          <li key={feature} style={s.featureItem}>
-            <span style={s.featureCheck}>✓</span>
-            <span>{feature}</span>
-          </li>
-        ))}
-      </ul>
-
-      <div style={s.planPriceCard}>
-        <div style={s.planPriceRow}>
-          <span style={s.planPriceAmount}>$60</span>
-          <span style={s.planPriceUnit}>/mo AUD</span>
-        </div>
-        <p style={s.planPriceDetail}>Covers up to 6 artists, then $15/artist beyond that.</p>
-      </div>
-
       <p style={s.trialNote}>
-        Your first 14 days are free — add a card to start the trial, you won't be charged until
-        it ends. Cancel anytime from Settings.
+        Next, add a card to start your 14-day free trial — you won't be charged until it ends.
       </p>
 
       <div style={s.rowBtns}>
         <button type="button" onClick={onBack} style={s.backBtn}>Back</button>
-        <button type="button" onClick={onConfirm} disabled={submitting} style={{ ...s.btn, flex: 1, opacity: submitting ? 0.5 : 1 }}>
+        <button type="submit" disabled={submitting} style={{ ...s.btn, flex: 1, opacity: submitting ? 0.5 : 1 }}>
           {submitting ? 'Redirecting to checkout…' : 'Continue to payment'}
         </button>
       </div>
-    </div>
+    </form>
   );
 }
 
