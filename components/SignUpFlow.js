@@ -56,7 +56,7 @@ export default function SignUpFlow({ onSwitchToSignIn, onWideChange }) {
     <div>
       <div style={s.switchRow}>
         <span style={s.switchRowText}>Already have an account?</span>
-        <button type="button" onClick={onSwitchToSignIn} style={s.switchLink}>Sign in</button>
+        <button type="button" onClick={onSwitchToSignIn} className="vanta-link" style={s.switchLink}>Sign in</button>
       </div>
 
       {step === 0 && <IntroStep onNext={() => setStep(1)} />}
@@ -190,7 +190,7 @@ function IntroStep({ onNext }) {
           <p style={s.trialNote}>
             You won't be charged until the trial ends, and you can cancel anytime from Settings.
           </p>
-          <button type="button" onClick={onNext} style={s.btn}>Get started</button>
+          <button type="button" onClick={onNext} className="vanta-btn" style={s.btn}>Get started</button>
         </div>
       </div>
     </div>
@@ -458,20 +458,47 @@ function AccountStep({ initial, onBack, onNext }) {
   return (
     <form onSubmit={handleSubmit} style={s.form}>
       <Field label="Email">
-        <input type="email" value={email} onChange={e => setEmail(e.target.value)} required style={s.input} placeholder="studio@example.com" autoComplete="email" />
+        <InputWithIcon icon={<MailIcon size={15} />} type="email" value={email} onChange={e => setEmail(e.target.value)} required placeholder="studio@example.com" autoComplete="email" />
       </Field>
       <Field label="Password">
-        <input type="password" value={password} onChange={e => setPassword(e.target.value)} required style={s.input} placeholder="Minimum 8 characters" autoComplete="new-password" />
+        <InputWithIcon icon={<LockIcon size={15} />} type="password" value={password} onChange={e => setPassword(e.target.value)} required placeholder="Minimum 8 characters" autoComplete="new-password" />
       </Field>
       <Field label="Confirm password">
-        <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} required style={s.input} placeholder="Re-enter password" autoComplete="new-password" />
+        <InputWithIcon icon={<LockIcon size={15} />} type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} required placeholder="Re-enter password" autoComplete="new-password" />
       </Field>
       {error && <p style={s.errorBox}>{error}</p>}
       <div style={s.rowBtns}>
-        <button type="button" onClick={onBack} style={s.backBtn}>Back</button>
-        <button type="submit" style={{ ...s.btn, flex: 1 }}>Continue</button>
+        <button type="button" onClick={onBack} className="vanta-back-btn" style={s.backBtn}>Back</button>
+        <button type="submit" className="vanta-btn" style={{ ...s.btn, flex: 1 }}>Continue</button>
       </div>
     </form>
+  );
+}
+
+function InputWithIcon({ icon, style, ...props }) {
+  return (
+    <div style={{ position: 'relative' }}>
+      <span style={s.inputIcon}>{icon}</span>
+      <input {...props} className="vanta-input" style={{ ...s.input, ...style, paddingLeft: '2.3rem' }} />
+    </div>
+  );
+}
+
+function MailIcon({ size = 16 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
+      <rect x="1.5" y="3.5" width="13" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.2" />
+      <path d="M2 4.5l6 4.5 6-4.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function LockIcon({ size = 16 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
+      <rect x="3" y="7" width="10" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.2" />
+      <path d="M5 7V5a3 3 0 0 1 6 0v2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+    </svg>
   );
 }
 
@@ -544,6 +571,7 @@ function StudioStep({ onBack, onSubmit, submitting }) {
             type="text"
             value={query}
             onChange={e => setQuery(e.target.value)}
+            className="vanta-input"
             style={s.input}
             placeholder="Studio name or address…"
             autoComplete="off"
@@ -573,19 +601,19 @@ function StudioStep({ onBack, onSubmit, submitting }) {
 
       {/* Add new studio option */}
       {query.trim().length > 0 && results.length === 0 && !searching && (
-        <button type="button" onClick={() => setMode('create')} style={s.addNewBtn}>
+        <button type="button" onClick={() => setMode('create')} className="vanta-btn" style={s.addNewBtn}>
           <span style={{ fontSize: '1rem', lineHeight: 1 }}>+</span>
           Add "{query}" as a new studio
         </button>
       )}
       {(results.length > 0 || query.trim().length === 0) && (
-        <button type="button" onClick={() => setMode('create')} style={s.addNewBtnSecondary}>
+        <button type="button" onClick={() => setMode('create')} className="vanta-link" style={s.addNewBtnSecondary}>
           My studio isn't listed — add it
         </button>
       )}
 
       <div style={s.rowBtns}>
-        <button type="button" onClick={onBack} style={s.backBtn}>Back</button>
+        <button type="button" onClick={onBack} className="vanta-back-btn" style={s.backBtn}>Back</button>
       </div>
     </div>
   );
@@ -661,11 +689,11 @@ function AlreadyClaimedNotice({ studio, onBack }) {
         )}
         <p style={s.claimedBody}>
           This studio is already signed up with Vanta. If this isn't right, contact{' '}
-          <a href="mailto:support@vanta.tattoo" style={s.claimedLink}>support@vanta.tattoo</a>{' '}
+          <a href="mailto:support@vanta.tattoo" className="vanta-link" style={s.claimedLink}>support@vanta.tattoo</a>{' '}
           right away to dispute it.
         </p>
       </div>
-      <button type="button" onClick={onBack} style={s.backBtn}>Search again</button>
+      <button type="button" onClick={onBack} className="vanta-back-btn" style={s.backBtn}>Search again</button>
     </div>
   );
 }
@@ -718,7 +746,7 @@ function CreateStudioForm({ initialName, initialResolved, onBack, onSubmit, subm
   return (
     <form onSubmit={handleSubmit} style={s.form}>
       <Field label="Studio name">
-        <input type="text" value={name} onChange={e => setName(e.target.value)} required style={s.input} placeholder="e.g. Dark Matter Tattoo" />
+        <input type="text" value={name} onChange={e => setName(e.target.value)} required className="vanta-input" style={s.input} placeholder="e.g. Dark Matter Tattoo" />
       </Field>
 
       <Field label="Address">
@@ -727,6 +755,7 @@ function CreateStudioForm({ initialName, initialResolved, onBack, onSubmit, subm
             type="text"
             value={addressQuery}
             onChange={e => { setAddressQuery(e.target.value); setResolved(null); }}
+            className="vanta-input"
             style={s.input}
             placeholder="Start typing your address…"
             autoComplete="off"
@@ -753,7 +782,7 @@ function CreateStudioForm({ initialName, initialResolved, onBack, onSubmit, subm
       {resolved && (
         <div style={s.resolvedBadge}>
           <span style={{ fontSize: '0.8rem', color: '#4cc98a' }}>✓ Location confirmed</span>
-          <button type="button" onClick={() => { setResolved(null); setAddressQuery(''); }} style={s.clearBtn}>
+          <button type="button" onClick={() => { setResolved(null); setAddressQuery(''); }} className="vanta-link" style={s.clearBtn}>
             Change
           </button>
         </div>
@@ -766,8 +795,8 @@ function CreateStudioForm({ initialName, initialResolved, onBack, onSubmit, subm
       </p>
 
       <div style={s.rowBtns}>
-        <button type="button" onClick={onBack} style={s.backBtn}>Back</button>
-        <button type="submit" disabled={submitting} style={{ ...s.btn, flex: 1, opacity: submitting ? 0.5 : 1 }}>
+        <button type="button" onClick={onBack} className="vanta-back-btn" style={s.backBtn}>Back</button>
+        <button type="submit" disabled={submitting} className="vanta-btn" style={{ ...s.btn, flex: 1, opacity: submitting ? 0.5 : 1 }}>
           {submitting ? 'Redirecting to checkout…' : 'Continue to payment'}
         </button>
       </div>
@@ -832,6 +861,15 @@ const s = {
     color: '#ffffff',
     outline: 'none',
     width: '100%',
+  },
+  inputIcon: {
+    position: 'absolute',
+    left: '0.75rem',
+    top: '50%',
+    transform: 'translateY(-50%)',
+    color: 'rgba(255,255,255,0.3)',
+    display: 'flex',
+    pointerEvents: 'none',
   },
   btn: {
     background: '#f5ecd9',

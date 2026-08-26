@@ -54,8 +54,9 @@ export default function HomePage() {
   return (
     <div style={s.page}>
       <div style={s.noise} />
+      <style>{GLOBAL_CSS}</style>
 
-      <div style={{ ...s.card, maxWidth: wide ? 720 : 420 }}>
+      <div className="vanta-card" style={{ ...s.card, maxWidth: wide ? 720 : 420 }}>
         <div style={s.brand}>
           <span style={s.wordmark}>vanta</span>
           <span style={s.wordmarkSub}>studio</span>
@@ -64,37 +65,38 @@ export default function HomePage() {
         {tab === 'signin' ? (
           <>
             <h1 style={s.authHeading}>Welcome back</h1>
+            <p style={s.authSubheading}>Sign in to manage your studio.</p>
             <form onSubmit={handleSignIn} style={s.form}>
               <Field label="Email">
-                <input
+                <InputWithIcon
+                  icon={<MailIcon size={15} />}
                   type="email"
                   value={email}
                   onChange={e => setEmail(e.target.value)}
                   required
                   autoComplete="email"
-                  style={s.input}
                   placeholder="you@studio.com"
                 />
               </Field>
               <Field label="Password">
-                <input
+                <InputWithIcon
+                  icon={<LockIcon size={15} />}
                   type="password"
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                   required
                   autoComplete="current-password"
-                  style={s.input}
                   placeholder="••••••••"
                 />
               </Field>
               {error && <p style={s.errorBox}>{error}</p>}
-              <button type="submit" disabled={loading} style={{ ...s.btn, opacity: loading ? 0.6 : 1 }}>
+              <button type="submit" disabled={loading} className="vanta-btn" style={{ ...s.btn, opacity: loading ? 0.6 : 1 }}>
                 {loading ? 'Signing in…' : 'Sign in'}
               </button>
             </form>
             <p style={s.switchLine}>
               New to Vanta?{' '}
-              <button type="button" onClick={() => { setTab('signup'); setError(''); }} style={s.switchLink}>
+              <button type="button" onClick={() => { setTab('signup'); setError(''); }} className="vanta-link" style={s.switchLink}>
                 Create account
               </button>
             </p>
@@ -115,6 +117,56 @@ function Field({ label, children }) {
     </div>
   );
 }
+
+function InputWithIcon({ icon, style, ...props }) {
+  return (
+    <div style={{ position: 'relative' }}>
+      <span style={s.inputIcon}>{icon}</span>
+      <input {...props} className="vanta-input" style={{ ...s.input, ...style, paddingLeft: '2.3rem' }} />
+    </div>
+  );
+}
+
+function MailIcon({ size = 16 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
+      <rect x="1.5" y="3.5" width="13" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.2" />
+      <path d="M2 4.5l6 4.5 6-4.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function LockIcon({ size = 16 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
+      <rect x="3" y="7" width="10" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.2" />
+      <path d="M5 7V5a3 3 0 0 1 6 0v2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+// Shared across the sign-in form here and SignUpFlow's own forms — one plain <style> tag on
+// the page applies to the whole document, so these classes work in both without duplicating
+// the rules. Kept to properties inline styles don't already set (box-shadow, filter,
+// transform) since an inline style always wins over a stylesheet rule for the same property.
+const GLOBAL_CSS = `
+.vanta-input { transition: border-color 0.15s ease, box-shadow 0.15s ease; }
+.vanta-input:focus { outline: none; border-color: rgba(245,236,217,0.45); box-shadow: 0 0 0 3px rgba(245,236,217,0.12); }
+.vanta-btn { transition: filter 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease; }
+.vanta-btn:hover:not(:disabled) { filter: brightness(1.06); box-shadow: 0 6px 20px rgba(245,236,217,0.18); }
+.vanta-btn:active:not(:disabled) { transform: translateY(1px); filter: brightness(0.97); }
+.vanta-back-btn { transition: background 0.15s ease, border-color 0.15s ease; }
+.vanta-back-btn:hover { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.18); }
+.vanta-link { transition: opacity 0.15s ease; }
+.vanta-link:hover { opacity: 0.75; }
+.vanta-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 20%; right: 20%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(245,236,217,0.5), transparent);
+}
+`;
 
 const s = {
   page: {
@@ -168,8 +220,23 @@ const s = {
     fontSize: '1.3rem',
     fontWeight: 700,
     color: '#ffffff',
-    margin: '0 0 1.5rem',
+    margin: '0 0 0.35rem',
     letterSpacing: '-0.01em',
+  },
+  authSubheading: {
+    fontSize: '0.85rem',
+    color: 'rgba(255,255,255,0.45)',
+    margin: '0 0 1.5rem',
+    lineHeight: 1.5,
+  },
+  inputIcon: {
+    position: 'absolute',
+    left: '0.75rem',
+    top: '50%',
+    transform: 'translateY(-50%)',
+    color: 'rgba(255,255,255,0.3)',
+    display: 'flex',
+    pointerEvents: 'none',
   },
   switchLine: {
     fontSize: '0.85rem',
