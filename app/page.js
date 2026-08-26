@@ -61,53 +61,46 @@ export default function HomePage() {
           <span style={s.wordmarkSub}>studio</span>
         </div>
 
-        {/* Tab switcher */}
-        <div style={s.tabs}>
-          <button
-            onClick={() => { setTab('signin'); setError(''); setWide(false); }}
-            style={{ ...s.tab, ...(tab === 'signin' ? s.tabActive : {}) }}
-          >
-            Sign in
-          </button>
-          <button
-            onClick={() => { setTab('signup'); setError(''); }}
-            style={{ ...s.tab, ...(tab === 'signup' ? s.tabActive : {}) }}
-          >
-            Create account
-          </button>
-        </div>
-
         {tab === 'signin' ? (
-          <form onSubmit={handleSignIn} style={s.form}>
-            <Field label="Email">
-              <input
-                type="email"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                required
-                autoComplete="email"
-                style={s.input}
-                placeholder="you@studio.com"
-              />
-            </Field>
-            <Field label="Password">
-              <input
-                type="password"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                required
-                autoComplete="current-password"
-                style={s.input}
-                placeholder="••••••••"
-              />
-            </Field>
-            {error && <p style={s.errorBox}>{error}</p>}
-            <button type="submit" disabled={loading} style={{ ...s.btn, opacity: loading ? 0.6 : 1 }}>
-              {loading ? 'Signing in…' : 'Sign in'}
-            </button>
-          </form>
+          <>
+            <h1 style={s.authHeading}>Welcome back</h1>
+            <form onSubmit={handleSignIn} style={s.form}>
+              <Field label="Email">
+                <input
+                  type="email"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  required
+                  autoComplete="email"
+                  style={s.input}
+                  placeholder="you@studio.com"
+                />
+              </Field>
+              <Field label="Password">
+                <input
+                  type="password"
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  required
+                  autoComplete="current-password"
+                  style={s.input}
+                  placeholder="••••••••"
+                />
+              </Field>
+              {error && <p style={s.errorBox}>{error}</p>}
+              <button type="submit" disabled={loading} style={{ ...s.btn, opacity: loading ? 0.6 : 1 }}>
+                {loading ? 'Signing in…' : 'Sign in'}
+              </button>
+            </form>
+            <p style={s.switchLine}>
+              New to Vanta?{' '}
+              <button type="button" onClick={() => { setTab('signup'); setError(''); }} style={s.switchLink}>
+                Create account
+              </button>
+            </p>
+          </>
         ) : (
-          <SignUpFlow onSwitchToSignIn={() => setTab('signin')} onWideChange={setWide} />
+          <SignUpFlow onSwitchToSignIn={() => { setTab('signin'); setError(''); setWide(false); }} onWideChange={setWide} />
         )}
       </div>
     </div>
@@ -171,30 +164,29 @@ const s = {
     color: 'rgba(245,236,217,0.7)',
     letterSpacing: '0.02em',
   },
-  tabs: {
-    display: 'flex',
-    gap: '0',
-    background: 'rgba(255,255,255,0.04)',
-    borderRadius: 8,
-    padding: '3px',
-    marginBottom: '1.75rem',
-  },
-  tab: {
-    flex: 1,
-    padding: '0.5rem',
-    borderRadius: 6,
-    border: 'none',
-    background: 'transparent',
-    color: 'rgba(255,255,255,0.4)',
-    fontSize: '0.83rem',
-    fontWeight: 500,
-    cursor: 'pointer',
-    transition: 'all 0.15s',
-  },
-  tabActive: {
-    background: 'rgba(255,255,255,0.08)',
+  authHeading: {
+    fontSize: '1.3rem',
+    fontWeight: 700,
     color: '#ffffff',
+    margin: '0 0 1.5rem',
+    letterSpacing: '-0.01em',
+  },
+  switchLine: {
+    fontSize: '0.85rem',
+    color: 'rgba(255,255,255,0.45)',
+    textAlign: 'center',
+    marginTop: '1.5rem',
+  },
+  switchLink: {
+    background: 'none',
+    border: 'none',
+    color: '#f5ecd9',
     fontWeight: 600,
+    fontSize: 'inherit',
+    cursor: 'pointer',
+    padding: 0,
+    textDecoration: 'underline',
+    textUnderlineOffset: 3,
   },
   form: {
     display: 'flex',

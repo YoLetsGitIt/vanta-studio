@@ -52,47 +52,54 @@ export default function SignUpFlow({ onSwitchToSignIn, onWideChange }) {
     }
   }
 
-  if (step === 0) {
-    return <IntroStep onNext={() => setStep(1)} />;
-  }
-
   return (
     <div>
-      {/* Step indicator */}
-      <div style={s.steps}>
-        {['Account', 'Studio'].map((label, i) => {
-          const num = i + 1;
-          const active = step === num;
-          const done = step > num;
-          return (
-            <div key={label} style={s.stepItem}>
-              <div style={{
-                ...s.stepDot,
-                background: done ? '#4cc98a' : active ? '#f5ecd9' : 'rgba(255,255,255,0.1)',
-                color: done ? '#0d1017' : active ? '#0d1017' : 'rgba(255,255,255,0.3)',
-              }}>
-                {done ? '✓' : num}
-              </div>
-              <span style={{ fontSize: '0.75rem', color: active ? '#f5ecd9' : 'rgba(255,255,255,0.3)', fontWeight: active ? 600 : 400 }}>
-                {label}
-              </span>
-            </div>
-          );
-        })}
-        <div style={s.stepLine} />
+      <div style={s.switchRow}>
+        <span style={s.switchRowText}>Already have an account?</span>
+        <button type="button" onClick={onSwitchToSignIn} style={s.switchLink}>Sign in</button>
       </div>
 
-      {error && <p style={s.errorBox}>{error}</p>}
+      {step === 0 && <IntroStep onNext={() => setStep(1)} />}
 
-      {step === 1 && (
-        <AccountStep initial={account} onBack={() => setStep(0)} onNext={handleAccountNext} />
-      )}
-      {step === 2 && (
-        <StudioStep
-          onBack={() => setStep(1)}
-          onSubmit={handleSubmit}
-          submitting={loading}
-        />
+      {step > 0 && (
+        <>
+          {/* Step indicator */}
+          <div style={s.steps}>
+            {['Account', 'Studio'].map((label, i) => {
+              const num = i + 1;
+              const active = step === num;
+              const done = step > num;
+              return (
+                <div key={label} style={s.stepItem}>
+                  <div style={{
+                    ...s.stepDot,
+                    background: done ? '#4cc98a' : active ? '#f5ecd9' : 'rgba(255,255,255,0.1)',
+                    color: done ? '#0d1017' : active ? '#0d1017' : 'rgba(255,255,255,0.3)',
+                  }}>
+                    {done ? '✓' : num}
+                  </div>
+                  <span style={{ fontSize: '0.75rem', color: active ? '#f5ecd9' : 'rgba(255,255,255,0.3)', fontWeight: active ? 600 : 400 }}>
+                    {label}
+                  </span>
+                </div>
+              );
+            })}
+            <div style={s.stepLine} />
+          </div>
+
+          {error && <p style={s.errorBox}>{error}</p>}
+
+          {step === 1 && (
+            <AccountStep initial={account} onBack={() => setStep(0)} onNext={handleAccountNext} />
+          )}
+          {step === 2 && (
+            <StudioStep
+              onBack={() => setStep(1)}
+              onSubmit={handleSubmit}
+              submitting={loading}
+            />
+          )}
+        </>
       )}
     </div>
   );
@@ -127,79 +134,100 @@ const PLAN_FEATURES = [
   },
 ];
 
-// Below ~620px viewport width the left/right columns stack (same as the old single-column
-// layout); above it, the preview + price/CTA sit beside the heading + feature list instead
-// of everything running in one long vertical stack.
+// The feature tabs drive everything below them (the sliding highlight, the preview panel,
+// and the description text) via a single activeIndex, auto-advancing on a timer unless the
+// visitor clicks a tab directly — clicking restarts the timer so it never fights them. Below
+// ~480px viewport width the tab labels drop to icon-only so four tabs still fit in a row.
 const INTRO_LAYOUT_CSS = `
-.vanta-intro-top { display: flex; flex-direction: column; gap: 1.5rem; }
-.vanta-intro-left { display: flex; flex-direction: column; gap: 1rem; }
-.vanta-intro-right { display: flex; flex-direction: column; gap: 1.1rem; }
-@media (min-width: 620px) {
-  .vanta-intro-top { flex-direction: row; align-items: flex-start; }
-  .vanta-intro-left { width: 270px; flex-shrink: 0; }
-  .vanta-intro-right { flex: 1; padding-top: 0.15rem; }
+@media (max-width: 480px) { .vanta-tab-label { display: none; } }
+.vanta-cta-bar { display: flex; flex-direction: column; gap: 1rem; }
+.vanta-cta-action { display: flex; flex-direction: column; gap: 0.6rem; }
+@media (min-width: 560px) {
+  .vanta-cta-bar { flex-direction: row; align-items: center; }
+  .vanta-cta-price { flex-shrink: 0; width: 230px; }
+  .vanta-cta-action { flex: 1; }
 }
 `;
 
+const PREVIEW_CYCLE_MS = 3400;
+
 function IntroStep({ onNext }) {
-  const [tab, setTab] = useState('schedule');
+  const [activeIndex, setActiveIndex] = useState(0);
+  const active = PLAN_FEATURES[activeIndex];
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setActiveIndex(i => (i + 1) % PLAN_FEATURES.length);
+    }, PREVIEW_CYCLE_MS);
+    return () => clearTimeout(timer);
+  }, [activeIndex]);
+
   return (
     <div style={s.introWrap}>
       <style>{INTRO_LAYOUT_CSS}</style>
-      <div className="vanta-intro-top">
-        <div className="vanta-intro-left">
-          <DashboardPreview tab={tab} onTabChange={setTab} />
 
-          <div style={s.planPriceCard}>
-            <span style={s.trialPill}>14-day free trial</span>
-            <div style={s.planPriceRow}>
-              <span style={s.planPriceAmount}>$60</span>
-              <span style={s.planPriceUnit}>/mo AUD</span>
-            </div>
-            <p style={s.planPriceDetail}>Covers up to 6 artists, then $15/artist beyond that.</p>
+      <FeatureTabs features={PLAN_FEATURES} activeIndex={activeIndex} onSelect={setActiveIndex} />
+
+      <div style={s.explanationArea}>
+        <DashboardPreview tab={active.key} />
+        <div key={active.key} className="vanta-preview-panel">
+          <h3 style={s.introTitle}>{active.title}</h3>
+          <p style={s.introSubtitle}>{active.desc}</p>
+        </div>
+      </div>
+
+      <div className="vanta-cta-bar" style={s.ctaBar}>
+        <div className="vanta-cta-price" style={s.planPriceCard}>
+          <span style={s.trialPill}>14-day free trial</span>
+          <div style={s.planPriceRow}>
+            <span style={s.planPriceAmount}>$60</span>
+            <span style={s.planPriceUnit}>/mo AUD</span>
           </div>
+          <p style={s.planPriceDetail}>Covers up to 6 artists, then $15/artist beyond that.</p>
+        </div>
 
+        <div className="vanta-cta-action">
           <p style={s.trialNote}>
             You won't be charged until the trial ends, and you can cancel anytime from Settings.
           </p>
-
           <button type="button" onClick={onNext} style={s.btn}>Get started</button>
-        </div>
-
-        <div className="vanta-intro-right">
-          <div>
-            <h3 style={s.introTitle}>Everything your studio needs</h3>
-            <p style={s.introSubtitle}>Booking, clients, artists, and payouts — all in one dashboard.</p>
-          </div>
-
-          <div style={s.featureGrid}>
-            {PLAN_FEATURES.map(f => (
-              <button
-                type="button"
-                key={f.title}
-                onClick={() => setTab(f.key)}
-                style={{ ...s.featureCard, ...(tab === f.key ? s.featureCardActive : {}) }}
-              >
-                <div style={{ ...s.featureIconBadge, ...(tab === f.key ? s.featureIconBadgeActive : {}) }}>{f.icon}</div>
-                <div>
-                  <div style={s.featureCardTitle}>{f.title}</div>
-                  <div style={s.featureCardDesc}>{f.desc}</div>
-                </div>
-              </button>
-            ))}
-          </div>
         </div>
       </div>
     </div>
   );
 }
 
-// Stylized, clickable preview of the studio dashboard — an illustration, not a literal
-// screenshot, so it needs no signed-in account or seeded data to render truthfully. The
-// sidebar icons and the feature cards below both drive the same `tab` state, so exploring
-// either one updates the mockup panel. Left alone, it auto-advances through all four on a
-// timer — the progress bar in the chrome row shows how long until the next flip — and
-// restarts that timer on every change so a manual click doesn't fight the next auto-flip.
+// A segmented control whose highlight slides (via transform, not re-layout) to sit behind
+// whichever feature is active — driven either by a click here or by IntroStep's auto-advance.
+function FeatureTabs({ features, activeIndex, onSelect }) {
+  return (
+    <div style={s.tabsRow}>
+      <div
+        style={{
+          ...s.tabsHighlight,
+          width: `${100 / features.length}%`,
+          transform: `translateX(${activeIndex * 100}%)`,
+        }}
+      />
+      {features.map((f, i) => (
+        <button
+          key={f.title}
+          type="button"
+          onClick={() => onSelect(i)}
+          style={{ ...s.tabItem, ...(activeIndex === i ? s.tabItemActive : {}) }}
+        >
+          <span style={s.tabIcon}>{f.icon}</span>
+          <span className="vanta-tab-label" style={s.tabLabel}>{f.title}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// Stylized preview of the studio dashboard — an illustration, not a literal screenshot, so
+// it needs no signed-in account or seeded data to render truthfully. Purely reflects
+// whichever feature tab is active; the progress bar in the chrome row mirrors the same
+// auto-advance timer IntroStep drives the tabs with.
 const PREVIEW_NAV = [
   { key: 'schedule', icon: HomeIcon },
   { key: 'schedule', icon: GridCalIcon },
@@ -208,9 +236,6 @@ const PREVIEW_NAV = [
   { key: 'analytics', icon: ChartIcon },
 ];
 
-const TAB_ORDER = ['schedule', 'clients', 'artists', 'analytics'];
-const PREVIEW_CYCLE_MS = 3200;
-
 const PREVIEW_KEYFRAMES = `
 @keyframes vantaPreviewProgress { from { width: 0%; } to { width: 100%; } }
 @keyframes vantaPreviewFade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
@@ -218,14 +243,7 @@ const PREVIEW_KEYFRAMES = `
 .vanta-preview-panel { animation: vantaPreviewFade 320ms ease; }
 `;
 
-function DashboardPreview({ tab, onTabChange }) {
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      onTabChange(TAB_ORDER[(TAB_ORDER.indexOf(tab) + 1) % TAB_ORDER.length]);
-    }, PREVIEW_CYCLE_MS);
-    return () => clearTimeout(timer);
-  }, [tab, onTabChange]);
-
+function DashboardPreview({ tab }) {
   return (
     <div style={s.previewFrame}>
       <style>{PREVIEW_KEYFRAMES}</style>
@@ -240,14 +258,9 @@ function DashboardPreview({ tab, onTabChange }) {
       <div style={s.previewBody}>
         <div style={s.previewSidebar}>
           {PREVIEW_NAV.map(({ key, icon: Icon }, i) => (
-            <button
-              key={i}
-              type="button"
-              onClick={() => onTabChange(key)}
-              style={{ ...s.previewSidebarIcon, ...(tab === key ? s.previewSidebarIconActive : {}) }}
-            >
+            <div key={i} style={{ ...s.previewSidebarIcon, ...(tab === key ? s.previewSidebarIconActive : {}) }}>
               <Icon size={11} />
-            </button>
+            </div>
           ))}
         </div>
         <div style={s.previewMain}>
@@ -848,70 +861,88 @@ const s = {
     lineHeight: 1.5,
     margin: 0,
   },
-  introWrap: { display: 'flex', flexDirection: 'column', gap: '1.35rem' },
-  introTitle: {
-    fontSize: '1.15rem',
-    fontWeight: 700,
-    color: '#ffffff',
-    margin: '0 0 0.3rem',
-    letterSpacing: '-0.01em',
-  },
-  introSubtitle: {
-    fontSize: '0.85rem',
-    color: 'rgba(255,255,255,0.5)',
-    margin: 0,
-    lineHeight: 1.5,
-  },
-  featureGrid: {
+  introWrap: { display: 'flex', flexDirection: 'column', gap: '1.5rem' },
+  switchRow: {
     display: 'flex',
-    flexDirection: 'column',
-    gap: '0.7rem',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    gap: '0.35rem',
+    marginBottom: '1.1rem',
   },
-  featureCard: {
-    display: 'flex',
-    alignItems: 'flex-start',
-    gap: '0.75rem',
-    padding: '0.75rem',
-    background: 'rgba(255,255,255,0.03)',
-    border: '1px solid rgba(255,255,255,0.07)',
-    borderRadius: 10,
-    width: '100%',
-    textAlign: 'left',
-    font: 'inherit',
-    color: 'inherit',
+  switchRowText: {
+    fontSize: '0.78rem',
+    color: 'rgba(255,255,255,0.4)',
+  },
+  switchLink: {
+    background: 'none',
+    border: 'none',
+    color: '#f5ecd9',
+    fontWeight: 600,
+    fontSize: '0.78rem',
     cursor: 'pointer',
-    transition: 'background 0.15s, border-color 0.15s',
+    padding: 0,
+    textDecoration: 'underline',
+    textUnderlineOffset: 3,
   },
-  featureCardActive: {
-    background: 'rgba(245,236,217,0.06)',
-    border: '1px solid rgba(245,236,217,0.3)',
+  tabsRow: {
+    position: 'relative',
+    display: 'flex',
+    gap: 2,
+    background: 'rgba(255,255,255,0.03)',
+    border: '1px solid rgba(255,255,255,0.08)',
+    borderRadius: 10,
+    padding: 4,
   },
-  featureIconBadge: {
+  tabsHighlight: {
+    position: 'absolute',
+    top: 4,
+    bottom: 4,
+    left: 4,
+    borderRadius: 7,
+    background: 'rgba(245,236,217,0.12)',
+    border: '1px solid rgba(245,236,217,0.28)',
+    transition: 'transform 0.45s cubic-bezier(0.4, 0, 0.2, 1)',
+  },
+  tabItem: {
+    position: 'relative',
+    zIndex: 1,
+    flex: 1,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    width: 34,
-    height: 34,
-    flexShrink: 0,
-    borderRadius: 8,
-    background: 'rgba(255,255,255,0.06)',
-    color: 'rgba(255,255,255,0.45)',
-    transition: 'background 0.15s, color 0.15s',
+    gap: '0.4rem',
+    padding: '0.65rem 0.4rem',
+    background: 'none',
+    border: 'none',
+    color: 'rgba(255,255,255,0.4)',
+    cursor: 'pointer',
+    transition: 'color 0.2s',
   },
-  featureIconBadgeActive: {
-    background: 'rgba(245,236,217,0.16)',
-    color: '#f5ecd9',
+  tabItemActive: { color: '#f5ecd9' },
+  tabIcon: { display: 'flex', alignItems: 'center', flexShrink: 0 },
+  tabLabel: { fontSize: '0.78rem', fontWeight: 600, whiteSpace: 'nowrap' },
+  explanationArea: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '1.1rem',
   },
-  featureCardTitle: {
-    fontSize: '0.85rem',
-    fontWeight: 600,
+  introTitle: {
+    fontSize: '1.3rem',
+    fontWeight: 700,
     color: '#ffffff',
-    marginBottom: '0.15rem',
+    margin: '0 0 0.35rem',
+    letterSpacing: '-0.01em',
   },
-  featureCardDesc: {
-    fontSize: '0.78rem',
-    color: 'rgba(255,255,255,0.5)',
-    lineHeight: 1.45,
+  introSubtitle: {
+    fontSize: '0.9rem',
+    color: 'rgba(255,255,255,0.55)',
+    margin: 0,
+    lineHeight: 1.6,
+    maxWidth: 520,
+  },
+  ctaBar: {
+    paddingTop: '1.25rem',
+    borderTop: '1px solid rgba(255,255,255,0.08)',
   },
   planPriceCard: {
     background: 'linear-gradient(160deg, rgba(245,236,217,0.09), rgba(255,255,255,0.03))',
@@ -981,7 +1012,7 @@ const s = {
     width: '0%',
     background: 'rgba(245,236,217,0.65)',
   },
-  previewBody: { display: 'flex', height: 136 },
+  previewBody: { display: 'flex', height: 210 },
   previewSidebar: {
     display: 'flex',
     flexDirection: 'column',
