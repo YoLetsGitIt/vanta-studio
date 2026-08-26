@@ -94,30 +94,36 @@ export default function SignUpFlow({ onSwitchToSignIn }) {
 // ── Step 0: What you get ──────────────────────────────────────────────────────
 
 const PLAN_FEATURES = [
-  'A shareable booking widget clients use to request appointments',
-  'Client records, consent forms, and full booking history in one place',
-  'Artist management with schedules and automatic payout tracking',
-  'Revenue and booking analytics for the whole studio',
+  { icon: <WidgetIcon />, title: 'Booking widget', desc: 'A shareable link clients use to request appointments straight into your schedule.' },
+  { icon: <PersonIcon />, title: 'Client records', desc: 'Consent forms, contact details, and full booking history in one place.' },
+  { icon: <UsersIcon />, title: 'Artist management', desc: 'Schedules, station assignments, and automatic payout tracking per artist.' },
+  { icon: <ChartIcon />, title: 'Analytics', desc: 'Revenue and booking trends for the whole studio, always up to date.' },
 ];
 
 function IntroStep({ onNext }) {
   return (
-    <div style={s.form}>
+    <div style={s.introWrap}>
+      <DashboardPreview />
+
       <div>
-        <h3 style={s.planTitle}>Everything your studio needs</h3>
-        <p style={s.planStudioName}>Booking, clients, artists, and payouts in one dashboard.</p>
+        <h3 style={s.introTitle}>Everything your studio needs</h3>
+        <p style={s.introSubtitle}>Booking, clients, artists, and payouts — all in one dashboard.</p>
       </div>
 
-      <ul style={s.featureList}>
-        {PLAN_FEATURES.map(feature => (
-          <li key={feature} style={s.featureItem}>
-            <span style={s.featureCheck}>✓</span>
-            <span>{feature}</span>
-          </li>
+      <div style={s.featureGrid}>
+        {PLAN_FEATURES.map(f => (
+          <div key={f.title} style={s.featureCard}>
+            <div style={s.featureIconBadge}>{f.icon}</div>
+            <div>
+              <div style={s.featureCardTitle}>{f.title}</div>
+              <div style={s.featureCardDesc}>{f.desc}</div>
+            </div>
+          </div>
         ))}
-      </ul>
+      </div>
 
       <div style={s.planPriceCard}>
+        <span style={s.trialPill}>14-day free trial</span>
         <div style={s.planPriceRow}>
           <span style={s.planPriceAmount}>$60</span>
           <span style={s.planPriceUnit}>/mo AUD</span>
@@ -126,12 +132,101 @@ function IntroStep({ onNext }) {
       </div>
 
       <p style={s.trialNote}>
-        Your first 14 days are free — you won't be charged until the trial ends, and you can
-        cancel anytime from Settings.
+        You won't be charged until the trial ends, and you can cancel anytime from Settings.
       </p>
 
       <button type="button" onClick={onNext} style={s.btn}>Get started</button>
     </div>
+  );
+}
+
+// Stylized preview of the studio dashboard (schedule + sidebar) — an illustration, not a
+// literal screenshot, so it needs no signed-in account or seeded data to render truthfully.
+function DashboardPreview() {
+  const filledCells = new Set([3, 9, 14, 18, 23]);
+  return (
+    <div style={s.previewFrame}>
+      <div style={s.previewChrome}>
+        <span style={{ ...s.previewDot, background: '#e8756f' }} />
+        <span style={{ ...s.previewDot, background: '#e8c56f' }} />
+        <span style={{ ...s.previewDot, background: '#6fbf8a' }} />
+      </div>
+      <div style={s.previewBody}>
+        <div style={s.previewSidebar}>
+          {[HomeIcon, GridCalIcon, UsersIcon, PersonIcon, ChartIcon].map((Icon, i) => (
+            <div key={i} style={{ ...s.previewSidebarIcon, ...(i === 1 ? s.previewSidebarIconActive : {}) }}>
+              <Icon size={11} />
+            </div>
+          ))}
+        </div>
+        <div style={s.previewMain}>
+          <div style={s.previewCalGrid}>
+            {Array.from({ length: 28 }).map((_, i) => (
+              <div key={i} style={{ ...s.previewCalCell, ...(filledCells.has(i) ? s.previewCalCellFilled : {}) }} />
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function WidgetIcon({ size = 18 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
+      <rect x="1.5" y="2.5" width="13" height="11" rx="2" stroke="currentColor" strokeWidth="1.2" />
+      <path d="M1.5 5.5h13" stroke="currentColor" strokeWidth="1.2" />
+      <path d="M4 8.5h5M4 10.8h3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function PersonIcon({ size = 18 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
+      <circle cx="8" cy="5" r="3" stroke="currentColor" strokeWidth="1.2" />
+      <path d="M2 14c0-3.31 2.69-6 6-6s6 2.69 6 6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function UsersIcon({ size = 18 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
+      <circle cx="6" cy="5" r="2.5" stroke="currentColor" strokeWidth="1.2" />
+      <path d="M1 13c0-2.76 2.24-5 5-5s5 2.24 5 5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+      <path d="M11 7.5a2.5 2.5 0 1 0 0-5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+      <path d="M13 13c0-1.86-.9-3.5-2.26-4.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function ChartIcon({ size = 18 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
+      <path d="M2 12l3.5-4 3 2.5L12 5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="12" cy="5" r="1.2" fill="currentColor" />
+    </svg>
+  );
+}
+
+function HomeIcon({ size = 18 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
+      <path d="M2 6.5L8 2l6 4.5V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V6.5Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
+      <path d="M6 15v-5h4v5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function GridCalIcon({ size = 18 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
+      <rect x="1.5" y="2.5" width="13" height="12" rx="1.5" stroke="currentColor" strokeWidth="1.2" />
+      <path d="M1.5 6.5h13" stroke="currentColor" strokeWidth="1.2" />
+      <path d="M5.5 1.5v2M10.5 1.5v2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+      <path d="M4.5 9.5h2M9.5 9.5h2M4.5 12h2M9.5 12h2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+    </svg>
   );
 }
 
@@ -557,43 +652,74 @@ const s = {
     lineHeight: 1.5,
     margin: 0,
   },
-  planTitle: {
-    fontSize: '1rem',
-    fontWeight: 600,
+  introWrap: { display: 'flex', flexDirection: 'column', gap: '1.35rem' },
+  introTitle: {
+    fontSize: '1.15rem',
+    fontWeight: 700,
     color: '#ffffff',
-    margin: '0 0 0.25rem',
+    margin: '0 0 0.3rem',
+    letterSpacing: '-0.01em',
   },
-  planStudioName: {
+  introSubtitle: {
     fontSize: '0.85rem',
     color: 'rgba(255,255,255,0.5)',
     margin: 0,
+    lineHeight: 1.5,
   },
-  featureList: {
+  featureGrid: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '0.6rem',
-    margin: 0,
-    padding: 0,
-    listStyle: 'none',
+    gap: '0.7rem',
   },
-  featureItem: {
+  featureCard: {
     display: 'flex',
     alignItems: 'flex-start',
-    gap: '0.6rem',
-    fontSize: '0.85rem',
-    color: 'rgba(255,255,255,0.75)',
-    lineHeight: 1.4,
+    gap: '0.75rem',
+    padding: '0.75rem',
+    background: 'rgba(255,255,255,0.03)',
+    border: '1px solid rgba(255,255,255,0.07)',
+    borderRadius: 10,
   },
-  featureCheck: {
-    color: '#4cc98a',
-    fontSize: '0.85rem',
+  featureIconBadge: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 34,
+    height: 34,
     flexShrink: 0,
+    borderRadius: 8,
+    background: 'rgba(245,236,217,0.1)',
+    color: '#f5ecd9',
+  },
+  featureCardTitle: {
+    fontSize: '0.85rem',
+    fontWeight: 600,
+    color: '#ffffff',
+    marginBottom: '0.15rem',
+  },
+  featureCardDesc: {
+    fontSize: '0.78rem',
+    color: 'rgba(255,255,255,0.5)',
+    lineHeight: 1.45,
   },
   planPriceCard: {
-    background: 'rgba(255,255,255,0.04)',
-    border: '1px solid rgba(255,255,255,0.1)',
-    borderRadius: 8,
-    padding: '0.9rem 1rem',
+    background: 'linear-gradient(160deg, rgba(245,236,217,0.09), rgba(255,255,255,0.03))',
+    border: '1px solid rgba(245,236,217,0.22)',
+    borderRadius: 10,
+    padding: '1rem 1.1rem',
+    boxShadow: '0 0 28px rgba(245,236,217,0.06)',
+  },
+  trialPill: {
+    display: 'inline-block',
+    fontSize: '0.68rem',
+    fontWeight: 700,
+    letterSpacing: '0.02em',
+    textTransform: 'uppercase',
+    color: '#4cc98a',
+    background: 'rgba(76,201,138,0.12)',
+    borderRadius: 999,
+    padding: '0.2rem 0.55rem',
+    marginBottom: '0.55rem',
   },
   planPriceRow: {
     display: 'flex',
@@ -601,7 +727,7 @@ const s = {
     gap: '0.3rem',
   },
   planPriceAmount: {
-    fontSize: '1.4rem',
+    fontSize: '1.6rem',
     fontWeight: 700,
     color: '#f5ecd9',
   },
@@ -611,8 +737,61 @@ const s = {
   },
   planPriceDetail: {
     fontSize: '0.78rem',
-    color: 'rgba(255,255,255,0.5)',
+    color: 'rgba(255,255,255,0.55)',
     margin: '0.35rem 0 0',
+  },
+  previewFrame: {
+    borderRadius: 12,
+    overflow: 'hidden',
+    border: '1px solid rgba(255,255,255,0.08)',
+    background: '#11161d',
+    boxShadow: '0 12px 32px rgba(0,0,0,0.35)',
+  },
+  previewChrome: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '5px',
+    padding: '0.55rem 0.7rem',
+    background: 'rgba(255,255,255,0.03)',
+    borderBottom: '1px solid rgba(255,255,255,0.06)',
+  },
+  previewDot: { width: 7, height: 7, borderRadius: '50%' },
+  previewBody: { display: 'flex', height: 118 },
+  previewSidebar: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '0.5rem',
+    padding: '0.6rem 0.45rem',
+    background: 'rgba(255,255,255,0.02)',
+    borderRight: '1px solid rgba(255,255,255,0.06)',
+  },
+  previewSidebarIcon: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 20,
+    height: 20,
+    borderRadius: 5,
+    color: 'rgba(255,255,255,0.3)',
+  },
+  previewSidebarIconActive: {
+    background: 'rgba(245,236,217,0.14)',
+    color: '#f5ecd9',
+  },
+  previewMain: { flex: 1, padding: '0.65rem' },
+  previewCalGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(7, 1fr)',
+    gap: '4px',
+    height: '100%',
+  },
+  previewCalCell: {
+    borderRadius: 3,
+    background: 'rgba(255,255,255,0.05)',
+  },
+  previewCalCellFilled: {
+    background: 'rgba(245,236,217,0.55)',
   },
   errorBox: {
     fontSize: '0.8rem',
