@@ -94,16 +94,37 @@ export default function SignUpFlow({ onSwitchToSignIn }) {
 // ── Step 0: What you get ──────────────────────────────────────────────────────
 
 const PLAN_FEATURES = [
-  { icon: <WidgetIcon />, title: 'Booking widget', desc: 'A shareable link clients use to request appointments straight into your schedule.' },
-  { icon: <PersonIcon />, title: 'Client records', desc: 'Consent forms, contact details, and full booking history in one place.' },
-  { icon: <UsersIcon />, title: 'Artist management', desc: 'Schedules, station assignments, and automatic payout tracking per artist.' },
-  { icon: <ChartIcon />, title: 'Analytics', desc: 'Revenue and booking trends for the whole studio, always up to date.' },
+  {
+    key: 'schedule',
+    icon: <WidgetIcon />,
+    title: 'Booking widget',
+    desc: 'A shareable link clients use to request a session, with deposits, 7-day/24-hour reminders, and a reschedule cutoff you control.',
+  },
+  {
+    key: 'clients',
+    icon: <PersonIcon />,
+    title: 'Client records',
+    desc: 'Consent status, allergies, and full booking history per client — plus CSV import from your old system.',
+  },
+  {
+    key: 'artists',
+    icon: <UsersIcon />,
+    title: 'Artist management',
+    desc: 'Approve artists, assign stations, and set separate walk-in vs. personal commission splits — payouts track automatically.',
+  },
+  {
+    key: 'analytics',
+    icon: <ChartIcon />,
+    title: 'Analytics',
+    desc: 'Gross and net sales, sales-per-hour by artist, and payout/reimbursement tracking — always current.',
+  },
 ];
 
 function IntroStep({ onNext }) {
+  const [tab, setTab] = useState('schedule');
   return (
     <div style={s.introWrap}>
-      <DashboardPreview />
+      <DashboardPreview tab={tab} onTabChange={setTab} />
 
       <div>
         <h3 style={s.introTitle}>Everything your studio needs</h3>
@@ -112,13 +133,18 @@ function IntroStep({ onNext }) {
 
       <div style={s.featureGrid}>
         {PLAN_FEATURES.map(f => (
-          <div key={f.title} style={s.featureCard}>
-            <div style={s.featureIconBadge}>{f.icon}</div>
+          <button
+            type="button"
+            key={f.title}
+            onClick={() => setTab(f.key)}
+            style={{ ...s.featureCard, ...(tab === f.key ? s.featureCardActive : {}) }}
+          >
+            <div style={{ ...s.featureIconBadge, ...(tab === f.key ? s.featureIconBadgeActive : {}) }}>{f.icon}</div>
             <div>
               <div style={s.featureCardTitle}>{f.title}</div>
               <div style={s.featureCardDesc}>{f.desc}</div>
             </div>
-          </div>
+          </button>
         ))}
       </div>
 
@@ -140,10 +166,20 @@ function IntroStep({ onNext }) {
   );
 }
 
-// Stylized preview of the studio dashboard (schedule + sidebar) — an illustration, not a
-// literal screenshot, so it needs no signed-in account or seeded data to render truthfully.
-function DashboardPreview() {
-  const filledCells = new Set([3, 9, 14, 18, 23]);
+// Stylized, clickable preview of the studio dashboard — an illustration, not a literal
+// screenshot, so it needs no signed-in account or seeded data to render truthfully. The
+// sidebar icons and the feature cards below both drive the same `tab` state, so exploring
+// either one updates the mockup panel.
+const PREVIEW_NAV = [
+  { key: 'schedule', icon: HomeIcon },
+  { key: 'schedule', icon: GridCalIcon },
+  { key: 'artists', icon: UsersIcon },
+  { key: 'clients', icon: PersonIcon },
+  { key: 'analytics', icon: ChartIcon },
+];
+
+function DashboardPreview({ tab, onTabChange }) {
+  const scheduleFilled = new Set([3, 9, 14, 18, 23]);
   return (
     <div style={s.previewFrame}>
       <div style={s.previewChrome}>
@@ -153,18 +189,54 @@ function DashboardPreview() {
       </div>
       <div style={s.previewBody}>
         <div style={s.previewSidebar}>
-          {[HomeIcon, GridCalIcon, UsersIcon, PersonIcon, ChartIcon].map((Icon, i) => (
-            <div key={i} style={{ ...s.previewSidebarIcon, ...(i === 1 ? s.previewSidebarIconActive : {}) }}>
+          {PREVIEW_NAV.map(({ key, icon: Icon }, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() => onTabChange(key)}
+              style={{ ...s.previewSidebarIcon, ...(tab === key ? s.previewSidebarIconActive : {}) }}
+            >
               <Icon size={11} />
-            </div>
+            </button>
           ))}
         </div>
         <div style={s.previewMain}>
-          <div style={s.previewCalGrid}>
-            {Array.from({ length: 28 }).map((_, i) => (
-              <div key={i} style={{ ...s.previewCalCell, ...(filledCells.has(i) ? s.previewCalCellFilled : {}) }} />
-            ))}
-          </div>
+          {tab === 'schedule' && (
+            <div style={s.previewCalGrid}>
+              {Array.from({ length: 28 }).map((_, i) => (
+                <div key={i} style={{ ...s.previewCalCell, ...(scheduleFilled.has(i) ? s.previewCalCellFilled : {}) }} />
+              ))}
+            </div>
+          )}
+          {tab === 'artists' && (
+            <div style={s.previewList}>
+              {[78, 52, 90].map((pct, i) => (
+                <div key={i} style={s.previewListRow}>
+                  <span style={s.previewAvatar} />
+                  <span style={s.previewBarTrack}><span style={{ ...s.previewBarFill, width: `${pct}%` }} /></span>
+                  <span style={s.previewListTag}>{pct}%</span>
+                </div>
+              ))}
+            </div>
+          )}
+          {tab === 'clients' && (
+            <div style={s.previewList}>
+              {[65, 88, 42].map((w, i) => (
+                <div key={i} style={s.previewListRow}>
+                  <span style={s.previewAvatar} />
+                  <span style={s.previewBarTrack}><span style={{ ...s.previewBarFill, width: `${w}%` }} /></span>
+                  <span style={s.previewListTagGood}>✓</span>
+                </div>
+              ))}
+            </div>
+          )}
+          {tab === 'analytics' && (
+            <div style={s.previewBarChart}>
+              {[35, 55, 40, 72, 50, 85, 60].map((h, i) => (
+                <span key={i} style={{ ...s.previewChartBar, height: `${h}%` }} />
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -679,6 +751,16 @@ const s = {
     background: 'rgba(255,255,255,0.03)',
     border: '1px solid rgba(255,255,255,0.07)',
     borderRadius: 10,
+    width: '100%',
+    textAlign: 'left',
+    font: 'inherit',
+    color: 'inherit',
+    cursor: 'pointer',
+    transition: 'background 0.15s, border-color 0.15s',
+  },
+  featureCardActive: {
+    background: 'rgba(245,236,217,0.06)',
+    border: '1px solid rgba(245,236,217,0.3)',
   },
   featureIconBadge: {
     display: 'flex',
@@ -688,7 +770,12 @@ const s = {
     height: 34,
     flexShrink: 0,
     borderRadius: 8,
-    background: 'rgba(245,236,217,0.1)',
+    background: 'rgba(255,255,255,0.06)',
+    color: 'rgba(255,255,255,0.45)',
+    transition: 'background 0.15s, color 0.15s',
+  },
+  featureIconBadgeActive: {
+    background: 'rgba(245,236,217,0.16)',
     color: '#f5ecd9',
   },
   featureCardTitle: {
@@ -774,12 +861,17 @@ const s = {
     height: 20,
     borderRadius: 5,
     color: 'rgba(255,255,255,0.3)',
+    background: 'none',
+    border: 'none',
+    padding: 0,
+    cursor: 'pointer',
+    transition: 'background 0.15s, color 0.15s',
   },
   previewSidebarIconActive: {
     background: 'rgba(245,236,217,0.14)',
     color: '#f5ecd9',
   },
-  previewMain: { flex: 1, padding: '0.65rem' },
+  previewMain: { flex: 1, padding: '0.65rem', display: 'flex', flexDirection: 'column', justifyContent: 'center' },
   previewCalGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(7, 1fr)',
@@ -792,6 +884,61 @@ const s = {
   },
   previewCalCellFilled: {
     background: 'rgba(245,236,217,0.55)',
+  },
+  previewList: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '0.55rem',
+  },
+  previewListRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.45rem',
+  },
+  previewAvatar: {
+    width: 16,
+    height: 16,
+    borderRadius: '50%',
+    flexShrink: 0,
+    background: 'rgba(255,255,255,0.12)',
+  },
+  previewBarTrack: {
+    flex: 1,
+    height: 6,
+    borderRadius: 3,
+    background: 'rgba(255,255,255,0.06)',
+    overflow: 'hidden',
+  },
+  previewBarFill: {
+    display: 'block',
+    height: '100%',
+    borderRadius: 3,
+    background: 'rgba(245,236,217,0.5)',
+  },
+  previewListTag: {
+    fontSize: '0.55rem',
+    color: 'rgba(255,255,255,0.35)',
+    flexShrink: 0,
+    width: 24,
+    textAlign: 'right',
+  },
+  previewListTagGood: {
+    fontSize: '0.6rem',
+    color: '#4cc98a',
+    flexShrink: 0,
+    width: 24,
+    textAlign: 'right',
+  },
+  previewBarChart: {
+    display: 'flex',
+    alignItems: 'flex-end',
+    gap: '5px',
+    height: '100%',
+  },
+  previewChartBar: {
+    flex: 1,
+    borderRadius: '2px 2px 0 0',
+    background: 'rgba(245,236,217,0.5)',
   },
   errorBox: {
     fontSize: '0.8rem',
