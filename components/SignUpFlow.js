@@ -111,66 +111,92 @@ export default function SignUpFlow({ onSwitchToSignIn, onWideChange }) {
 const PLAN_FEATURES = [
   {
     icon: <WidgetIcon />,
-    img: '/signup/booking-widget.png',
+    images: ['/signup/booking-widget.png', '/signup/booking-widget-2.png'],
     title: 'Booking widget',
     desc: 'A shareable link and QR code clients use to request a session — deposits, reminders, and a reschedule cutoff, all handled for you.',
-    detail: 'Clients scan a QR code or click your link to request a session straight into your calendar. Deposits, 7-day and 24-hour email reminders, and a reschedule cutoff you set are all built in — no back-and-forth DMs.',
+    detail: [
+      'Clients scan a QR code or click your link to request a session straight into your calendar — no app or account required on their end. Deposits, 7-day and 24-hour email reminders, and a reschedule cutoff you set are all built in, so a request doesn\'t turn into a string of DMs.',
+      'Share the link anywhere — your bio, a QR code on a table card, a text message — or embed the whole form on your own website.',
+    ],
   },
   {
     icon: <PaletteIcon />,
-    img: '/signup/widget-branding.png',
+    images: ['/signup/widget-branding.png', '/signup/widget-branding-2.png'],
     title: 'Widget branding',
     desc: 'Recolor the widget to match your studio in seconds, then drop a one-line embed snippet into your own site — no code required.',
-    detail: 'Pick a background and highlight color to match your own site, watch the live preview update instantly, then copy a single embed snippet — one div and one script tag — onto any page you control.',
+    detail: [
+      'Pick a background and highlight color to match your own site — the preview updates live as you type a hex code, so you see exactly what clients will see before you save anything.',
+      'Once you\'re happy with it, copy a single embed snippet — one div and one script tag — onto any page you control. No developer needed.',
+    ],
   },
   {
     icon: <ChecklistIcon />,
-    img: '/signup/custom-booking-form.png',
+    images: ['/signup/custom-booking-form.png', '/signup/custom-booking-form-2.png'],
     title: 'Custom booking form',
     desc: 'Turn any field on or off — placement, size, skin tone, reference photos — and mark exactly which ones are required. Your form, your rules.',
-    detail: 'Every field beyond name, date of birth, email, and phone is optional — turn on artist preference, placement, size, skin tone, reference photos, or allergies individually, and mark any of them as required. Nothing you don\'t need, everything you do.',
+    detail: [
+      'Every field beyond name, date of birth, email, and phone is optional. Turn on artist preference, placement, size, skin tone, reference photos, or allergies individually, and mark any of them as required before a client can submit.',
+      'Change your mind later — a field you turn off disappears from the public form immediately, and nothing about past bookings changes.',
+    ],
   },
   {
     icon: <DocumentIcon />,
-    img: '/signup/consent-builder.png',
+    images: ['/signup/consent-builder.png', '/signup/consent-builder-2.png'],
     title: 'Consent builder',
     desc: 'Design your own waiver from headings, checkboxes, and e-signatures — guardian fields appear automatically for clients under 18.',
-    detail: 'Compose your own waiver from headings, paragraphs, checkboxes, and yes/no fields, require an e-signature, and the form automatically adds a guardian-consent section the moment a client\'s date of birth shows they\'re under 18.',
+    detail: [
+      'Build your waiver from six field types — headings, paragraphs, checkboxes, text, long text, and yes/no questions — in whatever order makes sense for your studio, with a live preview of the client-facing version as you go.',
+      'Require an e-signature, and the form automatically adds a guardian-consent section the moment a client\'s date of birth shows they\'re under 18 — you don\'t have to build that logic yourself.',
+    ],
   },
   {
     icon: <PersonIcon />,
-    img: '/signup/client-records.png',
+    images: ['/signup/client-records.png', '/signup/client-records-2.png'],
     title: 'Client records',
     desc: 'Every client\'s consent status, allergies, and full booking history — searchable in seconds.',
-    detail: 'Every client gets a running profile: consent status against your current template, any noted allergies, and their full booking history — all searchable by name, email, or phone in one box.',
+    detail: [
+      'Every client gets a running profile beyond the basic contact card: consent status against your current template, design preferences, allergy or skin-condition notes, and even a pain-tolerance scale — all searchable by name, email, or phone in one box.',
+      'Send a consent link straight from their profile, and it updates the moment they sign.',
+    ],
   },
   {
     icon: <UsersIcon />,
-    art: <MiniArtists />,
+    images: ['/signup/artist-management-1.png', '/signup/artist-management-2.png'],
     title: 'Artist management',
     desc: 'Approve artists, assign stations, and set walk-in vs. personal commission splits — payouts track themselves.',
-    detail: 'Review pending artist applications, approve or reject them, assign physical stations, and set separate commission percentages for walk-in versus artist-sourced bookings — payouts calculate themselves from there.',
+    detail: [
+      'Set separate commission percentages for walk-in versus artist-sourced bookings — studio and artist can split revenue differently depending on who brought the client in.',
+      'Decide which parties have to record payment before a payout processes, and whether an artist still gets their cut when a client forfeits a deposit instead of showing up. Changes here only apply going forward, so they never rewrite history on past bookings.',
+    ],
   },
   {
     icon: <ChartIcon />,
-    img: '/signup/analytics.png',
+    images: ['/signup/analytics.png', '/signup/analytics-2.png'],
     title: 'Analytics',
     desc: 'Appointment counts, revenue, and a studio-vs-personal split, updated in real time.',
-    detail: 'Appointment counts broken into completed, confirmed, pending, cancelled, and no-show, plus revenue and a studio-vs-personal booking split — filterable by week, month, or a custom date range.',
+    detail: [
+      'Appointment counts broken into completed, confirmed, pending, cancelled, and no-show, plus revenue and a studio-vs-personal booking split — filterable by week, month, or a custom date range.',
+      'See new versus returning clients at a glance, and which clients are spending the most with your studio over the period you pick.',
+    ],
   },
   {
     icon: <GlobeIcon />,
-    img: '/signup/multi-language.png',
+    images: ['/signup/multi-language.png', '/signup/multi-language-2.png'],
     title: 'Multi-language',
     desc: 'The entire dashboard is available in English, Simplified Chinese, and Korean — switch anytime from Settings.',
-    detail: 'Switch the entire dashboard — every label, button, and page — between English, Simplified Chinese, and Korean from Settings, no page reload required.',
+    detail: [
+      'Switch the dashboard — navigation, buttons, and pages — between English, Simplified Chinese, and Korean from Settings, with no page reload.',
+    ],
   },
   {
     icon: <UploadIcon />,
-    img: '/signup/migration-import.png',
+    images: ['/signup/migration-import.png'],
     title: 'Migration import',
     desc: 'Already on Square, Acuity, or Fresha? Bring your client history over with built-in column mapping.',
-    detail: 'Export your client and appointment history from Square Appointments, Acuity, or Fresha as a CSV, and Vanta maps the columns automatically instead of leaving you to match fields by hand.',
+    detail: [
+      'Export your client and appointment history from Square Appointments, Acuity, or Fresha as a CSV, and Vanta recognizes the format automatically instead of leaving you to map every column by hand.',
+      'You get a preview of what will import before anything is saved, with counts of what imported, what linked to an existing client, and what was skipped.',
+    ],
   },
 ];
 
@@ -190,12 +216,11 @@ const INTRO_LAYOUT_CSS = `
 .vanta-feature-card { transition: background 0.15s ease, border-color 0.15s ease; cursor: pointer; }
 .vanta-feature-card:hover { background: rgba(255,255,255,0.05); border-color: rgba(245,236,217,0.25); }
 .vanta-feature-card:hover .vanta-expand-badge { opacity: 1; background: rgba(245,236,217,0.16); color: #f5ecd9; }
-.vanta-cta-bar { display: flex; flex-direction: column; gap: 1rem; }
-.vanta-cta-action { display: flex; flex-direction: column; gap: 0.6rem; }
+.vanta-cta-bar { display: flex; flex-direction: column; gap: 1.1rem; }
+.vanta-cta-button { width: 100%; }
 @media (min-width: 560px) {
-  .vanta-cta-bar { flex-direction: row; align-items: center; }
-  .vanta-cta-price { flex-shrink: 0; width: 230px; }
-  .vanta-cta-action { flex: 1; }
+  .vanta-cta-bar { flex-direction: row; align-items: center; justify-content: space-between; gap: 1.75rem; }
+  .vanta-cta-button { width: auto; min-width: 190px; flex-shrink: 0; }
 }
 @keyframes vantaModalIn { from { opacity: 0; transform: scale(0.96) translateY(6px); } to { opacity: 1; transform: scale(1) translateY(0); } }
 .vanta-modal-panel { animation: vantaModalIn 0.18s ease; }
@@ -222,7 +247,7 @@ function IntroStep({ onNext }) {
             onClick={() => setActiveFeature(f)}
           >
             <div style={s.featureArtFrame}>
-              {f.img ? <img src={f.img} alt="" style={s.featureArtImage} /> : f.art}
+              <img src={f.images[0]} alt="" style={s.featureArtImage} />
               <span className="vanta-expand-badge" style={s.expandBadge}>
                 <ExpandIcon />
               </span>
@@ -241,21 +266,26 @@ function IntroStep({ onNext }) {
       )}
 
       <div className="vanta-cta-bar" style={s.ctaBar}>
-        <div className="vanta-cta-price" style={s.planPriceCard}>
+        <div style={s.ctaInfo}>
           <span style={s.trialPill}>14-day free trial</span>
           <div style={s.planPriceRow}>
             <span style={s.planPriceAmount}>$60</span>
             <span style={s.planPriceUnit}>/mo AUD</span>
           </div>
-          <p style={s.planPriceDetail}>Covers up to 6 artists, then $15/artist beyond that.</p>
+          <p style={s.planPriceDetail}>
+            Covers up to 6 artists, then $15/artist beyond that. You won't be charged until the
+            trial ends, and you can cancel anytime from Settings.
+          </p>
         </div>
 
-        <div className="vanta-cta-action">
-          <p style={s.trialNote}>
-            You won't be charged until the trial ends, and you can cancel anytime from Settings.
-          </p>
-          <button type="button" onClick={onNext} className="vanta-btn" style={s.btn}>Get started</button>
-        </div>
+        <button
+          type="button"
+          onClick={onNext}
+          className="vanta-btn vanta-cta-button"
+          style={{ ...s.btn, width: undefined }}
+        >
+          Get started
+        </button>
       </div>
     </div>
   );
@@ -282,14 +312,20 @@ function FeatureDetailModal({ feature, onClose }) {
     <div className="vanta-modal-backdrop" style={s.modalBackdrop} onClick={onClose}>
       <div className="vanta-modal-panel" style={s.modalPanel} onClick={e => e.stopPropagation()}>
         <button type="button" onClick={onClose} style={s.modalClose} aria-label="Close">✕</button>
-        <div style={s.modalArtFrame}>
-          {feature.img ? <img src={feature.img} alt="" style={s.featureArtImage} /> : feature.art}
-        </div>
-        <div style={s.featureCardHeader}>
+        <div style={{ ...s.featureCardHeader, marginBottom: '1rem' }}>
           <span style={s.modalIcon}>{feature.icon}</span>
           <h3 style={s.modalTitle}>{feature.title}</h3>
         </div>
-        <p style={s.modalDesc}>{feature.detail ?? feature.desc}</p>
+        <div style={s.modalGallery}>
+          {feature.images.map(src => (
+            <div key={src} style={s.modalArtFrame}>
+              <img src={src} alt="" style={s.featureArtImage} />
+            </div>
+          ))}
+        </div>
+        {(feature.detail ?? [feature.desc]).map((paragraph, i) => (
+          <p key={i} style={s.modalDesc}>{paragraph}</p>
+        ))}
       </div>
     </div>,
     document.body
@@ -299,21 +335,6 @@ function FeatureDetailModal({ feature, onClose }) {
 // Artist management is the one card still backed by an illustration rather than a
 // screenshot — the real "My Artists" list has only one demo entry and shows a real email
 // address, so there's no clean shot to crop without exposing personal info.
-function MiniArtists() {
-  const rows = [{ w: 62, pct: 78 }, { w: 45, pct: 52 }];
-  return (
-    <div style={s.miniListCol}>
-      {rows.map((r, i) => (
-        <div key={i} style={s.miniListRow}>
-          <span style={s.miniAvatar} />
-          <span style={s.miniBarTrack}><span style={{ ...s.miniBarFill, width: `${r.w}%` }} /></span>
-          <span style={s.miniPct}>{r.pct}%</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 function WidgetIcon({ size = 18 }) {
   return (
     <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
@@ -950,7 +971,9 @@ const s = {
   modalPanel: {
     position: 'relative',
     width: '100%',
-    maxWidth: 460,
+    maxWidth: 480,
+    maxHeight: '85vh',
+    overflowY: 'auto',
     background: '#151b24',
     border: '1px solid rgba(255,255,255,0.1)',
     borderRadius: 16,
@@ -974,8 +997,14 @@ const s = {
     fontSize: '0.75rem',
     padding: 0,
   },
+  modalGallery: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '0.75rem',
+    marginBottom: '1.1rem',
+  },
   modalArtFrame: {
-    height: 230,
+    height: 200,
     borderRadius: 10,
     border: '1px solid rgba(255,255,255,0.08)',
     background: '#11161d',
@@ -984,7 +1013,7 @@ const s = {
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
-    marginBottom: '1.1rem',
+    flexShrink: 0,
   },
   modalIcon: {
     display: 'flex',
@@ -1002,7 +1031,7 @@ const s = {
     fontSize: '0.85rem',
     color: 'rgba(255,255,255,0.6)',
     lineHeight: 1.6,
-    margin: '0.6rem 0 0',
+    margin: '0 0 0.7rem',
   },
   featureCardHeader: {
     display: 'flex',
@@ -1025,12 +1054,6 @@ const s = {
     color: 'rgba(255,255,255,0.5)',
     lineHeight: 1.45,
   },
-  miniListCol: { display: 'flex', flexDirection: 'column', gap: '0.4rem', width: '100%' },
-  miniListRow: { display: 'flex', alignItems: 'center', gap: '0.35rem' },
-  miniAvatar: { width: 12, height: 12, borderRadius: '50%', flexShrink: 0, background: 'rgba(255,255,255,0.15)' },
-  miniBarTrack: { flex: 1, height: 5, borderRadius: 3, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' },
-  miniBarFill: { display: 'block', height: '100%', borderRadius: 3, background: 'rgba(245,236,217,0.5)' },
-  miniPct: { fontSize: '0.5rem', color: 'rgba(255,255,255,0.4)', flexShrink: 0, width: 20, textAlign: 'right' },
   introTitle: {
     fontSize: '1.3rem',
     fontWeight: 700,
@@ -1046,15 +1069,16 @@ const s = {
     maxWidth: 520,
   },
   ctaBar: {
-    paddingTop: '1.25rem',
-    borderTop: '1px solid rgba(255,255,255,0.08)',
-  },
-  planPriceCard: {
     background: 'linear-gradient(160deg, rgba(245,236,217,0.09), rgba(255,255,255,0.03))',
     border: '1px solid rgba(245,236,217,0.22)',
-    borderRadius: 10,
-    padding: '1rem 1.1rem',
+    borderRadius: 12,
+    padding: '1.1rem 1.25rem',
     boxShadow: '0 0 28px rgba(245,236,217,0.06)',
+  },
+  ctaInfo: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'flex-start',
   },
   trialPill: {
     display: 'inline-block',
