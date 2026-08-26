@@ -20,18 +20,23 @@ export default function SignUpFlow({ onSwitchToSignIn }) {
     setStep(2);
   }
 
-  async function handleSubmit(newStudio) {
+  function handleStudioNext(newStudio) {
     setStudio(newStudio);
+    setError('');
+    setStep(3);
+  }
+
+  async function handleConfirmPlan() {
     setError('');
     setLoading(true);
     try {
       const { checkout_url } = await registerStudio({
         email: account.email,
         password: account.password,
-        studioName: newStudio.name,
-        address: newStudio.address,
-        latitude: newStudio.latitude ?? null,
-        longitude: newStudio.longitude ?? null,
+        studioName: studio.name,
+        address: studio.address,
+        latitude: studio.latitude ?? null,
+        longitude: studio.longitude ?? null,
       });
       // No review needed — sign in, then hand off to Stripe Checkout to collect the
       // card and start the 14-day trial. The account stays pending until Stripe confirms.
@@ -51,7 +56,7 @@ export default function SignUpFlow({ onSwitchToSignIn }) {
     <div>
       {/* Step indicator */}
       <div style={s.steps}>
-        {['Account', 'Studio'].map((label, i) => {
+        {['Account', 'Studio', 'Plan'].map((label, i) => {
           const num = i + 1;
           const active = step === num;
           const done = step > num;
@@ -81,7 +86,14 @@ export default function SignUpFlow({ onSwitchToSignIn }) {
       {step === 2 && (
         <StudioStep
           onBack={() => setStep(1)}
-          onSubmit={handleSubmit}
+          onSubmit={handleStudioNext}
+        />
+      )}
+      {step === 3 && studio && (
+        <PlanStep
+          studioName={studio.name}
+          onBack={() => setStep(2)}
+          onConfirm={handleConfirmPlan}
           submitting={loading}
         />
       )}
@@ -124,7 +136,7 @@ function AccountStep({ initial, onNext }) {
 
 // ── Step 2: Studio search / create ───────────────────────────────────────────
 
-function StudioStep({ onBack, onSubmit, submitting }) {
+function StudioStep({ onBack, onSubmit }) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false);
@@ -174,7 +186,6 @@ function StudioStep({ onBack, onSubmit, submitting }) {
         initialResolved={prefill ? { address: prefill.addressString, latitude: prefill.latitude, longitude: prefill.longitude } : null}
         onBack={() => { setMode('search'); setPrefill(null); }}
         onSubmit={onSubmit}
-        submitting={submitting}
       />
     );
   }
@@ -319,7 +330,7 @@ function AlreadyClaimedNotice({ studio, onBack }) {
 
 // ── Create new studio form ────────────────────────────────────────────────────
 
-function CreateStudioForm({ initialName, initialResolved, onBack, onSubmit, submitting }) {
+function CreateStudioForm({ initialName, initialResolved, onBack, onSubmit }) {
   const [name, setName] = useState(initialName ?? '');
   const [addressQuery, setAddressQuery] = useState(initialResolved?.address ?? '');
   const [suggestions, setSuggestions] = useState([]);
@@ -408,17 +419,60 @@ function CreateStudioForm({ initialName, initialResolved, onBack, onSubmit, subm
 
       {error && <p style={s.errorBox}>{error}</p>}
 
+      <div style={s.rowBtns}>
+        <button type="button" onClick={onBack} style={s.backBtn}>Back</button>
+        <button type="submit" style={{ ...s.btn, flex: 1 }}>Continue</button>
+      </div>
+    </form>
+  );
+}
+
+// ── Step 3: Plan & pricing ────────────────────────────────────────────────────
+
+const PLAN_FEATURES = [
+  'A shareable booking widget clients use to request appointments',
+  'Client records, consent forms, and full booking history in one place',
+  'Artist management with schedules and automatic payout tracking',
+  'Revenue and booking analytics for the whole studio',
+];
+
+function PlanStep({ studioName, onBack, onConfirm, submitting }) {
+  return (
+    <div style={s.form}>
+      <div>
+        <h3 style={s.planTitle}>Your plan</h3>
+        <p style={s.planStudioName}>{studioName}</p>
+      </div>
+
+      <ul style={s.featureList}>
+        {PLAN_FEATURES.map(feature => (
+          <li key={feature} style={s.featureItem}>
+            <span style={s.featureCheck}>✓</span>
+            <span>{feature}</span>
+          </li>
+        ))}
+      </ul>
+
+      <div style={s.planPriceCard}>
+        <div style={s.planPriceRow}>
+          <span style={s.planPriceAmount}>$60</span>
+          <span style={s.planPriceUnit}>/mo AUD</span>
+        </div>
+        <p style={s.planPriceDetail}>Covers up to 6 artists, then $15/artist beyond that.</p>
+      </div>
+
       <p style={s.trialNote}>
-        Next, add a card to start your 14-day free trial — you won't be charged until it ends.
+        Your first 14 days are free — add a card to start the trial, you won't be charged until
+        it ends. Cancel anytime from Settings.
       </p>
 
       <div style={s.rowBtns}>
         <button type="button" onClick={onBack} style={s.backBtn}>Back</button>
-        <button type="submit" disabled={submitting} style={{ ...s.btn, flex: 1, opacity: submitting ? 0.5 : 1 }}>
+        <button type="button" onClick={onConfirm} disabled={submitting} style={{ ...s.btn, flex: 1, opacity: submitting ? 0.5 : 1 }}>
           {submitting ? 'Redirecting to checkout…' : 'Continue to payment'}
         </button>
       </div>
-    </form>
+    </div>
   );
 }
 
@@ -507,6 +561,63 @@ const s = {
     color: 'rgba(255,255,255,0.4)',
     lineHeight: 1.5,
     margin: 0,
+  },
+  planTitle: {
+    fontSize: '1rem',
+    fontWeight: 600,
+    color: '#ffffff',
+    margin: '0 0 0.25rem',
+  },
+  planStudioName: {
+    fontSize: '0.85rem',
+    color: 'rgba(255,255,255,0.5)',
+    margin: 0,
+  },
+  featureList: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '0.6rem',
+    margin: 0,
+    padding: 0,
+    listStyle: 'none',
+  },
+  featureItem: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: '0.6rem',
+    fontSize: '0.85rem',
+    color: 'rgba(255,255,255,0.75)',
+    lineHeight: 1.4,
+  },
+  featureCheck: {
+    color: '#4cc98a',
+    fontSize: '0.85rem',
+    flexShrink: 0,
+  },
+  planPriceCard: {
+    background: 'rgba(255,255,255,0.04)',
+    border: '1px solid rgba(255,255,255,0.1)',
+    borderRadius: 8,
+    padding: '0.9rem 1rem',
+  },
+  planPriceRow: {
+    display: 'flex',
+    alignItems: 'baseline',
+    gap: '0.3rem',
+  },
+  planPriceAmount: {
+    fontSize: '1.4rem',
+    fontWeight: 700,
+    color: '#f5ecd9',
+  },
+  planPriceUnit: {
+    fontSize: '0.8rem',
+    color: 'rgba(255,255,255,0.5)',
+  },
+  planPriceDetail: {
+    fontSize: '0.78rem',
+    color: 'rgba(255,255,255,0.5)',
+    margin: '0.35rem 0 0',
   },
   errorBox: {
     fontSize: '0.8rem',
