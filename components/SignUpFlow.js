@@ -115,10 +115,28 @@ const PLAN_FEATURES = [
     desc: 'A shareable link clients use to request a session, with deposits, 7-day/24-hour reminders, and a reschedule cutoff you control.',
   },
   {
+    key: 'branding',
+    icon: <PaletteIcon />,
+    title: 'Widget branding',
+    desc: 'Match the booking widget to your studio with custom colors, live-previewed, then drop a one-line embed snippet into your own site.',
+  },
+  {
     key: 'clients',
     icon: <PersonIcon />,
     title: 'Client records',
     desc: 'Consent status, allergies, and full booking history per client — plus CSV import from your old system.',
+  },
+  {
+    key: 'consent',
+    icon: <DocumentIcon />,
+    title: 'Consent builder',
+    desc: 'Build your own consent and waiver forms from headings, checkboxes, and e-signature fields — guardian fields appear automatically for minors.',
+  },
+  {
+    key: 'import',
+    icon: <UploadIcon />,
+    title: 'Migration import',
+    desc: 'Bring your history over from Square, Acuity, or Fresha with built-in column mapping, not just a blank CSV template.',
   },
   {
     key: 'artists',
@@ -132,14 +150,36 @@ const PLAN_FEATURES = [
     title: 'Analytics',
     desc: 'Gross and net sales, sales-per-hour by artist, and payout/reimbursement tracking — always current.',
   },
+  {
+    key: 'billing',
+    icon: <CardIcon />,
+    title: 'Self-serve billing',
+    desc: 'Manage your own Vanta subscription — update the card on file, see your next payment, or cancel — separate from client payments entirely.',
+  },
+  {
+    key: 'language',
+    icon: <GlobeIcon />,
+    title: 'Multi-language',
+    desc: 'The full dashboard ships translated into English and Korean, with more languages to come as the studio base grows.',
+  },
+  {
+    key: 'push',
+    icon: <BellIcon />,
+    title: 'Push alerts',
+    desc: 'New bookings and payments reach your phone the moment they happen, so you never have to keep the dashboard open to stay on top of things.',
+  },
 ];
 
 // The feature tabs drive everything below them (the sliding highlight, the preview panel,
 // and the description text) via a single activeIndex, auto-advancing on a timer unless the
 // visitor clicks a tab directly — clicking restarts the timer so it never fights them. Below
-// ~480px viewport width the tab labels drop to icon-only so four tabs still fit in a row.
+// ~480px viewport width the tab labels drop to icon-only so more tabs fit before scrolling
+// kicks in. `.vanta-tabs-scroll` hides its native scrollbar since the row's own arrow
+// buttons (shown only when there's more to scroll to) are the intended affordance.
 const INTRO_LAYOUT_CSS = `
 @media (max-width: 480px) { .vanta-tab-label { display: none; } }
+.vanta-tabs-scroll { scrollbar-width: none; -ms-overflow-style: none; }
+.vanta-tabs-scroll::-webkit-scrollbar { display: none; }
 .vanta-cta-bar { display: flex; flex-direction: column; gap: 1rem; }
 .vanta-cta-action { display: flex; flex-direction: column; gap: 0.6rem; }
 @media (min-width: 560px) {
@@ -197,30 +237,82 @@ function IntroStep({ onNext }) {
   );
 }
 
-// A segmented control whose highlight slides (via transform, not re-layout) to sit behind
-// whichever feature is active — driven either by a click here or by IntroStep's auto-advance.
+// A segmented control whose highlight slides to sit behind whichever feature is active —
+// driven either by a click here or by IntroStep's auto-advance. With enough tabs to overflow
+// the card width, the row scrolls horizontally (native touch/trackpad scroll, plus arrow
+// buttons that only appear when there's more to scroll to); the active tab auto-scrolls into
+// view so auto-advance never leaves it hidden off-screen. The highlight's position is
+// measured from the actual DOM rather than computed as a fixed fraction, since tabs are
+// sized to their own content instead of stretched to equal widths.
 function FeatureTabs({ features, activeIndex, onSelect }) {
+  const tabRefs = useRef([]);
+  const scrollRef = useRef(null);
+  const [highlight, setHighlight] = useState({ left: 0, width: 0 });
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const updateScrollButtons = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setCanScrollLeft(el.scrollLeft > 4);
+    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 4);
+  }, []);
+
+  useEffect(() => {
+    const el = tabRefs.current[activeIndex];
+    if (el) setHighlight({ left: el.offsetLeft, width: el.offsetWidth });
+    el?.scrollIntoView({ behavior: 'smooth', inline: 'nearest', block: 'nearest' });
+  }, [activeIndex, features]);
+
+  useEffect(() => {
+    updateScrollButtons();
+    window.addEventListener('resize', updateScrollButtons);
+    return () => window.removeEventListener('resize', updateScrollButtons);
+  }, [updateScrollButtons, features]);
+
+  function scrollByAmount(dir) {
+    scrollRef.current?.scrollBy({ left: dir * 180, behavior: 'smooth' });
+  }
+
   return (
-    <div style={s.tabsRow}>
-      <div
-        style={{
-          ...s.tabsHighlight,
-          width: `${100 / features.length}%`,
-          transform: `translateX(${activeIndex * 100}%)`,
-        }}
-      />
-      {features.map((f, i) => (
-        <button
-          key={f.title}
-          type="button"
-          onClick={() => onSelect(i)}
-          style={{ ...s.tabItem, ...(activeIndex === i ? s.tabItemActive : {}) }}
-        >
-          <span style={s.tabIcon}>{f.icon}</span>
-          <span className="vanta-tab-label" style={s.tabLabel}>{f.title}</span>
+    <div style={s.tabsOuter}>
+      {canScrollLeft && (
+        <button type="button" onClick={() => scrollByAmount(-1)} style={{ ...s.tabsArrow, left: -4 }} aria-label="Scroll tabs left">
+          <ChevronIcon direction="left" />
         </button>
-      ))}
+      )}
+      <div ref={scrollRef} className="vanta-tabs-scroll" style={s.tabsScroll} onScroll={updateScrollButtons}>
+        <div style={s.tabsRow}>
+          <div style={{ ...s.tabsHighlight, left: highlight.left, width: highlight.width }} />
+          {features.map((f, i) => (
+            <button
+              key={f.title}
+              ref={el => { tabRefs.current[i] = el; }}
+              type="button"
+              onClick={() => onSelect(i)}
+              style={{ ...s.tabItem, ...(activeIndex === i ? s.tabItemActive : {}) }}
+            >
+              <span style={s.tabIcon}>{f.icon}</span>
+              <span className="vanta-tab-label" style={s.tabLabel}>{f.title}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+      {canScrollRight && (
+        <button type="button" onClick={() => scrollByAmount(1)} style={{ ...s.tabsArrow, right: -4 }} aria-label="Scroll tabs right">
+          <ChevronIcon direction="right" />
+        </button>
+      )}
     </div>
+  );
+}
+
+function ChevronIcon({ direction = 'right', size = 12 }) {
+  const d = direction === 'left' ? 'M10 4l-4 4 4 4' : 'M6 4l4 4-4 4';
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
+      <path d={d} stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   );
 }
 
@@ -229,11 +321,12 @@ function FeatureTabs({ features, activeIndex, onSelect }) {
 // whichever feature tab is active; the progress bar in the chrome row mirrors the same
 // auto-advance timer IntroStep drives the tabs with.
 const PREVIEW_NAV = [
-  { key: 'schedule', icon: HomeIcon },
-  { key: 'schedule', icon: GridCalIcon },
-  { key: 'artists', icon: UsersIcon },
-  { key: 'clients', icon: PersonIcon },
-  { key: 'analytics', icon: ChartIcon },
+  { keys: ['schedule'], icon: HomeIcon },
+  { keys: ['schedule'], icon: GridCalIcon },
+  { keys: ['artists'], icon: UsersIcon },
+  { keys: ['clients', 'consent', 'import'], icon: PersonIcon },
+  { keys: ['analytics', 'billing'], icon: ChartIcon },
+  { keys: ['branding', 'language'], icon: GearIcon },
 ];
 
 const PREVIEW_KEYFRAMES = `
@@ -257,8 +350,8 @@ function DashboardPreview({ tab }) {
       </div>
       <div style={s.previewBody}>
         <div style={s.previewSidebar}>
-          {PREVIEW_NAV.map(({ key, icon: Icon }, i) => (
-            <div key={i} style={{ ...s.previewSidebarIcon, ...(tab === key ? s.previewSidebarIconActive : {}) }}>
+          {PREVIEW_NAV.map(({ keys, icon: Icon }, i) => (
+            <div key={i} style={{ ...s.previewSidebarIcon, ...(keys.includes(tab) ? s.previewSidebarIconActive : {}) }}>
               <Icon size={11} />
             </div>
           ))}
@@ -269,6 +362,12 @@ function DashboardPreview({ tab }) {
             {tab === 'artists' && <ArtistsPanel />}
             {tab === 'clients' && <ClientsPanel />}
             {tab === 'analytics' && <AnalyticsPanel />}
+            {tab === 'branding' && <BrandingPanel />}
+            {tab === 'consent' && <ConsentBuilderPanel />}
+            {tab === 'import' && <ImportPanel />}
+            {tab === 'billing' && <BillingPanel />}
+            {tab === 'language' && <LanguagePanel />}
+            {tab === 'push' && <PushPanel />}
           </div>
         </div>
       </div>
@@ -380,6 +479,139 @@ function AnalyticsPanel() {
   );
 }
 
+// A color swatch row (one selected) above a faux code snippet — the two halves of widget
+// branding: pick your colors, then embed the result.
+function BrandingPanel() {
+  const colors = ['#f5ecd9', '#6fbf8a', '#82aadc', '#e8756f', '#e8c56f'];
+  return (
+    <div style={s.brandingWrap}>
+      <div style={s.brandingSwatchRow}>
+        {colors.map((c, i) => (
+          <span key={c} style={{ ...s.brandingSwatch, background: c, ...(i === 0 ? s.brandingSwatchActive : {}) }} />
+        ))}
+      </div>
+      <div style={s.brandingCodeBlock}>
+        <div style={{ ...s.brandingCodeLine, width: '55%' }} />
+        <div style={{ ...s.brandingCodeLine, width: '80%' }} />
+        <div style={{ ...s.brandingCodeLine, width: '65%' }} />
+      </div>
+    </div>
+  );
+}
+
+// A few form-field rows (heading + two checkboxes) ending in a signature line — the shape of
+// the actual consent builder rather than an abstract document icon.
+function ConsentBuilderPanel() {
+  return (
+    <div style={s.consentWrap}>
+      <div style={s.consentFieldRow}>
+        <span style={s.consentFieldIcon}>H</span>
+        <span style={s.previewBarTrack}><span style={{ ...s.previewBarFill, width: '58%' }} /></span>
+      </div>
+      <div style={s.consentFieldRow}>
+        <span style={s.consentCheckbox} />
+        <span style={s.previewBarTrack}><span style={{ ...s.previewBarFill, width: '75%' }} /></span>
+      </div>
+      <div style={s.consentFieldRow}>
+        <span style={s.consentCheckbox} />
+        <span style={s.previewBarTrack}><span style={{ ...s.previewBarFill, width: '48%' }} /></span>
+      </div>
+      <div style={s.consentSignatureLine} />
+    </div>
+  );
+}
+
+// Three named source platforms migrating in at different completion — reads as a real
+// migration in progress rather than a generic "upload a file" icon.
+function ImportPanel() {
+  const platforms = [
+    { name: 'Square', pct: 100 },
+    { name: 'Acuity', pct: 100 },
+    { name: 'Fresha', pct: 82 },
+  ];
+  return (
+    <div style={s.previewList}>
+      {platforms.map(p => (
+        <div key={p.name} style={s.previewListRow}>
+          <span style={s.importPlatformTag}>{p.name}</span>
+          <span style={s.previewBarTrack}><span style={{ ...s.previewBarFill, width: `${p.pct}%` }} /></span>
+          <span style={s.previewListTagGood}>{p.pct === 100 ? '✓' : `${p.pct}%`}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Card on file + an "Active" status alongside the next-payment KPI — the studio's OWN
+// subscription, deliberately styled like AnalyticsPanel's KPI row to read as "also billing,
+// but not the client-facing kind".
+function BillingPanel() {
+  return (
+    <div style={s.billingWrap}>
+      <div style={s.billingCardRow}>
+        <span style={s.billingCardBadge}>VISA</span>
+        <span style={s.billingCardNumber}>•••• 4242</span>
+        <span style={s.previewListTagGood}>Active</span>
+      </div>
+      <div style={s.analyticsKpiRow}>
+        <div style={s.analyticsKpi}>
+          <span style={s.analyticsKpiValue}>$60</span>
+          <span style={s.analyticsKpiLabel}>Next payment</span>
+        </div>
+        <div style={s.analyticsKpi}>
+          <span style={s.analyticsKpiValue}>Sep 12</span>
+          <span style={s.analyticsKpiLabel}>Renews</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// EN/KO chips above a few real translated dashboard labels — showing actual Korean glyphs
+// makes the claim concrete instead of a generic "globe" gesture.
+function LanguagePanel() {
+  const rows = [['Dashboard', '대시보드'], ['Clients', '고객'], ['Schedule', '일정']];
+  return (
+    <div style={s.languageWrap}>
+      <div style={s.languageChipRow}>
+        <span style={{ ...s.languageChip, ...s.languageChipActive }}>EN</span>
+        <span style={s.languageChip}>한국어</span>
+      </div>
+      <div style={s.previewList}>
+        {rows.map(([en, ko]) => (
+          <div key={en} style={s.languageRow}>
+            <span style={s.languageEn}>{en}</span>
+            <span style={s.languageArrow}>→</span>
+            <span style={s.languageKo}>{ko}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Two stacked phone-style notification banners — concrete examples (a booking, a payment)
+// rather than an abstract bell.
+function PushPanel() {
+  const notifs = [
+    { title: 'New booking request', body: 'Sarah requested Sat 2:00pm' },
+    { title: 'Payment received', body: '$120 deposit — Jordan' },
+  ];
+  return (
+    <div style={s.pushWrap}>
+      {notifs.map(n => (
+        <div key={n.title} style={s.pushBanner}>
+          <span style={s.pushDot} />
+          <div>
+            <div style={s.pushTitle}>{n.title}</div>
+            <div style={s.pushBody}>{n.body}</div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function WidgetIcon({ size = 18 }) {
   return (
     <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
@@ -435,6 +667,73 @@ function GridCalIcon({ size = 18 }) {
       <path d="M1.5 6.5h13" stroke="currentColor" strokeWidth="1.2" />
       <path d="M5.5 1.5v2M10.5 1.5v2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
       <path d="M4.5 9.5h2M9.5 9.5h2M4.5 12h2M9.5 12h2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function PaletteIcon({ size = 18 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
+      <path d="M8 1.5a6.5 6.5 0 1 0 0 13c.8 0 1.3-.6 1-1.3-.2-.5.1-1 .6-1H10c1.9 0 3-1 3-2.7C13 4.8 10.8 1.5 8 1.5Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
+      <circle cx="5.2" cy="6.5" r="0.9" fill="currentColor" />
+      <circle cx="8" cy="4.5" r="0.9" fill="currentColor" />
+      <circle cx="10.8" cy="6.5" r="0.9" fill="currentColor" />
+    </svg>
+  );
+}
+
+function DocumentIcon({ size = 18 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
+      <path d="M4 1.5h5.5L12 4v10a.5.5 0 0 1-.5.5h-7A.5.5 0 0 1 4 14V2a.5.5 0 0 1 .5-.5Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
+      <path d="M6 7.5h4M6 10h4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+      <path d="M9.5 1.5V4h2.5" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function UploadIcon({ size = 18 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
+      <path d="M8 10.5V2.5M5 5.5 8 2.5l3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M2.5 11v1.5A1.5 1.5 0 0 0 4 14h8a1.5 1.5 0 0 0 1.5-1.5V11" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function CardIcon({ size = 18 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
+      <rect x="1.5" y="3.5" width="13" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.2" />
+      <path d="M1.5 6.5h13" stroke="currentColor" strokeWidth="1.2" />
+      <path d="M4 9.5h3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function GlobeIcon({ size = 18 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
+      <circle cx="8" cy="8" r="6.5" stroke="currentColor" strokeWidth="1.2" />
+      <path d="M1.5 8h13M8 1.5c1.7 1.8 2.7 4 2.7 6.5S9.7 12.7 8 14.5c-1.7-1.8-2.7-4-2.7-6.5S6.3 3.3 8 1.5Z" stroke="currentColor" strokeWidth="1.2" />
+    </svg>
+  );
+}
+
+function BellIcon({ size = 18 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
+      <path d="M4 6.5a4 4 0 1 1 8 0c0 3 1 4 1 4H3s1-1 1-4Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
+      <path d="M6.5 12.5a1.5 1.5 0 0 0 3 0" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function GearIcon({ size = 18 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
+      <circle cx="8" cy="8" r="2.2" stroke="currentColor" strokeWidth="1.2" />
+      <path d="M8 1.8v1.6M8 12.6v1.6M14.2 8h-1.6M3.4 8H1.8M12.3 3.7l-1.1 1.1M4.8 11.2l-1.1 1.1M12.3 12.3l-1.1-1.1M4.8 4.8 3.7 3.7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
     </svg>
   );
 }
@@ -922,10 +1221,38 @@ const s = {
     textDecoration: 'underline',
     textUnderlineOffset: 3,
   },
+  tabsOuter: {
+    position: 'relative',
+    display: 'flex',
+    alignItems: 'center',
+  },
+  tabsScroll: {
+    overflowX: 'auto',
+    flex: 1,
+  },
+  tabsArrow: {
+    position: 'absolute',
+    top: '50%',
+    transform: 'translateY(-50%)',
+    zIndex: 2,
+    width: 26,
+    height: 26,
+    borderRadius: '50%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    background: '#151b24',
+    border: '1px solid rgba(255,255,255,0.15)',
+    boxShadow: '0 2px 10px rgba(0,0,0,0.4)',
+    color: 'rgba(255,255,255,0.7)',
+    cursor: 'pointer',
+    padding: 0,
+  },
   tabsRow: {
     position: 'relative',
     display: 'flex',
     gap: 2,
+    width: 'max-content',
     background: 'rgba(255,255,255,0.03)',
     border: '1px solid rgba(255,255,255,0.08)',
     borderRadius: 10,
@@ -935,25 +1262,24 @@ const s = {
     position: 'absolute',
     top: 4,
     bottom: 4,
-    left: 4,
     borderRadius: 7,
     background: 'rgba(245,236,217,0.12)',
     border: '1px solid rgba(245,236,217,0.28)',
-    transition: 'transform 0.45s cubic-bezier(0.4, 0, 0.2, 1)',
+    transition: 'left 0.35s ease, width 0.35s ease',
   },
   tabItem: {
     position: 'relative',
     zIndex: 1,
-    flex: 1,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     gap: '0.4rem',
-    padding: '0.65rem 0.4rem',
+    padding: '0.65rem 0.8rem',
     background: 'none',
     border: 'none',
     color: 'rgba(255,255,255,0.4)',
     cursor: 'pointer',
+    whiteSpace: 'nowrap',
     transition: 'color 0.2s',
   },
   tabItemActive: { color: '#f5ecd9' },
@@ -1202,6 +1528,107 @@ const s = {
     textTransform: 'uppercase',
     letterSpacing: '0.03em',
   },
+  brandingWrap: { display: 'flex', flexDirection: 'column', gap: '0.7rem', height: '100%', justifyContent: 'center' },
+  brandingSwatchRow: { display: 'flex', gap: '0.5rem' },
+  brandingSwatch: { width: 22, height: 22, borderRadius: '50%', border: '2px solid transparent' },
+  brandingSwatchActive: { border: '2px solid #ffffff', boxShadow: '0 0 0 2px rgba(0,0,0,0.4)' },
+  brandingCodeBlock: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '0.4rem',
+    background: 'rgba(255,255,255,0.04)',
+    border: '1px solid rgba(255,255,255,0.08)',
+    borderRadius: 6,
+    padding: '0.6rem 0.7rem',
+  },
+  brandingCodeLine: { height: 6, borderRadius: 3, background: 'rgba(111,191,138,0.4)' },
+  consentWrap: { display: 'flex', flexDirection: 'column', gap: '0.55rem', height: '100%', justifyContent: 'center' },
+  consentFieldRow: { display: 'flex', alignItems: 'center', gap: '0.5rem' },
+  consentFieldIcon: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 16,
+    height: 16,
+    borderRadius: 4,
+    fontSize: '0.6rem',
+    fontWeight: 700,
+    background: 'rgba(255,255,255,0.08)',
+    color: 'rgba(255,255,255,0.5)',
+    flexShrink: 0,
+  },
+  consentCheckbox: {
+    width: 12,
+    height: 12,
+    borderRadius: 3,
+    border: '1.5px solid rgba(245,236,217,0.5)',
+    flexShrink: 0,
+  },
+  consentSignatureLine: {
+    marginTop: '0.2rem',
+    height: 1,
+    background: 'rgba(255,255,255,0.15)',
+    position: 'relative',
+  },
+  importPlatformTag: {
+    fontSize: '0.62rem',
+    fontWeight: 600,
+    color: 'rgba(255,255,255,0.6)',
+    width: 46,
+    flexShrink: 0,
+  },
+  billingWrap: { display: 'flex', flexDirection: 'column', gap: '0.8rem', height: '100%', justifyContent: 'center' },
+  billingCardRow: { display: 'flex', alignItems: 'center', gap: '0.5rem' },
+  billingCardBadge: {
+    fontSize: '0.55rem',
+    fontWeight: 700,
+    color: '#0d1017',
+    background: '#f5ecd9',
+    borderRadius: 4,
+    padding: '0.15rem 0.35rem',
+    flexShrink: 0,
+  },
+  billingCardNumber: { fontSize: '0.72rem', color: 'rgba(255,255,255,0.6)', flex: 1 },
+  languageWrap: { display: 'flex', flexDirection: 'column', gap: '0.7rem', height: '100%', justifyContent: 'center' },
+  languageChipRow: { display: 'flex', gap: '0.4rem' },
+  languageChip: {
+    fontSize: '0.62rem',
+    fontWeight: 600,
+    color: 'rgba(255,255,255,0.4)',
+    background: 'rgba(255,255,255,0.05)',
+    border: '1px solid rgba(255,255,255,0.08)',
+    borderRadius: 999,
+    padding: '0.2rem 0.6rem',
+  },
+  languageChipActive: {
+    color: '#f5ecd9',
+    background: 'rgba(245,236,217,0.12)',
+    border: '1px solid rgba(245,236,217,0.3)',
+  },
+  languageRow: { display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.72rem' },
+  languageEn: { color: 'rgba(255,255,255,0.55)', width: 58, flexShrink: 0 },
+  languageArrow: { color: 'rgba(255,255,255,0.25)', flexShrink: 0 },
+  languageKo: { color: '#f5ecd9', fontWeight: 500 },
+  pushWrap: { display: 'flex', flexDirection: 'column', gap: '0.5rem', height: '100%', justifyContent: 'center' },
+  pushBanner: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: '0.5rem',
+    background: 'rgba(255,255,255,0.05)',
+    border: '1px solid rgba(255,255,255,0.08)',
+    borderRadius: 8,
+    padding: '0.5rem 0.65rem',
+  },
+  pushDot: {
+    width: 8,
+    height: 8,
+    borderRadius: '50%',
+    background: '#82aadc',
+    flexShrink: 0,
+    marginTop: 3,
+  },
+  pushTitle: { fontSize: '0.7rem', fontWeight: 600, color: '#ffffff' },
+  pushBody: { fontSize: '0.65rem', color: 'rgba(255,255,255,0.45)', marginTop: 1 },
   errorBox: {
     fontSize: '0.8rem',
     color: '#e86f6f',
