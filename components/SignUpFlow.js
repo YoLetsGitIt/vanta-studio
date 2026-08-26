@@ -110,59 +110,64 @@ export default function SignUpFlow({ onSwitchToSignIn, onWideChange }) {
 const PLAN_FEATURES = [
   {
     icon: <WidgetIcon />,
+    art: <MiniSchedule />,
     title: 'Booking widget',
     desc: 'Shareable booking link with deposits, reminders, and a reschedule cutoff you control.',
   },
   {
     icon: <PaletteIcon />,
+    art: <MiniSwatches />,
     title: 'Widget branding',
     desc: 'Match your site with custom colors, then drop in a one-line embed snippet.',
   },
   {
-    icon: <PersonIcon />,
-    title: 'Client records',
-    desc: 'Consent status, allergies, and full booking history per client.',
+    icon: <ChecklistIcon />,
+    art: <MiniToggles />,
+    title: 'Custom booking form',
+    desc: 'Choose which fields — body location, size, photos, allergies — appear on your form.',
   },
   {
     icon: <DocumentIcon />,
+    art: <MiniConsent />,
     title: 'Consent builder',
     desc: 'Build your own waiver forms with e-signatures and automatic guardian fields for minors.',
   },
   {
-    icon: <UploadIcon />,
-    title: 'Migration import',
-    desc: 'Bring your history over from Square, Acuity, or Fresha — not just a blank CSV.',
+    icon: <PersonIcon />,
+    art: <MiniClients />,
+    title: 'Client records',
+    desc: 'Consent status, allergies, and full booking history per client.',
   },
   {
     icon: <UsersIcon />,
+    art: <MiniArtists />,
     title: 'Artist management',
     desc: 'Approve artists, assign stations, and split commissions — payouts track automatically.',
   },
   {
     icon: <ChartIcon />,
+    art: <MiniBarChart />,
     title: 'Analytics',
     desc: 'Gross/net sales and payouts by artist, always current.',
   },
   {
-    icon: <CardIcon />,
-    title: 'Self-serve billing',
-    desc: 'Manage your own subscription — separate from client payments entirely.',
-  },
-  {
     icon: <GlobeIcon />,
+    art: <MiniLanguage />,
     title: 'Multi-language',
-    desc: 'The full dashboard ships in English and Korean.',
+    desc: 'The full dashboard ships in English, Simplified Chinese, and Korean.',
   },
   {
-    icon: <BellIcon />,
-    title: 'Push alerts',
-    desc: 'New bookings and payments reach your phone the moment they happen.',
+    icon: <UploadIcon />,
+    art: <MiniImport />,
+    title: 'Migration import',
+    desc: 'Bring your history over from Square, Acuity, or Fresha.',
   },
 ];
 
-// A responsive grid rather than a click-through carousel — with 10 features, showing them
+// A responsive grid rather than a click-through carousel — with nine features, showing them
 // all at once beats making a visitor hunt for the ones they care about. Two columns below
-// 680px, three above (matches the wide card's own breakpoint in app/page.js).
+// 680px, three above (matches the wide card's own breakpoint in app/page.js) — three columns
+// x three rows for a clean fit.
 const INTRO_LAYOUT_CSS = `
 .vanta-feature-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.7rem; }
 @media (min-width: 680px) { .vanta-feature-grid { grid-template-columns: repeat(3, 1fr); } }
@@ -188,8 +193,11 @@ function IntroStep({ onNext }) {
       <div className="vanta-feature-grid">
         {PLAN_FEATURES.map(f => (
           <div key={f.title} style={s.featureGridCard}>
-            <div style={s.featureIconBadge}>{f.icon}</div>
-            <div style={s.featureCardTitle}>{f.title}</div>
+            <div style={s.featureArtFrame}>{f.art}</div>
+            <div style={s.featureCardHeader}>
+              <span style={s.featureCardIcon}>{f.icon}</span>
+              <span style={s.featureCardTitle}>{f.title}</span>
+            </div>
             <div style={s.featureCardDesc}>{f.desc}</div>
           </div>
         ))}
@@ -212,6 +220,121 @@ function IntroStep({ onNext }) {
           <button type="button" onClick={onNext} className="vanta-btn" style={s.btn}>Get started</button>
         </div>
       </div>
+    </div>
+  );
+}
+
+// Small illustrations backing each feature card — abstract enough to render legibly at
+// ~70px tall, but each shaped after the real thing (a week grid, a color picker, toggles,
+// a signature line) rather than a generic icon repeated bigger.
+function MiniSchedule() {
+  const filled = new Set([2, 6, 11, 13]);
+  return (
+    <div style={s.miniGrid}>
+      {Array.from({ length: 15 }).map((_, i) => (
+        <div key={i} style={{ ...s.miniCell, ...(filled.has(i) ? s.miniCellFilled : {}) }} />
+      ))}
+    </div>
+  );
+}
+
+function MiniSwatches() {
+  const colors = ['#f5ecd9', '#6fbf8a', '#82aadc', '#e8756f'];
+  return (
+    <div style={s.miniSwatchRow}>
+      {colors.map((c, i) => (
+        <span key={c} style={{ ...s.miniSwatch, background: c, ...(i === 0 ? s.miniSwatchActive : {}) }} />
+      ))}
+    </div>
+  );
+}
+
+function MiniToggles() {
+  const rows = [true, true, false];
+  return (
+    <div style={s.miniToggleCol}>
+      {rows.map((on, i) => (
+        <div key={i} style={s.miniToggleRow}>
+          <span style={s.miniToggleLabel} />
+          <span style={{ ...s.miniToggleTrack, ...(on ? s.miniToggleTrackOn : {}) }}>
+            <span style={{ ...s.miniToggleKnob, ...(on ? s.miniToggleKnobOn : {}) }} />
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function MiniConsent() {
+  return (
+    <div style={s.miniConsentCol}>
+      <div style={s.miniLine} />
+      <div style={{ ...s.miniLine, width: '65%' }} />
+      <div style={s.miniSigLine} />
+    </div>
+  );
+}
+
+function MiniClients() {
+  const rows = [{ w: 70, status: 'good' }, { w: 48, status: 'warn' }];
+  return (
+    <div style={s.miniListCol}>
+      {rows.map((r, i) => (
+        <div key={i} style={s.miniListRow}>
+          <span style={s.miniAvatar} />
+          <span style={s.miniBarTrack}><span style={{ ...s.miniBarFill, width: `${r.w}%` }} /></span>
+          <span style={r.status === 'good' ? s.miniTagGood : s.miniTagWarn}>{r.status === 'good' ? '✓' : '!'}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function MiniArtists() {
+  const rows = [{ w: 62, pct: 78 }, { w: 45, pct: 52 }];
+  return (
+    <div style={s.miniListCol}>
+      {rows.map((r, i) => (
+        <div key={i} style={s.miniListRow}>
+          <span style={s.miniAvatar} />
+          <span style={s.miniBarTrack}><span style={{ ...s.miniBarFill, width: `${r.w}%` }} /></span>
+          <span style={s.miniPct}>{r.pct}%</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function MiniBarChart() {
+  const bars = [40, 65, 50, 82, 60, 72];
+  return (
+    <div style={s.miniBarChartRow}>
+      {bars.map((h, i) => <span key={i} style={{ ...s.miniChartBar, height: `${h}%` }} />)}
+    </div>
+  );
+}
+
+function MiniLanguage() {
+  return (
+    <div style={s.miniChipRow}>
+      <span style={{ ...s.miniChip, ...s.miniChipActive }}>EN</span>
+      <span style={s.miniChip}>中文</span>
+      <span style={s.miniChip}>한국어</span>
+    </div>
+  );
+}
+
+function MiniImport() {
+  const platforms = ['Square', 'Acuity', 'Fresha'];
+  return (
+    <div style={s.miniListCol}>
+      {platforms.map(p => (
+        <div key={p} style={s.miniListRow}>
+          <span style={s.miniPillLabel}>{p}</span>
+          <span style={s.miniBarTrack}><span style={{ ...s.miniBarFill, width: '100%' }} /></span>
+          <span style={s.miniTagGood}>✓</span>
+        </div>
+      ))}
     </div>
   );
 }
@@ -285,16 +408,6 @@ function UploadIcon({ size = 18 }) {
   );
 }
 
-function CardIcon({ size = 18 }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
-      <rect x="1.5" y="3.5" width="13" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.2" />
-      <path d="M1.5 6.5h13" stroke="currentColor" strokeWidth="1.2" />
-      <path d="M4 9.5h3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-    </svg>
-  );
-}
-
 function GlobeIcon({ size = 18 }) {
   return (
     <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
@@ -304,11 +417,11 @@ function GlobeIcon({ size = 18 }) {
   );
 }
 
-function BellIcon({ size = 18 }) {
+function ChecklistIcon({ size = 18 }) {
   return (
     <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
-      <path d="M4 6.5a4 4 0 1 1 8 0c0 3 1 4 1 4H3s1-1 1-4Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
-      <path d="M6.5 12.5a1.5 1.5 0 0 0 3 0" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+      <path d="M3 4.5h1.5M3 8h1.5M3 11.5h1.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+      <path d="M6.5 4.5H13M6.5 8H13M6.5 11.5H13" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
     </svg>
   );
 }
@@ -799,22 +912,31 @@ const s = {
   featureGridCard: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '0.4rem',
-    padding: '0.85rem',
+    gap: '0.55rem',
+    padding: '0.75rem',
     background: 'rgba(255,255,255,0.03)',
     border: '1px solid rgba(255,255,255,0.07)',
     borderRadius: 10,
   },
-  featureIconBadge: {
+  featureArtFrame: {
+    height: 68,
+    borderRadius: 8,
+    border: '1px solid rgba(255,255,255,0.08)',
+    background: '#11161d',
+    padding: '0.5rem 0.6rem',
     display: 'flex',
     alignItems: 'center',
-    justifyContent: 'center',
-    width: 30,
-    height: 30,
-    flexShrink: 0,
-    borderRadius: 8,
-    background: 'rgba(245,236,217,0.12)',
+  },
+  featureCardHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.4rem',
+  },
+  featureCardIcon: {
+    display: 'flex',
+    alignItems: 'center',
     color: '#f5ecd9',
+    flexShrink: 0,
   },
   featureCardTitle: {
     fontSize: '0.83rem',
@@ -825,6 +947,64 @@ const s = {
     fontSize: '0.75rem',
     color: 'rgba(255,255,255,0.5)',
     lineHeight: 1.45,
+  },
+  miniGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(5, 1fr)',
+    gridTemplateRows: 'repeat(3, 1fr)',
+    gap: 3,
+    width: '100%',
+    height: '100%',
+  },
+  miniCell: { borderRadius: 2, background: 'rgba(255,255,255,0.06)' },
+  miniCellFilled: { background: 'rgba(245,236,217,0.55)' },
+  miniSwatchRow: { display: 'flex', gap: '0.4rem', alignItems: 'center' },
+  miniSwatch: { width: 16, height: 16, borderRadius: '50%', border: '2px solid transparent' },
+  miniSwatchActive: { border: '2px solid #ffffff', boxShadow: '0 0 0 1px rgba(0,0,0,0.4)' },
+  miniToggleCol: { display: 'flex', flexDirection: 'column', gap: '0.35rem', width: '100%' },
+  miniToggleRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.4rem' },
+  miniToggleLabel: { flex: 1, height: 5, borderRadius: 3, background: 'rgba(255,255,255,0.12)' },
+  miniToggleTrack: {
+    width: 18,
+    height: 10,
+    borderRadius: 999,
+    background: 'rgba(255,255,255,0.1)',
+    display: 'flex',
+    alignItems: 'center',
+    padding: 1.5,
+    flexShrink: 0,
+  },
+  miniToggleTrackOn: { background: 'rgba(245,236,217,0.4)' },
+  miniToggleKnob: { width: 7, height: 7, borderRadius: '50%', background: 'rgba(255,255,255,0.5)', transition: 'transform 0.15s' },
+  miniToggleKnobOn: { background: '#f5ecd9', transform: 'translateX(8px)' },
+  miniConsentCol: { display: 'flex', flexDirection: 'column', gap: '0.4rem', width: '100%' },
+  miniLine: { height: 5, width: '85%', borderRadius: 3, background: 'rgba(255,255,255,0.12)' },
+  miniSigLine: { height: 1, width: '70%', background: 'rgba(255,255,255,0.2)', marginTop: '0.2rem' },
+  miniListCol: { display: 'flex', flexDirection: 'column', gap: '0.4rem', width: '100%' },
+  miniListRow: { display: 'flex', alignItems: 'center', gap: '0.35rem' },
+  miniAvatar: { width: 12, height: 12, borderRadius: '50%', flexShrink: 0, background: 'rgba(255,255,255,0.15)' },
+  miniBarTrack: { flex: 1, height: 5, borderRadius: 3, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' },
+  miniBarFill: { display: 'block', height: '100%', borderRadius: 3, background: 'rgba(245,236,217,0.5)' },
+  miniTagGood: { fontSize: '0.55rem', color: '#4cc98a', flexShrink: 0 },
+  miniTagWarn: { fontSize: '0.6rem', fontWeight: 700, color: '#e8c56f', flexShrink: 0 },
+  miniPct: { fontSize: '0.5rem', color: 'rgba(255,255,255,0.4)', flexShrink: 0, width: 20, textAlign: 'right' },
+  miniPillLabel: { fontSize: '0.55rem', color: 'rgba(255,255,255,0.55)', width: 34, flexShrink: 0 },
+  miniBarChartRow: { display: 'flex', alignItems: 'flex-end', gap: 3, width: '100%', height: '100%' },
+  miniChartBar: { flex: 1, borderRadius: '1px 1px 0 0', background: 'rgba(245,236,217,0.5)' },
+  miniChipRow: { display: 'flex', gap: '0.3rem', flexWrap: 'wrap' },
+  miniChip: {
+    fontSize: '0.55rem',
+    fontWeight: 600,
+    color: 'rgba(255,255,255,0.4)',
+    background: 'rgba(255,255,255,0.05)',
+    border: '1px solid rgba(255,255,255,0.08)',
+    borderRadius: 999,
+    padding: '0.15rem 0.4rem',
+  },
+  miniChipActive: {
+    color: '#f5ecd9',
+    background: 'rgba(245,236,217,0.12)',
+    border: '1px solid rgba(245,236,217,0.3)',
   },
   introTitle: {
     fontSize: '1.3rem',
