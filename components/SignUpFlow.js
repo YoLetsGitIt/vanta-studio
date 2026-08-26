@@ -178,11 +178,18 @@ const PLAN_FEATURES = [
 // all at once beats making a visitor hunt for the ones they care about. Two columns below
 // 680px, three above (matches the wide card's own breakpoint in app/page.js) — three columns
 // x three rows for a clean fit.
+//
+// Cards open their detail modal on click/tap on every device — an earlier hover-to-open
+// version on desktop felt like it "disappeared" the moment the cursor moved even slightly,
+// since hovering the backdrop (however briefly, mid-move) reads as leaving the card. Click
+// is deliberate and doesn't have that problem; the expand icon (bottom-right of the art
+// frame, brightening on hover) is what signals the card is clickable in its place.
 const INTRO_LAYOUT_CSS = `
 .vanta-feature-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.7rem; }
 @media (min-width: 680px) { .vanta-feature-grid { grid-template-columns: repeat(3, 1fr); } }
 .vanta-feature-card { transition: background 0.15s ease, border-color 0.15s ease; cursor: pointer; }
 .vanta-feature-card:hover { background: rgba(255,255,255,0.05); border-color: rgba(245,236,217,0.25); }
+.vanta-feature-card:hover .vanta-expand-badge { opacity: 1; background: rgba(245,236,217,0.16); color: #f5ecd9; }
 .vanta-cta-bar { display: flex; flex-direction: column; gap: 1rem; }
 .vanta-cta-action { display: flex; flex-direction: column; gap: 0.6rem; }
 @media (min-width: 560px) {
@@ -191,28 +198,11 @@ const INTRO_LAYOUT_CSS = `
   .vanta-cta-action { flex: 1; }
 }
 @keyframes vantaModalIn { from { opacity: 0; transform: scale(0.96) translateY(6px); } to { opacity: 1; transform: scale(1) translateY(0); } }
-.vanta-modal-panel { animation: vantaModalIn 0.18s ease; pointer-events: auto; }
-/* On hover-capable devices the backdrop lets the cursor pass through to whatever card is
-   underneath — otherwise the backdrop itself (which covers the hovered card) would fire
-   that card's mouseleave the instant the modal appears, closing it immediately. Touch
-   devices have no hover to protect, so the backdrop stays clickable there for "tap
-   outside to close". */
-.vanta-modal-backdrop { pointer-events: none; }
-@media (hover: none) { .vanta-modal-backdrop { pointer-events: auto; } }
+.vanta-modal-panel { animation: vantaModalIn 0.18s ease; }
 `;
 
 function IntroStep({ onNext }) {
   const [activeFeature, setActiveFeature] = useState(null);
-  // Only wire hover handlers on devices that actually support hover. Without this gate,
-  // Playwright (and some real touch browsers) still dispatch mouseenter/mouseleave during
-  // a tap's internal pointer path, which could pop the modal for a card the finger only
-  // passed over — and once open, the touch-only backdrop (pointer-events: auto, so a real
-  // tap can dismiss it) would then swallow the actual tap meant for a different card.
-  // Touch devices get tap-to-toggle only, via onClick.
-  const [supportsHover, setSupportsHover] = useState(false);
-  useEffect(() => {
-    setSupportsHover(window.matchMedia('(hover: hover)').matches);
-  }, []);
 
   return (
     <div style={s.introWrap}>
@@ -229,12 +219,13 @@ function IntroStep({ onNext }) {
             key={f.title}
             className="vanta-feature-card"
             style={s.featureGridCard}
-            onMouseEnter={supportsHover ? () => setActiveFeature(f) : undefined}
-            onMouseLeave={supportsHover ? () => setActiveFeature(prev => (prev === f ? null : prev)) : undefined}
-            onClick={() => setActiveFeature(prev => (prev === f ? null : f))}
+            onClick={() => setActiveFeature(f)}
           >
             <div style={s.featureArtFrame}>
               {f.img ? <img src={f.img} alt="" style={s.featureArtImage} /> : f.art}
+              <span className="vanta-expand-badge" style={s.expandBadge}>
+                <ExpandIcon />
+              </span>
             </div>
             <div style={s.featureCardHeader}>
               <span style={s.featureCardIcon}>{f.icon}</span>
@@ -406,6 +397,17 @@ function ChecklistIcon({ size = 18 }) {
     <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
       <path d="M3 4.5h1.5M3 8h1.5M3 11.5h1.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
       <path d="M6.5 4.5H13M6.5 8H13M6.5 11.5H13" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+// A "maximize" glyph (two corner brackets) — the badge that signals a feature card opens a
+// bigger view, sitting on the art frame at a visible-but-quiet opacity so it reads as
+// clickable without hover to reveal it (mobile has no hover to rely on).
+function ExpandIcon({ size = 12 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
+      <path d="M6 2H2v4M10 14h4v-4M2 14l4.5-4.5M14 2 9.5 6.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
@@ -903,6 +905,7 @@ const s = {
     borderRadius: 10,
   },
   featureArtFrame: {
+    position: 'relative',
     height: 108,
     borderRadius: 8,
     border: '1px solid rgba(255,255,255,0.08)',
@@ -912,6 +915,21 @@ const s = {
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
+  },
+  expandBadge: {
+    position: 'absolute',
+    bottom: '0.5rem',
+    right: '0.5rem',
+    width: 22,
+    height: 22,
+    borderRadius: '50%',
+    background: 'rgba(0,0,0,0.55)',
+    color: 'rgba(255,255,255,0.75)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    opacity: 0.9,
+    transition: 'background 0.15s ease, color 0.15s ease',
   },
   featureArtImage: {
     width: '100%',
