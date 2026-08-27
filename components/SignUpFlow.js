@@ -112,7 +112,7 @@ const PLAN_FEATURES = [
   {
     icon: <WidgetIcon />,
     art: <MiniSchedule />,
-    images: ['/signup/booking-widget.png', '/signup/booking-widget-2.png'],
+    images: ['/signup/booking-widget-2.png'],
     video: '/signup/booking-widget.webm',
     title: 'Booking widget',
     desc: 'A shareable link and QR code clients use to request a session — deposits, reminders, and a reschedule cutoff, all handled for you.',
@@ -194,24 +194,16 @@ const PLAN_FEATURES = [
   {
     icon: <GlobeIcon />,
     art: <MiniLanguage />,
-    images: ['/signup/multi-language.png'],
-    video: '/signup/multi-language.webm',
+    images: [],
     title: 'Multi-language',
     desc: 'The entire dashboard is available in English, Simplified Chinese, and Korean — switch anytime from Settings.',
-    detail: [
-      'Switch the dashboard — navigation, buttons, and pages — between English, Simplified Chinese, and Korean from Settings, with no page reload.',
-    ],
   },
   {
     icon: <UploadIcon />,
     art: <MiniImport />,
-    images: ['/signup/migration-import.png'],
+    images: [],
     title: 'Migration import',
     desc: 'Already on Square, Acuity, or Fresha? Bring your client history over with built-in column mapping.',
-    detail: [
-      'Export your client and appointment history from Square Appointments, Acuity, or Fresha as a CSV, and Vanta recognizes the format automatically instead of leaving you to map every column by hand.',
-      'You get a preview of what will import before anything is saved, with counts of what imported, what linked to an existing client, and what was skipped.',
-    ],
   },
 ];
 
@@ -229,7 +221,7 @@ const INTRO_LAYOUT_CSS = `
 .vanta-feature-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.7rem; }
 @media (min-width: 680px) { .vanta-feature-grid { grid-template-columns: repeat(3, 1fr); } }
 .vanta-feature-card { transition: background 0.15s ease, border-color 0.15s ease; cursor: pointer; }
-.vanta-feature-card:hover { background: rgba(255,255,255,0.05); border-color: rgba(245,236,217,0.25); }
+.vanta-feature-card:not(.vanta-feature-card-static):hover { background: rgba(255,255,255,0.05); border-color: rgba(245,236,217,0.25); }
 .vanta-feature-card:hover .vanta-expand-badge { opacity: 1; background: rgba(245,236,217,0.16); color: #f5ecd9; }
 .vanta-cta-bar { display: flex; flex-direction: column; gap: 1.1rem; }
 .vanta-cta-button { width: 100%; }
@@ -254,26 +246,31 @@ function IntroStep({ onNext }) {
       </div>
 
       <div className="vanta-feature-grid">
-        {PLAN_FEATURES.map(f => (
-          <div
-            key={f.title}
-            className="vanta-feature-card"
-            style={s.featureGridCard}
-            onClick={() => setActiveFeature(f)}
-          >
-            <div style={s.featureArtFrame}>
-              {f.art}
-              <span className="vanta-expand-badge" style={s.expandBadge}>
-                <ExpandIcon />
-              </span>
+        {PLAN_FEATURES.map(f => {
+          const hasDetail = f.images.length > 0 || !!f.video;
+          return (
+            <div
+              key={f.title}
+              className={hasDetail ? 'vanta-feature-card' : 'vanta-feature-card vanta-feature-card-static'}
+              style={{ ...s.featureGridCard, cursor: hasDetail ? 'pointer' : 'default' }}
+              onClick={hasDetail ? () => setActiveFeature(f) : undefined}
+            >
+              <div style={s.featureArtFrame}>
+                {f.art}
+                {hasDetail && (
+                  <span className="vanta-expand-badge" style={s.expandBadge}>
+                    <ExpandIcon />
+                  </span>
+                )}
+              </div>
+              <div style={s.featureCardHeader}>
+                <span style={s.featureCardIcon}>{f.icon}</span>
+                <span style={s.featureCardTitle}>{f.title}</span>
+              </div>
+              <div style={s.featureCardDesc}>{f.desc}</div>
             </div>
-            <div style={s.featureCardHeader}>
-              <span style={s.featureCardIcon}>{f.icon}</span>
-              <span style={s.featureCardTitle}>{f.title}</span>
-            </div>
-            <div style={s.featureCardDesc}>{f.desc}</div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {activeFeature && (
@@ -326,33 +323,37 @@ function FeatureDetailModal({ feature, onClose }) {
   return createPortal(
     <div className="vanta-modal-backdrop" style={s.modalBackdrop} onClick={onClose}>
       <div className="vanta-modal-panel" style={s.modalPanel} onClick={e => e.stopPropagation()}>
-        <button type="button" onClick={onClose} style={s.modalClose} aria-label="Close">✕</button>
-        <div style={{ ...s.featureCardHeader, marginBottom: '1rem' }}>
-          <span style={s.modalIcon}>{feature.icon}</span>
-          <h3 style={s.modalTitle}>{feature.title}</h3>
+        <div style={s.modalHeader}>
+          <div style={s.featureCardHeader}>
+            <span style={s.modalIcon}>{feature.icon}</span>
+            <h3 style={s.modalTitle}>{feature.title}</h3>
+          </div>
+          <button type="button" onClick={onClose} style={s.modalClose} aria-label="Close">✕</button>
         </div>
-        <div style={s.modalGallery}>
-          {feature.images.map(src => (
-            <div key={src} style={s.modalArtFrame}>
-              <img src={src} alt="" style={s.modalGalleryImage} />
-            </div>
+        <div style={s.modalBody}>
+          <div style={s.modalGallery}>
+            {feature.images.map(src => (
+              <div key={src} style={s.modalArtFrame}>
+                <img src={src} alt="" style={s.modalGalleryImage} />
+              </div>
+            ))}
+            {feature.video && (
+              <div style={s.modalArtFrame}>
+                <video
+                  src={feature.video}
+                  style={s.modalGalleryImage}
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                />
+              </div>
+            )}
+          </div>
+          {(feature.detail ?? [feature.desc]).map((paragraph, i) => (
+            <p key={i} style={s.modalDesc}>{paragraph}</p>
           ))}
-          {feature.video && (
-            <div style={s.modalArtFrame}>
-              <video
-                src={feature.video}
-                style={s.modalGalleryImage}
-                autoPlay
-                loop
-                muted
-                playsInline
-              />
-            </div>
-          )}
         </div>
-        {(feature.detail ?? [feature.desc]).map((paragraph, i) => (
-          <p key={i} style={s.modalDesc}>{paragraph}</p>
-        ))}
       </div>
     </div>,
     document.body
@@ -1114,17 +1115,34 @@ const s = {
     width: '100%',
     maxWidth: 760,
     maxHeight: '92vh',
-    overflowY: 'auto',
+    display: 'flex',
+    flexDirection: 'column',
+    overflow: 'hidden',
     background: '#151b24',
     border: '1px solid rgba(255,255,255,0.1)',
     borderRadius: 16,
-    padding: '1.5rem',
     boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
   },
+  // Lives outside the scrollable body (rather than position:sticky within it) so it never
+  // has to fight the scroll container's stacking/overflow for the "stay put" behavior —
+  // it's just a normal flex sibling above the part that scrolls.
+  modalHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: '0.75rem',
+    padding: '1.25rem 1.5rem',
+    flexShrink: 0,
+    borderBottom: '1px solid rgba(255,255,255,0.08)',
+  },
+  modalBody: {
+    flex: 1,
+    minHeight: 0,
+    overflowY: 'auto',
+    padding: '1.25rem 1.5rem 1.5rem',
+  },
   modalClose: {
-    position: 'absolute',
-    top: '0.85rem',
-    right: '0.85rem',
+    flexShrink: 0,
     width: 28,
     height: 28,
     borderRadius: '50%',
