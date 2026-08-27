@@ -1111,8 +1111,8 @@ const s = {
   modalPanel: {
     position: 'relative',
     width: '100%',
-    maxWidth: 480,
-    maxHeight: '85vh',
+    maxWidth: 760,
+    maxHeight: '92vh',
     overflowY: 'auto',
     background: '#151b24',
     border: '1px solid rgba(255,255,255,0.1)',
