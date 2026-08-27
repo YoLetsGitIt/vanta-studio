@@ -111,6 +111,7 @@ export default function SignUpFlow({ onSwitchToSignIn, onWideChange }) {
 const PLAN_FEATURES = [
   {
     icon: <WidgetIcon />,
+    art: <MiniSchedule />,
     images: ['/signup/booking-widget.png', '/signup/booking-widget-2.png'],
     title: 'Booking widget',
     desc: 'A shareable link and QR code clients use to request a session — deposits, reminders, and a reschedule cutoff, all handled for you.',
@@ -121,16 +122,18 @@ const PLAN_FEATURES = [
   },
   {
     icon: <PaletteIcon />,
+    art: <MiniSwatches />,
     images: ['/signup/widget-branding.png', '/signup/widget-branding-2.png'],
     title: 'Widget branding',
-    desc: 'Recolor the widget to match your studio in seconds, then drop a one-line embed snippet into your own site — no code required.',
+    desc: 'Add the booking widget to your own website in minutes — match your studio\'s colors, then paste in one line of code. No developer needed.',
     detail: [
       'Pick a background and highlight color to match your own site — the preview updates live as you type a hex code, so you see exactly what clients will see before you save anything.',
-      'Once you\'re happy with it, copy a single embed snippet — one div and one script tag — onto any page you control. No developer needed.',
+      'Once you\'re happy with it, copy a single embed snippet — one div and one script tag — onto any website you control, no matter what it\'s built with. No developer needed.',
     ],
   },
   {
     icon: <ChecklistIcon />,
+    art: <MiniToggles />,
     images: ['/signup/custom-booking-form.png', '/signup/custom-booking-form-2.png'],
     title: 'Custom booking form',
     desc: 'Turn any field on or off — placement, size, skin tone, reference photos — and mark exactly which ones are required. Your form, your rules.',
@@ -141,6 +144,7 @@ const PLAN_FEATURES = [
   },
   {
     icon: <DocumentIcon />,
+    art: <MiniConsent />,
     images: ['/signup/consent-builder.png', '/signup/consent-builder-2.png'],
     title: 'Consent builder',
     desc: 'Design your own waiver from headings, checkboxes, and e-signatures — guardian fields appear automatically for clients under 18.',
@@ -151,6 +155,7 @@ const PLAN_FEATURES = [
   },
   {
     icon: <PersonIcon />,
+    art: <MiniClients />,
     images: ['/signup/client-records.png', '/signup/client-records-2.png'],
     title: 'Client records',
     desc: 'Every client\'s consent status, allergies, and full booking history — searchable in seconds.',
@@ -161,6 +166,7 @@ const PLAN_FEATURES = [
   },
   {
     icon: <UsersIcon />,
+    art: <MiniArtists />,
     images: ['/signup/artist-management-1.png', '/signup/artist-management-2.png'],
     title: 'Artist management',
     desc: 'Approve artists, assign stations, and set walk-in vs. personal commission splits — payouts track themselves.',
@@ -171,6 +177,7 @@ const PLAN_FEATURES = [
   },
   {
     icon: <ChartIcon />,
+    art: <MiniBarChart />,
     images: ['/signup/analytics.png', '/signup/analytics-2.png'],
     title: 'Analytics',
     desc: 'Appointment counts, revenue, and a studio-vs-personal split, updated in real time.',
@@ -181,7 +188,9 @@ const PLAN_FEATURES = [
   },
   {
     icon: <GlobeIcon />,
-    images: ['/signup/multi-language.png', '/signup/multi-language-2.png'],
+    art: <MiniLanguage />,
+    images: ['/signup/multi-language.png'],
+    video: '/signup/multi-language.webm',
     title: 'Multi-language',
     desc: 'The entire dashboard is available in English, Simplified Chinese, and Korean — switch anytime from Settings.',
     detail: [
@@ -190,6 +199,7 @@ const PLAN_FEATURES = [
   },
   {
     icon: <UploadIcon />,
+    art: <MiniImport />,
     images: ['/signup/migration-import.png'],
     title: 'Migration import',
     desc: 'Already on Square, Acuity, or Fresha? Bring your client history over with built-in column mapping.',
@@ -247,7 +257,7 @@ function IntroStep({ onNext }) {
             onClick={() => setActiveFeature(f)}
           >
             <div style={s.featureArtFrame}>
-              <img src={f.images[0]} alt="" style={s.featureArtImage} />
+              {f.art}
               <span className="vanta-expand-badge" style={s.expandBadge}>
                 <ExpandIcon />
               </span>
@@ -319,9 +329,21 @@ function FeatureDetailModal({ feature, onClose }) {
         <div style={s.modalGallery}>
           {feature.images.map(src => (
             <div key={src} style={s.modalArtFrame}>
-              <img src={src} alt="" style={s.featureArtImage} />
+              <img src={src} alt="" style={s.modalGalleryImage} />
             </div>
           ))}
+          {feature.video && (
+            <div style={s.modalArtFrame}>
+              <video
+                src={feature.video}
+                style={s.modalGalleryImage}
+                autoPlay
+                loop
+                muted
+                playsInline
+              />
+            </div>
+          )}
         </div>
         {(feature.detail ?? [feature.desc]).map((paragraph, i) => (
           <p key={i} style={s.modalDesc}>{paragraph}</p>
@@ -332,9 +354,123 @@ function FeatureDetailModal({ feature, onClose }) {
   );
 }
 
-// Artist management is the one card still backed by an illustration rather than a
-// screenshot — the real "My Artists" list has only one demo entry and shows a real email
-// address, so there's no clean shot to crop without exposing personal info.
+// Small illustrations backing each feature card — abstract enough to render legibly at
+// ~70px tall, but each shaped after the real thing (a week grid, a color picker, toggles,
+// a signature line) rather than a generic icon repeated bigger. The modal opened by
+// clicking a card uses real screenshots instead; these stay as quick, uniform-height
+// glances in the grid.
+function MiniSchedule() {
+  const filled = new Set([2, 6, 11, 13]);
+  return (
+    <div style={s.miniGrid}>
+      {Array.from({ length: 15 }).map((_, i) => (
+        <div key={i} style={{ ...s.miniCell, ...(filled.has(i) ? s.miniCellFilled : {}) }} />
+      ))}
+    </div>
+  );
+}
+
+function MiniSwatches() {
+  const colors = ['#f5ecd9', '#6fbf8a', '#82aadc', '#e8756f'];
+  return (
+    <div style={s.miniSwatchRow}>
+      {colors.map((c, i) => (
+        <span key={c} style={{ ...s.miniSwatch, background: c, ...(i === 0 ? s.miniSwatchActive : {}) }} />
+      ))}
+    </div>
+  );
+}
+
+function MiniToggles() {
+  const rows = [true, true, false];
+  return (
+    <div style={s.miniToggleCol}>
+      {rows.map((on, i) => (
+        <div key={i} style={s.miniToggleRow}>
+          <span style={s.miniToggleLabel} />
+          <span style={{ ...s.miniToggleTrack, ...(on ? s.miniToggleTrackOn : {}) }}>
+            <span style={{ ...s.miniToggleKnob, ...(on ? s.miniToggleKnobOn : {}) }} />
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function MiniConsent() {
+  return (
+    <div style={s.miniConsentCol}>
+      <div style={s.miniLine} />
+      <div style={{ ...s.miniLine, width: '65%' }} />
+      <div style={s.miniSigLine} />
+    </div>
+  );
+}
+
+function MiniClients() {
+  const rows = [{ w: 70, status: 'good' }, { w: 48, status: 'warn' }];
+  return (
+    <div style={s.miniListCol}>
+      {rows.map((r, i) => (
+        <div key={i} style={s.miniListRow}>
+          <span style={s.miniAvatar} />
+          <span style={s.miniBarTrack}><span style={{ ...s.miniBarFill, width: `${r.w}%` }} /></span>
+          <span style={r.status === 'good' ? s.miniTagGood : s.miniTagWarn}>{r.status === 'good' ? '✓' : '!'}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function MiniArtists() {
+  const rows = [{ w: 62, pct: 78 }, { w: 45, pct: 52 }];
+  return (
+    <div style={s.miniListCol}>
+      {rows.map((r, i) => (
+        <div key={i} style={s.miniListRow}>
+          <span style={s.miniAvatar} />
+          <span style={s.miniBarTrack}><span style={{ ...s.miniBarFill, width: `${r.w}%` }} /></span>
+          <span style={s.miniPct}>{r.pct}%</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function MiniBarChart() {
+  const bars = [40, 65, 50, 82, 60, 72];
+  return (
+    <div style={s.miniBarChartRow}>
+      {bars.map((h, i) => <span key={i} style={{ ...s.miniChartBar, height: `${h}%` }} />)}
+    </div>
+  );
+}
+
+function MiniLanguage() {
+  return (
+    <div style={s.miniChipRow}>
+      <span style={{ ...s.miniChip, ...s.miniChipActive }}>EN</span>
+      <span style={s.miniChip}>中文</span>
+      <span style={s.miniChip}>한국어</span>
+    </div>
+  );
+}
+
+function MiniImport() {
+  const platforms = ['Square', 'Acuity', 'Fresha'];
+  return (
+    <div style={s.miniListCol}>
+      {platforms.map(p => (
+        <div key={p} style={s.miniListRow}>
+          <span style={s.miniPillLabel}>{p}</span>
+          <span style={s.miniBarTrack}><span style={{ ...s.miniBarFill, width: '100%' }} /></span>
+          <span style={s.miniTagGood}>✓</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function WidgetIcon({ size = 18 }) {
   return (
     <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
@@ -927,7 +1063,7 @@ const s = {
   },
   featureArtFrame: {
     position: 'relative',
-    height: 108,
+    height: 68,
     borderRadius: 8,
     border: '1px solid rgba(255,255,255,0.08)',
     background: '#11161d',
@@ -952,10 +1088,10 @@ const s = {
     opacity: 0.9,
     transition: 'background 0.15s ease, color 0.15s ease',
   },
-  featureArtImage: {
+  modalGalleryImage: {
     width: '100%',
-    height: '100%',
-    objectFit: 'contain',
+    height: 'auto',
+    display: 'block',
   },
   modalBackdrop: {
     position: 'fixed',
@@ -1003,15 +1139,17 @@ const s = {
     gap: '0.75rem',
     marginBottom: '1.1rem',
   },
+  // No fixed height: a fixed-height frame with object-fit:contain looked fine for the
+  // landscape crops but left wide empty margins on either side of the portrait ones (a
+  // phone-shaped client profile, a tall sidebar nav) — the image just shrank to fit the
+  // height instead of using the frame's full width. Letting height follow the image's own
+  // aspect ratio at 100% width means every image — landscape or portrait — fills the frame
+  // edge to edge; a portrait image just makes for a taller frame, which the panel's own
+  // scroll already accommodates.
   modalArtFrame: {
-    height: 200,
     borderRadius: 10,
     border: '1px solid rgba(255,255,255,0.08)',
     background: '#11161d',
-    padding: '0.75rem',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
     overflow: 'hidden',
     flexShrink: 0,
   },
@@ -1053,6 +1191,64 @@ const s = {
     fontSize: '0.75rem',
     color: 'rgba(255,255,255,0.5)',
     lineHeight: 1.45,
+  },
+  miniGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(5, 1fr)',
+    gridTemplateRows: 'repeat(3, 1fr)',
+    gap: 3,
+    width: '100%',
+    height: '100%',
+  },
+  miniCell: { borderRadius: 2, background: 'rgba(255,255,255,0.06)' },
+  miniCellFilled: { background: 'rgba(245,236,217,0.55)' },
+  miniSwatchRow: { display: 'flex', gap: '0.4rem', alignItems: 'center' },
+  miniSwatch: { width: 16, height: 16, borderRadius: '50%', border: '2px solid transparent' },
+  miniSwatchActive: { border: '2px solid #ffffff', boxShadow: '0 0 0 1px rgba(0,0,0,0.4)' },
+  miniToggleCol: { display: 'flex', flexDirection: 'column', gap: '0.35rem', width: '100%' },
+  miniToggleRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.4rem' },
+  miniToggleLabel: { flex: 1, height: 5, borderRadius: 3, background: 'rgba(255,255,255,0.12)' },
+  miniToggleTrack: {
+    width: 18,
+    height: 10,
+    borderRadius: 999,
+    background: 'rgba(255,255,255,0.1)',
+    display: 'flex',
+    alignItems: 'center',
+    padding: 1.5,
+    flexShrink: 0,
+  },
+  miniToggleTrackOn: { background: 'rgba(245,236,217,0.4)' },
+  miniToggleKnob: { width: 7, height: 7, borderRadius: '50%', background: 'rgba(255,255,255,0.5)', transition: 'transform 0.15s' },
+  miniToggleKnobOn: { background: '#f5ecd9', transform: 'translateX(8px)' },
+  miniConsentCol: { display: 'flex', flexDirection: 'column', gap: '0.4rem', width: '100%' },
+  miniLine: { height: 5, width: '85%', borderRadius: 3, background: 'rgba(255,255,255,0.12)' },
+  miniSigLine: { height: 1, width: '70%', background: 'rgba(255,255,255,0.2)', marginTop: '0.2rem' },
+  miniListCol: { display: 'flex', flexDirection: 'column', gap: '0.4rem', width: '100%' },
+  miniListRow: { display: 'flex', alignItems: 'center', gap: '0.35rem' },
+  miniAvatar: { width: 12, height: 12, borderRadius: '50%', flexShrink: 0, background: 'rgba(255,255,255,0.15)' },
+  miniBarTrack: { flex: 1, height: 5, borderRadius: 3, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' },
+  miniBarFill: { display: 'block', height: '100%', borderRadius: 3, background: 'rgba(245,236,217,0.5)' },
+  miniTagGood: { fontSize: '0.55rem', color: '#4cc98a', flexShrink: 0 },
+  miniTagWarn: { fontSize: '0.6rem', fontWeight: 700, color: '#e8c56f', flexShrink: 0 },
+  miniPct: { fontSize: '0.5rem', color: 'rgba(255,255,255,0.4)', flexShrink: 0, width: 20, textAlign: 'right' },
+  miniPillLabel: { fontSize: '0.55rem', color: 'rgba(255,255,255,0.55)', width: 34, flexShrink: 0 },
+  miniBarChartRow: { display: 'flex', alignItems: 'flex-end', gap: 3, width: '100%', height: '100%' },
+  miniChartBar: { flex: 1, borderRadius: '1px 1px 0 0', background: 'rgba(245,236,217,0.5)' },
+  miniChipRow: { display: 'flex', gap: '0.3rem', flexWrap: 'wrap' },
+  miniChip: {
+    fontSize: '0.55rem',
+    fontWeight: 600,
+    color: 'rgba(255,255,255,0.4)',
+    background: 'rgba(255,255,255,0.05)',
+    border: '1px solid rgba(255,255,255,0.08)',
+    borderRadius: 999,
+    padding: '0.15rem 0.4rem',
+  },
+  miniChipActive: {
+    color: '#f5ecd9',
+    background: 'rgba(245,236,217,0.12)',
+    border: '1px solid rgba(245,236,217,0.3)',
   },
   introTitle: {
     fontSize: '1.3rem',
