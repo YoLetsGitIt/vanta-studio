@@ -113,6 +113,7 @@ const PLAN_FEATURES = [
     icon: <WidgetIcon />,
     art: <MiniSchedule />,
     images: ['/signup/booking-widget.png', '/signup/booking-widget-2.png'],
+    video: '/signup/booking-widget.webm',
     title: 'Booking widget',
     desc: 'A shareable link and QR code clients use to request a session — deposits, reminders, and a reschedule cutoff, all handled for you.',
     detail: [
@@ -123,13 +124,13 @@ const PLAN_FEATURES = [
   {
     icon: <PaletteIcon />,
     art: <MiniSwatches />,
-    images: ['/signup/widget-branding.png', '/signup/widget-branding-2.png'],
+    images: ['/signup/widget-branding-2.png'],
     video: '/signup/widget-branding.webm',
     title: 'Widget branding',
     desc: 'Add the booking widget to your own website in minutes — match your studio\'s colors, then paste in one line of code. No developer needed.',
     detail: [
+      'Copy a single embed snippet — one div and one script tag — onto any website you control, no matter what it\'s built with. No developer needed.',
       'Pick a background and highlight color to match your own site — the preview updates live as you type a hex code, so you see exactly what clients will see before you save anything.',
-      'Once you\'re happy with it, copy a single embed snippet — one div and one script tag — onto any website you control, no matter what it\'s built with. No developer needed.',
     ],
   },
   {
@@ -147,7 +148,7 @@ const PLAN_FEATURES = [
   {
     icon: <DocumentIcon />,
     art: <MiniConsent />,
-    images: ['/signup/consent-builder.png'],
+    images: [],
     video: '/signup/consent-builder.webm',
     title: 'Consent builder',
     desc: 'Design your own waiver from headings, checkboxes, and e-signatures — guardian fields appear automatically for clients under 18.',
