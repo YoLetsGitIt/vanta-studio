@@ -124,6 +124,7 @@ const PLAN_FEATURES = [
     icon: <PaletteIcon />,
     art: <MiniSwatches />,
     images: ['/signup/widget-branding.png', '/signup/widget-branding-2.png'],
+    video: '/signup/widget-branding.webm',
     title: 'Widget branding',
     desc: 'Add the booking widget to your own website in minutes — match your studio\'s colors, then paste in one line of code. No developer needed.',
     detail: [
@@ -134,7 +135,8 @@ const PLAN_FEATURES = [
   {
     icon: <ChecklistIcon />,
     art: <MiniToggles />,
-    images: ['/signup/custom-booking-form.png', '/signup/custom-booking-form-2.png'],
+    images: ['/signup/custom-booking-form.png'],
+    video: '/signup/custom-booking-form.webm',
     title: 'Custom booking form',
     desc: 'Turn any field on or off — placement, size, skin tone, reference photos — and mark exactly which ones are required. Your form, your rules.',
     detail: [
@@ -145,7 +147,8 @@ const PLAN_FEATURES = [
   {
     icon: <DocumentIcon />,
     art: <MiniConsent />,
-    images: ['/signup/consent-builder.png', '/signup/consent-builder-2.png'],
+    images: ['/signup/consent-builder.png'],
+    video: '/signup/consent-builder.webm',
     title: 'Consent builder',
     desc: 'Design your own waiver from headings, checkboxes, and e-signatures — guardian fields appear automatically for clients under 18.',
     detail: [
@@ -167,12 +170,13 @@ const PLAN_FEATURES = [
   {
     icon: <UsersIcon />,
     art: <MiniArtists />,
-    images: ['/signup/artist-management-1.png', '/signup/artist-management-2.png'],
+    images: ['/signup/artist-management-2.png'],
+    video: '/signup/artist-management.webm',
     title: 'Artist management',
     desc: 'Approve artists, assign stations, and set walk-in vs. personal commission splits — payouts track themselves.',
     detail: [
-      'Set separate commission percentages for walk-in versus artist-sourced bookings — studio and artist can split revenue differently depending on who brought the client in.',
       'Decide which parties have to record payment before a payout processes, and whether an artist still gets their cut when a client forfeits a deposit instead of showing up. Changes here only apply going forward, so they never rewrite history on past bookings.',
+      'Set separate commission percentages for walk-in versus artist-sourced bookings — studio and artist can split revenue differently depending on who brought the client in, updating live as you type a new percentage.',
     ],
   },
   {
