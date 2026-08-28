@@ -110,30 +110,7 @@ export default function SignUpFlow({ onSwitchToSignIn, onWideChange }) {
 
 const PLAN_FEATURES = [
   {
-    icon: <WidgetIcon />,
-    art: <MiniSchedule />,
-    images: ['/signup/booking-widget-2.png'],
-    video: '/signup/booking-widget.webm',
-    title: 'Booking widget',
-    desc: 'A shareable link and QR code clients use to request a session — deposits, reminders, and a reschedule cutoff, all handled for you.',
-    detail: [
-      'Clients scan a QR code or click your link to request a session straight into your calendar — no app or account required on their end. Deposits, 7-day and 24-hour email reminders, and a reschedule cutoff you set are all built in, so a request doesn\'t turn into a string of DMs.',
-      'Share the link anywhere — your bio, a QR code on a table card, a text message — or embed the whole form on your own website.',
-    ],
-  },
-  {
-    icon: <PaletteIcon />,
-    art: <MiniSwatches />,
-    images: ['/signup/widget-branding-2.png'],
-    video: '/signup/widget-branding.webm',
-    title: 'Widget branding',
-    desc: 'Add the booking widget to your own website in minutes — match your studio\'s colors, then paste in one line of code. No developer needed.',
-    detail: [
-      'Copy a single embed snippet — one div and one script tag — onto any website you control, no matter what it\'s built with. No developer needed.',
-      'Pick a background and highlight color to match your own site — the preview updates live as you type a hex code, so you see exactly what clients will see before you save anything.',
-    ],
-  },
-  {
+    section: 'Bookings',
     icon: <ChecklistIcon />,
     art: <MiniToggles />,
     images: ['/signup/custom-booking-form.png'],
@@ -146,6 +123,33 @@ const PLAN_FEATURES = [
     ],
   },
   {
+    section: 'Bookings',
+    icon: <WidgetIcon />,
+    art: <MiniSchedule />,
+    images: [],
+    video: '/signup/booking-widget.webm',
+    title: 'Booking widget',
+    desc: 'A shareable link and QR code clients use to request a session — deposits, reminders, and a reschedule cutoff, all handled for you.',
+    detail: [
+      'Clients scan a QR code or click your link to request a session straight into your calendar — no app or account required on their end. Deposits, 7-day and 24-hour email reminders, and a reschedule cutoff you set are all built in, so a request doesn\'t turn into a string of DMs.',
+      'Share the link anywhere — your bio, a QR code on a table card, a text message — or embed the whole form on your own website.',
+    ],
+  },
+  {
+    section: 'Bookings',
+    icon: <PaletteIcon />,
+    art: <MiniSwatches />,
+    images: ['/signup/widget-branding-2.png'],
+    video: '/signup/widget-branding.webm',
+    title: 'Widget branding',
+    desc: 'Add the booking widget to your own website in minutes — match your studio\'s colors, then paste in one line of code. No developer needed.',
+    detail: [
+      'Copy a single embed snippet — one div and one script tag — onto any website you control, no matter what it\'s built with. No developer needed.',
+      'Pick a background and highlight color to match your own site — the preview updates live as you type a hex code, so you see exactly what clients will see before you save anything.',
+    ],
+  },
+  {
+    section: 'Clients',
     icon: <DocumentIcon />,
     art: <MiniConsent />,
     images: [],
@@ -158,6 +162,7 @@ const PLAN_FEATURES = [
     ],
   },
   {
+    section: 'Clients',
     icon: <PersonIcon />,
     art: <MiniClients />,
     images: ['/signup/client-records.png', '/signup/client-records-2.png'],
@@ -169,6 +174,7 @@ const PLAN_FEATURES = [
     ],
   },
   {
+    section: 'Studio',
     icon: <UsersIcon />,
     art: <MiniArtists />,
     images: ['/signup/artist-management-2.png'],
@@ -181,6 +187,7 @@ const PLAN_FEATURES = [
     ],
   },
   {
+    section: 'Studio',
     icon: <ChartIcon />,
     art: <MiniBarChart />,
     images: ['/signup/analytics.png', '/signup/analytics-2.png'],
@@ -192,6 +199,7 @@ const PLAN_FEATURES = [
     ],
   },
   {
+    section: 'Setup',
     icon: <GlobeIcon />,
     art: <MiniLanguage />,
     images: [],
@@ -199,6 +207,7 @@ const PLAN_FEATURES = [
     desc: 'The entire dashboard is available in English, Simplified Chinese, and Korean — switch anytime from Settings.',
   },
   {
+    section: 'Setup',
     icon: <UploadIcon />,
     art: <MiniImport />,
     images: [],
@@ -206,6 +215,19 @@ const PLAN_FEATURES = [
     desc: 'Already on Square, Acuity, or Fresha? Bring your client history over with built-in column mapping.',
   },
 ];
+
+// Groups PLAN_FEATURES by their `section` field, preserving first-seen section order —
+// grouping in one pass here (rather than a second array literal) keeps section membership
+// defined in exactly one place, right next to each feature's own data.
+const FEATURE_SECTIONS = PLAN_FEATURES.reduce((sections, feature) => {
+  let section = sections.find(s => s.title === feature.section);
+  if (!section) {
+    section = { title: feature.section, features: [] };
+    sections.push(section);
+  }
+  section.features.push(feature);
+  return sections;
+}, []);
 
 // A responsive grid rather than a click-through carousel — with nine features, showing them
 // all at once beats making a visitor hunt for the ones they care about. Two columns below
@@ -245,32 +267,39 @@ function IntroStep({ onNext }) {
         <p style={s.introSubtitle}>Booking, clients, artists, and payouts — all in one dashboard.</p>
       </div>
 
-      <div className="vanta-feature-grid">
-        {PLAN_FEATURES.map(f => {
-          const hasDetail = f.images.length > 0 || !!f.video;
-          return (
-            <div
-              key={f.title}
-              className={hasDetail ? 'vanta-feature-card' : 'vanta-feature-card vanta-feature-card-static'}
-              style={{ ...s.featureGridCard, cursor: hasDetail ? 'pointer' : 'default' }}
-              onClick={hasDetail ? () => setActiveFeature(f) : undefined}
-            >
-              <div style={s.featureArtFrame}>
-                {f.art}
-                {hasDetail && (
-                  <span className="vanta-expand-badge" style={s.expandBadge}>
-                    <ExpandIcon />
-                  </span>
-                )}
-              </div>
-              <div style={s.featureCardHeader}>
-                <span style={s.featureCardIcon}>{f.icon}</span>
-                <span style={s.featureCardTitle}>{f.title}</span>
-              </div>
-              <div style={s.featureCardDesc}>{f.desc}</div>
+      <div style={s.featureSections}>
+        {FEATURE_SECTIONS.map(section => (
+          <div key={section.title}>
+            <h4 style={s.featureSectionTitle}>{section.title}</h4>
+            <div className="vanta-feature-grid">
+              {section.features.map(f => {
+                const hasDetail = f.images.length > 0 || !!f.video;
+                return (
+                  <div
+                    key={f.title}
+                    className={hasDetail ? 'vanta-feature-card' : 'vanta-feature-card vanta-feature-card-static'}
+                    style={{ ...s.featureGridCard, cursor: hasDetail ? 'pointer' : 'default' }}
+                    onClick={hasDetail ? () => setActiveFeature(f) : undefined}
+                  >
+                    <div style={s.featureArtFrame}>
+                      {f.art}
+                      {hasDetail && (
+                        <span className="vanta-expand-badge" style={s.expandBadge}>
+                          <ExpandIcon />
+                        </span>
+                      )}
+                    </div>
+                    <div style={s.featureCardHeader}>
+                      <span style={s.featureCardIcon}>{f.icon}</span>
+                      <span style={s.featureCardTitle}>{f.title}</span>
+                    </div>
+                    <div style={s.featureCardDesc}>{f.desc}</div>
+                  </div>
+                );
+              })}
             </div>
-          );
-        })}
+          </div>
+        ))}
       </div>
 
       {activeFeature && (
@@ -1036,6 +1065,15 @@ const s = {
     margin: 0,
   },
   introWrap: { display: 'flex', flexDirection: 'column', gap: '1.5rem' },
+  featureSections: { display: 'flex', flexDirection: 'column', gap: '1.3rem' },
+  featureSectionTitle: {
+    fontSize: '0.72rem',
+    fontWeight: 700,
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
+    color: 'rgba(255,255,255,0.4)',
+    margin: '0 0 0.55rem',
+  },
   switchRow: {
     display: 'flex',
     justifyContent: 'flex-end',
