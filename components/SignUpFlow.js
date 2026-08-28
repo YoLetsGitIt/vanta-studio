@@ -188,6 +188,14 @@ const PLAN_FEATURES = [
   },
   {
     section: 'Studio',
+    icon: <StationIcon />,
+    art: <MiniStations />,
+    images: [],
+    title: 'Station scheduling',
+    desc: 'The booking form only ever offers a station that\'s actually free at that date and time — two artists can\'t land on the same chair by accident.',
+  },
+  {
+    section: 'Studio',
     icon: <ChartIcon />,
     art: <MiniBarChart />,
     images: ['/signup/analytics.png', '/signup/analytics-2.png'],
@@ -472,6 +480,23 @@ function MiniArtists() {
   );
 }
 
+function MiniStations() {
+  // Two station columns, each a stack of time slots — one slot lit up per column to read as
+  // "here's who's using what, when" at a glance, echoing the app's own per-station day view.
+  const columns = [[false, true, false, false], [false, false, true, false]];
+  return (
+    <div style={s.miniStationRow}>
+      {columns.map((slots, i) => (
+        <div key={i} style={s.miniStationCol}>
+          {slots.map((busy, j) => (
+            <span key={j} style={{ ...s.miniStationSlot, ...(busy ? s.miniStationSlotBusy : {}) }} />
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function MiniBarChart() {
   const bars = [40, 65, 50, 82, 60, 72];
   return (
@@ -571,6 +596,16 @@ function UploadIcon({ size = 18 }) {
     <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
       <path d="M8 10.5V2.5M5 5.5 8 2.5l3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
       <path d="M2.5 11v1.5A1.5 1.5 0 0 0 4 14h8a1.5 1.5 0 0 0 1.5-1.5V11" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function StationIcon({ size = 18 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
+      <rect x="1.5" y="2.5" width="5.5" height="11" rx="1.5" stroke="currentColor" strokeWidth="1.2" />
+      <rect x="9" y="2.5" width="5.5" height="11" rx="1.5" stroke="currentColor" strokeWidth="1.2" />
+      <circle cx="4.25" cy="6" r="1" fill="currentColor" />
     </svg>
   );
 }
@@ -1294,6 +1329,10 @@ const s = {
   miniTagWarn: { fontSize: '0.6rem', fontWeight: 700, color: '#e8c56f', flexShrink: 0 },
   miniPct: { fontSize: '0.5rem', color: 'rgba(255,255,255,0.4)', flexShrink: 0, width: 20, textAlign: 'right' },
   miniPillLabel: { fontSize: '0.55rem', color: 'rgba(255,255,255,0.55)', width: 34, flexShrink: 0 },
+  miniStationRow: { display: 'flex', gap: 4, width: '100%', height: '100%' },
+  miniStationCol: { flex: 1, display: 'flex', flexDirection: 'column', gap: 3 },
+  miniStationSlot: { flex: 1, borderRadius: 2, background: 'rgba(255,255,255,0.06)' },
+  miniStationSlotBusy: { background: 'rgba(245,236,217,0.55)' },
   miniBarChartRow: { display: 'flex', alignItems: 'flex-end', gap: 3, width: '100%', height: '100%' },
   miniChartBar: { flex: 1, borderRadius: '1px 1px 0 0', background: 'rgba(245,236,217,0.5)' },
   miniChipRow: { display: 'flex', gap: '0.3rem', flexWrap: 'wrap' },
