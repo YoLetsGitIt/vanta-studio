@@ -149,6 +149,14 @@ const PLAN_FEATURES = [
     ],
   },
   {
+    section: 'Bookings',
+    icon: <StationIcon />,
+    art: <MiniStations />,
+    images: [],
+    title: 'Station scheduling',
+    desc: 'The booking form only ever offers a station that\'s actually free at that date and time — two artists can\'t land on the same chair by accident.',
+  },
+  {
     section: 'Clients',
     icon: <DocumentIcon />,
     art: <MiniConsent />,
@@ -185,14 +193,6 @@ const PLAN_FEATURES = [
       'Decide which parties have to record payment before a payout processes, and whether an artist still gets their cut when a client forfeits a deposit instead of showing up. Changes here only apply going forward, so they never rewrite history on past bookings.',
       'Set separate commission percentages for walk-in versus artist-sourced bookings — studio and artist can split revenue differently depending on who brought the client in, updating live as you type a new percentage.',
     ],
-  },
-  {
-    section: 'Studio',
-    icon: <StationIcon />,
-    art: <MiniStations />,
-    images: [],
-    title: 'Station scheduling',
-    desc: 'The booking form only ever offers a station that\'s actually free at that date and time — two artists can\'t land on the same chair by accident.',
   },
   {
     section: 'Studio',
@@ -249,7 +249,7 @@ const FEATURE_SECTIONS = PLAN_FEATURES.reduce((sections, feature) => {
 // frame, brightening on hover) is what signals the card is clickable in its place.
 const INTRO_LAYOUT_CSS = `
 .vanta-feature-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.7rem; }
-@media (min-width: 680px) { .vanta-feature-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (min-width: 760px) { .vanta-feature-grid { grid-template-columns: repeat(4, 1fr); } }
 .vanta-feature-card { transition: background 0.15s ease, border-color 0.15s ease; cursor: pointer; }
 .vanta-feature-card:not(.vanta-feature-card-static):hover { background: rgba(255,255,255,0.05); border-color: rgba(245,236,217,0.25); }
 .vanta-feature-card:hover .vanta-expand-badge { opacity: 1; background: rgba(245,236,217,0.16); color: #f5ecd9; }
