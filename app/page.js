@@ -56,7 +56,7 @@ export default function HomePage() {
       <div style={s.noise} />
       <style>{GLOBAL_CSS}</style>
 
-      <div className="vanta-card" style={{ ...s.card, maxWidth: wide ? 720 : 420 }}>
+      <div className="vanta-card" style={{ ...s.card, maxWidth: wide ? 960 : 420 }}>
         <div style={s.brand}>
           <span style={s.wordmark}>vanta</span>
           <span style={s.wordmarkSub}>studio</span>
