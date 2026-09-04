@@ -2,15 +2,18 @@
 
 import { useState, useEffect, useCallback, useMemo, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { listStudioBookings, acceptBookingWithStation, rejectBooking, cancelBooking, recordOutcome, createFollowUpBooking, sendSelectionLink, confirmBooking, reassignArtist, rescheduleBooking, getStudioArtists, getStripeStatus } from '@/lib/api';
+import { listStudioBookings, getStudioArtists, getStripeStatus } from '@/lib/api';
 import { getCached, setCached, invalidatePrefix } from '@/lib/cache';
 import { statusColors, statusLabel, capitalise } from '@/lib/status';
-import { getBookingType } from '@/lib/bookingType';
+import { getBookingStyle } from '@/lib/bookingType';
 import { hasArtist } from '@/lib/format';
 import CompleteBookingModal from '@/components/CompleteBookingModal';
 import RejectBookingModal from '@/components/RejectBookingModal';
 import BookingDetailPanel from '@/components/BookingDetailPanel';
 import { useLanguage } from '@/lib/i18n';
+import SendSelectionLinkModal from '@/components/SendSelectionLinkModal';
+import { showError } from '@/lib/feedback';
+import { bookingActions } from '@/lib/bookingActions';
 
 const STATUS_FILTERS = [
   { value: 'pending',                              tKey: 'status_pending' },
@@ -67,13 +70,6 @@ function AppointmentsInner() {
   const [cancelTarget, setCancelTarget] = useState(null);
   const [toast, setToast] = useState(null);
   const [sendLinkTarget,   setSendLinkTarget]   = useState(null);
-  const [sendLinkHours,    setSendLinkHours]    = useState(168);
-  const [sendLinkDuration, setSendLinkDuration] = useState(60);
-  const [sendLinkDeposit,  setSendLinkDeposit]  = useState(false);
-  const [sendLinkAmount,   setSendLinkAmount]   = useState('');
-  const [sendLinkQuote,    setSendLinkQuote]    = useState('');
-  const [sendLinkArtistId, setSendLinkArtistId] = useState('');
-  const [sendLinkSaving,   setSendLinkSaving]   = useState(false);
   const [reassignTarget, setReassignTarget] = useState(null); // booking id
   const [reassignArtistId, setReassignArtistId] = useState('');
   const [reassignResend, setReassignResend] = useState(true);
@@ -163,8 +159,8 @@ function AppointmentsInner() {
 
   async function handleAccept(id, stationId) {
     setActionLoading(true);
-    try { await acceptBookingWithStation(id, stationId); await load(true); setSelected(null); }
-    catch (e) { alert(e.message); }
+    try { await bookingActions.accept(id, stationId); await load(true); setSelected(null); }
+    catch (e) { showError(e); }
     finally { setActionLoading(false); }
   }
 
@@ -172,8 +168,8 @@ function AppointmentsInner() {
 
   async function confirmReject(reason) {
     setActionLoading(true);
-    try { await rejectBooking(rejectTarget, reason); await load(true); setSelected(null); setRejectTarget(null); }
-    catch (e) { alert(e.message); }
+    try { await bookingActions.reject(rejectTarget, reason); await load(true); setSelected(null); setRejectTarget(null); }
+    catch (e) { showError(e); }
     finally { setActionLoading(false); }
   }
 
@@ -184,72 +180,51 @@ function AppointmentsInner() {
   async function confirmComplete(finalPrice, paymentSplits, wantsFollowUp) {
     setActionLoading(true);
     try {
-      await recordOutcome(completeTarget.id, 'completed', finalPrice, paymentSplits);
-      if (wantsFollowUp) await createFollowUpBooking(completeTarget.id);
+      await bookingActions.complete(completeTarget.id, { finalPrice, paymentSplits, createFollowUp: wantsFollowUp });
       await load(true);
       setSelected(null);
       setCompleteTarget(null);
       showToast(wantsFollowUp ? 'Booking completed · follow-up session created' : 'Booking marked as complete');
     }
-    catch (e) { alert(e.message); }
+    catch (e) { showError(e); }
     finally { setActionLoading(false); }
   }
 
   async function confirmNoShow() {
     setActionLoading(true);
     try {
-      await recordOutcome(noShowTarget, 'no_show');
+      await bookingActions.noShow(noShowTarget);
       await load(true);
       setSelected(null);
       setNoShowTarget(null);
       showToast('Booking marked as no show');
     }
-    catch (e) { alert(e.message); }
+    catch (e) { showError(e); }
     finally { setActionLoading(false); }
   }
 
   async function confirmCancel(reason) {
     setActionLoading(true);
-    try { await cancelBooking(cancelTarget, reason); await load(true); setSelected(null); setCancelTarget(null); }
-    catch (e) { alert(e.message); }
+    try { await bookingActions.cancel(cancelTarget, reason); await load(true); setSelected(null); setCancelTarget(null); }
+    catch (e) { showError(e); }
     finally { setActionLoading(false); }
   }
 
   function handleSendLink(id) {
     setSendLinkTarget(id);
-    setSendLinkHours(168);
-    setSendLinkDuration(60);
-    setSendLinkDeposit(false);
-    setSendLinkAmount('');
-    setSendLinkQuote('');
-    setSendLinkArtistId('');
     if (studioArtists.length === 0) {
       getStudioArtists('approved').then(d => setStudioArtists(d.artists ?? [])).catch(() => {});
     }
   }
 
-  async function confirmSendLink() {
-    setSendLinkSaving(true);
-    try {
-      const amount   = sendLinkDeposit && sendLinkAmount ? parseFloat(sendLinkAmount) : null;
-      const duration = sendLinkDuration ? Number(sendLinkDuration) : null;
-      const quote    = sendLinkQuote ? parseFloat(sendLinkQuote) : null;
-      await sendSelectionLink(sendLinkTarget, sendLinkHours, sendLinkDeposit, amount, duration, quote, sendLinkArtistId || null);
-      await load(true);
-      setSendLinkTarget(null);
-      showToast('Selection link sent to client');
-    } catch (e) { alert(e.message); }
-    finally { setSendLinkSaving(false); }
-  }
-
   async function handleConfirm(id) {
     setActionLoading(true);
     try {
-      await confirmBooking(id);
+      await bookingActions.confirm(id);
       await load(true);
       setSelected(null);
       showToast('Booking confirmed');
-    } catch (e) { alert(e.message); }
+    } catch (e) { showError(e); }
     finally { setActionLoading(false); }
   }
 
@@ -266,11 +241,11 @@ function AppointmentsInner() {
     if (!reassignArtistId) return;
     setReassignSaving(true);
     try {
-      await reassignArtist(reassignTarget, reassignArtistId, reassignResend);
+      await bookingActions.reassign(reassignTarget, reassignArtistId, reassignResend);
       await load(true);
       setReassignTarget(null);
       showToast(reassignResend ? 'Artist reassigned · new link sent' : 'Artist reassigned');
-    } catch (e) { alert(e.message); }
+    } catch (e) { showError(e); }
     finally { setReassignSaving(false); }
   }
 
@@ -298,15 +273,15 @@ function AppointmentsInner() {
     const [sh, sm] = rescheduleStart.split(':').map(Number);
     const [eh, em] = rescheduleEnd.split(':').map(Number);
     const durationMins = (eh * 60 + em) - (sh * 60 + sm);
-    if (durationMins <= 0) { alert('End time must be after start time.'); return; }
+    if (durationMins <= 0) { showError('End time must be after start time.'); return; }
     const newTime = new Date(`${rescheduleDate}T${rescheduleStart}:00`).toISOString();
     setRescheduleSaving(true);
     try {
-      await rescheduleBooking(rescheduleTarget.id, newTime, rescheduleMsg.trim(), durationMins);
+      await bookingActions.reschedule(rescheduleTarget.id, { newTime, message: rescheduleMsg, durationMinutes: durationMins });
       await load(true);
       setRescheduleTarget(null);
       showToast('Booking rescheduled · client emailed');
-    } catch (e) { alert(e.message); }
+    } catch (e) { showError(e); }
     finally { setRescheduleSaving(false); }
   }
 
@@ -326,7 +301,6 @@ function AppointmentsInner() {
 
   const selectedBooking = selected ? bookings.find(b => b.id === selected) : null;
   const sendLinkBooking = sendLinkTarget ? bookings.find(b => b.id === sendLinkTarget) : null;
-  const sendLinkNeedsArtist = !!sendLinkTarget && !hasArtist(sendLinkBooking?.artist_id);
 
   return (
     <div style={s.page}>
@@ -374,87 +348,7 @@ function AppointmentsInner() {
       )}
 
       {sendLinkTarget && (
-        <div style={s.modalOverlay} onClick={() => setSendLinkTarget(null)}>
-          <div style={s.modal} onClick={e => e.stopPropagation()}>
-            <h3 style={s.modalTitle}>{t('appt_send_link')}</h3>
-            <p style={s.modalSub}>{t('appt_send_link_desc')}</p>
-            {sendLinkNeedsArtist && (
-              <>
-                <label style={s.modalLabel}>{t('bdp_artist')}</label>
-                <select value={sendLinkArtistId} onChange={e => setSendLinkArtistId(e.target.value)} style={s.modalSelect}>
-                  <option value="">{t('appt_select_artist')}</option>
-                  {studioArtists.map(a => (
-                    <option key={a.artistId ?? a.id} value={a.artistId ?? a.id}>{a.name}</option>
-                  ))}
-                </select>
-              </>
-            )}
-            <label style={s.modalLabel}>{t('appt_duration')}</label>
-            <select value={sendLinkDuration} onChange={e => setSendLinkDuration(Number(e.target.value))} style={s.modalSelect}>
-              <option value={60}>1 hour</option>
-              <option value={90}>1.5 hours</option>
-              <option value={120}>2 hours</option>
-              <option value={180}>3 hours</option>
-              <option value={240}>4 hours</option>
-              <option value={300}>5 hours</option>
-              <option value={360}>6 hours</option>
-              <option value={480}>Full day (8 hrs)</option>
-            </select>
-            <label style={s.modalLabel}>{t('appt_quote')}</label>
-            <input
-              type="number"
-              inputMode="numeric"
-              placeholder="e.g. 350"
-              value={sendLinkQuote}
-              onChange={e => setSendLinkQuote(e.target.value)}
-              onKeyDown={e => ['e','E','+','-','.'].includes(e.key) && e.preventDefault()}
-              style={s.modalInput}
-              min="0"
-            />
-            <label style={s.modalLabel}>{t('appt_expires')}</label>
-            <select value={sendLinkHours} onChange={e => setSendLinkHours(Number(e.target.value))} style={s.modalSelect}>
-              <option value={24}>24 hours</option>
-              <option value={48}>48 hours</option>
-              <option value={72}>72 hours</option>
-              <option value={168}>7 days</option>
-              <option value={336}>14 days</option>
-            </select>
-            {stripeConnected ? (
-              <>
-                <label style={s.modalCheckRow}>
-                  <input type="checkbox" checked={sendLinkDeposit} onChange={e => setSendLinkDeposit(e.target.checked)} style={{ accentColor: 'var(--accent)' }} />
-                  <span style={{ fontSize: '0.85rem', color: 'var(--text-dim)' }}>{t('appt_deposit')}</span>
-                </label>
-                {sendLinkDeposit && (
-                  <input
-                    type="number"
-                    inputMode="decimal"
-                    placeholder="Deposit amount ($)"
-                    value={sendLinkAmount}
-                    onChange={e => setSendLinkAmount(e.target.value)}
-                    onKeyDown={e => ['e','E','+','-'].includes(e.key) && e.preventDefault()}
-                    style={s.modalInput}
-                    min="0"
-                  />
-                )}
-              </>
-            ) : (
-              <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: '0.25rem 0 0', padding: '0.5rem 0.65rem', background: 'rgba(255,255,255,0.04)', borderRadius: 6 }}>
-                {t('appt_stripe_hint')}
-              </p>
-            )}
-            <div style={s.modalActions}>
-              <button style={s.modalCancel} onClick={() => setSendLinkTarget(null)}>{t('cancel')}</button>
-              <button
-                style={{ ...s.modalConfirm, opacity: (sendLinkSaving || (sendLinkNeedsArtist && !sendLinkArtistId)) ? 0.5 : 1 }}
-                onClick={confirmSendLink}
-                disabled={sendLinkSaving || (sendLinkNeedsArtist && !sendLinkArtistId)}
-              >
-                {t(sendLinkSaving ? 'sending' : 'appt_send_link_btn')}
-              </button>
-            </div>
-          </div>
-        </div>
+        <SendSelectionLinkModal booking={sendLinkBooking} artists={studioArtists} stripeConnected={stripeConnected} onClose={() => setSendLinkTarget(null)} onSent={() => load(true)} />
       )}
 
       {reassignTarget && (
@@ -697,7 +591,7 @@ function BookingRow({ booking: b, selected, onSelect, labelOverride }) {
     hasArtist(b.artist_id) ? b.artist_name : t('bdp_artist_unspecified'),
   ].filter(Boolean);
 
-  const bookingType = getBookingType(b.source);
+  const bookingStyle = getBookingStyle(b.source);
   const price = b.estimated_quote > 0 ? `$${Number(b.estimated_quote).toLocaleString()}` : null;
 
   return (
@@ -741,8 +635,8 @@ function BookingRow({ booking: b, selected, onSelect, labelOverride }) {
           <span style={s.rowMeta}>{sessionParts.join(' · ')}</span>
         )}
         <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', marginTop: '0.1rem' }}>
-          <span style={{ ...s.sourceTag, background: bookingType === 'studio' ? 'rgba(245,158,58,0.1)' : 'rgba(167,139,250,0.1)', color: bookingType === 'studio' ? '#f59e3a' : '#a78bfa', borderColor: bookingType === 'studio' ? 'rgba(245,158,58,0.25)' : 'rgba(167,139,250,0.25)' }}>
-            {bookingType === 'studio' ? 'Studio' : 'Personal'}
+          <span style={{ ...s.sourceTag, background: bookingStyle.bg, color: bookingStyle.tagColor, borderColor: bookingStyle.border }}>
+            {bookingStyle.tag}
           </span>
         </div>
       </div>
@@ -946,7 +840,7 @@ const s = {
   },
   modalSaveBtn: {
     flex: 2, padding: '0.5rem', borderRadius: 7,
-    border: '1px solid rgba(245,236,217,0.25)', background: 'rgba(245,236,217,0.08)',
+    border: '1px solid var(--accent-tint-border)', background: 'var(--accent-tint)',
     color: 'var(--accent)', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer',
   },
 };

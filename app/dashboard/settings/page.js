@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from 'react';
 import dynamic from 'next/dynamic';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   getMyStudioAccount, updateStudioProfile,
   getStudioHours, updateStudioHours,
@@ -11,12 +11,13 @@ import {
   listConsentTemplates, createConsentTemplate, updateConsentTemplate, deleteConsentTemplate,
   getStripeStatus, startStripeOnboarding, disconnectStripe,
   getFormConfig, updateFormConfig,
-  startBillingCheckout, getBillingDetails, cancelBillingSubscription, openBillingPortal,
+  startBillingCheckout, getBillingDetails, cancelBillingSubscription, reactivateBillingSubscription, openBillingPortal,
 } from '@/lib/api';
 import { getSupabase } from '@/lib/supabase';
 import { invalidate } from '@/lib/cache';
 import { getTheme, setTheme } from '@/lib/theme';
 import { useLanguage, LANGUAGES } from '@/lib/i18n';
+import { requestConfirmation, showError } from '@/lib/feedback';
 
 const QRCodeSVG = dynamic(() => import('qrcode.react').then(m => m.QRCodeSVG), { ssr: false });
 
@@ -458,7 +459,7 @@ function ConsentFormPreview({ name, fields, requiresSig, requiresGuardian }) {
           </div>
         )}
 
-        <div style={{ padding: '0.6rem', background: 'rgba(245,236,217,0.1)', border: '1px solid rgba(245,236,217,0.18)', borderRadius: 8, fontSize: '0.8rem', fontWeight: 700, color: '#f5ecd9', textAlign: 'center', marginTop: 4 }}>
+        <div style={{ padding: '0.6rem', background: 'var(--accent-tint)', border: '1px solid var(--accent-tint-border)', borderRadius: 8, fontSize: '0.8rem', fontWeight: 700, color: 'var(--accent)', textAlign: 'center', marginTop: 4 }}>
           Submit
         </div>
       </div>
@@ -468,6 +469,8 @@ function ConsentFormPreview({ name, fields, requiresSig, requiresGuardian }) {
 
 export default function SettingsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const requestedTab = searchParams.get('tab');
   const { lang, switchLanguage, t } = useLanguage();
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState('');
@@ -497,6 +500,12 @@ export default function SettingsPage() {
   const [tab, setTab] = useState('studio');
 
   useEffect(() => { setThemeState(getTheme()); }, []);
+
+  useEffect(() => {
+    if (['studio', 'bookings', 'payments', 'account'].includes(requestedTab)) {
+      setTab(requestedTab);
+    }
+  }, [requestedTab]);
 
   function toggleTheme() {
     const next = theme === 'dark' ? 'light' : 'dark';
@@ -676,20 +685,24 @@ export default function SettingsPage() {
       const station = await addStation();
       setStations(s => [...s, station]);
     } catch (e) {
-      alert(e.message);
+      showError(e);
     } finally {
       setStationLoading(false);
     }
   }
 
   async function handleRemoveStation(id) {
+    if (stations.length <= 1) {
+      showError('A studio must have at least one station. Add another station before removing this one.');
+      return;
+    }
     setStationLoading(true);
     try {
       await removeStation(id);
       setStations(s => s.filter(st => st.id !== id));
       if (expandedStation === id) setExpandedStation(null);
     } catch (e) {
-      alert(e.message);
+      showError(e);
     } finally {
       setStationLoading(false);
     }
@@ -704,7 +717,7 @@ export default function SettingsPage() {
       const data = await getStations();
       setStations(data.stations ?? []);
     } catch (e) {
-      alert(e.message);
+      showError(e);
     } finally {
       setStationLoading(false);
     }
@@ -717,7 +730,7 @@ export default function SettingsPage() {
       setUnavailDate('');
       await refreshStations();
     } catch (e) {
-      alert(e.message);
+      showError(e);
     }
   }
 
@@ -726,7 +739,7 @@ export default function SettingsPage() {
       await clearStationUnavailability(stationId, date.split('T')[0]);
       await refreshStations();
     } catch (e) {
-      alert(e.message);
+      showError(e);
     }
   }
 
@@ -803,12 +816,12 @@ export default function SettingsPage() {
   }
 
   async function handleDeleteTemplate(t) {
-    if (!confirm(`Delete "${t.name}"? This cannot be undone.`)) return;
+    if (!await requestConfirmation({ title: `Delete “${t.name}”?`, message: 'This consent form will be permanently deleted.', confirmLabel: 'Delete form', danger: true })) return;
     try {
       await deleteConsentTemplate(t.id);
       setConsentTemplates(prev => prev.filter(x => x.id !== t.id));
     } catch (e) {
-      alert(e.message);
+      showError(e);
     }
   }
 
@@ -819,7 +832,7 @@ export default function SettingsPage() {
     try {
       await updateFormConfig(next);
     } catch (e) {
-      alert(e.message);
+      showError(e);
     } finally {
       setFormFieldsSaving(false);
     }
@@ -829,6 +842,16 @@ export default function SettingsPage() {
     setBillingLoading(true);
     setBillingError('');
     try {
+      if (isCanceling) {
+        // Subscription is still active, just scheduled to cancel — undo that in place
+        // rather than sending the studio through Checkout again (which would re-offer
+        // a trial it's already had and create a second, redundant subscription).
+        await reactivateBillingSubscription();
+        const fresh = await getBillingDetails();
+        setBillingDetails(fresh);
+        setBillingLoading(false);
+        return;
+      }
       const { checkout_url } = await startBillingCheckout();
       window.location.href = checkout_url;
     } catch (e) {
@@ -887,7 +910,7 @@ export default function SettingsPage() {
   }
 
   async function handleStripeDisconnect() {
-    if (!confirm('Disconnect Stripe? Deposits will no longer be collected for new bookings.')) return;
+    if (!await requestConfirmation({ title: 'Disconnect Stripe?', message: 'Deposits will no longer be collected for new bookings.', confirmLabel: 'Disconnect', danger: true })) return;
     setStripeError('');
     try {
       await disconnectStripe();
@@ -898,6 +921,11 @@ export default function SettingsPage() {
   }
 
   async function handleSignOut() {
+    const { data: { session } } = await getSupabase().auth.getSession();
+    if (session?.user?.id) {
+      sessionStorage.removeItem(`vanta-studio-tour-session:${session.user.id}`);
+      sessionStorage.removeItem(`vanta-studio-tour-start:${session.user.id}`);
+    }
     await getSupabase().auth.signOut();
     router.replace('/');
   }
@@ -944,6 +972,7 @@ export default function SettingsPage() {
           ].map(tb => (
             <button
               key={tb.id}
+              data-tour-settings-tab={tb.id}
               onMouseDown={e => e.preventDefault()}
               onClick={() => setTab(tb.id)}
               style={{ ...s.tabBtn, ...(tab === tb.id ? s.tabBtnActive : {}) }}
@@ -1031,7 +1060,7 @@ export default function SettingsPage() {
                     type="checkbox"
                     checked={day.is_closed}
                     onChange={e => setHourField(i, 'is_closed', e.target.checked)}
-                    style={{ accentColor: '#f5ecd9' }}
+                    style={{ accentColor: 'var(--accent)' }}
                   />
                   <span style={{ color: day.is_closed ? 'var(--text-ghost)' : 'var(--text-muted)', fontSize: '0.75rem' }}>
                     {t('closed')}
@@ -1076,8 +1105,8 @@ export default function SettingsPage() {
               </p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
                 {[
-                  { label: 'Studio', value: walkinCut, set: setWalkinCut, hint: 'Studio-sourced clients' },
-                  { label: 'Personal', value: personalCut, set: setPersonalCut, hint: 'App, manual & imported bookings' },
+                  { label: 'Studio & Walk-in', value: walkinCut, set: setWalkinCut, hint: 'Studio and walk-in bookings' },
+                  { label: 'Personal, App & Imported', value: personalCut, set: setPersonalCut, hint: 'Personal, app and imported bookings' },
                 ].map(({ label, value, set, hint }) => (
                   <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                     <span style={{ width: 68, fontSize: '0.82rem', color: 'var(--text)', fontWeight: 500 }}>{label}</span>
@@ -1411,7 +1440,7 @@ export default function SettingsPage() {
 
         <section style={s.card}>
           <h2 style={s.sectionTitle}>{t('stations')}</h2>
-          <p style={s.sectionDesc}>Artists are assigned to a free station when a booking is accepted.</p>
+          <p style={s.sectionDesc}>Artists are assigned to a free station when a booking is accepted. Every studio must keep at least one active station.</p>
           {stationLastDayTarget && (
             <StationLastDayModal
               saving={stationLoading}
@@ -1434,16 +1463,18 @@ export default function SettingsPage() {
                   </div>
                   <div style={s.stationActions}>
                     <button
-                      style={s.stationToggleBtn}
+                      style={{ ...s.stationToggleBtn, opacity: stations.length <= 1 ? 0.4 : 1 }}
                       onClick={() => setStationLastDayTarget({ id: st.id, endDate: st.endDate ?? null })}
-                      disabled={stationLoading}
+                      disabled={stationLoading || stations.length <= 1}
+                      title={stations.length <= 1 ? 'Add another station before setting this station’s last day.' : undefined}
                     >
                       {st.endDate ? 'Change last day' : 'Set last day'}
                     </button>
                     <button
-                      style={s.stationRemoveBtn}
+                      style={{ ...s.stationRemoveBtn, opacity: stations.length <= 1 ? 0.4 : 1 }}
                       onClick={() => handleRemoveStation(st.id)}
-                      disabled={stationLoading}
+                      disabled={stationLoading || stations.length <= 1}
+                      title={stations.length <= 1 ? 'A studio must have at least one station.' : undefined}
                     >
                       Remove
                     </button>
@@ -1498,7 +1529,7 @@ export default function SettingsPage() {
             </div>
             {walkInUrl && (
               <div style={s.qrWrap}>
-                <QRCodeSVG value={walkInUrl} size={80} bgColor="transparent" fgColor="#f5ecd9" />
+                <QRCodeSVG value={walkInUrl} size={80} bgColor="transparent" fgColor="#6aaf9d" />
               </div>
             )}
           </div>
@@ -1693,10 +1724,12 @@ export default function SettingsPage() {
                           : 'Add a card to activate billing for this studio.'}
               </span>
             </div>
-            {subscriptionStatus !== 'active' && (
+            {(subscriptionStatus !== 'active' || isCanceling) && (
               <div style={{ marginLeft: 'auto', flexShrink: 0 }}>
                 <button style={s.saveBtn} onClick={handleAddBilling} disabled={billingLoading}>
-                  {billingLoading ? 'Starting checkout…' : 'Add billing'}
+                  {billingLoading
+                    ? (isCanceling ? 'Reactivating…' : 'Starting checkout…')
+                    : (isCanceling ? 'Undo cancellation' : 'Add billing')}
                 </button>
               </div>
             )}
@@ -1820,8 +1853,7 @@ const s = {
   saveBtn: { alignSelf: 'flex-start', background: 'var(--accent-tint)', border: '1px solid var(--accent-tint-border)', borderRadius: 8, padding: '0.55rem 1.25rem', fontSize: '0.85rem', fontWeight: 600, color: 'var(--accent)', cursor: 'pointer' },
   billingStatusDot: (status) => {
     const color = status === 'active' ? '#4cc98a' : status === 'canceling' ? '#e8b04f' : status === 'past_due' ? '#e8b04f' : status === 'canceled' ? '#e86f6f' : 'var(--text-ghost)';
-    const glow = status === 'active' ? 'rgba(76,201,138,0.5)' : status === 'canceling' ? 'rgba(232,176,79,0.4)' : status === 'past_due' ? 'rgba(232,176,79,0.4)' : status === 'canceled' ? 'rgba(232,111,111,0.4)' : 'transparent';
-    return { width: 10, height: 10, borderRadius: '50%', flexShrink: 0, background: color, boxShadow: `0 0 6px ${glow}` };
+    return { width: 10, height: 10, borderRadius: '50%', flexShrink: 0, background: color };
   },
   cancelSubscriptionLink: { background: 'none', border: 'none', padding: 0, fontSize: '0.78rem', color: 'var(--text-ghost)', textDecoration: 'underline', cursor: 'pointer', fontFamily: 'inherit' },
   // Billing — the primary "what/when" number gets a hero treatment; seats are
@@ -1883,11 +1915,11 @@ const s = {
   templateRowActions: { display: 'flex', gap: '0.4rem', flexShrink: 0 },
   templateName: { fontSize: '0.87rem', fontWeight: 500, color: 'var(--text-dim)' },
   templateFieldCount: { fontSize: '0.72rem', color: 'var(--text-ghost)' },
-  guardianBadge: { fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', padding: '0.12rem 0.45rem', borderRadius: 4, background: 'rgba(245,236,217,0.08)', color: 'var(--text-muted)' },
+  guardianBadge: { fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', padding: '0.12rem 0.45rem', borderRadius: 4, background: 'var(--accent-tint)', color: 'var(--text-muted)' },
   inactiveBadge: { fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', padding: '0.12rem 0.45rem', borderRadius: 4, background: 'rgba(255,255,255,0.04)', color: 'var(--text-ghost)' },
   formTypeBadge: { fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', padding: '0.12rem 0.45rem', borderRadius: 4 },
   formTypeBadgeColors: {
-    consent: { background: 'rgba(245,236,217,0.1)', color: 'var(--accent)' },
+    consent: { background: 'var(--accent-tint)', color: 'var(--accent)' },
     waiver:  { background: 'rgba(232,111,111,0.12)', color: '#e86f6f' },
     health:  { background: 'rgba(76,201,138,0.12)', color: '#4cc98a' },
   },
@@ -1907,7 +1939,7 @@ const s = {
   stripeConnectBtn: { alignSelf: 'flex-start', background: 'var(--accent)', border: 'none', borderRadius: 8, padding: '0.65rem 1.4rem', fontSize: '0.88rem', fontWeight: 700, color: 'var(--accent-contrast, #111)', cursor: 'pointer' },
   stripeDisconnectBtn: { alignSelf: 'flex-start', background: 'transparent', border: '1px solid rgba(255,80,80,0.2)', borderRadius: 6, padding: '0.35rem 0.85rem', fontSize: '0.78rem', color: 'rgba(255,100,100,0.65)', cursor: 'pointer' },
   stripeStatusRow: { display: 'flex', alignItems: 'center', gap: '0.85rem', background: 'var(--bg-base)', border: '1px solid var(--border-faint)', borderRadius: 10, padding: '0.9rem 1rem' },
-  stripeStatusDot: (active) => ({ width: 10, height: 10, borderRadius: '50%', flexShrink: 0, background: active ? '#4cc98a' : 'rgba(255,180,0,0.8)', boxShadow: active ? '0 0 6px rgba(76,201,138,0.5)' : '0 0 6px rgba(255,180,0,0.4)' }),
+  stripeStatusDot: (active) => ({ width: 10, height: 10, borderRadius: '50%', flexShrink: 0, background: active ? 'var(--status-confirmed)' : 'var(--status-pending)' }),
   // Account
   signOutBtn: { alignSelf: 'flex-start', background: 'var(--bg-chip)', border: '1px solid var(--border)', borderRadius: 6, padding: '0.4rem 1rem', fontSize: '0.75rem', color: 'var(--text-faint)', cursor: 'pointer' },
   themeToggle: { background: 'none', border: 'none', cursor: 'pointer', padding: 0 },

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { getSupabase } from '@/lib/supabase';
-import { getMyStudioAccount } from '@/lib/api';
+import { completeStudioSignup, getMyStudioAccount } from '@/lib/api';
 import SignUpFlow from '@/components/SignUpFlow';
 
 
@@ -13,17 +13,38 @@ export default function HomePage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(true);
   const [wide, setWide] = useState(false); // sign-up's intro step has enough content to earn a wider card
 
   useEffect(() => {
-    getSupabase()
-      .auth.getSession()
-      .then(({ data: { session } }) => {
-        if (session) router.replace('/dashboard');
-        else setChecking(false);
-      });
+    async function initialize() {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('signup') === 'complete') {
+        setTab('signin');
+        const sessionId = params.get('session_id');
+        try {
+          if (!sessionId) throw new Error('Missing Stripe checkout session');
+          await completeStudioSignup(sessionId);
+          const saved = JSON.parse(window.sessionStorage.getItem('vanta-pending-signup') || 'null');
+          if (!saved?.email || !saved?.password) throw new Error('Your studio is ready — sign in with the email and password you chose.');
+          const { error: signInError } = await getSupabase().auth.signInWithPassword(saved);
+          if (signInError) throw signInError;
+          window.sessionStorage.removeItem('vanta-pending-signup');
+          router.replace('/dashboard');
+          return;
+        } catch (err) {
+          setNotice(err.message || 'Payment setup is complete. Please sign in to continue.');
+        }
+      } else if (params.has('signup')) {
+        setTab('signup');
+      }
+      const { data: { session } } = await getSupabase().auth.getSession();
+      if (session) router.replace('/dashboard');
+      else setChecking(false);
+    }
+    initialize();
   }, [router]);
 
   async function handleSignIn(e) {
@@ -31,16 +52,20 @@ export default function HomePage() {
     setError('');
     setLoading(true);
     const supabase = getSupabase();
-    const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
+    const { data: signInData, error: authError } = await supabase.auth.signInWithPassword({ email, password });
     if (authError) {
       setError(authError.message);
       setLoading(false);
       return;
     }
+    if (email.trim().toLowerCase() === 'studio@test.com' && signInData.user?.id) {
+      sessionStorage.removeItem(`vanta-studio-tour-session:${signInData.user.id}`);
+      sessionStorage.setItem(`vanta-studio-tour-start:${signInData.user.id}`, 'true');
+    }
     // Verify this is a studio account
     try {
       await getMyStudioAccount();
-      router.replace('/dashboard');
+      router.replace(email.trim().toLowerCase() === 'studio@test.com' ? '/dashboard?tour=1' : '/dashboard');
     } catch {
       // No studio account — sign them out and block access
       await supabase.auth.signOut();
@@ -52,11 +77,11 @@ export default function HomePage() {
   if (checking) return null;
 
   return (
-    <div style={s.page}>
+    <div className={`vanta-page${tab === 'signup' ? ' vanta-page--signup' : ''}`} style={s.page}>
       <div style={s.noise} />
       <style>{GLOBAL_CSS}</style>
 
-      <div className="vanta-card" style={{ ...s.card, maxWidth: wide ? 960 : 420 }}>
+      <div className={`vanta-card${tab === 'signup' ? ' vanta-card--signup' : ''}`} style={{ ...s.card, maxWidth: wide ? 960 : 420 }}>
         <div style={s.brand}>
           <span style={s.wordmark}>vanta</span>
           <span style={s.wordmarkSub}>studio</span>
@@ -66,6 +91,7 @@ export default function HomePage() {
           <>
             <h1 style={s.authHeading}>Welcome back</h1>
             <p style={s.authSubheading}>Sign in to manage your studio.</p>
+            {notice && <p style={s.noticeBox}>{notice}</p>}
             <form onSubmit={handleSignIn} style={s.form}>
               <Field label="Email">
                 <InputWithIcon
@@ -151,9 +177,9 @@ function LockIcon({ size = 16 }) {
 // transform) since an inline style always wins over a stylesheet rule for the same property.
 const GLOBAL_CSS = `
 .vanta-input { transition: border-color 0.15s ease, box-shadow 0.15s ease; }
-.vanta-input:focus { outline: none; border-color: rgba(245,236,217,0.45); box-shadow: 0 0 0 3px rgba(245,236,217,0.12); }
+.vanta-input:focus { outline: none; border-color: rgba(213,208,199,0.34); box-shadow: 0 0 0 2px rgba(213,208,199,0.06); }
 .vanta-btn { transition: filter 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease; }
-.vanta-btn:hover:not(:disabled) { filter: brightness(1.06); box-shadow: 0 6px 20px rgba(245,236,217,0.18); }
+.vanta-btn:hover:not(:disabled) { filter: brightness(1.08); }
 .vanta-btn:active:not(:disabled) { transform: translateY(1px); filter: brightness(0.97); }
 .vanta-back-btn { transition: background 0.15s ease, border-color 0.15s ease; }
 .vanta-back-btn:hover { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.18); }
@@ -166,6 +192,12 @@ const GLOBAL_CSS = `
   height: 1px;
   background: linear-gradient(90deg, transparent, rgba(245,236,217,0.5), transparent);
 }
+.vanta-card--signup { transform-origin: 50% 58%; animation: vanta-signup-card-in 1.05s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.vanta-card--signup > * { animation: vanta-signup-content-in 0.72s cubic-bezier(0.16, 1, 0.3, 1) 0.32s both; }
+.vanta-card--signup > :nth-child(3) { animation-delay: 0.44s; }
+@keyframes vanta-signup-card-in { 0% { opacity: 0; transform: perspective(900px) translateY(90px) rotateX(14deg) scale(0.86); filter: blur(12px); } 62% { opacity: 1; transform: perspective(900px) translateY(-8px) rotateX(-1.5deg) scale(1.018); filter: blur(0); } 100% { opacity: 1; transform: perspective(900px) translateY(0) rotateX(0) scale(1); filter: blur(0); } }
+@keyframes vanta-signup-content-in { from { opacity: 0; transform: translateY(24px); filter: blur(6px); } to { opacity: 1; transform: translateY(0); filter: blur(0); } }
+@media (prefers-reduced-motion: reduce) { .vanta-card--signup, .vanta-card--signup > * { animation: none; } }
 `;
 
 const s = {
@@ -174,7 +206,7 @@ const s = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    background: 'radial-gradient(ellipse 1400px 900px at 50% -100px, rgba(245,236,217,0.04) 0%, transparent 60%), #0d1017',
+    background: 'var(--bg-base)',
     padding: '1.5rem',
     position: 'relative',
     overflow: 'hidden',
@@ -189,8 +221,9 @@ const s = {
   },
   card: {
     width: '100%',
-    background: 'rgba(255,255,255,0.03)',
-    border: '1px solid rgba(255,255,255,0.08)',
+    background: 'var(--bg-card)',
+    border: '1px solid var(--border-faint)',
+    boxShadow: 'var(--shadow-card)',
     borderRadius: 16,
     padding: '2.25rem 2rem',
     backdropFilter: 'blur(12px)',
@@ -261,8 +294,8 @@ const s = {
     gap: '1.1rem',
   },
   input: {
-    background: 'rgba(255,255,255,0.04)',
-    border: '1px solid rgba(255,255,255,0.1)',
+    background: 'var(--bg-input)',
+    border: '1px solid var(--border)',
     borderRadius: 8,
     padding: '0.65rem 0.85rem',
     fontSize: '0.9rem',
@@ -278,10 +311,20 @@ const s = {
     borderRadius: 6,
     padding: '0.5rem 0.75rem',
   },
+  noticeBox: {
+    margin: '0 0 1rem',
+    padding: '0.7rem 0.8rem',
+    borderRadius: 8,
+    fontSize: '0.78rem',
+    lineHeight: 1.45,
+    color: '#8bdcb4',
+    background: 'rgba(76,201,138,0.08)',
+    border: '1px solid rgba(76,201,138,0.22)',
+  },
   btn: {
     marginTop: '0.25rem',
-    background: '#f5ecd9',
-    color: '#0d1017',
+    background: 'var(--accent)',
+    color: 'var(--accent-contrast)',
     border: 'none',
     borderRadius: 8,
     padding: '0.75rem',

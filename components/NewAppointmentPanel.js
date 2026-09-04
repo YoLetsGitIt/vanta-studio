@@ -1,17 +1,13 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
-import {
-  getStudioArtists,
-  getStations,
-  getStudioHours,
-  listStudioBookings,
-  createManualBooking,
-} from '@/lib/api';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { createManualBooking, getStudioSchedule } from '@/lib/api';
 import { useStationAvailability } from '@/lib/useStationAvailability';
+import { useNewAppointmentData } from '@/lib/useNewAppointmentData';
 import { invalidatePrefix } from '@/lib/cache';
 import { formatDob } from '@/lib/format';
 import { useLanguage } from '@/lib/i18n';
+import { requestConfirmation } from '@/lib/feedback';
 
 const DURATION_OPTIONS = [
   { label: '30 min', value: 30 },
@@ -31,10 +27,10 @@ function todayStr() {
 }
 
 
-function nextHalfHour() {
+function nextAppointmentSlot() {
   const d = new Date();
   d.setMinutes(d.getMinutes() >= 30 ? 60 : 30, 0, 0);
-  return d.toTimeString().slice(0, 5);
+  return { date: d.toLocaleDateString('en-CA'), time: d.toTimeString().slice(0, 5) };
 }
 
 function getDefaultSizeUnit() {
@@ -72,13 +68,14 @@ function to24(h12, minute, ampm) {
   return String(h).padStart(2, '0') + ':' + minute;
 }
 
-function TimeSelect({ value, onChange }) {
+function TimeSelect({ value, onChange, label }) {
   const { h12, minute, ampm } = parse24(value);
   const hours = [12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
   const minutes = ['00', '15', '30', '45'];
   return (
     <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
       <select
+        aria-label={`${label} hour`}
         style={{ ...selectStyle, flex: 1 }}
         value={h12}
         onChange={e => onChange(to24(Number(e.target.value), minute, ampm))}
@@ -87,6 +84,7 @@ function TimeSelect({ value, onChange }) {
       </select>
       <span style={{ color: 'var(--text-ghost)', fontSize: '1rem', flexShrink: 0 }}>:</span>
       <select
+        aria-label={`${label} minutes`}
         style={{ ...selectStyle, flex: 1 }}
         value={minute}
         onChange={e => onChange(to24(h12, e.target.value, ampm))}
@@ -94,6 +92,7 @@ function TimeSelect({ value, onChange }) {
         {minutes.map(m => <option key={m} value={m}>{m}</option>)}
       </select>
       <select
+        aria-label={`${label} AM or PM`}
         style={{ ...selectStyle, flex: 1 }}
         value={ampm}
         onChange={e => onChange(to24(h12, minute, e.target.value))}
@@ -105,8 +104,13 @@ function TimeSelect({ value, onChange }) {
   );
 }
 
-export default function NewAppointmentPanel({ open, onClose, onCreated }) {
+export default function NewAppointmentPanel({ open, onClose, onCreated, initialBookingType = 'personal' }) {
   const { t } = useLanguage();
+  const panelRef = useRef(null);
+  const closeButtonRef = useRef(null);
+  const previouslyFocusedRef = useRef(null);
+  const dirtyRef = useRef(false);
+  const savingRef = useRef(false);
 
   // ── Client
   const [clientMode, setClientMode] = useState('search');
@@ -134,87 +138,71 @@ export default function NewAppointmentPanel({ open, onClose, onCreated }) {
   // ── Pricing
   const [finalPrice, setFinalPrice] = useState('');
   const [depositAmount, setDepositAmount] = useState('');
+  const [depositMode, setDepositMode] = useState('none');
+  const [showOptional, setShowOptional] = useState(false);
+  const [daySchedule, setDaySchedule] = useState([]);
+  const [scheduleError, setScheduleError] = useState('');
 
-  // ── Booking type (Studio = walkin, Personal = personal)
-  const [bookingType, setBookingType] = useState('personal');
+  // Distinct analytics sources: studio appointment, walk-in, or artist personal.
+  const [bookingType, setBookingType] = useState(initialBookingType);
 
   // ── Notes
   const [notes, setNotes] = useState('');
 
   // ── Remote data
-  const [artists, setArtists] = useState([]);
-  const [allStations, setAllStations] = useState([]);
-  const [studioHours, setStudioHours] = useState([]);
-  const [pastBookings, setPastBookings] = useState([]);
-  const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const { artists, stations: allStations, hours: studioHours, clients: pastClients, stripeConnected, loading, error: loadError, retry } = useNewAppointmentData(open);
 
   useEffect(() => {
     if (!open) return;
-    setBookingDate(todayStr());
-    setStartTime(nextHalfHour());
-  }, [open]);
+    const slot = nextAppointmentSlot();
+    setBookingDate(slot.date);
+    setStartTime(slot.time);
+    setBookingType(initialBookingType);
+  }, [open, initialBookingType]);
 
+  // Clear a saved validation/API error once the user changes the fields that
+  // produced it. Current validationError remains derived and updates instantly.
   useEffect(() => {
-    if (!open) return;
-    let cancelled = false;
-    setLoading(true);
-    Promise.all([
-      getStudioArtists('approved').catch(() => ({ artists: [] })),
-      getStations().catch(() => ({ stations: [] })),
-      getStudioHours().catch(() => ({ hours: [] })),
-      listStudioBookings('').catch(() => ({ bookings: [] })),
-    ]).then(([artistsData, stationsData, hoursData, bookingsData]) => {
-      if (cancelled) return;
-      const a = artistsData.artists ?? [];
-      setArtists(a);
-      setAllStations((stationsData.stations ?? []).filter(s => s.is_active !== false));
-      setStudioHours(hoursData.hours ?? []);
-      setPastBookings(bookingsData.bookings ?? []);
-      // No auto-selection — user must pick an artist
-    }).finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
-  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (error) setError('');
+  }, [clientMode, selectedClient, firstName, lastName, clientEmail, clientPhone, artistId, bookingDate, startTime, durationMins, stationId, finalPrice, depositAmount, depositMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Build ISO timestamp for time-slot overlap check.
   const chosenTimeISO = bookingDate && startTime
     ? new Date(`${bookingDate}T${startTime}:00`).toISOString()
     : '';
 
-  const { stations: availableStations, loading: stationsLoading } = useStationAvailability({
+  const { stations: availableStations, loading: stationsLoading, error: stationAvailabilityError } = useStationAvailability({
     date: bookingDate,
     startTime: chosenTimeISO,
     durationMins,
     fallback: allStations,
   });
 
-  // Reset station selection whenever date/time/duration changes.
-  useEffect(() => { setStationId(''); }, [bookingDate, chosenTimeISO, durationMins]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!open || !bookingDate) { setScheduleError(''); return; }
+    let cancelled = false;
+    setScheduleError('');
+    getStudioSchedule(bookingDate)
+      .then(data => { if (!cancelled) setDaySchedule(data.entries ?? []); })
+      .catch(() => { if (!cancelled) { setDaySchedule([]); setScheduleError('Live artist availability could not be checked.'); } });
+    return () => { cancelled = true; };
+  }, [open, bookingDate, artistId, startTime, durationMins]);
 
-  // Past client search
-  const pastClients = useMemo(() => {
-    const map = new Map();
-    for (const b of pastBookings) {
-      const key = b.requester_email || b.requester_name;
-      if (key && !map.has(key)) {
-        map.set(key, {
-          name: b.requester_name || '',
-          email: b.requester_email || '',
-          phone: b.requester_phone || '',
-          dob: b.dob || '',
-        });
-      }
-    }
-    return Array.from(map.values());
-  }, [pastBookings]);
+  // Reset station selection whenever date/time/duration changes.
+  useEffect(() => {
+    const options = availableStations ?? [];
+    if (options.length > 0 && !options.some(station => station.id === stationId)) setStationId(options[0].id);
+    if (options.length === 0) setStationId('');
+  }, [availableStations]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const filteredClients = useMemo(() => {
     const q = clientSearch.toLowerCase();
     if (!q) return [];
     return pastClients.filter(c =>
-      c.name.toLowerCase().includes(q) ||
-      c.email.toLowerCase().includes(q) ||
+      (c.name || '').toLowerCase().includes(q) ||
+      (c.email || '').toLowerCase().includes(q) ||
       (c.phone || '').includes(q)
     ).slice(0, 6);
   }, [clientSearch, pastClients]);
@@ -242,13 +230,12 @@ export default function NewAppointmentPanel({ open, onClose, onCreated }) {
     if (!bookingDate || !studioHours.length) return null;
     const d = new Date(bookingDate + 'T12:00:00');
     const studioDay = (d.getDay() + 6) % 7; // JS Sun=0 → studio Mon=0…Sun=6
-    // Query orders by day_of_week ASC, so index is reliable; find is a safe fallback
-    return studioHours[studioDay]
-      ?? studioHours.find(h => h.day_of_week === studioDay)
+    return studioHours.find(h => h.day_of_week === studioDay)
+      ?? studioHours[studioDay]
       ?? null;
   }, [bookingDate, studioHours]);
 
-  const timeError = useMemo(() => {
+  const timeError = (() => {
     if (!studioHours.length || !dayHours) return null;
     if (dayHours.is_closed) return t('nap_err_closed');
     if (!startTime) return null;
@@ -260,12 +247,47 @@ export default function NewAppointmentPanel({ open, onClose, onCreated }) {
     if (startMins < oh * 60 + om) return `${t('nap_err_opens_at')} ${dayHours.open_time} — ${t('nap_err_too_early')}`;
     if (endMins > ch * 60 + cm) return `${t('nap_err_ends_after')} (${dayHours.close_time}).`;
     return null;
-  }, [studioHours, dayHours, startTime, durationMins, t]);
+  })();
 
   const clientName = clientMode === 'search'
     ? (selectedClient?.name || '')
     : [firstName.trim(), lastName.trim()].filter(Boolean).join(' ');
-  const canSubmit = !!clientName && !!artistId && !!bookingDate && !!startTime && !timeError && !!stationId;
+  const emailInvalid = !!clientEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clientEmail.trim());
+  const phoneInvalid = !!clientPhone.trim() && clientPhone.replace(/\D/g, '').length < 7;
+  const quote = Number(finalPrice || 0);
+  const deposit = Number(depositAmount || 0);
+  const depositEnabled = depositMode !== 'none';
+  const depositInvalid = depositEnabled && (deposit <= 0 || (quote > 0 && deposit > quote));
+  const chosenDateTime = bookingDate && startTime ? new Date(`${bookingDate}T${startTime}:00`) : null;
+  const dateInPast = chosenDateTime && Number.isFinite(chosenDateTime.getTime()) && chosenDateTime.getTime() < Date.now();
+  const artistConflict = useMemo(() => {
+    if (!artistId || !chosenDateTime || !durationMins) return null;
+    const start = chosenDateTime.getTime();
+    const end = start + durationMins * 60000;
+    return daySchedule.find(entry => {
+      if ((entry.artistId ?? entry.artist_id) !== artistId || !entry.chosenTime) return false;
+      const otherStart = new Date(entry.chosenTime).getTime();
+      const otherEnd = otherStart + (entry.durationMins ?? 60) * 60000;
+      return otherStart < end && otherEnd > start;
+    }) ?? null;
+  }, [artistId, chosenDateTime?.getTime(), durationMins, daySchedule]); // eslint-disable-line react-hooks/exhaustive-deps
+  const validationError = timeError
+    || (dateInPast ? 'Choose a time that has not already passed.' : '')
+    || (emailInvalid ? 'Enter a valid client email address.' : '')
+    || (phoneInvalid ? 'Enter a valid client phone number.' : '')
+    || (artistConflict ? 'This artist already has an appointment at that time.' : '')
+    || (depositInvalid ? (deposit <= 0 ? 'Enter a deposit amount.' : 'The deposit cannot be greater than the quoted price.') : '');
+  const missingRequirement = !clientName ? t('nap_err_client')
+    : !artistId ? t('nap_err_artist')
+    : !bookingDate || !startTime ? t('nap_err_datetime')
+    : !stationId ? 'Select an available station.'
+    : '';
+  const disabledReason = loadError || validationError || missingRequirement;
+  const canSubmit = !disabledReason;
+  const essentialsComplete = Boolean(clientName && artistId && bookingDate && startTime && stationId && !timeError && !dateInPast && !artistConflict);
+  const dirty = Boolean(selectedClient || firstName || lastName || clientEmail || clientPhone || clientDob || artistId || stationId || size || retouch || finalPrice || depositAmount || depositMode !== 'none' || notes || bookingType !== initialBookingType);
+  dirtyRef.current = dirty;
+  savingRef.current = saving;
 
   function resetForm() {
     setClientMode('search');
@@ -273,25 +295,56 @@ export default function NewAppointmentPanel({ open, onClose, onCreated }) {
     setSelectedClient(null);
     setFirstName(''); setLastName(''); setClientEmail(''); setClientPhone(''); setClientDob('');
     setArtistId('');
-    setBookingDate(todayStr());
-    setStartTime(nextHalfHour());
+    const slot = nextAppointmentSlot();
+    setBookingDate(slot.date);
+    setStartTime(slot.time);
     setDurationMins(60);
     setStationId('');
     setSize(''); setSizeUnit('cm'); setRetouch(false);
-    setFinalPrice(''); setDepositAmount('');
-    setBookingType('personal');
+    setFinalPrice(''); setDepositAmount(''); setDepositMode('none'); setShowOptional(false);
+    setBookingType(initialBookingType);
     setNotes(''); setError('');
   }
 
-  function handleClose() { resetForm(); onClose(); }
+  async function handleClose() {
+    if (savingRef.current) return;
+    if (dirtyRef.current) {
+      const confirmed = await requestConfirmation({
+        title: 'Discard this appointment?',
+        message: 'The details entered in this appointment will be lost.',
+        confirmLabel: 'Discard appointment',
+        danger: true,
+      });
+      if (!confirmed) return;
+    }
+    resetForm();
+    onClose();
+  }
+
+  useEffect(() => {
+    if (!open) return;
+    previouslyFocusedRef.current = document.activeElement;
+    closeButtonRef.current?.focus();
+    function onKeyDown(event) {
+      if (event.key === 'Escape') { event.preventDefault(); handleClose(); return; }
+      if (event.key !== 'Tab' || !panelRef.current) return;
+      const focusable = [...panelRef.current.querySelectorAll('button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [href], [tabindex]:not([tabindex="-1"])')];
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    }
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      previouslyFocusedRef.current?.focus?.();
+    };
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleSubmit(e) {
     e.preventDefault();
-    if (!clientName) { setError(t('nap_err_client')); return; }
-    if (!artistId) { setError(t('nap_err_artist')); return; }
-    if (!bookingDate || !startTime) { setError(t('nap_err_datetime')); return; }
-    if (timeError) { setError(timeError); return; }
-    if (!stationId) { setError('Please select a station.'); return; }
+    if (disabledReason) { setError(disabledReason); return; }
     setSaving(true); setError('');
     try {
       const chosenTime = new Date(`${bookingDate}T${startTime}:00`).toISOString();
@@ -302,7 +355,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated }) {
         requester_name: clientName,
         chosen_time: chosenTime,
         duration_minutes: durationMins,
-        deposit_required: da > 0,
+        deposit_required: depositEnabled && da > 0,
       };
       if (retouch) body.session_type = 'retouch';
       if (size.trim()) { body.size = size.trim(); body.size_unit = sizeUnit; }
@@ -311,9 +364,10 @@ export default function NewAppointmentPanel({ open, onClose, onCreated }) {
       if (clientDob.trim()) body.dob = clientDob.trim();
       if (stationId) body.station_id = stationId;
       if (fp > 0) body.estimated_quote = fp;
-      if (da > 0) body.deposit_amount = da;
+      if (depositEnabled && da > 0) body.deposit_amount = da;
+      if (depositMode === 'paid') body.deposit_paid = true;
       if (notes.trim()) body.notes = notes.trim();
-      body.source = bookingType === 'studio' ? 'walkin' : 'personal';
+      body.source = bookingType;
       await createManualBooking(body);
       invalidatePrefix('bookings:');
       invalidatePrefix('schedule:');
@@ -332,37 +386,51 @@ export default function NewAppointmentPanel({ open, onClose, onCreated }) {
     <>
       <div
         onClick={handleClose}
+        aria-hidden="true"
         style={{ ...bd.backdrop, opacity: open ? 1 : 0, pointerEvents: open ? 'auto' : 'none' }}
       />
-      <div style={{ ...bd.panel, transform: open ? 'translateX(0)' : 'translateX(100%)' }}>
+      <div ref={panelRef} role="dialog" aria-modal="true" aria-hidden={!open} aria-labelledby="new-appointment-title" style={{ ...bd.panel, transform: open ? 'translateX(0)' : 'translateX(100%)', visibility: open ? 'visible' : 'hidden' }}>
 
         <div style={bd.header}>
-          <span style={bd.title}>{t('nap_title')}</span>
-          <button onClick={handleClose} style={bd.closeBtn} aria-label="Close">✕</button>
+          <span id="new-appointment-title" style={bd.title}>{t('nap_title')}</span>
+          <button ref={closeButtonRef} type="button" onClick={handleClose} style={bd.closeBtn} aria-label="Close new appointment">✕</button>
         </div>
 
         {loading ? (
-          <div style={bd.loadingWrap}><div style={bd.loadingDot} /></div>
+          <div style={bd.loadingWrap} role="status"><div style={bd.loadingDot} /><span style={bd.srOnly}>Loading appointment details</span></div>
+        ) : loadError ? (
+          <div role="alert" style={bd.loadErrorWrap}>
+            <strong>Appointment details couldn&apos;t be loaded</strong>
+            <span style={bd.loadErrorText}>{loadError}</span>
+            <button type="button" style={bd.retryBtn} onClick={retry}>Try again</button>
+          </div>
         ) : (
           <form onSubmit={handleSubmit} style={bd.form}>
 
             {/* ── BOOKING TYPE ── */}
             <div style={bd.section}>
               <p style={bd.sectionLabel}>{t('nap_booking_type')}</p>
-              <div style={bd.modeTabs}>
+              <div style={bd.typeCards}>
                 <button
                   type="button"
-                  style={{ ...bd.modeTab, ...(bookingType === 'personal' ? bd.modeTabActive : {}) }}
-                  onClick={() => setBookingType('personal')}
+                  style={{ ...bd.typeCard, ...(bookingType === 'studio' ? bd.typeCardActive : {}) }}
+                  onClick={() => setBookingType('studio')}
                 >
-                  {t('nap_type_personal')}
+                  <strong>Studio appointment</strong><span>Planned and booked by the studio</span>
                 </button>
                 <button
                   type="button"
-                  style={{ ...bd.modeTab, ...(bookingType === 'studio' ? bd.modeTabActive : {}) }}
-                  onClick={() => setBookingType('studio')}
+                  style={{ ...bd.typeCard, ...(bookingType === 'walkin' ? bd.typeCardActive : {}) }}
+                  onClick={() => setBookingType('walkin')}
                 >
-                  {t('nap_type_studio')}
+                  <strong>Walk-in</strong><span>Client arrived without a planned booking</span>
+                </button>
+                <button
+                  type="button"
+                  style={{ ...bd.typeCard, ...(bookingType === 'personal' ? bd.typeCardActive : {}) }}
+                  onClick={() => setBookingType('personal')}
+                >
+                  <strong>Personal appointment</strong><span>Client brought in by the artist</span>
                 </button>
               </div>
             </div>
@@ -381,6 +449,8 @@ export default function NewAppointmentPanel({ open, onClose, onCreated }) {
                 </select>
               </div>
             )}
+            {artists.length === 0 && <p role="alert" style={bd.inlineError}>Add or approve an artist before creating an appointment.</p>}
+            {allStations.length === 0 && <p role="alert" style={bd.inlineError}>No active station was found. Reload the studio or add a station in Settings before creating an appointment.</p>}
 
             {/* ── CLIENT ── */}
             <div style={bd.section}>
@@ -405,6 +475,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated }) {
 
               {clientMode === 'search' ? (
                 selectedClient ? (
+                  <div>
                   <div style={bd.selectedClientCard}>
                     <div style={{ minWidth: 0 }}>
                       <span style={bd.selectedClientName}>{selectedClient.name}</span>
@@ -414,10 +485,24 @@ export default function NewAppointmentPanel({ open, onClose, onCreated }) {
                     </div>
                     <button type="button" style={bd.deselectBtn} onClick={clearSelectedClient} title="Remove">✕</button>
                   </div>
+                  {(selectedClient.allergies || selectedClient.pain_tolerance || selectedClient.notes) && (
+                    <div role="note" style={bd.clientWarning}>
+                      <strong>Client context</strong>
+                      {selectedClient.allergies && <span>Allergies: {selectedClient.allergies}</span>}
+                      {selectedClient.pain_tolerance && <span>Pain tolerance: {selectedClient.pain_tolerance}</span>}
+                      {selectedClient.notes && <span>Notes: {selectedClient.notes}</span>}
+                    </div>
+                  )}
+                  </div>
                 ) : (
                   <div style={{ position: 'relative' }}>
                     <input
                       style={bd.input}
+                      role="combobox"
+                      aria-label="Search existing clients"
+                      aria-expanded={showDropdown && filteredClients.length > 0}
+                      aria-controls="new-appointment-client-results"
+                      aria-autocomplete="list"
                       placeholder={t('clients_search')}
                       value={clientSearch}
                       onChange={e => { setClientSearch(e.target.value); setShowDropdown(true); }}
@@ -426,9 +511,9 @@ export default function NewAppointmentPanel({ open, onClose, onCreated }) {
                       autoComplete="off"
                     />
                     {showDropdown && filteredClients.length > 0 && (
-                      <div style={bd.dropdown}>
+                      <div id="new-appointment-client-results" role="listbox" style={bd.dropdown}>
                         {filteredClients.map((c, i) => (
-                          <button key={i} type="button" style={bd.dropdownItem} onMouseDown={() => pickClient(c)}>
+                          <button key={c.id ?? c.email ?? `${c.name}-${i}`} role="option" type="button" style={bd.dropdownItem} onMouseDown={() => pickClient(c)}>
                             <span style={bd.dropdownName}>{c.name}</span>
                             <span style={bd.dropdownSub}>{[c.email, c.phone].filter(Boolean).join(' · ')}</span>
                           </button>
@@ -483,6 +568,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated }) {
                       <input
                         style={bd.input}
                         type="email"
+                        aria-invalid={emailInvalid}
                         value={clientEmail}
                         onChange={e => setClientEmail(e.target.value)}
                         placeholder="email@example.com"
@@ -493,6 +579,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated }) {
                       <input
                         style={bd.input}
                         type="tel"
+                        aria-invalid={phoneInvalid}
                         value={clientPhone}
                         onChange={e => setClientPhone(e.target.value)}
                         placeholder="+1 555 0100"
@@ -512,6 +599,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated }) {
                 <input
                   style={bd.input}
                   type="date"
+                  min={todayStr()}
                   value={bookingDate}
                   onChange={e => setBookingDate(e.target.value)}
                   required
@@ -520,7 +608,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated }) {
 
               <div style={bd.field}>
                 <label style={bd.label}>{t('nap_start_time')}</label>
-                <TimeSelect value={startTime} onChange={setStartTime} />
+                <TimeSelect value={startTime} onChange={setStartTime} label={t('nap_start_time')} />
               </div>
 
               <div style={bd.field}>
@@ -542,6 +630,8 @@ export default function NewAppointmentPanel({ open, onClose, onCreated }) {
               ) : bookingDate && !studioHours.length ? (
                 <p style={bd.hint}>{t('nap_no_hours_hint')}</p>
               ) : null}
+              {artistConflict && <div role="alert" style={bd.timeWarning}><span style={bd.timeWarningIcon}>⚠</span>This artist already has an appointment that overlaps this time.</div>}
+              {scheduleError && <p role="status" style={bd.availabilityNotice}>{scheduleError} The server will verify it when you create the appointment.</p>}
             </div>
 
             {/* ── STATION — revealed after date + time + duration are set ── */}
@@ -558,15 +648,24 @@ export default function NewAppointmentPanel({ open, onClose, onCreated }) {
                         <option key={s.id} value={s.id}>{s.name}</option>
                       ))}
                     </select>
+                    {stationId && <p style={bd.hint}>The first available station was selected automatically. You can change it.</p>}
                     {availableStations !== null && availableStations.length === 0 && (
                       <p style={bd.inlineError}>{t('nap_no_stations_date')}</p>
                     )}
+                    {stationAvailabilityError && <p role="alert" style={bd.inlineError}>Live station availability could not be checked. The booking will be verified when you create it.</p>}
                   </>
                 )}
               </div>
             )}
 
+            {essentialsComplete && bookingType === 'walkin' && (
+              <button type="button" style={bd.optionalToggle} onClick={() => setShowOptional(value => !value)} aria-expanded={showOptional}>
+                {showOptional ? 'Hide optional details' : 'Add tattoo, pricing, deposit, or notes'} <span>{showOptional ? '↑' : '↓'}</span>
+              </button>
+            )}
+
             {/* ── DETAILS ── */}
+            {essentialsComplete && (bookingType !== 'walkin' || showOptional) && <>
             <div style={bd.section}>
               <p style={bd.sectionLabel}>{t('nap_details')}</p>
               <label style={bd.checkRow}>
@@ -601,9 +700,9 @@ export default function NewAppointmentPanel({ open, onClose, onCreated }) {
             {/* ── PRICING ── */}
             <div style={bd.section}>
               <p style={bd.sectionLabel}>{t('nap_pricing')}</p>
-              <div style={bd.fieldRow}>
+              <div style={bd.field}>
                 <div style={bd.field}>
-                  <label style={bd.label}>{t('bdp_final_price')}</label>
+                  <label style={bd.label}>Estimated price</label>
                   <div style={bd.prefixWrap}>
                     <span style={bd.prefix}>$</span>
                     <input
@@ -616,19 +715,30 @@ export default function NewAppointmentPanel({ open, onClose, onCreated }) {
                   </div>
                 </div>
                 <div style={bd.field}>
-                  <label style={bd.label}>{t('bdp_deposit')}</label>
+                  <label style={bd.label}>Deposit</label>
+                  <div style={bd.depositModes}>
+                    {[
+                      ['none', 'No deposit'],
+                      ['later', stripeConnected ? 'Collect later' : 'Due later'],
+                      ['paid', 'Already paid'],
+                    ].map(([value, label]) => <button key={value} type="button" onClick={() => setDepositMode(value)} style={{ ...bd.depositMode, ...(depositMode === value ? bd.depositModeActive : {}) }}>{label}</button>)}
+                  </div>
+                  {depositMode !== 'none' && <>
                   <div style={bd.prefixWrap}>
                     <span style={bd.prefix}>$</span>
                     <input
                       style={{ ...bd.input, paddingLeft: '1.75rem' }}
                       type="number" min="0" step="0.01"
                       value={depositAmount}
+                      aria-invalid={depositInvalid}
                       onChange={e => setDepositAmount(e.target.value)}
                       placeholder="0.00"
                     />
                   </div>
+                  {depositMode === 'later' && <span style={bd.hint}>{stripeConnected ? 'This will appear as an unpaid deposit to collect.' : 'Record the external payment when it is received.'}</span>}
+                  {depositMode === 'paid' && <span style={bd.hint}>The deposit will be recorded as received now.</span>}
                   {(() => {
-                    const da = parseFloat(depositAmount) || 0;
+                    const da = depositMode === 'later' && stripeConnected ? parseFloat(depositAmount) || 0 : 0;
                     if (da <= 0) return null;
                     const feeCents = Math.round(da * 0.03 * 100) + 50;
                     const total = da + feeCents / 100;
@@ -638,6 +748,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated }) {
                       </span>
                     );
                   })()}
+                  </>}
                 </div>
               </div>
             </div>
@@ -652,16 +763,34 @@ export default function NewAppointmentPanel({ open, onClose, onCreated }) {
                 placeholder={t('nap_notes_placeholder')}
               />
             </div>
+            </>}
 
-            {error && <p style={bd.errorText}>{error}</p>}
+            {essentialsComplete && (
+              <div style={bd.summary}>
+                <span style={bd.sectionLabel}>REVIEW</span>
+                <strong style={bd.summaryText}>{[
+                  bookingType === 'walkin' ? 'Walk-in' : bookingType === 'studio' ? 'Studio appointment' : 'Personal appointment',
+                  artists.find(artist => (artist.artistId ?? artist.artist_id ?? artist.id) === artistId)?.name,
+                  chosenDateTime?.toLocaleString('en-AU', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }),
+                  `${durationMins} min`,
+                  (availableStations ?? allStations).find(station => station.id === stationId)?.name,
+                  quote > 0 ? `$${quote.toFixed(2)}` : null,
+                ].filter(Boolean).join(' · ')}</strong>
+              </div>
+            )}
+
+            {(validationError || error) && <p role="alert" style={bd.errorText}>{error || validationError}</p>}
 
             <button
               type="submit"
               style={{ ...bd.submitBtn, opacity: canSubmit && !saving ? 1 : 0.4 }}
               disabled={!canSubmit || saving}
+              title={!canSubmit ? disabledReason : undefined}
+              aria-describedby={!canSubmit ? 'new-appointment-disabled-reason' : undefined}
             >
               {saving ? t('sched_creating') : t('nap_create')}
             </button>
+            {!canSubmit && <span id="new-appointment-disabled-reason" style={bd.disabledReason}>{disabledReason}</span>}
 
           </form>
         )}
@@ -699,6 +828,10 @@ const bd = {
   },
   loadingWrap: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' },
   loadingDot: { width: 8, height: 8, borderRadius: '50%', background: 'var(--bg-chip)' },
+  srOnly: { position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0,0,0,0)', whiteSpace: 'nowrap', border: 0 },
+  loadErrorWrap: { margin: '1.5rem', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.55rem', border: '1px solid rgba(224,96,96,0.38)', borderRadius: 10, color: 'var(--text)' },
+  loadErrorText: { color: 'var(--text-muted)', fontSize: '0.82rem', lineHeight: 1.5 },
+  retryBtn: { alignSelf: 'flex-start', border: 0, borderRadius: 8, padding: '0.55rem 0.8rem', background: 'var(--accent)', color: 'var(--accent-contrast)', fontWeight: 700, cursor: 'pointer' },
   form: {
     flex: 1, overflowY: 'auto',
     display: 'flex', flexDirection: 'column', gap: 0,
@@ -730,6 +863,9 @@ const bd = {
     background: 'var(--bg-chip)',
     color: 'var(--text)', fontWeight: 600,
   },
+  typeCards: { display: 'grid', gridTemplateColumns: '1fr', gap: '0.45rem' },
+  typeCard: { display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 3, width: '100%', padding: '0.72rem 0.8rem', borderRadius: 9, border: '1px solid var(--border)', background: 'var(--bg-input)', color: 'var(--text)', textAlign: 'left', cursor: 'pointer', fontSize: '0.8rem' },
+  typeCardActive: { borderColor: 'var(--accent)', background: 'var(--accent-tint)', color: 'var(--accent)' },
   fieldRow: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem' },
   field: { display: 'flex', flexDirection: 'column', gap: '0.3rem' },
   label: { fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-muted)' },
@@ -772,12 +908,14 @@ const bd = {
   },
   selectedClientName: { display: 'block', fontSize: '0.875rem', color: 'var(--text)', fontWeight: 500 },
   selectedClientSub: { display: 'block', fontSize: '0.75rem', color: 'var(--text-faint)', marginTop: 2 },
+  clientWarning: { display: 'flex', flexDirection: 'column', gap: 4, marginTop: '0.55rem', padding: '0.65rem 0.75rem', borderRadius: 8, border: '1px solid rgba(245,158,58,0.25)', background: 'rgba(245,158,58,0.08)', color: 'var(--text-muted)', fontSize: '0.74rem' },
   deselectBtn: {
     background: 'none', border: 'none', flexShrink: 0,
     color: 'var(--text-secondary)', fontSize: '0.8rem', cursor: 'pointer', padding: '0.15rem',
   },
   hint: { margin: 0, fontSize: '0.75rem', color: 'var(--text-ghost)' },
   inlineError: { margin: 0, fontSize: '0.78rem', color: '#ff8c5a' },
+  availabilityNotice: { margin: 0, fontSize: '0.74rem', color: 'var(--text-ghost)', lineHeight: 1.45 },
   timeWarning: {
     display: 'flex', alignItems: 'center', gap: '0.5rem',
     background: 'rgba(255,140,90,0.1)', border: '1px solid rgba(255,140,90,0.25)',
@@ -817,7 +955,14 @@ const bd = {
   unitBtnActive: {
     background: 'var(--bg-chip)', color: 'var(--text)', fontWeight: 600,
   },
+  optionalToggle: { margin: '-0.5rem 0 1.25rem', padding: '0.7rem 0.8rem', borderRadius: 8, border: '1px dashed var(--border)', background: 'transparent', color: 'var(--accent)', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer', display: 'flex', justifyContent: 'space-between' },
+  depositModes: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 5 },
+  depositMode: { padding: '0.5rem 0.35rem', borderRadius: 7, border: '1px solid var(--border)', background: 'var(--bg-input)', color: 'var(--text-muted)', fontSize: '0.7rem', cursor: 'pointer' },
+  depositModeActive: { borderColor: 'var(--accent)', background: 'var(--accent-tint)', color: 'var(--accent)', fontWeight: 700 },
+  summary: { display: 'flex', flexDirection: 'column', gap: '0.45rem', padding: '0.85rem', borderRadius: 9, border: '1px solid var(--accent-tint-border)', background: 'var(--accent-tint)' },
+  summaryText: { color: 'var(--text)', fontSize: '0.8rem', lineHeight: 1.5 },
   errorText: { margin: '0.5rem 0 0', fontSize: '0.8rem', color: '#ff6b6b' },
+  disabledReason: { marginTop: '0.45rem', textAlign: 'center', color: 'var(--text-ghost)', fontSize: '0.73rem' },
   submitBtn: {
     background: 'var(--accent)', border: 'none', borderRadius: 10,
     padding: '0.75rem', fontSize: '0.9rem', fontWeight: 700,

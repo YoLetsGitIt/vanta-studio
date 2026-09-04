@@ -2,14 +2,11 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { useRouter } from 'next/navigation';
-import { registerStudio, searchStudios } from '@/lib/api';
-import { getSupabase } from '@/lib/supabase';
+import { checkStudioSignupEmail, registerStudio, searchStudios } from '@/lib/api';
 
 // ── Main flow ─────────────────────────────────────────────────────────────────
 
 export default function SignUpFlow({ onSwitchToSignIn, onWideChange }) {
-  const router = useRouter();
   const [step, setStep] = useState(0); // 0: intro, 1: account, 2: studio
   const [account, setAccount] = useState({ email: '', password: '', confirmPassword: '' });
   const [loading, setLoading] = useState(false);
@@ -39,13 +36,12 @@ export default function SignUpFlow({ onSwitchToSignIn, onWideChange }) {
         latitude: newStudio.latitude ?? null,
         longitude: newStudio.longitude ?? null,
       });
-      // No review needed — sign in, then hand off to Stripe Checkout to collect the
-      // card and start the 14-day trial. The account stays pending until Stripe confirms.
-      const { error: signInError } = await getSupabase().auth.signInWithPassword({
+      // No user or studio exists yet. Stripe confirms the payment setup first;
+      // the backend creates the account only from that successful webhook.
+      window.sessionStorage.setItem('vanta-pending-signup', JSON.stringify({
         email: account.email,
         password: account.password,
-      });
-      if (signInError) { router.replace('/'); return; }
+      }));
       window.location.href = checkout_url;
     } catch (e) {
       setError(e.message);
@@ -55,15 +51,14 @@ export default function SignUpFlow({ onSwitchToSignIn, onWideChange }) {
 
   return (
     <div>
-      <div style={s.switchRow}>
-        <span style={s.switchRowText}>Already have an account?</span>
-        <button type="button" onClick={onSwitchToSignIn} className="vanta-link" style={s.switchLink}>Sign in</button>
-      </div>
-
-      {step === 0 && <IntroStep onNext={() => setStep(1)} />}
+      {step === 0 && <IntroStep onNext={() => setStep(1)} onSwitchToSignIn={onSwitchToSignIn} />}
 
       {step > 0 && (
         <>
+          <div style={s.switchRow}>
+            <span style={s.switchRowText}>Already have an account?</span>
+            <button type="button" onClick={onSwitchToSignIn} className="vanta-link" style={s.switchLink}>Sign in</button>
+          </div>
           {/* Step indicator */}
           <div style={s.steps}>
             {['Account', 'Studio'].map((label, i) => {
@@ -113,26 +108,13 @@ const PLAN_FEATURES = [
     section: 'Bookings',
     icon: <ChecklistIcon />,
     art: <MiniToggles />,
-    images: ['/signup/custom-booking-form.png'],
-    video: '/signup/custom-booking-form.webm',
-    title: 'Custom booking form',
-    desc: 'Turn any field on or off — placement, size, skin tone, reference photos — and mark exactly which ones are required. Your form, your rules.',
+    images: [],
+    videos: ['/signup/custom-booking-form.webm', '/signup/booking-widget.webm'],
+    title: 'Booking form & widget',
+    desc: 'Build the tattoo-specific form your clients need, then share it as a link, QR code, or embed on your own site.',
     detail: [
       'Every field beyond name, date of birth, email, and phone is optional. Turn on artist preference, placement, size, skin tone, reference photos, or allergies individually, and mark any of them as required before a client can submit.',
-      'Change your mind later — a field you turn off disappears from the public form immediately, and nothing about past bookings changes.',
-    ],
-  },
-  {
-    section: 'Bookings',
-    icon: <WidgetIcon />,
-    art: <MiniSchedule />,
-    images: [],
-    video: '/signup/booking-widget.webm',
-    title: 'Booking widget',
-    desc: 'A shareable link and QR code clients use to request a session — deposits, reminders, and a reschedule cutoff, all handled for you.',
-    detail: [
-      'Clients scan a QR code or click your link to request a session straight into your calendar — no app or account required on their end. Deposits, 7-day and 24-hour email reminders, and a reschedule cutoff you set are all built in, so a request doesn\'t turn into a string of DMs.',
-      'Share the link anywhere — your bio, a QR code on a table card, a text message — or embed the whole form on your own website.',
+      'Clients can scan a QR code, follow a link, or use an embed on your site to request a session. Deposits, 7-day and 24-hour email reminders, and a reschedule cutoff you set are all handled for you.',
     ],
   },
   {
@@ -141,6 +123,7 @@ const PLAN_FEATURES = [
     art: <MiniSwatches />,
     images: ['/signup/widget-branding-2.png'],
     video: '/signup/widget-branding.webm',
+    mediaAspectRatio: '11 / 4',
     title: 'Widget branding',
     desc: 'Add the booking widget to your own website in minutes — match your studio\'s colors, then paste in one line of code. No developer needed.',
     detail: [
@@ -173,7 +156,11 @@ const PLAN_FEATURES = [
     section: 'Clients',
     icon: <PersonIcon />,
     art: <MiniClients />,
-    images: ['/signup/client-records.png', '/signup/client-records-2.png'],
+    images: ['/signup/client-records-profile.png'],
+    mediaLayout: 'stacked',
+    mediaMaxWidth: 330,
+    mediaPreviewHeight: 440,
+    mediaAnimation: 'scroll',
     title: 'Client records',
     desc: 'Every client\'s consent status, allergies, and full booking history — searchable in seconds.',
     detail: [
@@ -185,20 +172,24 @@ const PLAN_FEATURES = [
     section: 'Studio',
     icon: <UsersIcon />,
     art: <MiniArtists />,
-    images: ['/signup/artist-management-2.png'],
-    video: '/signup/artist-management.webm',
+    images: [],
+    media: [
+      { type: 'video', src: '/signup/artist-payout-interaction.webm' },
+      { type: 'image', src: '/signup/artist-stats-redacted.png', presentation: 'artist-stats' },
+    ],
+    mediaPresentation: 'artist-focus',
     title: 'Artist management',
-    desc: 'Approve artists, assign stations, and set walk-in vs. personal commission splits — payouts track themselves.',
+    desc: 'See artist performance at a glance, then track exactly what each artist has earned, been paid, and is still owed.',
     detail: [
-      'Decide which parties have to record payment before a payout processes, and whether an artist still gets their cut when a client forfeits a deposit instead of showing up. Changes here only apply going forward, so they never rewrite history on past bookings.',
-      'Set separate commission percentages for walk-in versus artist-sourced bookings — studio and artist can split revenue differently depending on who brought the client in, updating live as you type a new percentage.',
+      'The Artists & Payouts view puts performance and payment status together: tattoos, gross sales, average ticket, deposits, hours, artist payout, paid-out amount, and the outstanding balance.',
+      'Every artist profile has its own operating view, with session, completion, upcoming-booking, and revenue stats alongside availability, timetable, and scheduled work.',
     ],
   },
   {
     section: 'Studio',
     icon: <ChartIcon />,
     art: <MiniBarChart />,
-    images: ['/signup/analytics.png', '/signup/analytics-2.png'],
+    images: ['/signup/analytics-live-overview.png'],
     title: 'Analytics',
     desc: 'Appointment counts, revenue, and a studio-vs-personal split, updated in real time.',
     detail: [
@@ -207,7 +198,7 @@ const PLAN_FEATURES = [
     ],
   },
   {
-    section: 'Setup',
+    section: 'System',
     icon: <GlobeIcon />,
     art: <MiniLanguage />,
     images: [],
@@ -215,7 +206,7 @@ const PLAN_FEATURES = [
     desc: 'The entire dashboard is available in English, Simplified Chinese, and Korean — switch anytime from Settings.',
   },
   {
-    section: 'Setup',
+    section: 'System',
     icon: <UploadIcon />,
     art: <MiniImport />,
     images: [],
@@ -237,10 +228,8 @@ const FEATURE_SECTIONS = PLAN_FEATURES.reduce((sections, feature) => {
   return sections;
 }, []);
 
-// A responsive grid rather than a click-through carousel — with nine features, showing them
-// all at once beats making a visitor hunt for the ones they care about. Two columns below
-// 680px, three above (matches the wide card's own breakpoint in app/page.js) — three columns
-// x three rows for a clean fit.
+// Feature groups are switched through compact tabs, keeping the wide sign-up preview to a
+// single desktop viewport while still letting studios explore every area of the product.
 //
 // Cards open their detail modal on click/tap on every device — an earlier hover-to-open
 // version on desktop felt like it "disappeared" the moment the cursor moved even slightly,
@@ -250,64 +239,96 @@ const FEATURE_SECTIONS = PLAN_FEATURES.reduce((sections, feature) => {
 const INTRO_LAYOUT_CSS = `
 .vanta-feature-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.7rem; }
 @media (min-width: 760px) { .vanta-feature-grid { grid-template-columns: repeat(4, 1fr); } }
+.vanta-feature-grid-enter { animation: vantaFeatureGridIn 0.28s ease-out both; }
+.vanta-feature-tabs { display: flex; gap: 0.45rem; overflow-x: auto; padding-bottom: 0.15rem; scrollbar-width: none; }
+.vanta-feature-tabs::-webkit-scrollbar { display: none; }
+.vanta-feature-tab { flex: 0 0 auto; padding: 0.45rem 0.72rem; border: 1px solid rgba(255,255,255,0.1); border-radius: 999px; background: rgba(255,255,255,0.025); color: rgba(255,255,255,0.45); font-size: 0.72rem; font-weight: 600; box-shadow: none; transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease; }
+.vanta-feature-tab:hover { background: rgba(255,255,255,0.06); }
+.vanta-feature-tab.is-active { border-color: rgba(245,236,217,0.45); background: rgba(245,236,217,0.14); color: #f5ecd9; }
 .vanta-feature-card { transition: background 0.15s ease, border-color 0.15s ease; cursor: pointer; }
 .vanta-feature-card:not(.vanta-feature-card-static):hover { background: rgba(255,255,255,0.05); border-color: rgba(245,236,217,0.25); }
 .vanta-feature-card:hover .vanta-expand-badge { opacity: 1; background: rgba(245,236,217,0.16); color: #f5ecd9; }
 .vanta-cta-bar { display: flex; flex-direction: column; gap: 1.1rem; }
 .vanta-cta-button { width: 100%; }
+.vanta-intro-heading { display: flex; flex-direction: column; gap: 1rem; }
+.vanta-intro-access { display: flex; align-items: center; gap: 0.35rem; }
+@keyframes vantaFeatureGridIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 @media (min-width: 560px) {
   .vanta-cta-bar { flex-direction: row; align-items: center; justify-content: space-between; gap: 1.75rem; }
-  .vanta-cta-button { width: auto; min-width: 190px; flex-shrink: 0; }
+  .vanta-cta-button { width: auto; min-width: 210px; flex-shrink: 0; }
+  .vanta-intro-heading { flex-direction: row; align-items: flex-start; justify-content: space-between; gap: 2rem; }
+  .vanta-intro-access { flex-shrink: 0; padding-top: 0.2rem; }
 }
 @keyframes vantaModalIn { from { opacity: 0; transform: scale(0.96) translateY(6px); } to { opacity: 1; transform: scale(1) translateY(0); } }
 .vanta-modal-panel { animation: vantaModalIn 0.18s ease; }
+.vanta-modal-video-frame { display: flex; align-items: center; justify-content: center; background: #090c11 !important; }
+.vanta-modal-video-frame--consent { padding-left: 3%; box-sizing: border-box; }
+.vanta-modal-video { display: block; width: 100%; height: 100%; object-fit: contain; object-position: center; }
+.vanta-modal-image--artist-focus { transform: scale(1.4); transform-origin: 60% 35%; }
+.vanta-modal-image--artist-stats { transform: scale(1.16); transform-origin: 60% 35%; }
+.vanta-modal-scroll-preview { overflow: hidden !important; }
+.vanta-modal-scroll-image { animation: vantaClientProfileScroll 7s ease-in-out infinite; }
+@keyframes vantaClientProfileScroll { 0%, 18% { transform: translateY(0); } 72%, 88% { transform: translateY(-41.4%); } 100% { transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) { .vanta-modal-scroll-image { animation: none; } }
 `;
 
-function IntroStep({ onNext }) {
+function IntroStep({ onNext, onSwitchToSignIn }) {
   const [activeFeature, setActiveFeature] = useState(null);
+  const [activeSection, setActiveSection] = useState(FEATURE_SECTIONS[0].title);
+  const currentSection = FEATURE_SECTIONS.find(section => section.title === activeSection) ?? FEATURE_SECTIONS[0];
 
   return (
     <div style={s.introWrap}>
       <style>{INTRO_LAYOUT_CSS}</style>
 
-      <div>
-        <h3 style={s.introTitle}>Everything your studio needs</h3>
-        <p style={s.introSubtitle}>Booking, clients, artists, and payouts — all in one dashboard.</p>
+      <div className="vanta-intro-heading" style={s.introHeading}>
+        <div>
+          <h3 style={s.introTitle}>Everything your studio needs</h3>
+          <p style={s.introSubtitle}>Booking, clients, artists, and payouts — all in one dashboard.</p>
+        </div>
+        <div className="vanta-intro-access" style={s.introAccess}>
+          <span>Already on Vanta?</span>
+          <button type="button" onClick={onSwitchToSignIn} className="vanta-link" style={s.switchLink}>Sign in</button>
+        </div>
       </div>
 
       <div style={s.featureSections}>
-        {FEATURE_SECTIONS.map(section => (
-          <div key={section.title}>
-            <h4 style={s.featureSectionTitle}>{section.title}</h4>
-            <div className="vanta-feature-grid">
-              {section.features.map(f => {
-                const hasDetail = f.images.length > 0 || !!f.video;
-                return (
-                  <div
-                    key={f.title}
-                    className={hasDetail ? 'vanta-feature-card' : 'vanta-feature-card vanta-feature-card-static'}
-                    style={{ ...s.featureGridCard, cursor: hasDetail ? 'pointer' : 'default' }}
-                    onClick={hasDetail ? () => setActiveFeature(f) : undefined}
-                  >
-                    <div style={s.featureArtFrame}>
-                      {f.art}
-                      {hasDetail && (
-                        <span className="vanta-expand-badge" style={s.expandBadge}>
-                          <ExpandIcon />
-                        </span>
-                      )}
-                    </div>
-                    <div style={s.featureCardHeader}>
-                      <span style={s.featureCardIcon}>{f.icon}</span>
-                      <span style={s.featureCardTitle}>{f.title}</span>
-                    </div>
-                    <div style={s.featureCardDesc}>{f.desc}</div>
+        <div className="vanta-feature-tabs" role="tablist" aria-label="Vanta Studio features">
+          {FEATURE_SECTIONS.map(section => (
+            <button key={section.title} type="button" role="tab" aria-selected={activeSection === section.title} className={`vanta-feature-tab${activeSection === section.title ? ' is-active' : ''}`} onClick={() => setActiveSection(section.title)}>
+              {section.title}
+            </button>
+          ))}
+        </div>
+        <div>
+          <div key={currentSection.title} className="vanta-feature-grid vanta-feature-grid-enter">
+            {currentSection.features.map(f => {
+              const hasDetail = f.images.length > 0 || !!f.video || (f.videos?.length ?? 0) > 0 || (f.media?.length ?? 0) > 0;
+              return (
+                <div
+                  key={f.title}
+                  className={hasDetail ? 'vanta-feature-card' : 'vanta-feature-card vanta-feature-card-static'}
+                  style={{ ...s.featureGridCard, cursor: hasDetail ? 'pointer' : 'default' }}
+                  onClick={hasDetail ? () => setActiveFeature(f) : undefined}
+                >
+                  <div style={s.featureArtFrame}>
+                    {f.art}
+                    {hasDetail && (
+                      <span className="vanta-expand-badge" style={s.expandBadge}>
+                        <ExpandIcon />
+                      </span>
+                    )}
                   </div>
-                );
-              })}
-            </div>
+                  <div style={s.featureCardHeader}>
+                    <span style={s.featureCardIcon}>{f.icon}</span>
+                    <span style={s.featureCardTitle}>{f.title}</span>
+                  </div>
+                  <div style={s.featureCardDesc}>{f.desc}</div>
+                </div>
+              );
+            })}
           </div>
-        ))}
+        </div>
       </div>
 
       {activeFeature && (
@@ -316,14 +337,13 @@ function IntroStep({ onNext }) {
 
       <div className="vanta-cta-bar" style={s.ctaBar}>
         <div style={s.ctaInfo}>
-          <span style={s.trialPill}>14-day free trial</span>
+          <span style={s.planLabel}>Studio plan</span>
           <div style={s.planPriceRow}>
             <span style={s.planPriceAmount}>$60</span>
             <span style={s.planPriceUnit}>/mo AUD</span>
           </div>
           <p style={s.planPriceDetail}>
-            Covers up to 6 artists, then $15/artist beyond that. You won't be charged until the
-            trial ends, and you can cancel anytime from Settings.
+            Includes up to 6 artists. Add more for $15/artist per month.
           </p>
         </div>
 
@@ -333,7 +353,7 @@ function IntroStep({ onNext }) {
           className="vanta-btn vanta-cta-button"
           style={{ ...s.btn, width: undefined }}
         >
-          Get started
+          Start 14-day free trial
         </button>
       </div>
     </div>
@@ -345,6 +365,12 @@ function IntroStep({ onNext }) {
 // backdrop both close it; clicking the panel itself doesn't, so it survives incidental
 // mouse movement while reading.
 function FeatureDetailModal({ feature, onClose }) {
+  const useNaturalMedia = feature.mediaLayout === 'stacked';
+  const media = feature.media ?? [
+    ...feature.images.map(src => ({ type: 'image', src })),
+    ...(feature.videos ?? (feature.video ? [feature.video] : [])).map(src => ({ type: 'video', src })),
+  ];
+
   useEffect(() => {
     function handleKey(e) { if (e.key === 'Escape') onClose(); }
     window.addEventListener('keydown', handleKey);
@@ -359,7 +385,7 @@ function FeatureDetailModal({ feature, onClose }) {
   // close the modal) could land outside its real box and hit the page behind it instead.
   return createPortal(
     <div className="vanta-modal-backdrop" style={s.modalBackdrop} onClick={onClose}>
-      <div className="vanta-modal-panel" style={s.modalPanel} onClick={e => e.stopPropagation()}>
+      <div className="vanta-modal-panel" style={{ ...s.modalPanel, ...(feature.mediaPresentation === 'artist-focus' ? { maxWidth: 1100 } : {}) }} onClick={e => e.stopPropagation()}>
         <div style={s.modalHeader}>
           <div style={s.featureCardHeader}>
             <span style={s.modalIcon}>{feature.icon}</span>
@@ -368,24 +394,32 @@ function FeatureDetailModal({ feature, onClose }) {
           <button type="button" onClick={onClose} style={s.modalClose} aria-label="Close">✕</button>
         </div>
         <div style={s.modalBody}>
-          <div style={s.modalGallery}>
-            {feature.images.map(src => (
-              <div key={src} style={s.modalArtFrame}>
-                <img src={src} alt="" style={s.modalGalleryImage} />
+          <div style={{ ...s.modalGallery, gridTemplateColumns: media.length > 1 && !useNaturalMedia ? 'repeat(auto-fit, minmax(240px, 1fr))' : '1fr' }}>
+            {media.map(({ type, src, presentation }) => (
+              <div
+                key={src}
+                className={type === 'video'
+                  ? `vanta-modal-video-frame${src.includes('consent-builder') ? ' vanta-modal-video-frame--consent' : ''}`
+                  : feature.mediaAnimation === 'scroll' ? 'vanta-modal-scroll-preview' : undefined}
+                style={{
+                  ...s.modalArtFrame,
+                  ...(useNaturalMedia ? { aspectRatio: 'auto' } : feature.mediaAspectRatio ? { aspectRatio: feature.mediaAspectRatio } : {}),
+                  ...(feature.mediaMaxWidth ? { width: '100%', maxWidth: feature.mediaMaxWidth, marginInline: 'auto' } : {}),
+                  ...(feature.mediaPreviewHeight ? { height: feature.mediaPreviewHeight } : {}),
+                }}
+              >
+                {type === 'image' ? (
+                  <img
+                    src={src}
+                    alt=""
+                    className={feature.mediaAnimation === 'scroll' ? 'vanta-modal-scroll-image' : (presentation ?? feature.mediaPresentation) === 'artist-focus' ? 'vanta-modal-image--artist-focus' : presentation === 'artist-stats' ? 'vanta-modal-image--artist-stats' : undefined}
+                    style={{ ...s.modalGalleryImage, ...(useNaturalMedia ? { height: 'auto' } : {}) }}
+                  />
+                ) : (
+                  <video src={src} className={`vanta-modal-video${(presentation ?? feature.mediaPresentation) === 'artist-focus' ? ' vanta-modal-image--artist-focus' : ''}`} autoPlay loop muted playsInline />
+                )}
               </div>
             ))}
-            {feature.video && (
-              <div style={s.modalArtFrame}>
-                <video
-                  src={feature.video}
-                  style={s.modalGalleryImage}
-                  autoPlay
-                  loop
-                  muted
-                  playsInline
-                />
-              </div>
-            )}
           </div>
           {(feature.detail ?? [feature.desc]).map((paragraph, i) => (
             <p key={i} style={s.modalDesc}>{paragraph}</p>
@@ -646,19 +680,46 @@ function AccountStep({ initial, onBack, onNext }) {
   const [password, setPassword] = useState(initial.password);
   const [confirmPassword, setConfirmPassword] = useState(initial.confirmPassword);
   const [error, setError] = useState('');
+  const [checkingEmail, setCheckingEmail] = useState(false);
 
-  function handleSubmit(e) {
+  function validateEmail(value) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+  }
+
+  function handleEmailBlur() {
+    if (email.trim() && !validateEmail(email)) {
+      setError('Enter a valid email address, including a domain (for example, studio@example.com).');
+    }
+  }
+
+  async function handleSubmit(e) {
     e.preventDefault();
     setError('');
+    const normalizedEmail = email.trim();
+    // Browsers consider addresses such as "name@localhost" valid for an email
+    // input. Stripe requires a deliverable-looking domain, so catch that before
+    // the user reaches billing.
+    if (!validateEmail(normalizedEmail)) {
+      setError('Enter a valid email address, including a domain (for example, studio@example.com).');
+      return;
+    }
     if (password.length < 8) { setError('Password must be at least 8 characters'); return; }
     if (password !== confirmPassword) { setError('Passwords do not match'); return; }
-    onNext({ email, password, confirmPassword });
+    setCheckingEmail(true);
+    try {
+      await checkStudioSignupEmail(normalizedEmail);
+      onNext({ email: normalizedEmail, password, confirmPassword });
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setCheckingEmail(false);
+    }
   }
 
   return (
     <form onSubmit={handleSubmit} style={s.form}>
       <Field label="Email">
-        <InputWithIcon icon={<MailIcon size={15} />} type="email" value={email} onChange={e => setEmail(e.target.value)} required placeholder="studio@example.com" autoComplete="email" />
+        <InputWithIcon icon={<MailIcon size={15} />} type="email" value={email} onChange={e => { setEmail(e.target.value); if (error) setError(''); }} onBlur={handleEmailBlur} required pattern="[^\s@]+@[^\s@]+\.[^\s@]+" title="Enter an email address with a valid domain, such as studio@example.com." placeholder="studio@example.com" autoComplete="email" />
       </Field>
       <Field label="Password">
         <InputWithIcon icon={<LockIcon size={15} />} type="password" value={password} onChange={e => setPassword(e.target.value)} required placeholder="Minimum 8 characters" autoComplete="new-password" />
@@ -669,7 +730,7 @@ function AccountStep({ initial, onBack, onNext }) {
       {error && <p style={s.errorBox}>{error}</p>}
       <div style={s.rowBtns}>
         <button type="button" onClick={onBack} className="vanta-back-btn" style={s.backBtn}>Back</button>
-        <button type="submit" className="vanta-btn" style={{ ...s.btn, flex: 1 }}>Continue</button>
+        <button type="submit" disabled={checkingEmail} className="vanta-btn" style={{ ...s.btn, flex: 1, opacity: checkingEmail ? 0.6 : 1 }}>{checkingEmail ? 'Checking…' : 'Continue'}</button>
       </div>
     </form>
   );
@@ -1100,6 +1161,12 @@ const s = {
     margin: 0,
   },
   introWrap: { display: 'flex', flexDirection: 'column', gap: '1.5rem' },
+  introHeading: { paddingBottom: '0.15rem' },
+  introAccess: {
+    fontSize: '0.76rem',
+    color: 'rgba(255,255,255,0.42)',
+    whiteSpace: 'nowrap',
+  },
   featureSections: { display: 'flex', flexDirection: 'column', gap: '1.3rem' },
   featureSectionTitle: {
     fontSize: '0.72rem',
@@ -1169,7 +1236,8 @@ const s = {
   },
   modalGalleryImage: {
     width: '100%',
-    height: 'auto',
+    height: '100%',
+    objectFit: 'contain',
     display: 'block',
   },
   modalBackdrop: {
@@ -1230,24 +1298,17 @@ const s = {
     padding: 0,
   },
   modalGallery: {
-    display: 'flex',
-    flexDirection: 'column',
+    display: 'grid',
     gap: '0.75rem',
     marginBottom: '1.1rem',
   },
-  // No fixed height: a fixed-height frame with object-fit:contain looked fine for the
-  // landscape crops but left wide empty margins on either side of the portrait ones (a
-  // phone-shaped client profile, a tall sidebar nav) — the image just shrank to fit the
-  // height instead of using the frame's full width. Letting height follow the image's own
-  // aspect ratio at 100% width means every image — landscape or portrait — fills the frame
-  // edge to edge; a portrait image just makes for a taller frame, which the panel's own
-  // scroll already accommodates.
   modalArtFrame: {
     borderRadius: 10,
     border: '1px solid rgba(255,255,255,0.08)',
     background: '#11161d',
     overflow: 'hidden',
     flexShrink: 0,
+    aspectRatio: '16 / 10',
   },
   modalIcon: {
     display: 'flex',
@@ -1392,6 +1453,15 @@ const s = {
     display: 'flex',
     alignItems: 'baseline',
     gap: '0.3rem',
+  },
+  planLabel: {
+    display: 'block',
+    marginBottom: '0.28rem',
+    color: 'rgba(255,255,255,0.46)',
+    fontSize: '0.67rem',
+    fontWeight: 700,
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
   },
   planPriceAmount: {
     fontSize: '1.6rem',

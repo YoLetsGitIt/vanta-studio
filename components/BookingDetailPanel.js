@@ -8,6 +8,8 @@ import { statusColors, statusLabel, capitalise as cap } from '@/lib/status';
 import { formatDob as fmtDob, hasArtist } from '@/lib/format';
 import { getCached, setCached } from '@/lib/cache';
 import { useLanguage } from '@/lib/i18n';
+import { showError } from '@/lib/feedback';
+import { getBookingSourceLabel } from '@/lib/bookingType';
 
 const PAYMENT_LABELS = { cash: 'Cash', card: 'Card / POS', bank_transfer: 'Bank Transfer' };
 const CONSENT_STYLE  = {
@@ -185,7 +187,7 @@ export default function BookingDetailPanel({
       const d = await addNote('booking', bookingId, noteInput.trim());
       setStudioNotes(prev => [d.note, ...(prev ?? [])]);
       setNoteInput('');
-    } catch { /* silent */ }
+    } catch (error) { showError(error); }
     finally { setNoteAdding(false); }
   }
 
@@ -193,7 +195,7 @@ export default function BookingDetailPanel({
     try {
       await deleteNote(id);
       setStudioNotes(prev => (prev ?? []).filter(n => n.id !== id));
-    } catch { /* silent */ }
+    } catch (error) { showError(error); }
   }
 
   // ── Load consent templates (once) ─────────────────────────────────────────
@@ -274,7 +276,7 @@ export default function BookingDetailPanel({
       await generateConsentLink(email, actualId);
       setLinkSentId(templateId);
       setTimeout(() => setLinkSentId(null), 3000);
-    } catch (e) { alert(e.message); }
+    } catch (e) { showError(e); }
     finally { setLinkGeneratingId(null); }
   }
 
@@ -416,7 +418,7 @@ export default function BookingDetailPanel({
               {source && (
                 <span style={{ fontSize: '0.68rem', fontWeight: 600, padding: '0.15rem 0.45rem', borderRadius: 4,
                   background: 'var(--bg-chip)', color: 'var(--text-ghost)', border: '1px solid var(--border-faint)' }}>
-                  {{ walkin: 'Studio', web: 'Web', app: 'App', personal: 'Manual', import: 'Imported' }[source] ?? source}
+                  {getBookingSourceLabel(source)}
                 </span>
               )}
             </div>

@@ -2,11 +2,16 @@
 
 import { useState, useEffect, useCallback, Suspense, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { getStudioArtists, approveStudioArtist, rejectStudioArtist, setArtistLastDay, setArtistAcceptingBookings, getStudioArtistStats, getStudioScheduleRange, getArtistWorkSchedule, updateArtistWorkSchedule } from '@/lib/api';
+import { QRCodeSVG } from 'qrcode.react';
+import { getStudioArtists, approveStudioArtist, rejectStudioArtist, setArtistLastDay, setArtistAcceptingBookings, getStudioArtistStats, getStudioScheduleRange, getArtistWorkSchedule, updateArtistWorkSchedule, getMyStudioAccount } from '@/lib/api';
 import { getCached, setCached, invalidatePrefix } from '@/lib/cache';
 import { APPROVAL_STATUS_COLORS } from '@/lib/status';
 import { initials } from '@/lib/format';
 import { useLanguage } from '@/lib/i18n';
+import { getSupabase } from '@/lib/supabase';
+import { showError } from '@/lib/feedback';
+
+const APP_STORE_URL = 'https://apps.apple.com/au/app/vanta-find-your-next-tattoo/id6760996738';
 
 function fmtHHMM(hhmm) {
   if (!hhmm) return '';
@@ -29,8 +34,9 @@ function ArtistsInner() {
   const router = useRouter();
   const params = useSearchParams();
   const selectedId = params.get('id');
+  const onboardingRequested = params.get('onboarding') === '1';
 
-  const [showPending, setShowPending] = useState(false);
+  const [showPending, setShowPending] = useState(() => params.get('pending') === '1');
   const [approved, setApproved] = useState([]);
   const [pending, setPending] = useState([]);
   const [removed, setRemoved] = useState([]);
@@ -40,6 +46,9 @@ function ArtistsInner() {
   const [actionLoading, setActionLoading] = useState(null);
   const [rejectTarget,  setRejectTarget]  = useState(null);
   const [removeTarget,  setRemoveTarget]  = useState(null);
+  const [artistGuideOpen, setArtistGuideOpen] = useState(false);
+  const [studioName, setStudioName] = useState('Your studio');
+  const [studioNameCopied, setStudioNameCopied] = useState(false);
 
   const load = useCallback(async (bust = false) => {
     if (bust) invalidatePrefix('artists:');
@@ -79,10 +88,39 @@ function ArtistsInner() {
 
   useEffect(() => { load(); }, [load]);
 
+  useEffect(() => {
+    let active = true;
+    async function prepareArtistGuide() {
+      const supabase = getSupabase();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!active || !session?.user) return;
+      const userId = session.user.id;
+      const tourFinished = localStorage.getItem(`vanta-studio-tour:${userId}`) === 'complete';
+      const guideKey = `vanta-studio-artist-guide:${userId}`;
+      const forceOpen = onboardingRequested;
+      const alwaysShowGuide = session.user.email?.trim().toLowerCase() === 'studio@test.com';
+      const mainTourActive = document.body.dataset.vantaTourActive === 'true';
+      if (!mainTourActive && ((tourFinished && (!localStorage.getItem(guideKey) || alwaysShowGuide)) || forceOpen)) setArtistGuideOpen(true);
+      getMyStudioAccount().then(data => {
+        if (active) setStudioName(data.studio?.name || 'Your studio');
+      }).catch(() => {});
+    }
+    prepareArtistGuide();
+    return () => { active = false; };
+  }, [onboardingRequested]);
+
+  function dismissArtistGuide() {
+    getSupabase().auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) localStorage.setItem(`vanta-studio-artist-guide:${session.user.id}`, 'complete');
+    });
+    setArtistGuideOpen(false);
+    if (onboardingRequested) router.replace('/dashboard/artists');
+  }
+
   async function handleApprove(id) {
     setActionLoading(id);
     try { await approveStudioArtist(id); await load(true); }
-    catch (e) { alert(e.message); }
+    catch (e) { showError(e); }
     finally { setActionLoading(null); }
   }
 
@@ -94,14 +132,14 @@ function ArtistsInner() {
     if (!rejectTarget) return;
     setActionLoading(rejectTarget);
     try { await rejectStudioArtist(rejectTarget, reason); setRejectTarget(null); await load(true); }
-    catch (e) { alert(e.message); }
+    catch (e) { showError(e); }
     finally { setActionLoading(null); }
   }
 
   async function handleToggleAccepting(id, currentValue) {
     setActionLoading(id);
     try { await setArtistAcceptingBookings(id, !currentValue); await load(true); }
-    catch (e) { alert(e.message); }
+    catch (e) { showError(e); }
     finally { setActionLoading(null); }
   }
 
@@ -118,7 +156,7 @@ function ArtistsInner() {
       await load(true);
       router.push('/dashboard/artists');
     }
-    catch (e) { alert(e.message); }
+    catch (e) { showError(e); }
     finally { setActionLoading(null); }
   }
 
@@ -173,6 +211,18 @@ function ArtistsInner() {
           existingEndDate={removeTarget.endDate}
           onConfirm={confirmRemove}
           onCancel={() => setRemoveTarget(null)}
+        />
+      )}
+      {artistGuideOpen && (
+        <ArtistOnboardingGuide
+          studioName={studioName}
+          copied={studioNameCopied}
+          onCopy={() => navigator.clipboard?.writeText(studioName).then(() => {
+            setStudioNameCopied(true);
+            setTimeout(() => setStudioNameCopied(false), 1800);
+          })}
+          onSkip={dismissArtistGuide}
+          onViewRequests={() => { dismissArtistGuide(); router.push('/dashboard/artists?pending=1'); }}
         />
       )}
       <div style={s.header}>
@@ -238,6 +288,92 @@ function ArtistsInner() {
         )}
       </div>
     </div>
+  );
+}
+
+function ArtistOnboardingGuide({ studioName, copied, onCopy, onSkip, onViewRequests }) {
+  const [step, setStep] = useState(0);
+  const steps = [
+    { kicker: 'STEP 1 OF 5', title: 'Let’s add your first artist.', body: 'Ask your artist to download the Vanta app. They’ll connect to your studio from their own phone.', action: 'They have the app' },
+    { kicker: 'STEP 2 OF 5', title: 'They create their artist profile.', body: 'They complete their artist profile first, then add your studio from their profile settings.', action: 'Next' },
+    { kicker: 'STEP 3 OF 5', title: 'They open Add studio.', body: 'In the Vanta app, they go to Profile → Edit profile → Studios, then tap Add studio.', action: 'Next' },
+    { kicker: 'STEP 4 OF 5', title: 'They select your studio and save.', body: 'They search for your studio, choose the matching result, tap Add studio to profile, then Save changes in Edit profile.', action: 'Next' },
+    { kicker: 'STEP 5 OF 5', title: 'You approve their request.', body: 'That save creates a Pending review request here in Vanta Studio. Approve it to add them to your schedule and booking flow.', action: 'View pending requests' },
+  ];
+  const current = steps[step];
+  const isDownload = step === 0;
+
+  return (
+    <div style={s.artistGuideOverlay} role="dialog" aria-modal="true" aria-label="Add your first artist">
+      <div style={s.artistGuideCard}>
+        <button type="button" style={s.artistGuideClose} onClick={onSkip} aria-label="Skip artist setup">×</button>
+        <section style={s.artistGuideContent}>
+          <span style={s.artistGuideEyebrow}>{current.kicker}</span>
+          <h2 style={s.artistGuideTitle}>{current.title}</h2>
+          <p style={s.artistGuideText}>{current.body}</p>
+
+          {isDownload ? (
+            <div style={s.downloadCard}>
+              <div style={s.qrBox}><QRCodeSVG value={APP_STORE_URL} size={126} bgColor="#ffffff" fgColor="#11151d" /></div>
+              <div>
+                <strong style={s.downloadTitle}>Download Vanta for iPhone</strong>
+                <p style={s.downloadText}>Have your artist scan this QR code, then open the app and create an Artist account.</p>
+                <a href={APP_STORE_URL} target="_blank" rel="noreferrer" style={s.appStoreLink}>Open the App Store <span>↗</span></a>
+              </div>
+            </div>
+          ) : (
+            <div style={s.guideStudioName}>
+              <span>YOUR STUDIO NAME</span>
+              <strong>{studioName}</strong>
+              <button type="button" style={s.copyStudioName} onClick={onCopy}>{copied ? 'Copied' : 'Copy'}</button>
+            </div>
+          )}
+
+          <div style={s.artistGuideActions}>
+            <button type="button" style={s.artistGuideSecondary} onClick={onSkip}>Skip for now</button>
+            <button type="button" style={s.artistGuidePrimary} onClick={() => step === steps.length - 1 ? onViewRequests() : setStep(step + 1)}>{current.action} <span>→</span></button>
+          </div>
+          <div style={s.guideProgress}>
+            {steps.map((item, index) => <button key={item.kicker} type="button" aria-label={`Go to ${item.kicker}`} onClick={() => setStep(index)} style={{ ...s.guideProgressDot, ...(index === step ? s.guideProgressDotActive : {}) }} />)}
+          </div>
+        </section>
+        <ArtistAppScreen step={step} />
+      </div>
+    </div>
+  );
+}
+
+function ArtistAppScreen({ step }) {
+  const screens = [
+    { src: '/onboarding/artist-app-welcome.png', alt: 'Vanta app welcome screen' },
+    { src: '/onboarding/artist-app-welcome.png', alt: 'Vanta app welcome screen' },
+    { src: '/onboarding/artist-add-studio.png', alt: 'Vanta app Add Studio screen' },
+    { src: '/onboarding/artist-studio-search.png', alt: 'Vanta app showing studio search results' },
+  ];
+  if (step === 4) {
+    return (
+      <aside style={s.approvalPreview}>
+        <span style={s.appPreviewLabel}>ON THE ARTISTS PAGE</span>
+        <div style={s.pendingReviewLocation}>
+          <span style={s.pendingReviewLocationTitle}>My artists</span>
+          <span style={s.pendingReviewLocationArrow}>←</span>
+          <span style={s.pendingReviewLocationButton}>Pending review</span>
+        </div>
+        <div style={s.approvalPreviewIcon}>✓</div>
+        <strong style={s.approvalPreviewTitle}>Approve from Pending review</strong>
+        <span style={s.approvalPreviewText}>It’s the button in the top-right of the Artists page.</span>
+      </aside>
+    );
+  }
+  const { src, alt } = screens[step];
+
+  return (
+    <aside style={s.appPreview}>
+      <span style={s.appPreviewLabel}>REAL VANTA APP SCREEN</span>
+      <div style={s.mobileCaptureFrame}>
+        <img key={src} src={src} alt={alt} style={{ ...s.mobileCapture, transform: step === 3 ? 'translateY(-160px)' : 'translateY(-1px)' }} />
+      </div>
+    </aside>
   );
 }
 
@@ -745,6 +881,38 @@ function ArtistRemoveModal({ onConfirm, onCancel, saving, existingEndDate }) {
 }
 
 const s = {
+  artistGuideOverlay: { position: 'fixed', inset: 0, zIndex: 1000, display: 'grid', placeItems: 'center', padding: '1.25rem', background: 'rgba(5,7,11,0.82)', backdropFilter: 'blur(9px)' },
+  artistGuideCard: { width: 'min(100%, 1000px)', minHeight: 570, maxHeight: 'calc(100vh - 2.5rem)', overflow: 'auto', position: 'relative', display: 'grid', gridTemplateColumns: 'minmax(0, 1.1fr) minmax(270px, 0.9fr)', gap: '2.5rem', padding: '2.5rem', borderRadius: 20, background: 'var(--bg-modal)', border: '1px solid var(--accent-tint-border)', boxShadow: '0 32px 110px rgba(0,0,0,0.54)' },
+  artistGuideClose: { position: 'absolute', top: 16, right: 17, width: 34, height: 34, border: '1px solid var(--border)', borderRadius: '50%', background: 'transparent', color: 'var(--text-muted)', fontSize: '1.4rem', lineHeight: 1, cursor: 'pointer' },
+  artistGuideContent: { display: 'flex', flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'center', minWidth: 0 },
+  artistGuideEyebrow: { fontSize: '0.66rem', letterSpacing: '0.13em', fontWeight: 700, color: 'var(--accent)' },
+  artistGuideTitle: { margin: '0.55rem 0 0', maxWidth: 490, fontSize: '2rem', lineHeight: 1.06, letterSpacing: '-0.045em', color: 'var(--text)' },
+  artistGuideText: { margin: '0.85rem 0 1.5rem', maxWidth: 470, fontSize: '0.91rem', lineHeight: 1.6, color: 'var(--text-muted)' },
+  downloadCard: { width: '100%', maxWidth: 480, display: 'flex', alignItems: 'center', gap: '1rem', padding: '1rem', borderRadius: 12, border: '1px solid var(--accent-tint-border)', background: 'var(--accent-tint)' },
+  qrBox: { flexShrink: 0, display: 'grid', placeItems: 'center', padding: 9, borderRadius: 8, background: '#ffffff' },
+  downloadTitle: { display: 'block', color: 'var(--text)', fontSize: '0.85rem' },
+  downloadText: { margin: '0.32rem 0 0.6rem', color: 'var(--text-ghost)', fontSize: '0.74rem', lineHeight: 1.45 },
+  appStoreLink: { color: 'var(--accent)', fontSize: '0.73rem', fontWeight: 700, textDecoration: 'none' },
+  guideStudioName: { width: '100%', maxWidth: 480, display: 'grid', gridTemplateColumns: '1fr auto', gap: '0.25rem 0.75rem', alignItems: 'center', padding: '0.9rem 1rem', borderRadius: 10, border: '1px solid var(--accent-tint-border)', background: 'var(--accent-tint)' },
+  copyStudioName: { gridColumn: 2, gridRow: '1 / span 2', border: '1px solid var(--accent-tint-border)', borderRadius: 6, padding: '0.35rem 0.55rem', background: 'var(--accent-tint)', color: 'var(--accent)', fontSize: '0.68rem', fontWeight: 700, cursor: 'pointer' },
+  artistGuideActions: { display: 'flex', gap: '0.65rem', flexWrap: 'wrap', marginTop: '1.55rem' },
+  artistGuidePrimary: { border: 0, borderRadius: 8, padding: '0.75rem 0.9rem', background: 'var(--accent)', color: 'var(--accent-contrast)', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.6rem' },
+  artistGuideSecondary: { border: '1px solid var(--border)', borderRadius: 8, padding: '0.75rem 0.9rem', background: 'transparent', color: 'var(--text-muted)', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer' },
+  guideProgress: { display: 'flex', gap: '0.38rem', marginTop: '1.25rem' },
+  guideProgressDot: { width: 7, height: 7, padding: 0, border: 0, borderRadius: 10, background: 'rgba(255,255,255,0.18)', cursor: 'pointer' },
+  guideProgressDotActive: { width: 20, background: 'var(--accent)' },
+  appPreview: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.75rem', padding: '0.2rem 0' },
+  appPreviewLabel: { fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.13em', color: 'var(--text-ghost)' },
+  mobileCaptureFrame: { width: 254, maxHeight: 468, overflow: 'hidden', borderRadius: 25, border: '3px solid #383d47', background: '#080b10', boxShadow: '0 20px 50px rgba(0,0,0,0.36)' },
+  mobileCapture: { display: 'block', width: '100%', height: 'auto', transform: 'translateY(-1px)', transition: 'opacity 0.22s ease' },
+  approvalPreview: { alignSelf: 'center', width: 254, minHeight: 310, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.8rem', padding: '2rem', borderRadius: 18, border: '1px solid var(--accent-tint-border)', background: 'var(--accent-tint)', textAlign: 'center' },
+  approvalPreviewIcon: { width: 44, height: 44, display: 'grid', placeItems: 'center', borderRadius: '50%', background: 'rgba(76,201,138,0.14)', border: '1px solid rgba(76,201,138,0.35)', color: '#58d79b', fontWeight: 800 },
+  approvalPreviewTitle: { color: 'var(--text)', fontSize: '1rem' },
+  approvalPreviewText: { color: 'var(--text-ghost)', fontSize: '0.75rem', lineHeight: 1.55 },
+  pendingReviewLocation: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.35rem', padding: '0.7rem', borderRadius: 9, background: '#10141c', border: '1px solid var(--border)', color: 'var(--text)' },
+  pendingReviewLocationTitle: { fontSize: '0.66rem', fontWeight: 700 },
+  pendingReviewLocationArrow: { marginLeft: 'auto', color: 'var(--accent)', fontSize: '1rem' },
+  pendingReviewLocationButton: { padding: '0.42rem 0.48rem', borderRadius: 6, border: '1px solid var(--accent-active-border)', background: 'var(--accent-tint)', color: 'var(--accent)', fontSize: '0.58rem', fontWeight: 700 },
   editSchedBtn: {
     background: 'none', border: '1px solid var(--border)', borderRadius: 6,
     color: 'var(--text-muted)', fontSize: '0.72rem', fontWeight: 600,

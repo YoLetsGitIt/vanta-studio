@@ -8,6 +8,7 @@ import {
   PieChart, Pie, Cell,
 } from 'recharts';
 import { useLanguage } from '@/lib/i18n';
+import { getBookingSourceLabel } from '@/lib/bookingType';
 
 // Financial figures and Artists & Payouts moved to /dashboard/financial
 // (a separate, password-protected nav tab). This page only shows the
@@ -30,7 +31,6 @@ function fmt(n) {
   if (n == null || n === '') return '—';
   return '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
-function formatSource(s) { return ({ app: 'App', studio: 'Studio', personal: 'Personal', walkin: 'Studio', import: 'Imported' })[s] ?? s; }
 function formatDate(d) {
   if (!d) return '—';
   return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -156,15 +156,14 @@ export default function RevenuePage() {
 
 // ── Small components ──────────────────────────────────────────────────────────
 
-const SOURCE_COLORS = { App: '#6fa3e8', Studio: '#4cc98a', Personal: '#f59e3a', Imported: '#a78bfa' };
+const SOURCE_COLORS = { App: '#6fa3e8', Studio: '#f59e3a', 'Walk-in': '#4abaa8', Personal: '#a78bfa', Imported: '#8c9aaa' };
 
 function SourceBreakdown({ data }) {
   const total = data.reduce((s, d) => s + d.count, 0);
-  // Multiple raw sources (e.g. 'studio' and 'walkin') share the same display
-  // label, so group by label here rather than charting each raw source row.
+  // Group legacy aliases by display label while keeping walk-ins distinct.
   const grouped = new Map();
   for (const d of data) {
-    const name = formatSource(d.source);
+    const name = getBookingSourceLabel(d.source);
     grouped.set(name, (grouped.get(name) ?? 0) + d.count);
   }
   const chartData = Array.from(grouped, ([name, value]) => ({

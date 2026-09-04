@@ -1,39 +1,43 @@
 :root {
   /* Structural colours */
-  --text:           #ffffff;
-  --text-dim:       rgba(255,255,255,0.82);
-  --text-muted:     rgba(255,255,255,0.5);
-  --text-secondary: rgba(255,255,255,0.4);
-  --text-faint:     rgba(255,255,255,0.35);
-  --text-ghost:     rgba(255,255,255,0.22);
+  --text:           #f2f0ec;
+  --text-dim:       #d0cdc7;
+  --text-muted:     #96938e;
+  --text-secondary: #77746f;
+  --text-faint:     #686560;
+  --text-ghost:     #56534f;
 
-  --bg-base:        #0d1017;
-  --bg-sidebar:     #0b0f16;
-  --bg-panel:       #0f151e;
-  --bg-modal:       #1a1a1a;
-  --bg-card:        rgba(255,255,255,0.025);
-  --bg-row-active:  rgba(255,255,255,0.04);
-  --bg-input:       rgba(255,255,255,0.05);
-  --bg-chip:        rgba(255,255,255,0.06);
+  --bg-base:        #080808;
+  --bg-sidebar:     #0c0c0c;
+  --bg-panel:       #121212;
+  --bg-modal:       #181818;
+  --bg-card:        #161616;
+  --bg-row-active:  #1d1d1d;
+  --bg-input:       #242424;
+  --bg-chip:        #202020;
 
-  --border-faint:   rgba(255,255,255,0.06);
-  --border:         rgba(255,255,255,0.1);
-  --border-strong:  rgba(255,255,255,0.14);
+  --border-faint:   rgba(255,255,255,0.055);
+  --border:         rgba(255,255,255,0.09);
+  --border-strong:  rgba(255,255,255,0.17);
 
-  --accent:               #f5ecd9;
-  --accent-tint:          rgba(245,236,217,0.08);
-  --accent-tint-border:   rgba(245,236,217,0.18);
-  --accent-active-tint:   rgba(245,236,217,0.1);
-  --accent-active-border: rgba(245,236,217,0.3);
-  --nav-active-bg:        rgba(245,236,217,0.07);
+  --accent:               #d5d0c7;
+  --accent-contrast:      #0a0a0a;
+  --accent-tint:          rgba(213,208,199,0.075);
+  --accent-tint-border:   rgba(213,208,199,0.16);
+  --accent-active-tint:   rgba(213,208,199,0.11);
+  --accent-active-border: rgba(213,208,199,0.24);
+  --nav-active-bg:        #202020;
+
+  --shadow-card:  0 1px 0 rgba(255,255,255,0.025), 0 10px 30px rgba(0,0,0,0.22);
+  --shadow-modal: 0 28px 80px rgba(0,0,0,0.62);
 
   /* Semantic status colours — same in both themes */
-  --status-pending:   #f59e3a;
-  --status-proposed:  #6fa3e8;
-  --status-confirmed: #4cc98a;
-  --status-completed: rgba(255,255,255,0.35);
-  --status-cancelled: rgba(255,255,255,0.2);
-  --status-rejected:  #e86f6f;
+  --status-pending:   #bd9763;
+  --status-proposed:  #7f96ad;
+  --status-confirmed: #719887;
+  --status-completed: #77746f;
+  --status-cancelled: #56534f;
+  --status-rejected:  #a96f6f;
 
   --sidebar-width: 220px;
 }
@@ -60,6 +64,7 @@
   --border-strong:  rgba(0,0,0,0.14);
 
   --accent:               #1a1510;
+  --accent-contrast:      #ffffff;
   --accent-tint:          rgba(26,21,16,0.07);
   --accent-tint-border:   rgba(26,21,16,0.15);
   --accent-active-tint:   rgba(26,21,16,0.09);
@@ -96,6 +101,54 @@ button {
   outline: none;
   -webkit-appearance: none;
   appearance: none;
+  transition: filter 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+}
+
+button:hover:not(:disabled) { filter: brightness(1.1); }
+
+input,
+textarea,
+select {
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+input:hover,
+textarea:hover,
+select:hover { border-color: var(--border-strong) !important; }
+
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  border-color: rgba(213,208,199,0.32) !important;
+  box-shadow: 0 0 0 2px rgba(213,208,199,0.055);
+}
+
+@media (max-width: 900px) {
+  .studio-home-four-col {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .studio-home-body {
+    padding: 1rem !important;
+  }
+
+  .studio-home-two-col,
+  .studio-home-four-col {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .studio-attention-item {
+    align-items: flex-start !important;
+    flex-direction: column !important;
+  }
+
+  .studio-attention-actions {
+    justify-content: flex-start !important;
+    width: 100%;
+  }
 }
 
 button:focus,
@@ -103,6 +156,42 @@ button:focus-visible {
   outline: none;
   box-shadow: none;
 }
+
+.selection-link-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(0,0,0,0.62);
+  backdrop-filter: blur(3px);
+}
+
+.selection-link-modal {
+  width: min(100%, 360px);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1.4rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-panel);
+  box-shadow: var(--shadow-modal);
+}
+
+.selection-link-modal h3 { color: var(--text); font-size: 1rem; }
+.selection-link-modal > p { color: var(--text-ghost); font-size: 0.78rem; line-height: 1.45; }
+.selection-link-field { display: flex; flex-direction: column; gap: 0.4rem; }
+.selection-link-field > span { color: var(--text-faint); font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+.selection-link-modal input,
+.selection-link-modal select { width: 100%; padding: 0.55rem 0.7rem; border: 1px solid var(--border); border-radius: 7px; background: var(--bg-input); color: var(--text); font: inherit; font-size: 0.82rem; }
+.selection-link-check { display: flex; align-items: center; gap: 0.5rem; color: var(--text-muted); font-size: 0.8rem; }
+.selection-link-check input { width: auto; accent-color: var(--accent); }
+.selection-link-actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 0.35rem; }
+.selection-link-actions button { padding: 0.5rem 0.8rem; border: 1px solid var(--border); border-radius: 7px; background: transparent; color: var(--text-muted); font-size: 0.78rem; font-weight: 600; }
+.selection-link-actions .primary { border-color: transparent; background: var(--accent); color: var(--accent-contrast); font-weight: 700; }
+.selection-link-actions button:disabled { cursor: default; opacity: 0.5; }
 
 input,
 textarea {

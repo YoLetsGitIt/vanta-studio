@@ -1,14 +1,16 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getStudioArtists, getStudioSchedule, getStudioScheduleRange, getStudioBooking, acceptBookingWithStation, createManualBooking, createFollowUpBooking, rejectBooking, cancelBooking, recordOutcome, rescheduleBooking, getStations, sendSelectionLink, confirmBooking, reassignArtist, getStripeStatus } from '@/lib/api';
-import { getBookingStyle, TYPE_STYLE } from '@/lib/bookingType';
+import { getStudioArtists, getStudioSchedule, getStudioScheduleRange, getStudioBooking, createManualBooking, getStations, getStripeStatus } from '@/lib/api';
+import { BOOKING_SOURCES, getBookingStyle, TYPE_STYLE } from '@/lib/bookingType';
 import BookingDetailPanel from '@/components/BookingDetailPanel';
 import { getCached, setCached, invalidatePrefix } from '@/lib/cache';
 import CompleteBookingModal from '@/components/CompleteBookingModal';
 import RejectBookingModal from '@/components/RejectBookingModal';
 import { initials, toISODate, hasArtist } from '@/lib/format';
 import { useLanguage } from '@/lib/i18n';
+import { showError } from '@/lib/feedback';
+import { bookingActions } from '@/lib/bookingActions';
 
 const HOUR_PX   = 64;
 const DAY_START = 8;
@@ -112,7 +114,7 @@ function useBookingActions(afterChange) {
       clearTarget();
       closeDetail();
       afterChange();
-    } catch (e) { alert(e.message); }
+    } catch (e) { showError(e); }
     finally { setActionLoading(false); }
   }
 
@@ -140,7 +142,7 @@ function useBookingActions(afterChange) {
       }
       return;
     }
-    if (action === 'confirm') { run(() => confirmBooking(selectedEntry.bookingId), () => {}); return; }
+    if (action === 'confirm') { run(() => bookingActions.confirm(selectedEntry.bookingId), () => {}); return; }
     if (action === 'reassign') {
       setReassignTarget(selectedEntry.bookingId);
       setReassignArtistId(''); setReassignResend(true);
@@ -149,20 +151,19 @@ function useBookingActions(afterChange) {
       }
       return;
     }
-    if (action === 'accept')  run(() => acceptBookingWithStation(selectedEntry.bookingId, stationId), () => {});
+    if (action === 'accept')  run(() => bookingActions.accept(selectedEntry.bookingId, stationId), () => {});
   }
 
   const confirmComplete = (finalPrice, paymentSplits, wantsFollowUp) =>
     run(async () => {
-      await recordOutcome(completeTarget.id, 'completed', finalPrice, paymentSplits);
-      if (wantsFollowUp) await createFollowUpBooking(completeTarget.id);
+      await bookingActions.complete(completeTarget.id, { finalPrice, paymentSplits, createFollowUp: wantsFollowUp });
     }, () => setCompleteTarget(null));
   const confirmNoShow = () =>
-    run(() => recordOutcome(noShowTarget, 'no_show'), () => setNoShowTarget(null));
+    run(() => bookingActions.noShow(noShowTarget), () => setNoShowTarget(null));
   const confirmReject = (reason) =>
-    run(() => rejectBooking(rejectTarget, reason), () => setRejectTarget(null));
+    run(() => bookingActions.reject(rejectTarget, reason), () => setRejectTarget(null));
   const confirmCancel = (reason) =>
-    run(() => cancelBooking(cancelTarget, reason), () => setCancelTarget(null));
+    run(() => bookingActions.cancel(cancelTarget, reason), () => setCancelTarget(null));
 
   async function confirmSendLink() {
     setSendLinkSaving(true);
@@ -170,11 +171,11 @@ function useBookingActions(afterChange) {
       const amount   = sendLinkDeposit && sendLinkAmount ? parseFloat(sendLinkAmount) : null;
       const duration = sendLinkDuration ? Number(sendLinkDuration) : null;
       const quote    = sendLinkQuote ? parseFloat(sendLinkQuote) : null;
-      await sendSelectionLink(sendLinkTarget, sendLinkHours, sendLinkDeposit, amount, duration, quote, sendLinkArtistId || null);
+      await bookingActions.sendSelectionLink(sendLinkTarget, { expiresHours: sendLinkHours, depositRequired: sendLinkDeposit, depositAmount: amount, durationMinutes: duration, estimatedQuote: quote, artistId: sendLinkArtistId || null });
       setSendLinkTarget(null);
       closeDetail();
       afterChange();
-    } catch (e) { alert(e.message); }
+    } catch (e) { showError(e); }
     finally { setSendLinkSaving(false); }
   }
 
@@ -182,11 +183,11 @@ function useBookingActions(afterChange) {
     if (!reassignArtistId) return;
     setReassignSaving(true);
     try {
-      await reassignArtist(reassignTarget, reassignArtistId, reassignResend);
+      await bookingActions.reassign(reassignTarget, reassignArtistId, reassignResend);
       setReassignTarget(null);
       closeDetail();
       afterChange();
-    } catch (e) { alert(e.message); }
+    } catch (e) { showError(e); }
     finally { setReassignSaving(false); }
   }
 
@@ -215,16 +216,16 @@ function useBookingActions(afterChange) {
     const [sh, sm] = rescheduleStart.split(':').map(Number);
     const [eh, em] = rescheduleEnd.split(':').map(Number);
     const durationMins = (eh * 60 + em) - (sh * 60 + sm);
-    if (durationMins <= 0) { alert('End time must be after start time.'); return; }
+    if (durationMins <= 0) { showError('End time must be after start time.'); return; }
     const id = detailBooking?.id ?? selectedEntry?.bookingId;
     const newTime = new Date(`${rescheduleDate}T${rescheduleStart}:00`).toISOString();
     setRescheduleSaving(true);
     try {
-      await rescheduleBooking(id, newTime, rescheduleMsg.trim(), durationMins);
+      await bookingActions.reschedule(id, { newTime, message: rescheduleMsg, durationMinutes: durationMins });
       setRescheduleTarget(null);
       closeDetail();
       afterChange();
-    } catch (e) { alert(e.message); }
+    } catch (e) { showError(e); }
     finally { setRescheduleSaving(false); }
   }
 
@@ -504,7 +505,7 @@ const cancelBtnStyle = {
 };
 const saveBtnStyle = {
   flex: 2, padding: '0.5rem', borderRadius: 7,
-  border: '1px solid rgba(245,236,217,0.25)', background: 'rgba(245,236,217,0.08)',
+  border: '1px solid var(--accent-tint-border)', background: 'var(--accent-tint)',
   color: 'var(--accent)', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer',
 };
 
@@ -632,14 +633,12 @@ function MonthView({ monthStart, onDayClick }) {
       </div>
 
       <div style={s.legend}>
-        <div style={s.legendItem}>
-          <div style={{ width: 8, height: 8, borderRadius: 2, background: SOURCE_STYLE.studio.dot, flexShrink: 0 }} />
-          <span style={{ ...s.legendName, color: SOURCE_STYLE.studio.tagColor }}>{t('sched_legend_studio')}</span>
-        </div>
-        <div style={s.legendItem}>
-          <div style={{ width: 8, height: 8, borderRadius: 2, background: SOURCE_STYLE.personal.dot, flexShrink: 0 }} />
-          <span style={{ ...s.legendName, color: SOURCE_STYLE.personal.tagColor }}>{t('sched_legend_personal')}</span>
-        </div>
+        {Object.values(BOOKING_SOURCES).map(source => (
+          <div key={source.key} style={s.legendItem}>
+            <div style={{ width: 8, height: 8, borderRadius: 2, background: SOURCE_STYLE[source.key].dot, flexShrink: 0 }} />
+            <span style={{ ...s.legendName, color: SOURCE_STYLE[source.key].tagColor }}>{source.label}</span>
+          </div>
+        ))}
       </div>
     </div>
 

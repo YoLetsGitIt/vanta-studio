@@ -13,6 +13,7 @@ import { getCached, setCached } from '@/lib/cache';
 import { statusColors, capitalise } from '@/lib/status';
 import { formatDob } from '@/lib/format';
 import { useLanguage } from '@/lib/i18n';
+import { showError } from '@/lib/feedback';
 
 function ClientsInner() {
   const { t } = useLanguage();
@@ -78,7 +79,7 @@ function ClientsInner() {
         setConsents(data.consents ?? {});
         setConsentVersion(data.current_version ?? '1');
       })
-      .catch(() => {});
+      .catch(showError);
     getBatchClientConsentSubmissions(emails)
       .then(data => {
         const map = {};
@@ -89,7 +90,7 @@ function ClientsInner() {
         }
         setSubmissionsByEmail(map);
       })
-      .catch(() => {});
+      .catch(showError);
   }, [bookings]);
 
   const clients = useMemo(() => {
@@ -371,7 +372,7 @@ function ClientDetail({ client, onClose, consentTemplates = [], onSendConsentLin
     try {
       await deleteNote(id);
       setNotes(prev => (prev ?? []).filter(n => n.id !== id));
-    } catch { /* silent */ }
+    } catch (error) { showError(error); }
   }
 
   async function handleSaveProfile() {
@@ -410,7 +411,7 @@ function ClientDetail({ client, onClose, consentTemplates = [], onSendConsentLin
       setLinkSentId(templateId);
       setTimeout(() => setLinkSentId(null), 3000);
     } catch (e) {
-      alert(e.message);
+      showError(e);
     } finally {
       setLinkGeneratingId(null);
     }

@@ -198,6 +198,9 @@ function WalkInInner() {
 
   async function handleSubmit(e) {
     e.preventDefault();
+    if (!firstName.trim() || !lastName.trim()) { setSubmitError('Please provide your first and last name.'); return; }
+    if (!email.trim()) { setSubmitError('Please provide your email address.'); return; }
+    if (!phoneNum.trim()) { setSubmitError('Please provide your phone number.'); return; }
     if (field('body_location').enabled && placements.length === 0) { setSubmitError('Please select at least one placement.'); return; }
 
     // Validate consent form templates — only enforce required ones
@@ -339,20 +342,20 @@ function WalkInInner() {
           {/* ── About you ── */}
           <Section title="About you" first>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-              <Field label="First name">
+              <Field label={<>First name<Required /></>}>
                 <input style={s.input} type="text" value={firstName} required onChange={e => setFirstName(e.target.value)} placeholder="First" />
               </Field>
-              <Field label="Last name">
+              <Field label={<>Last name<Required /></>}>
                 <input style={s.input} type="text" value={lastName} required onChange={e => setLastName(e.target.value)} placeholder="Last" />
               </Field>
             </div>
             <Field label={<>Date of birth<Required /></>}>
               <input style={{ ...s.input, colorScheme: 'dark' }} type="date" value={dob} required onChange={e => setDob(e.target.value)} />
             </Field>
-            <Field label="Email">
+            <Field label={<>Email<Required /></>}>
               <input style={s.input} type="email" value={email} required onChange={e => setEmail(e.target.value)} placeholder="you@example.com" />
             </Field>
-            <Field label="Phone">
+            <Field label={<>Phone<Required /></>}>
               <div style={s.phoneRow}>
                 <select
                   style={{ ...s.input, ...s.phoneCodeSelect }}

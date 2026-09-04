@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { getSupabase } from '@/lib/supabase';
@@ -8,6 +8,7 @@ import { getMyStudioAccount, startBillingCheckout, openBillingPortal } from '@/l
 import { initTheme } from '@/lib/theme';
 import { useLanguage, LanguageProvider } from '@/lib/i18n';
 import NewAppointmentPanel from '@/components/NewAppointmentPanel';
+import FeedbackHost from '@/components/FeedbackHost';
 
 const NAV = [
   { href: '/dashboard/home',         tKey: 'nav_dashboard', icon: HomeIcon },
@@ -15,8 +16,33 @@ const NAV = [
   { href: '/dashboard/artists',      tKey: 'nav_artists',   icon: UsersIcon },
   { href: '/dashboard/clients',      tKey: 'nav_clients',   icon: PersonIcon },
   { href: '/dashboard/appointments', tKey: 'nav_bookings',  icon: CalendarIcon },
-  { href: '/dashboard/revenue',      tKey: 'nav_analytics', icon: ChartIcon },
+  { href: '/dashboard/analytics',    tKey: 'nav_analytics', icon: ChartIcon },
   { href: '/dashboard/financial',    tKey: 'revenue_financial', icon: RevenueIcon },
+];
+
+const TOUR_STEPS = [
+  {
+    title: 'Welcome to Vanta Studio.',
+    body: 'We’ll take a quick tour of how your studio works in Vanta and the important flows—from bookings and artists to payments and settings.',
+    action: 'Start tutorial',
+  },
+  ...NAV.map(({ href, tKey }, index) => ({
+    title: ['Your daily overview', 'Studio schedule', 'Your artists', 'Client records', 'Bookings', 'Analytics', 'Financials'][index],
+    body: [
+      'See what needs attention today, who is working, and how the week is filling up.',
+      'See every artist, station, and appointment in one calendar—without double-booking a chair.',
+      'Approve artists, manage availability, review their performance, and record payouts.',
+      'Keep client details, consent status, preferences, and booking history together.',
+      'Review incoming requests, confirm appointments, and keep deposits and follow-ups on track.',
+      'Understand appointment performance, returning clients, and studio growth at a glance.',
+      'Track revenue, payments, and how earnings are split across your studio.',
+    ][index],
+    target: 'nav', targetIndex: index, href, tKey,
+  })),
+  { title: 'Settings: Studio', body: 'Set your studio name, address, hours, branding, and the details clients see first.', target: 'settings', settingsTab: 'studio', href: '/dashboard/settings?tab=studio' },
+  { title: 'Settings: Bookings', body: 'Build your booking form, share your booking link or widget, set deposits, reminders, and client consent.', target: 'settings', settingsTab: 'bookings', href: '/dashboard/settings?tab=bookings' },
+  { title: 'Settings: Payments', body: 'Connect Stripe, choose how payments are handled, and control payouts across your studio.', target: 'settings', settingsTab: 'payments', href: '/dashboard/settings?tab=payments' },
+  { title: 'Settings: Account', body: 'Manage your subscription, billing details, and the account preferences that keep your studio running.', target: 'settings', settingsTab: 'account', href: '/dashboard/settings?tab=account' },
 ];
 
 // Mirrors the backend's subscriptionInactive() (internal/handlers/studio.go) exactly —
@@ -82,6 +108,7 @@ function getBillingIssue(subscriptionStatus) {
 export default function DashboardLayout({ children }) {
   return (
     <LanguageProvider>
+      <FeedbackHost />
       <DashboardShell>{children}</DashboardShell>
     </LanguageProvider>
   );
@@ -97,10 +124,36 @@ function DashboardShell({ children }) {
   const [subscriptionStatus, setSubscriptionStatus] = useState('');
   const [ready, setReady] = useState(false);
   const [appointmentPanelOpen, setAppointmentPanelOpen] = useState(false);
+  const [appointmentType, setAppointmentType] = useState('walkin');
+  const [tourStep, setTourStep] = useState(null);
+  const initializedRef = useRef(false);
+
+  useEffect(() => {
+    function openAppointment(event) {
+      setAppointmentType(event.detail?.bookingType ?? 'walkin');
+      setAppointmentPanelOpen(true);
+    }
+    window.addEventListener('vanta:open-new-appointment', openAppointment);
+    return () => window.removeEventListener('vanta:open-new-appointment', openAppointment);
+  }, []);
 
   useEffect(() => { initTheme(); }, []);
 
   useEffect(() => {
+    const settingsTab = TOUR_STEPS[tourStep]?.settingsTab;
+    if (settingsTab) document.body.dataset.vantaTourSettingsTab = settingsTab;
+    else delete document.body.dataset.vantaTourSettingsTab;
+    if (tourStep !== null) document.body.dataset.vantaTourActive = 'true';
+    else delete document.body.dataset.vantaTourActive;
+    return () => {
+      delete document.body.dataset.vantaTourSettingsTab;
+      delete document.body.dataset.vantaTourActive;
+    };
+  }, [tourStep]);
+
+  useEffect(() => {
+    if (initializedRef.current) return;
+    initializedRef.current = true;
     async function init() {
       const supabase = getSupabase();
       const { data: { session } } = await supabase.auth.getSession();
@@ -120,12 +173,29 @@ function DashboardShell({ children }) {
       setSubscriptionStatus(studioAccount.studio?.subscription_status ?? '');
 
       setBillingBlocked(subscriptionInactive(studioAccount.studio));
+      const tourKey = `vanta-studio-tour:${session.user.id}`;
+      const sessionTourKey = `vanta-studio-tour-session:${session.user.id}`;
+      const requestedTourKey = `vanta-studio-tour-start:${session.user.id}`;
+      const alwaysShowTour = session.user.email?.trim().toLowerCase() === 'studio@test.com';
+      // The test account starts the tour on each new login, not on every dashboard
+      // route transition or component remount within the same signed-in session.
+      const requestedByRoute = new URLSearchParams(window.location.search).get('tour') === '1';
+      const explicitlyRequested = sessionStorage.getItem(requestedTourKey) === 'true' || requestedByRoute;
+      const showTestTourThisSession = alwaysShowTour && (explicitlyRequested || !sessionStorage.getItem(sessionTourKey));
+      if (showTestTourThisSession) sessionStorage.setItem(sessionTourKey, 'shown');
+      sessionStorage.removeItem(requestedTourKey);
+      if (requestedByRoute) window.history.replaceState({}, '', '/dashboard/home');
+      if (showTestTourThisSession || !localStorage.getItem(tourKey)) setTourStep(0);
       setReady(true);
     }
     init();
   }, [router]);
 
   async function handleSignOut() {
+    if (user?.id) {
+      sessionStorage.removeItem(`vanta-studio-tour-session:${user.id}`);
+      sessionStorage.removeItem(`vanta-studio-tour-start:${user.id}`);
+    }
     await getSupabase().auth.signOut();
     router.replace('/');
   }
@@ -144,8 +214,20 @@ function DashboardShell({ children }) {
 
   const displayName = studioName || 'Studio';
 
+  function finishTour() {
+    if (user?.id) localStorage.setItem(`vanta-studio-tour:${user.id}`, 'complete');
+    setTourStep(null);
+  }
+
+  function moveTour(nextStep) {
+    const next = TOUR_STEPS[nextStep];
+    if (next?.href) router.push(next.href);
+    setTourStep(nextStep);
+  }
+
   return (
     <div style={s.shell}>
+      <style>{TOUR_HIGHLIGHT_CSS}</style>
       <div style={s.body}>
         <aside style={s.sidebar}>
           <div style={s.sidebarTop}>
@@ -154,14 +236,15 @@ function DashboardShell({ children }) {
               <span style={s.logoSub}>studio</span>
             </Link>
 
-            <button onClick={() => setAppointmentPanelOpen(true)} style={s.newApptBtn}>
+            <button onClick={() => { setAppointmentType('walkin'); setAppointmentPanelOpen(true); }} style={s.newApptBtn}>
               <PlusIcon size={13} />
               {t('new_appointment')}
             </button>
 
             <nav style={s.nav}>
-              {NAV.map(({ href, tKey, icon: Icon }) => {
+              {NAV.map(({ href, tKey, icon: Icon }, index) => {
                 const active = pathname.startsWith(href);
+                const highlighted = TOUR_STEPS[tourStep]?.target === 'nav' && TOUR_STEPS[tourStep]?.targetIndex === index;
                 return (
                   <Link
                     key={href}
@@ -169,6 +252,7 @@ function DashboardShell({ children }) {
                     style={{
                       ...s.navItem,
                       ...(active ? s.navActive : {}),
+                      ...(highlighted ? s.tourHighlight : {}),
                       color: active ? 'var(--accent)' : 'var(--text-muted)',
                     }}
                   >
@@ -191,6 +275,7 @@ function DashboardShell({ children }) {
                 href="/dashboard/settings"
                 style={{
                   ...s.gearBtn,
+                  ...(TOUR_STEPS[tourStep]?.target === 'settings' && !TOUR_STEPS[tourStep]?.settingsTab ? s.tourHighlight : {}),
                   color: pathname.startsWith('/dashboard/settings') ? 'var(--accent)' : 'var(--text-muted)',
                 }}
                 title="Settings"
@@ -206,9 +291,52 @@ function DashboardShell({ children }) {
 
       <NewAppointmentPanel
         open={appointmentPanelOpen}
+        initialBookingType={appointmentType}
         onClose={() => setAppointmentPanelOpen(false)}
         onCreated={() => {}}
       />
+
+      {tourStep !== null && (
+        <DashboardTour
+          step={tourStep}
+          onBack={() => moveTour(Math.max(0, tourStep - 1))}
+          onNext={() => tourStep === TOUR_STEPS.length - 1 ? finishTour() : moveTour(tourStep + 1)}
+          onSkip={finishTour}
+        />
+      )}
+    </div>
+  );
+}
+
+const TOUR_HIGHLIGHT_CSS = `
+body[data-vanta-tour-settings-tab="studio"] [data-tour-settings-tab="studio"],
+body[data-vanta-tour-settings-tab="bookings"] [data-tour-settings-tab="bookings"],
+body[data-vanta-tour-settings-tab="payments"] [data-tour-settings-tab="payments"],
+body[data-vanta-tour-settings-tab="account"] [data-tour-settings-tab="account"] {
+  position: relative !important;
+  z-index: 101 !important;
+  box-shadow: 0 0 0 1px var(--accent-active-border), 0 12px 30px rgba(0,0,0,0.28) !important;
+}
+`;
+
+function DashboardTour({ step, onBack, onNext, onSkip }) {
+  const item = TOUR_STEPS[step];
+  const isLast = step === TOUR_STEPS.length - 1;
+  return (
+    <div style={s.tourLayer} role="dialog" aria-modal="true" aria-label="Dashboard tour">
+      <div style={s.tourShade} />
+      <div style={s.tourCard}>
+        <span style={s.tourProgress}>{step === 0 ? 'WELCOME' : `${String(step).padStart(2, '0')} / ${String(TOUR_STEPS.length - 1).padStart(2, '0')}`}</span>
+        <h2 style={s.tourTitle}>{item.title}</h2>
+        <p style={s.tourBody}>{item.body}</p>
+        <div style={s.tourActions}>
+          <button type="button" onClick={onSkip} style={s.tourSkip}>Skip tour</button>
+          <div style={s.tourNavActions}>
+            {step > 0 && <button type="button" onClick={onBack} style={s.tourBack}>Back</button>}
+            <button type="button" onClick={onNext} style={s.tourNext}>{isLast ? 'Finish' : item.action ?? 'Next'} <span>→</span></button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -502,6 +630,10 @@ const s = {
   navActive: {
     background: 'var(--nav-active-bg)',
   },
+  tourHighlight: {
+    position: 'relative', zIndex: 101,
+    background: 'var(--accent-tint)', boxShadow: '0 0 0 1px var(--accent-active-border), 0 12px 30px rgba(0,0,0,0.24)',
+  },
   sidebarBottom: {
     padding: '0 1rem',
   },
@@ -560,4 +692,19 @@ const s = {
     flexDirection: 'column',
     background: 'var(--bg-base)',
   },
+  tourLayer: { position: 'fixed', inset: 0, zIndex: 100, pointerEvents: 'none' },
+  tourShade: { position: 'absolute', inset: 0, background: 'rgba(7,9,13,0.72)', backdropFilter: 'blur(2px)' },
+  tourCard: {
+    position: 'absolute', zIndex: 102, pointerEvents: 'auto', left: 244, top: '50%', transform: 'translateY(-50%)',
+    width: 440, padding: '1.8rem', borderRadius: 16, background: 'var(--bg-modal)', border: '1px solid var(--accent-tint-border)',
+    boxShadow: '0 24px 80px rgba(0,0,0,0.45)', display: 'flex', flexDirection: 'column', gap: '0.9rem',
+  },
+  tourProgress: { fontSize: '0.67rem', fontWeight: 700, color: 'var(--accent)', letterSpacing: '0.1em' },
+  tourTitle: { margin: 0, fontSize: '1.28rem', letterSpacing: '-0.025em', color: 'var(--text)' },
+  tourBody: { margin: 0, fontSize: '0.9rem', color: 'var(--text-muted)', lineHeight: 1.58 },
+  tourActions: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '0.6rem' },
+  tourNavActions: { display: 'flex', gap: '0.5rem' },
+  tourSkip: { border: 0, background: 'transparent', padding: 0, color: 'var(--text-ghost)', fontSize: '0.76rem', cursor: 'pointer' },
+  tourBack: { border: '1px solid var(--border)', borderRadius: 7, padding: '0.5rem 0.7rem', background: 'transparent', color: 'var(--text-muted)', fontSize: '0.76rem', cursor: 'pointer' },
+  tourNext: { border: 0, borderRadius: 7, padding: '0.5rem 0.75rem', background: 'var(--accent)', color: 'var(--accent-contrast)', fontSize: '0.76rem', fontWeight: 700, cursor: 'pointer', display: 'flex', gap: '0.45rem', alignItems: 'center' },
 };

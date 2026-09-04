@@ -8,6 +8,8 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from 'recharts';
 import { useLanguage } from '@/lib/i18n';
+import { requestConfirmation, showError } from '@/lib/feedback';
+import { getBookingSourceLabel } from '@/lib/bookingType';
 
 // This entire page (Financial + Artists & Payouts) is password-protected, but
 // only for the initial entry each browser session — unlock state persists in
@@ -80,9 +82,13 @@ export default function FinancialPage() {
   // Load payout summaries + reimbursement requests once unlocked.
   useEffect(() => {
     if (!unlocked) return;
-    getPayoutSummaries().then(d => setPayouts(d.payouts ?? [])).catch(() => {});
-    getReimbursements().then(d => setReimbursements(d.reimbursements ?? [])).catch(() => {});
-    getMyStudioAccount().then(d => setPaymentRequirement(d.studio?.payment_recording_requirement ?? 'studio_only')).catch(() => {});
+    Promise.all([getPayoutSummaries(), getReimbursements(), getMyStudioAccount()])
+      .then(([payoutData, reimbursementData, accountData]) => {
+        setPayouts(payoutData.payouts ?? []);
+        setReimbursements(reimbursementData.reimbursements ?? []);
+        setPaymentRequirement(accountData.studio?.payment_recording_requirement ?? 'studio_only');
+      })
+      .catch(error => setError(error?.message || 'Financial data could not be loaded.'));
   }, [unlocked]);
 
   async function handleReviewReimbursement(id, action) {
@@ -93,7 +99,7 @@ export default function FinancialPage() {
       setReimbursements(r.reimbursements ?? []);
       setPayouts(p.payouts ?? []); // approved claims change outstanding amounts
     } catch (e) {
-      alert(e.message);
+      showError(e);
     } finally {
       setReviewingReimbursement(null);
     }
@@ -318,12 +324,12 @@ function FinancialContent({ s, weeklyChart, startDate, endDate, isLight }) {
                   contentStyle={{ background: tooltipBg, border: `1px solid ${tooltipBorder}`, borderRadius: 8, fontSize: 12, color: tooltipColor }}
                   labelStyle={{ color: tickColor }}
                 />
-                <Bar dataKey="gross"    fill="rgba(245,236,217,0.55)" radius={[3,3,0,0]} name="Gross sales" />
+                <Bar dataKey="gross"    fill="var(--accent)" fillOpacity={0.72} radius={[3,3,0,0]} name="Gross sales" />
                 <Bar dataKey="deposits" fill="rgba(111,163,232,0.4)"  radius={[3,3,0,0]} name="Deposits" />
               </BarChart>
             </ResponsiveContainer>
             <div style={st.legend}>
-              <LegendDot color="rgba(245,236,217,0.8)" label="Gross sales" />
+              <LegendDot color="var(--accent)" label="Gross sales" />
               <LegendDot color="rgba(111,163,232,0.8)" label="Deposits" />
             </div>
           </div>
@@ -622,7 +628,7 @@ function PayoutPanel({ artist, onClose, onPaid }) {
   }
 
   async function handleDelete(payoutId) {
-    if (!confirm('Delete this payout record?')) return;
+    if (!await requestConfirmation({ title: 'Delete payout record?', message: 'This removes the payout record and cannot be undone.', confirmLabel: 'Delete payout', danger: true })) return;
     setDeleting(payoutId);
     try {
       await deletePayout(payoutId);
@@ -841,9 +847,6 @@ function EarningsPanel({ artist, requirement, onClose }) {
     if (!iso) return '—';
     return new Date(iso).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
   }
-  function fmtSource(s) {
-    return ({ app: 'App', studio: 'Studio', manual: 'Manual', import: 'Import' })[s] ?? s;
-  }
 
   function fmtMethod(m) {
     return ({ cash: 'Cash', bank_transfer: 'Bank transfer', card: 'Card', online: 'Online' })[m] ?? m;
@@ -926,7 +929,7 @@ function EarningsPanel({ artist, requirement, onClose }) {
                     <tr key={e.booking_id} style={{ ...st.tr, background: e.paid ? 'transparent' : 'rgba(245,158,58,0.05)' }}>
                       <td style={{ ...st.td, whiteSpace: 'nowrap' }}>{fmtDate(e.chosen_time)}</td>
                       <td style={{ ...st.td, color: 'var(--text)', fontWeight: 500 }}>{e.client_name}</td>
-                      <td style={st.td}>{fmtSource(e.source)}</td>
+                      <td style={st.td}>{getBookingSourceLabel(e.source)}</td>
                       <td style={st.td}><PaymentCell entry={e} /></td>
                       <td style={st.td}>{fmt(e.gross)}</td>
                       <td style={{ ...st.td, fontWeight: 600, color: '#4cc98a' }}>{fmt(e.artist_cut)}</td>
