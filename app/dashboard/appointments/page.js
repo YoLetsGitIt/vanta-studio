@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { listStudioBookings, getStudioArtists, getStripeStatus } from '@/lib/api';
+import { listStudioBookings, getStudioArtists, getStripeStatus, getStudioBooking } from '@/lib/api';
 import { getCached, setCached, invalidatePrefix } from '@/lib/cache';
 import { statusColors, statusLabel, capitalise } from '@/lib/status';
 import { getBookingStyle } from '@/lib/bookingType';
@@ -82,6 +82,7 @@ function AppointmentsInner() {
   const [rescheduleSaving, setRescheduleSaving] = useState(false);
   const [studioArtists, setStudioArtists] = useState([]);
   const [stripeConnected, setStripeConnected] = useState(false);
+  const requestedBookingId = searchParams.get('booking');
 
   const activeSub = activeFilter === COMPLETED_TAB
     ? (COMPLETED_SUB_FILTERS.find(f => f.value === completedSubFilter) ?? COMPLETED_SUB_FILTERS[0])
@@ -132,6 +133,23 @@ function AppointmentsInner() {
       setLoading(false);
     }
   }, [effectiveStatus, effectiveOutcome, sortDir]);
+
+  useEffect(() => {
+    if (!requestedBookingId || loading) return;
+    if (bookings.some(booking => booking.id === requestedBookingId)) {
+      setSelected(requestedBookingId);
+      return;
+    }
+    let cancelled = false;
+    getStudioBooking(requestedBookingId)
+      .then(booking => {
+        if (cancelled || !booking?.id) return;
+        setBookings(current => current.some(item => item.id === booking.id) ? current : [booking, ...current]);
+        setSelected(booking.id);
+      })
+      .catch(showError);
+    return () => { cancelled = true; };
+  }, [requestedBookingId, loading, bookings]);
 
   useEffect(() => { load(); }, [load]);
 

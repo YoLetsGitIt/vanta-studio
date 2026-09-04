@@ -1,13 +1,15 @@
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { createManualBooking, getStudioSchedule } from '@/lib/api';
+import { useRouter } from 'next/navigation';
+import { createManualBooking, generateConsentLink, getStudioSchedule } from '@/lib/api';
 import { useStationAvailability } from '@/lib/useStationAvailability';
 import { useNewAppointmentData } from '@/lib/useNewAppointmentData';
 import { invalidatePrefix } from '@/lib/cache';
 import { formatDob } from '@/lib/format';
 import { useLanguage } from '@/lib/i18n';
-import { requestConfirmation } from '@/lib/feedback';
+import { requestConfirmation, showError, showFeedback } from '@/lib/feedback';
+import { bookingActions } from '@/lib/bookingActions';
 
 const DURATION_OPTIONS = [
   { label: '30 min', value: 30 },
@@ -106,6 +108,7 @@ function TimeSelect({ value, onChange, label }) {
 
 export default function NewAppointmentPanel({ open, onClose, onCreated, initialBookingType = 'personal' }) {
   const { t } = useLanguage();
+  const router = useRouter();
   const panelRef = useRef(null);
   const closeButtonRef = useRef(null);
   const previouslyFocusedRef = useRef(null);
@@ -368,13 +371,41 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
       if (depositMode === 'paid') body.deposit_paid = true;
       if (notes.trim()) body.notes = notes.trim();
       body.source = bookingType;
-      await createManualBooking(body);
+      const createdBooking = await createManualBooking(body);
       invalidatePrefix('bookings:');
       invalidatePrefix('schedule:');
       window.dispatchEvent(new CustomEvent('booking-created'));
       resetForm();
       onCreated?.();
       onClose();
+      const bookingId = createdBooking?.id;
+      const actions = [{
+        label: 'View booking',
+        onClick: () => router.push(`/dashboard/appointments?status=confirmed${bookingId ? `&booking=${encodeURIComponent(bookingId)}` : ''}`),
+      }];
+      if (bookingId && clientEmail.trim() && depositEnabled && depositMode === 'later' && da > 0 && stripeConnected) {
+        actions.push({
+          label: 'Send deposit link',
+          onClick: async () => {
+            try {
+              await bookingActions.sendSelectionLink(bookingId, { expiresHours: 168, depositRequired: true, depositAmount: da, durationMinutes: durationMins, estimatedQuote: fp || null, artistId });
+              showFeedback('Deposit payment link sent.', 'success');
+            } catch (sendError) { showError(sendError); }
+          },
+        });
+      }
+      if (clientEmail.trim()) {
+        actions.push({
+          label: 'Send consent form',
+          onClick: async () => {
+            try {
+              await generateConsentLink(clientEmail.trim(), undefined, clientDob.trim() || undefined);
+              showFeedback('Consent form sent.', 'success');
+            } catch (sendError) { showError(sendError); }
+          },
+        });
+      }
+      showFeedback('Appointment created successfully.', 'success', actions);
     } catch (err) {
       setError(err.message);
     } finally {

@@ -25,7 +25,7 @@ import CompleteBookingModal from '@/components/CompleteBookingModal';
 import RejectBookingModal from '@/components/RejectBookingModal';
 import SendSelectionLinkModal from '@/components/SendSelectionLinkModal';
 import DashboardQuickActions from '@/components/DashboardQuickActions';
-import { requestConfirmation, showError } from '@/lib/feedback';
+import { requestConfirmation, showError, showFeedback } from '@/lib/feedback';
 import { bookingActions } from '@/lib/bookingActions';
 
 
@@ -79,6 +79,7 @@ export default function HomePage() {
   const [pendingArtists, setPendingArtists] = useState([]);
   const [pendingReimbursements, setPendingReimbursements] = useState([]);
   const [unpaidDepositBookings, setUnpaidDepositBookings] = useState([]);
+  const [sentDepositLink, setSentDepositLink] = useState(null);
   const [sendLinkOpen, setSendLinkOpen] = useState(false);
   const [stripeConnected, setStripeConnected] = useState(false);
   const [loadError, setLoadError] = useState('');
@@ -283,6 +284,22 @@ export default function HomePage() {
     }
   }
 
+  async function sendDepositPaymentLink(booking) {
+    const actionKey = `deposit-${booking.id}`;
+    await runAttentionAction(actionKey, () => bookingActions.sendSelectionLink(booking.id, {
+      expiresHours: 168,
+      depositRequired: true,
+      depositAmount: Number(booking.deposit_amount),
+      durationMinutes: booking.proposed_duration_minutes ?? booking.duration_minutes ?? 60,
+      estimatedQuote: booking.estimated_quote ?? null,
+      artistId: booking.artist_id || null,
+    }), () => {
+      setSentDepositLink(booking.id);
+      showFeedback('Deposit payment link sent.', 'success');
+      setTimeout(() => setSentDepositLink(current => current === booking.id ? null : current), 3000);
+    });
+  }
+
   // Group today by artist
   const byArtist = {};
   for (const entry of todayEntries) {
@@ -394,7 +411,14 @@ export default function HomePage() {
                 <AttentionGroup title="Unpaid deposits" icon="card" count={awaitingPaymentCount} subtitle="Deposit not yet received" open={!!openAttentionGroups.payment} onToggle={() => toggleAttentionGroup('payment')}>
                   {unpaidDepositBookings.map(booking => (
                     <AttentionItem key={booking.id} title={booking.requester_name ?? 'Client'} subtitle={bookingSubtitle(booking)}>
-                      <button style={s.inlineSecondary} onClick={() => openBookingReview(booking)}>Open booking</button>
+                      <button
+                        style={s.inlinePrimary}
+                        disabled={attentionAction === `deposit-${booking.id}` || !booking.requester_email}
+                        title={!booking.requester_email ? 'Add a client email before sending a deposit link' : undefined}
+                        onClick={() => sendDepositPaymentLink(booking)}
+                      >
+                        {sentDepositLink === booking.id ? 'Sent ✓' : attentionAction === `deposit-${booking.id}` ? 'Sending…' : 'Send deposit link'}
+                      </button>
                     </AttentionItem>
                   ))}
                 </AttentionGroup>
@@ -404,7 +428,7 @@ export default function HomePage() {
                 <AttentionGroup title="Incomplete past sessions" icon="clock" count={overdueBookings.length} subtitle="Past sessions still need an outcome and payment" open={!!openAttentionGroups.overdue} onToggle={() => toggleAttentionGroup('overdue')}>
                   {overdueBookings.map(booking => (
                     <AttentionItem key={booking.id} title={booking.requester_name ?? 'Client'} subtitle={bookingSubtitle(booking)}>
-                      <button style={s.inlinePrimary} onClick={() => openBookingReview(booking)}>Record outcome</button>
+                      <button style={s.inlinePrimary} onClick={() => setCompleteBooking(booking)}>Record outcome</button>
                     </AttentionItem>
                   ))}
                 </AttentionGroup>
