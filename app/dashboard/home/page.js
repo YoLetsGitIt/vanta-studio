@@ -22,6 +22,7 @@ import { useRouter } from 'next/navigation';
 import { initials, toISODate } from '@/lib/format';
 import BookingDetailPanel from '@/components/BookingDetailPanel';
 import CompleteBookingModal from '@/components/CompleteBookingModal';
+import RejectBookingModal from '@/components/RejectBookingModal';
 import SendSelectionLinkModal from '@/components/SendSelectionLinkModal';
 import DashboardQuickActions from '@/components/DashboardQuickActions';
 import { requestConfirmation, showError } from '@/lib/feedback';
@@ -74,6 +75,7 @@ export default function HomePage() {
   const [reviewBooking, setReviewBooking] = useState(null);
   const [reviewLoading, setReviewLoading] = useState(false);
   const [completeBooking, setCompleteBooking] = useState(null);
+  const [rejectBooking, setRejectBooking] = useState(null);
   const [pendingArtists, setPendingArtists] = useState([]);
   const [pendingReimbursements, setPendingReimbursements] = useState([]);
   const [unpaidDepositBookings, setUnpaidDepositBookings] = useState([]);
@@ -250,6 +252,16 @@ export default function HomePage() {
     await runAttentionAction(completeBooking.id, () => bookingActions.complete(completeBooking.id, { finalPrice, paymentSplits }), () => {
       setOverdueBookings(items => items.filter(item => item.id !== completeBooking.id));
       setCompleteBooking(null);
+      setReviewBooking(null);
+    });
+  }
+
+  async function rejectReviewedBooking(reason) {
+    if (!rejectBooking?.id) return;
+    await runAttentionAction(rejectBooking.id, () => bookingActions.reject(rejectBooking.id, reason), () => {
+      setPendingBookings(items => items.filter(item => item.id !== rejectBooking.id));
+      setPendingCount(count => Math.max(0, count - 1));
+      setRejectBooking(null);
       setReviewBooking(null);
     });
   }
@@ -549,6 +561,7 @@ export default function HomePage() {
           onConfirm={reviewBooking.status === 'requires_confirmation' ? confirmReviewedBooking : undefined}
           onComplete={reviewBooking.status === 'confirmed' ? () => setCompleteBooking(reviewBooking) : undefined}
           onSendLink={reviewBooking.status === 'pending' || reviewBooking.status === 'awaiting_payment' ? openSendLink : undefined}
+          onReject={reviewBooking.status === 'pending' || reviewBooking.status === 'awaiting_payment' ? () => setRejectBooking(reviewBooking) : undefined}
           actionLoading={attentionAction === reviewBooking.id}
         />
       )}
@@ -564,6 +577,14 @@ export default function HomePage() {
           onConfirm={completeReviewedBooking}
           onCancel={() => setCompleteBooking(null)}
           saving={attentionAction === completeBooking.id}
+        />
+      )}
+
+      {rejectBooking && (
+        <RejectBookingModal
+          saving={attentionAction === rejectBooking.id}
+          onConfirm={rejectReviewedBooking}
+          onCancel={() => setRejectBooking(null)}
         />
       )}
     </div>
