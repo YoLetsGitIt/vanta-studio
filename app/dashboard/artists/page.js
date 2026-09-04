@@ -743,14 +743,14 @@ function ArtistDetail({ artist, onBack, onApprove, onReject, onRemove, onToggleA
                   disabled={actionLoading}
                   style={{
                     flexShrink: 0,
-                    width: 44, height: 24, borderRadius: 12, border: 'none', cursor: actionLoading ? 'default' : 'pointer',
-                    background: artist.acceptingBookings ? 'var(--accent)' : 'var(--border-strong)',
+                    width: 44, height: 24, borderRadius: 12, border: '1px solid var(--switch-edge)', cursor: actionLoading ? 'default' : 'pointer',
+                    background: artist.acceptingBookings ? 'var(--switch-on)' : 'var(--switch-off)',
                     position: 'relative', transition: 'background 0.2s', opacity: actionLoading ? 0.5 : 1,
                   }}
                 >
                   <span style={{
                     position: 'absolute', top: 3, left: artist.acceptingBookings ? 22 : 3,
-                    width: 18, height: 18, borderRadius: '50%', background: '#fff',
+                    width: 18, height: 18, borderRadius: '50%', background: 'var(--switch-thumb)', boxShadow: '0 1px 3px rgba(0,0,0,0.65)',
                     transition: 'left 0.2s', display: 'block',
                   }} />
                 </button>

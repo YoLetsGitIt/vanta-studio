@@ -1155,14 +1155,14 @@ export default function SettingsPage() {
                 type="button"
                 onClick={() => setPayForfeitedDeposits(v => !v)}
                 style={{
-                  width: 44, height: 24, borderRadius: 12, border: 'none', cursor: 'pointer',
-                  background: payForfeitedDeposits ? 'var(--accent)' : 'var(--bg-chip)',
+                  width: 44, height: 24, borderRadius: 12, border: '1px solid var(--switch-edge)', cursor: 'pointer',
+                  background: payForfeitedDeposits ? 'var(--switch-on)' : 'var(--switch-off)',
                   position: 'relative', transition: 'background 0.2s', flexShrink: 0,
                 }}
               >
                 <span style={{
                   position: 'absolute', top: 3, left: payForfeitedDeposits ? 23 : 3, width: 18, height: 18,
-                  borderRadius: '50%', background: '#fff', transition: 'left 0.2s',
+                  borderRadius: '50%', background: 'var(--switch-thumb)', boxShadow: '0 1px 3px rgba(0,0,0,0.65)', transition: 'left 0.2s',
                 }} />
               </button>
             </div>
@@ -1254,14 +1254,14 @@ export default function SettingsPage() {
               <button
                 onClick={() => { setSendReminder7d(v => !v); }}
                 style={{
-                  width: 44, height: 24, borderRadius: 12, border: 'none', cursor: 'pointer',
-                  background: sendReminder7d ? 'var(--accent)' : 'var(--bg-chip)',
+                  width: 44, height: 24, borderRadius: 12, border: '1px solid var(--switch-edge)', cursor: 'pointer',
+                  background: sendReminder7d ? 'var(--switch-on)' : 'var(--switch-off)',
                   position: 'relative', transition: 'background 0.2s', flexShrink: 0,
                 }}
               >
                 <span style={{
                   position: 'absolute', top: 3, left: sendReminder7d ? 23 : 3, width: 18, height: 18,
-                  borderRadius: '50%', background: '#fff', transition: 'left 0.2s',
+                  borderRadius: '50%', background: 'var(--switch-thumb)', boxShadow: '0 1px 3px rgba(0,0,0,0.65)', transition: 'left 0.2s',
                 }} />
               </button>
             </div>
@@ -1273,14 +1273,14 @@ export default function SettingsPage() {
               <button
                 onClick={() => { setSendReminder24h(v => !v); }}
                 style={{
-                  width: 44, height: 24, borderRadius: 12, border: 'none', cursor: 'pointer',
-                  background: sendReminder24h ? 'var(--accent)' : 'var(--bg-chip)',
+                  width: 44, height: 24, borderRadius: 12, border: '1px solid var(--switch-edge)', cursor: 'pointer',
+                  background: sendReminder24h ? 'var(--switch-on)' : 'var(--switch-off)',
                   position: 'relative', transition: 'background 0.2s', flexShrink: 0,
                 }}
               >
                 <span style={{
                   position: 'absolute', top: 3, left: sendReminder24h ? 23 : 3, width: 18, height: 18,
-                  borderRadius: '50%', background: '#fff', transition: 'left 0.2s',
+                  borderRadius: '50%', background: 'var(--switch-thumb)', boxShadow: '0 1px 3px rgba(0,0,0,0.65)', transition: 'left 0.2s',
                 }} />
               </button>
             </div>
