@@ -314,7 +314,7 @@ function ArtistOnboardingGuide({ studioName, copied, onCopy, onSkip, onViewReque
 
           {isDownload ? (
             <div style={s.downloadCard}>
-              <div style={s.qrBox}><QRCodeSVG value={APP_STORE_URL} size={126} bgColor="#ffffff" fgColor="#11151d" /></div>
+              <div style={s.qrBox}><QRCodeSVG value={APP_STORE_URL} size={126} bgColor="#d5d0c7" fgColor="#080808" marginSize={2} /></div>
               <div>
                 <strong style={s.downloadTitle}>Download Vanta for iPhone</strong>
                 <p style={s.downloadText}>Have your artist scan this QR code, then open the app and create an Artist account.</p>
@@ -868,7 +868,7 @@ function ArtistRemoveModal({ onConfirm, onCancel, saving, existingEndDate }) {
             style={{
               flex: 2, padding: '0.7rem', borderRadius: 8, border: 'none',
               background: saving ? 'var(--bg-chip)' : isToday ? 'rgba(232,111,111,0.85)' : 'var(--accent)',
-              color: saving ? 'var(--text-ghost)' : isToday ? '#fff' : '#0d1017',
+              color: saving ? 'var(--text-ghost)' : isToday ? '#fff' : '#0a0a0a',
               cursor: saving ? 'default' : 'pointer', fontSize: '0.9rem', fontWeight: 700, fontFamily: 'inherit',
             }}
           >
@@ -881,7 +881,7 @@ function ArtistRemoveModal({ onConfirm, onCancel, saving, existingEndDate }) {
 }
 
 const s = {
-  artistGuideOverlay: { position: 'fixed', inset: 0, zIndex: 1000, display: 'grid', placeItems: 'center', padding: '1.25rem', background: 'rgba(5,7,11,0.82)', backdropFilter: 'blur(9px)' },
+  artistGuideOverlay: { position: 'fixed', inset: 0, zIndex: 1000, display: 'grid', placeItems: 'center', padding: '1.25rem', background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(9px)' },
   artistGuideCard: { width: 'min(100%, 1000px)', minHeight: 570, maxHeight: 'calc(100vh - 2.5rem)', overflow: 'auto', position: 'relative', display: 'grid', gridTemplateColumns: 'minmax(0, 1.1fr) minmax(270px, 0.9fr)', gap: '2.5rem', padding: '2.5rem', borderRadius: 20, background: 'var(--bg-modal)', border: '1px solid var(--accent-tint-border)', boxShadow: '0 32px 110px rgba(0,0,0,0.54)' },
   artistGuideClose: { position: 'absolute', top: 16, right: 17, width: 34, height: 34, border: '1px solid var(--border)', borderRadius: '50%', background: 'transparent', color: 'var(--text-muted)', fontSize: '1.4rem', lineHeight: 1, cursor: 'pointer' },
   artistGuideContent: { display: 'flex', flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'center', minWidth: 0 },
@@ -909,7 +909,7 @@ const s = {
   approvalPreviewIcon: { width: 44, height: 44, display: 'grid', placeItems: 'center', borderRadius: '50%', background: 'rgba(76,201,138,0.14)', border: '1px solid rgba(76,201,138,0.35)', color: '#58d79b', fontWeight: 800 },
   approvalPreviewTitle: { color: 'var(--text)', fontSize: '1rem' },
   approvalPreviewText: { color: 'var(--text-ghost)', fontSize: '0.75rem', lineHeight: 1.55 },
-  pendingReviewLocation: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.35rem', padding: '0.7rem', borderRadius: 9, background: '#10141c', border: '1px solid var(--border)', color: 'var(--text)' },
+  pendingReviewLocation: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.35rem', padding: '0.7rem', borderRadius: 9, background: 'var(--bg-panel)', border: '1px solid var(--border)', color: 'var(--text)' },
   pendingReviewLocationTitle: { fontSize: '0.66rem', fontWeight: 700 },
   pendingReviewLocationArrow: { marginLeft: 'auto', color: 'var(--accent)', fontSize: '1rem' },
   pendingReviewLocationButton: { padding: '0.42rem 0.48rem', borderRadius: 6, border: '1px solid var(--accent-active-border)', background: 'var(--accent-tint)', color: 'var(--accent)', fontSize: '0.58rem', fontWeight: 700 },
@@ -983,7 +983,7 @@ const s = {
   pendingCount: {
     fontSize: '0.7rem',
     fontWeight: 700,
-    color: '#0d1017',
+    color: '#0a0a0a',
     background: '#f59e3a',
     borderRadius: 20,
     padding: '0.1rem 0.45rem',

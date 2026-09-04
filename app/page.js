@@ -190,7 +190,7 @@ const GLOBAL_CSS = `
   position: absolute;
   top: 0; left: 20%; right: 20%;
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(245,236,217,0.5), transparent);
+  background: linear-gradient(90deg, transparent, rgba(213,208,199,0.5), transparent);
 }
 .vanta-card--signup { transform-origin: 50% 58%; animation: vanta-signup-card-in 1.05s cubic-bezier(0.16, 1, 0.3, 1) both; }
 .vanta-card--signup > * { animation: vanta-signup-content-in 0.72s cubic-bezier(0.16, 1, 0.3, 1) 0.32s both; }
@@ -246,7 +246,7 @@ const s = {
   wordmarkSub: {
     fontSize: '1.1rem',
     fontWeight: 500,
-    color: 'rgba(245,236,217,0.7)',
+    color: 'rgba(213,208,199,0.7)',
     letterSpacing: '0.02em',
   },
   authHeading: {
@@ -280,7 +280,7 @@ const s = {
   switchLink: {
     background: 'none',
     border: 'none',
-    color: '#f5ecd9',
+    color: '#d5d0c7',
     fontWeight: 600,
     fontSize: 'inherit',
     cursor: 'pointer',

@@ -477,7 +477,7 @@ function WalkInInner() {
 
             {field('retouch').enabled && (
               <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: 'rgba(255,255,255,0.7)', cursor: 'pointer' }}>
-                <input type="checkbox" checked={retouch} onChange={e => setRetouch(e.target.checked)} style={{ width: 16, height: 16, accentColor: '#f5ecd9', cursor: 'pointer' }} />
+                <input type="checkbox" checked={retouch} onChange={e => setRetouch(e.target.checked)} style={{ width: 16, height: 16, accentColor: '#d5d0c7', cursor: 'pointer' }} />
                 This is a touch-up / retouch
               </label>
             )}
@@ -521,7 +521,7 @@ function WalkInInner() {
             {field('allergies').enabled && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: 'rgba(255,255,255,0.7)', cursor: 'pointer' }}>
-                  <input type="checkbox" checked={hasAllergies} onChange={e => { setHasAllergies(e.target.checked); if (!e.target.checked) setAllergyDetails(''); }} style={{ width: 16, height: 16, accentColor: '#f5ecd9', cursor: 'pointer' }} />
+                  <input type="checkbox" checked={hasAllergies} onChange={e => { setHasAllergies(e.target.checked); if (!e.target.checked) setAllergyDetails(''); }} style={{ width: 16, height: 16, accentColor: '#d5d0c7', cursor: 'pointer' }} />
                   I have allergies or sensitivities{field('allergies').required ? '' : ' (optional)'}
                 </label>
                 {hasAllergies && (
@@ -582,7 +582,7 @@ function WalkInInner() {
                         type="checkbox"
                         checked={!!ts.answers?.__agreed__}
                         onChange={e => setTemplateAnswer(t.id, '__agreed__', e.target.checked ? 'true' : '')}
-                        style={{ accentColor: '#f5ecd9', flexShrink: 0, marginTop: 2 }}
+                        style={{ accentColor: '#d5d0c7', flexShrink: 0, marginTop: 2 }}
                       />
                       <span style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.7)', lineHeight: 1.5 }}>
                         I have read and agreed to the above <span style={{ color: '#e86f6f' }}>*</span>
@@ -662,14 +662,14 @@ function ConsentFormField({ field, value, onChange }) {
   };
   switch (field.type) {
     case 'heading':
-      return <p style={{ fontSize: '0.9rem', fontWeight: 700, color: '#f5ecd9', margin: 0 }}>{field.label}</p>;
+      return <p style={{ fontSize: '0.9rem', fontWeight: 700, color: '#d5d0c7', margin: 0 }}>{field.label}</p>;
     case 'paragraph':
       return <p style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.55)', margin: 0, lineHeight: 1.65, maxHeight: 160, overflowY: 'auto', whiteSpace: 'pre-wrap' }}>{field.label}</p>;
     case 'checkbox':
       return (
         <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6rem', cursor: 'pointer' }}>
           <input type="checkbox" checked={!!value} onChange={e => onChange(e.target.checked ? 'true' : '')}
-            style={{ accentColor: '#f5ecd9', flexShrink: 0, marginTop: 2 }} />
+            style={{ accentColor: '#d5d0c7', flexShrink: 0, marginTop: 2 }} />
           <span style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.7)', lineHeight: 1.5 }}>
             {field.label}{field.required && <span style={{ color: '#e86f6f', marginLeft: 2 }}>*</span>}
           </span>
@@ -687,9 +687,9 @@ function ConsentFormField({ field, value, onChange }) {
                 onClick={() => onChange(opt)}
                 style={{
                   padding: '0.45rem 1.2rem', borderRadius: 8,
-                  border: `1px solid ${value === opt ? '#f5ecd9' : 'rgba(255,255,255,0.12)'}`,
-                  background: value === opt ? 'rgba(245,236,217,0.12)' : 'rgba(255,255,255,0.04)',
-                  color: value === opt ? '#f5ecd9' : 'rgba(255,255,255,0.5)',
+                  border: `1px solid ${value === opt ? '#d5d0c7' : 'rgba(255,255,255,0.12)'}`,
+                  background: value === opt ? 'rgba(213,208,199,0.12)' : 'rgba(255,255,255,0.04)',
+                  color: value === opt ? '#d5d0c7' : 'rgba(255,255,255,0.5)',
                   fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
                 }}>{opt}</button>
             ))}
@@ -747,7 +747,7 @@ function SignaturePad({ onCapture }) {
     const { x, y } = getPos(e);
     const ctx = canvasRef.current.getContext('2d');
     ctx.lineTo(x, y);
-    ctx.strokeStyle = '#f5ecd9';
+    ctx.strokeStyle = '#d5d0c7';
     ctx.lineWidth = 2;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
@@ -906,7 +906,7 @@ const s = {
     resize: 'vertical',
   },
   submitBtn: {
-    background: '#f5ecd9',
+    background: '#d5d0c7',
     border: 'none',
     borderRadius: 10,
     color: '#0e0e0e',
@@ -931,9 +931,9 @@ const s = {
     fontFamily: 'inherit',
   },
   placementChipActive: {
-    background: 'rgba(245,236,217,0.12)',
-    border: '1px solid rgba(245,236,217,0.35)',
-    color: '#f5ecd9',
+    background: 'rgba(213,208,199,0.12)',
+    border: '1px solid rgba(213,208,199,0.35)',
+    color: '#d5d0c7',
   },
   placementChipDisabled: {
     opacity: 0.3,
@@ -957,18 +957,18 @@ const s = {
   sigClear: { background: 'none', border: 'none', fontSize: '0.72rem', color: 'rgba(255,255,255,0.35)', cursor: 'pointer', padding: '0.15rem 0', fontFamily: 'inherit' },
   consentText: { fontSize: '0.8rem', color: 'rgba(255,255,255,0.55)', margin: 0, lineHeight: 1.65, maxHeight: 160, overflowY: 'auto' },
   consentCheck: { display: 'flex', alignItems: 'flex-start', gap: '0.6rem', fontSize: '0.8rem', color: 'rgba(255,255,255,0.7)', cursor: 'pointer' },
-  consentFormTitle: { fontSize: '0.9rem', fontWeight: 700, color: '#f5ecd9' },
+  consentFormTitle: { fontSize: '0.9rem', fontWeight: 700, color: '#d5d0c7' },
   formTypeBadge: { fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', padding: '0.15rem 0.5rem', borderRadius: 4 },
   formTypeBadgeColors: {
-    consent: { background: 'rgba(245,236,217,0.1)', color: '#f5ecd9' },
+    consent: { background: 'rgba(213,208,199,0.1)', color: '#d5d0c7' },
     waiver:  { background: 'rgba(232,111,111,0.12)', color: '#e86f6f' },
     health:  { background: 'rgba(76,201,138,0.12)', color: '#4cc98a' },
   },
   guardianBox: {
-    background: 'rgba(245,236,217,0.04)', border: '1px solid rgba(245,236,217,0.12)',
+    background: 'rgba(213,208,199,0.04)', border: '1px solid rgba(213,208,199,0.12)',
     borderRadius: 10, padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.65rem',
   },
-  guardianTitle: { fontSize: '0.8rem', fontWeight: 700, color: '#f5ecd9', margin: 0 },
+  guardianTitle: { fontSize: '0.8rem', fontWeight: 700, color: '#d5d0c7', margin: 0 },
   switchLink: {
     background: 'none', border: 'none',
     color: 'rgba(255,255,255,0.35)',

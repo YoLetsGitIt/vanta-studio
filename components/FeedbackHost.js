@@ -72,7 +72,7 @@ const styles = {
   error: { borderColor: 'rgba(224,96,96,0.42)' },
   success: { borderColor: 'var(--accent-tint-border)' },
   dismiss: { marginLeft: 'auto', border: 0, background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '1.1rem', lineHeight: 1 },
-  overlay: { position: 'fixed', inset: 0, zIndex: 10001, display: 'grid', placeItems: 'center', padding: 20, background: 'rgba(5,7,10,0.72)', backdropFilter: 'blur(3px)' },
+  overlay: { position: 'fixed', inset: 0, zIndex: 10001, display: 'grid', placeItems: 'center', padding: 20, background: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(3px)' },
   dialog: { width: 'min(430px, 100%)', borderRadius: 14, border: '1px solid var(--border)', background: 'var(--bg-modal)', boxShadow: '0 24px 80px rgba(0,0,0,0.5)', padding: '1.4rem' },
   title: { margin: 0, color: 'var(--text)', fontSize: '1.05rem' },
   message: { margin: '0.65rem 0 1.3rem', color: 'var(--text-muted)', fontSize: '0.87rem', lineHeight: 1.55 },

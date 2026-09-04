@@ -156,7 +156,7 @@ export default function RevenuePage() {
 
 // ── Small components ──────────────────────────────────────────────────────────
 
-const SOURCE_COLORS = { App: '#6fa3e8', Studio: '#f59e3a', 'Walk-in': '#4abaa8', Personal: '#a78bfa', Imported: '#8c9aaa' };
+const SOURCE_COLORS = { App: '#d5d0c7', Studio: '#bdb8af', 'Walk-in': '#a7a29a', Personal: '#918d86', Imported: '#77746f' };
 
 function SourceBreakdown({ data }) {
   const total = data.reduce((s, d) => s + d.count, 0);
@@ -169,7 +169,7 @@ function SourceBreakdown({ data }) {
   const chartData = Array.from(grouped, ([name, value]) => ({
     name,
     value,
-    color: SOURCE_COLORS[name] ?? '#a78bfa',
+    color: SOURCE_COLORS[name] ?? '#918d86',
   }));
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '2rem', marginTop: '1rem', flexWrap: 'wrap' }}>

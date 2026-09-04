@@ -69,12 +69,12 @@ export default function SignUpFlow({ onSwitchToSignIn, onWideChange }) {
                 <div key={label} style={s.stepItem}>
                   <div style={{
                     ...s.stepDot,
-                    background: done ? '#4cc98a' : active ? '#f5ecd9' : 'rgba(255,255,255,0.1)',
-                    color: done ? '#0d1017' : active ? '#0d1017' : 'rgba(255,255,255,0.3)',
+                    background: done ? '#4cc98a' : active ? '#d5d0c7' : 'rgba(255,255,255,0.1)',
+                    color: done ? '#0a0a0a' : active ? '#0a0a0a' : 'rgba(255,255,255,0.3)',
                   }}>
                     {done ? '✓' : num}
                   </div>
-                  <span style={{ fontSize: '0.75rem', color: active ? '#f5ecd9' : 'rgba(255,255,255,0.3)', fontWeight: active ? 600 : 400 }}>
+                  <span style={{ fontSize: '0.75rem', color: active ? '#d5d0c7' : 'rgba(255,255,255,0.3)', fontWeight: active ? 600 : 400 }}>
                     {label}
                   </span>
                 </div>
@@ -244,10 +244,10 @@ const INTRO_LAYOUT_CSS = `
 .vanta-feature-tabs::-webkit-scrollbar { display: none; }
 .vanta-feature-tab { flex: 0 0 auto; padding: 0.45rem 0.72rem; border: 1px solid rgba(255,255,255,0.1); border-radius: 999px; background: rgba(255,255,255,0.025); color: rgba(255,255,255,0.45); font-size: 0.72rem; font-weight: 600; box-shadow: none; transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease; }
 .vanta-feature-tab:hover { background: rgba(255,255,255,0.06); }
-.vanta-feature-tab.is-active { border-color: rgba(245,236,217,0.45); background: rgba(245,236,217,0.14); color: #f5ecd9; }
+.vanta-feature-tab.is-active { border-color: rgba(213,208,199,0.45); background: rgba(213,208,199,0.14); color: #d5d0c7; }
 .vanta-feature-card { transition: background 0.15s ease, border-color 0.15s ease; cursor: pointer; }
-.vanta-feature-card:not(.vanta-feature-card-static):hover { background: rgba(255,255,255,0.05); border-color: rgba(245,236,217,0.25); }
-.vanta-feature-card:hover .vanta-expand-badge { opacity: 1; background: rgba(245,236,217,0.16); color: #f5ecd9; }
+.vanta-feature-card:not(.vanta-feature-card-static):hover { background: rgba(255,255,255,0.05); border-color: rgba(213,208,199,0.25); }
+.vanta-feature-card:hover .vanta-expand-badge { opacity: 1; background: rgba(213,208,199,0.16); color: #d5d0c7; }
 .vanta-cta-bar { display: flex; flex-direction: column; gap: 1.1rem; }
 .vanta-cta-button { width: 100%; }
 .vanta-intro-heading { display: flex; flex-direction: column; gap: 1rem; }
@@ -448,7 +448,7 @@ function MiniSchedule() {
 }
 
 function MiniSwatches() {
-  const colors = ['#f5ecd9', '#6fbf8a', '#82aadc', '#e8756f'];
+  const colors = ['#d5d0c7', '#6fbf8a', '#82aadc', '#e8756f'];
   return (
     <div style={s.miniSwatchRow}>
       {colors.map((c, i) => (
@@ -1133,8 +1133,8 @@ const s = {
     pointerEvents: 'none',
   },
   btn: {
-    background: '#f5ecd9',
-    color: '#0d1017',
+    background: '#d5d0c7',
+    color: '#0a0a0a',
     border: 'none',
     borderRadius: 8,
     padding: '0.75rem',
@@ -1190,7 +1190,7 @@ const s = {
   switchLink: {
     background: 'none',
     border: 'none',
-    color: '#f5ecd9',
+    color: '#d5d0c7',
     fontWeight: 600,
     fontSize: '0.78rem',
     cursor: 'pointer',
@@ -1313,7 +1313,7 @@ const s = {
   modalIcon: {
     display: 'flex',
     alignItems: 'center',
-    color: '#f5ecd9',
+    color: '#d5d0c7',
     flexShrink: 0,
   },
   modalTitle: {
@@ -1336,7 +1336,7 @@ const s = {
   featureCardIcon: {
     display: 'flex',
     alignItems: 'center',
-    color: '#f5ecd9',
+    color: '#d5d0c7',
     flexShrink: 0,
   },
   featureCardTitle: {
@@ -1358,7 +1358,7 @@ const s = {
     height: '100%',
   },
   miniCell: { borderRadius: 2, background: 'rgba(255,255,255,0.06)' },
-  miniCellFilled: { background: 'rgba(245,236,217,0.55)' },
+  miniCellFilled: { background: 'rgba(213,208,199,0.55)' },
   miniSwatchRow: { display: 'flex', gap: '0.4rem', alignItems: 'center' },
   miniSwatch: { width: 16, height: 16, borderRadius: '50%', border: '2px solid transparent' },
   miniSwatchActive: { border: '2px solid #ffffff', boxShadow: '0 0 0 1px rgba(0,0,0,0.4)' },
@@ -1375,9 +1375,9 @@ const s = {
     padding: 1.5,
     flexShrink: 0,
   },
-  miniToggleTrackOn: { background: 'rgba(245,236,217,0.4)' },
+  miniToggleTrackOn: { background: 'rgba(213,208,199,0.4)' },
   miniToggleKnob: { width: 7, height: 7, borderRadius: '50%', background: 'rgba(255,255,255,0.5)', transition: 'transform 0.15s' },
-  miniToggleKnobOn: { background: '#f5ecd9', transform: 'translateX(8px)' },
+  miniToggleKnobOn: { background: '#d5d0c7', transform: 'translateX(8px)' },
   miniConsentCol: { display: 'flex', flexDirection: 'column', gap: '0.4rem', width: '100%' },
   miniLine: { height: 5, width: '85%', borderRadius: 3, background: 'rgba(255,255,255,0.12)' },
   miniSigLine: { height: 1, width: '70%', background: 'rgba(255,255,255,0.2)', marginTop: '0.2rem' },
@@ -1385,7 +1385,7 @@ const s = {
   miniListRow: { display: 'flex', alignItems: 'center', gap: '0.35rem' },
   miniAvatar: { width: 12, height: 12, borderRadius: '50%', flexShrink: 0, background: 'rgba(255,255,255,0.15)' },
   miniBarTrack: { flex: 1, height: 5, borderRadius: 3, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' },
-  miniBarFill: { display: 'block', height: '100%', borderRadius: 3, background: 'rgba(245,236,217,0.5)' },
+  miniBarFill: { display: 'block', height: '100%', borderRadius: 3, background: 'rgba(213,208,199,0.5)' },
   miniTagGood: { fontSize: '0.55rem', color: '#4cc98a', flexShrink: 0 },
   miniTagWarn: { fontSize: '0.6rem', fontWeight: 700, color: '#e8c56f', flexShrink: 0 },
   miniPct: { fontSize: '0.5rem', color: 'rgba(255,255,255,0.4)', flexShrink: 0, width: 20, textAlign: 'right' },
@@ -1393,9 +1393,9 @@ const s = {
   miniStationRow: { display: 'flex', gap: 4, width: '100%', height: '100%' },
   miniStationCol: { flex: 1, display: 'flex', flexDirection: 'column', gap: 3 },
   miniStationSlot: { flex: 1, borderRadius: 2, background: 'rgba(255,255,255,0.06)' },
-  miniStationSlotBusy: { background: 'rgba(245,236,217,0.55)' },
+  miniStationSlotBusy: { background: 'rgba(213,208,199,0.55)' },
   miniBarChartRow: { display: 'flex', alignItems: 'flex-end', gap: 3, width: '100%', height: '100%' },
-  miniChartBar: { flex: 1, borderRadius: '1px 1px 0 0', background: 'rgba(245,236,217,0.5)' },
+  miniChartBar: { flex: 1, borderRadius: '1px 1px 0 0', background: 'rgba(213,208,199,0.5)' },
   miniChipRow: { display: 'flex', gap: '0.3rem', flexWrap: 'wrap' },
   miniChip: {
     fontSize: '0.55rem',
@@ -1407,9 +1407,9 @@ const s = {
     padding: '0.15rem 0.4rem',
   },
   miniChipActive: {
-    color: '#f5ecd9',
-    background: 'rgba(245,236,217,0.12)',
-    border: '1px solid rgba(245,236,217,0.3)',
+    color: '#d5d0c7',
+    background: 'rgba(213,208,199,0.12)',
+    border: '1px solid rgba(213,208,199,0.3)',
   },
   introTitle: {
     fontSize: '1.3rem',
@@ -1426,11 +1426,11 @@ const s = {
     maxWidth: 520,
   },
   ctaBar: {
-    background: 'linear-gradient(160deg, rgba(245,236,217,0.09), rgba(255,255,255,0.03))',
-    border: '1px solid rgba(245,236,217,0.22)',
+    background: 'linear-gradient(160deg, rgba(213,208,199,0.09), rgba(255,255,255,0.03))',
+    border: '1px solid rgba(213,208,199,0.22)',
     borderRadius: 12,
     padding: '1.1rem 1.25rem',
-    boxShadow: '0 0 28px rgba(245,236,217,0.06)',
+    boxShadow: '0 0 28px rgba(213,208,199,0.06)',
   },
   ctaInfo: {
     display: 'flex',
@@ -1466,7 +1466,7 @@ const s = {
   planPriceAmount: {
     fontSize: '1.6rem',
     fontWeight: 700,
-    color: '#f5ecd9',
+    color: '#d5d0c7',
   },
   planPriceUnit: {
     fontSize: '0.8rem',
@@ -1525,7 +1525,7 @@ const s = {
     padding: '0.9rem',
   },
   claimedBody: { fontSize: '0.82rem', color: 'rgba(255,255,255,0.6)', lineHeight: 1.5, margin: '0.4rem 0 0' },
-  claimedLink: { color: '#f5ecd9' },
+  claimedLink: { color: '#d5d0c7' },
   clearBtn: {
     background: 'none',
     border: 'none',
@@ -1539,10 +1539,10 @@ const s = {
     alignItems: 'center',
     gap: '0.5rem',
     padding: '0.7rem 0.85rem',
-    background: 'rgba(245,236,217,0.06)',
-    border: '1px solid rgba(245,236,217,0.15)',
+    background: 'rgba(213,208,199,0.06)',
+    border: '1px solid rgba(213,208,199,0.15)',
     borderRadius: 8,
-    color: '#f5ecd9',
+    color: '#d5d0c7',
     fontSize: '0.85rem',
     fontWeight: 500,
     cursor: 'pointer',

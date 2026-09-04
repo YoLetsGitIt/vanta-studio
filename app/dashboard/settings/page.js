@@ -48,7 +48,7 @@ const ALL_PLACEMENTS = [
 ];
 
 function hexToRgbaStr(hex, alpha) {
-  if (!hex || hex[0] !== '#') return `rgba(245,236,217,${alpha})`;
+  if (!hex || hex[0] !== '#') return `rgba(213,208,199,${alpha})`;
   const h = hex.slice(1).length === 3
     ? hex.slice(1).split('').map(c => c+c).join('')
     : hex.slice(1);
@@ -480,7 +480,7 @@ export default function SettingsPage() {
   const [email, setEmail] = useState('');
   const [aftercareInstructions, setAftercareInstructions] = useState('');
   const [widgetBgColor, setWidgetBgColor] = useState('#111111');
-  const [widgetAccentColor, setWidgetAccentColor] = useState('#f5ecd9');
+  const [widgetAccentColor, setWidgetAccentColor] = useState('#d5d0c7');
   const [timezone, setTimezone] = useState('Australia/Sydney');
   const [walkinCut, setWalkinCut] = useState('0');
   const [personalCut, setPersonalCut] = useState('0');
@@ -572,7 +572,7 @@ export default function SettingsPage() {
         if (account.studio?.longitude != null) setAddressLng(account.studio.longitude);
         setAftercareInstructions(account.studio?.aftercare_instructions ?? '');
         setWidgetBgColor(account.studio?.widget_bg_color || '#111111');
-        setWidgetAccentColor(account.studio?.widget_accent_color || '#f5ecd9');
+        setWidgetAccentColor(account.studio?.widget_accent_color || '#d5d0c7');
         setTimezone(account.studio?.timezone || 'Australia/Sydney');
         setWalkinCut(String(account.studio?.walkin_cut_percent ?? account.studio?.studio_cut_percent ?? 0));
         setPersonalCut(String(account.studio?.personal_cut_percent ?? account.studio?.studio_cut_percent ?? 0));
@@ -1096,63 +1096,82 @@ export default function SettingsPage() {
         {tab === 'payments' && <>
 
         <section style={{ ...s.card, gridColumn: '1 / -1' }}>
-          <h2 style={s.sectionTitle}>Commission</h2>
-          <form onSubmit={handleSaveProfile} style={s.form}>
+          <div style={s.settingsSectionHeader}>
+            <h2 style={s.sectionTitle}>Commission</h2>
+            <p style={s.sectionDesc}>Set the studio share for each booking source. The remainder is paid to the artist.</p>
+          </div>
+          <form onSubmit={handleSaveProfile} style={s.paymentsForm}>
             <div style={s.field}>
-              <label style={s.label}>Studio commission (%)</label>
-              <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: '0 0 0.5rem' }}>
-                The studio&apos;s cut of a completed booking. Studio and personal commissions can differ.
-              </p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+              <div className="studio-commission-grid" style={s.commissionGrid}>
                 {[
-                  { label: 'Studio & Walk-in', value: walkinCut, set: setWalkinCut, hint: 'Studio and walk-in bookings' },
-                  { label: 'Personal, App & Imported', value: personalCut, set: setPersonalCut, hint: 'Personal, app and imported bookings' },
-                ].map(({ label, value, set, hint }) => (
-                  <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                    <span style={{ width: 68, fontSize: '0.82rem', color: 'var(--text)', fontWeight: 500 }}>{label}</span>
-                    <input
-                      style={{ ...s.input, width: 90 }}
-                      type="number" min="0" max="100" step="0.5"
-                      inputMode="decimal"
-                      value={value}
-                      onChange={e => set(e.target.value)}
-                      onKeyDown={e => ['e','E','+','-'].includes(e.key) && e.preventDefault()}
-                      placeholder="0"
-                    />
-                    <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                      {value && !isNaN(parseFloat(value)) && parseFloat(value) > 0
-                        ? `Artist keeps ${(100 - parseFloat(value)).toFixed(1)}% · ${hint}`
-                        : `No cut · ${hint}`}
-                    </span>
-                  </div>
-                ))}
+                  { label: 'Studio & walk-in', description: 'Bookings sourced or recorded by the studio.', sources: ['Studio', 'Walk-in'], value: walkinCut, set: setWalkinCut },
+                  { label: 'Personal, app & imported', description: 'Bookings brought in by an artist or added from another source.', sources: ['Personal', 'App', 'Imported'], value: personalCut, set: setPersonalCut },
+                ].map(({ label, description, sources, value, set }) => {
+                  const parsedValue = parseFloat(value);
+                  const studioShare = Number.isFinite(parsedValue) ? Math.min(100, Math.max(0, parsedValue)) : 0;
+                  const formatShare = share => Number.isInteger(share) ? `${share}%` : `${share.toFixed(1)}%`;
+                  return (
+                    <div key={label} style={s.commissionTile}>
+                      <div style={s.commissionTileHeader}>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={s.commissionTitle}>{label}</div>
+                          <div style={s.commissionDescription}>{description}</div>
+                        </div>
+                        <label style={s.commissionInputWrap}>
+                          <span style={s.visuallyHidden}>{label} studio commission percentage</span>
+                          <input
+                            style={s.commissionInput}
+                            type="number" min="0" max="100" step="0.5"
+                            inputMode="decimal"
+                            value={value}
+                            onChange={e => set(e.target.value)}
+                            onKeyDown={e => ['e','E','+','-'].includes(e.key) && e.preventDefault()}
+                            placeholder="0"
+                          />
+                          <span style={s.commissionPercent}>%</span>
+                        </label>
+                      </div>
+                      <div style={s.commissionSplit}>
+                        <span style={s.commissionSplitLabel}>Studio receives <strong style={s.commissionSplitValue}>{formatShare(studioShare)}</strong></span>
+                        <span style={s.commissionSplitLabel}>Artist receives <strong style={s.commissionSplitValue}>{formatShare(100 - studioShare)}</strong></span>
+                      </div>
+                      <div style={s.sourceChips}>
+                        {sources.map(source => <span key={source} style={s.sourceChip}>{source}</span>)}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
-            <div style={s.field}>
-              <label style={s.label}>Payment recording requirement</label>
-              <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: '0 0 0.5rem' }}>
-                Which parties must record payment before a payout can be processed. Only applies
-                to bookings completed from when you change this — it won&apos;t require artists to
-                go back and record payment on past bookings.
-              </p>
+            <div className="studio-payment-setting" style={s.paymentSetting}>
+              <div style={s.paymentSettingCopy}>
+                <label htmlFor="payment-recording-requirement" style={s.paymentSettingTitle}>Payment recording requirement</label>
+                <p style={s.paymentSettingDescription}>
+                  Choose who must record payment before a payout can be processed. This only affects bookings completed after you save the change.
+                </p>
+              </div>
               <select
-                style={{ ...s.input, cursor: 'pointer', colorScheme: 'auto' }}
+                id="payment-recording-requirement"
+                style={s.paymentSettingSelect}
                 value={paymentRecordingReq}
                 onChange={e => setPaymentRecordingReq(e.target.value)}
               >
                 <option value="studio_only">Studio only</option>
-                <option value="both">Studio and Artist</option>
+                <option value="both">Studio and artist</option>
               </select>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 0', borderTop: '1px solid var(--border)' }}>
-              <div>
-                <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text)' }}>Pay artist on forfeited deposits</div>
-                <div style={{ fontSize: 13, color: 'var(--text-ghost)', marginTop: 2, maxWidth: 420 }}>
-                  When a client cancels after paying a deposit that isn&apos;t refunded, credit the assigned artist their commission on it. Only applies to cancellations from when this is turned on — it won&apos;t backdate past forfeitures.
-                </div>
+            <div className="studio-payment-setting" style={s.paymentSetting}>
+              <div style={s.paymentSettingCopy}>
+                <div style={s.paymentSettingTitle}>Pay artist on forfeited deposits</div>
+                <p style={s.paymentSettingDescription}>
+                  If a paid deposit is retained after cancellation, credit the assigned artist their commission. This applies to future cancellations only.
+                </p>
               </div>
               <button
                 type="button"
+                role="switch"
+                aria-checked={payForfeitedDeposits}
+                aria-label="Pay artist on forfeited deposits"
                 onClick={() => setPayForfeitedDeposits(v => !v)}
                 style={{
                   width: 44, height: 24, borderRadius: 12, border: '1px solid var(--switch-edge)', cursor: 'pointer',
@@ -1161,8 +1180,8 @@ export default function SettingsPage() {
                 }}
               >
                 <span style={{
-                  position: 'absolute', top: 3, left: payForfeitedDeposits ? 23 : 3, width: 18, height: 18,
-                  borderRadius: '50%', background: 'var(--switch-thumb)', boxShadow: '0 1px 3px rgba(0,0,0,0.65)', transition: 'left 0.2s',
+                  position: 'absolute', top: 2, left: payForfeitedDeposits ? 22 : 2, width: 18, height: 18,
+                  borderRadius: '50%', background: 'var(--switch-thumb)', border: '1px solid var(--switch-edge)', boxShadow: '0 1px 3px rgba(0,0,0,0.65)', transition: 'left 0.2s',
                 }} />
               </button>
             </div>
@@ -1529,7 +1548,7 @@ export default function SettingsPage() {
             </div>
             {walkInUrl && (
               <div style={s.qrWrap}>
-                <QRCodeSVG value={walkInUrl} size={80} bgColor="transparent" fgColor="#6aaf9d" />
+                <QRCodeSVG value={walkInUrl} size={80} bgColor="#d5d0c7" fgColor="#080808" marginSize={2} />
               </div>
             )}
           </div>
@@ -1844,13 +1863,34 @@ const s = {
   section: { display: 'flex', flexDirection: 'column', gap: '1rem' },
   sectionTitle: { fontSize: '0.875rem', fontWeight: 600, color: 'var(--text)', margin: '0 0 0.25rem' },
   sectionDesc: { fontSize: '0.82rem', color: 'var(--text-secondary)', margin: 0 },
+  settingsSectionHeader: { display: 'flex', flexDirection: 'column', gap: '0.25rem', paddingBottom: '0.15rem' },
   form: { display: 'flex', flexDirection: 'column', gap: '1rem' },
+  paymentsForm: { display: 'flex', flexDirection: 'column', gap: '1rem', maxWidth: 1120 },
   field: { display: 'flex', flexDirection: 'column', gap: '0.4rem' },
   label: { fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-muted)' },
   input: { background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 8, padding: '0.6rem 0.85rem', fontSize: '0.9rem', color: 'var(--text)', outline: 'none', width: '100%', boxSizing: 'border-box' },
   inputReadonly: { color: 'var(--text-faint)', cursor: 'default' },
   errorText: { fontSize: '0.8rem', color: '#ff6b6b', margin: 0 },
   saveBtn: { alignSelf: 'flex-start', background: 'var(--accent-tint)', border: '1px solid var(--accent-tint-border)', borderRadius: 8, padding: '0.55rem 1.25rem', fontSize: '0.85rem', fontWeight: 600, color: 'var(--accent)', cursor: 'pointer' },
+  commissionGrid: { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '0.75rem' },
+  commissionTile: { display: 'flex', flexDirection: 'column', gap: '0.85rem', minWidth: 0, padding: '1rem', background: 'var(--bg-input)', border: '1px solid var(--border-faint)', borderRadius: 10 },
+  commissionTileHeader: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem' },
+  commissionTitle: { fontSize: '0.9rem', fontWeight: 650, color: 'var(--text)', lineHeight: 1.35 },
+  commissionDescription: { marginTop: '0.25rem', maxWidth: 360, fontSize: '0.76rem', lineHeight: 1.45, color: 'var(--text-secondary)' },
+  commissionInputWrap: { display: 'flex', alignItems: 'center', flexShrink: 0, width: 96, height: 44, padding: '0 0.65rem', boxSizing: 'border-box', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8 },
+  commissionInput: { width: '100%', minWidth: 0, padding: 0, background: 'transparent', border: 0, outline: 'none', color: 'var(--text)', fontSize: '1rem', fontWeight: 650, fontFamily: 'inherit' },
+  commissionPercent: { color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 600 },
+  commissionSplit: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border-faint)' },
+  commissionSplitLabel: { display: 'flex', flexDirection: 'column', gap: 2, color: 'var(--text-secondary)', fontSize: '0.69rem' },
+  commissionSplitValue: { color: 'var(--text)', fontSize: '0.9rem', fontWeight: 650 },
+  sourceChips: { display: 'flex', flexWrap: 'wrap', gap: '0.35rem' },
+  sourceChip: { padding: '0.22rem 0.48rem', borderRadius: 999, background: 'var(--bg-chip)', border: '1px solid var(--border-faint)', color: 'var(--text-muted)', fontSize: '0.67rem', fontWeight: 600 },
+  paymentSetting: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '2rem', padding: '1rem', background: 'var(--bg-base)', border: '1px solid var(--border-faint)', borderRadius: 10 },
+  paymentSettingCopy: { display: 'flex', flexDirection: 'column', gap: '0.3rem', minWidth: 0 },
+  paymentSettingTitle: { fontSize: '0.84rem', fontWeight: 600, color: 'var(--text)' },
+  paymentSettingDescription: { maxWidth: 680, margin: 0, color: 'var(--text-secondary)', fontSize: '0.75rem', lineHeight: 1.5 },
+  paymentSettingSelect: { width: 230, flexShrink: 0, cursor: 'pointer', colorScheme: 'auto', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 8, padding: '0.6rem 0.8rem', color: 'var(--text)', fontSize: '0.84rem', fontFamily: 'inherit' },
+  visuallyHidden: { position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0, 0, 0, 0)', whiteSpace: 'nowrap', border: 0 },
   billingStatusDot: (status) => {
     const color = status === 'active' ? '#4cc98a' : status === 'canceling' ? '#e8b04f' : status === 'past_due' ? '#e8b04f' : status === 'canceled' ? '#e86f6f' : 'var(--text-ghost)';
     return { width: 10, height: 10, borderRadius: '50%', flexShrink: 0, background: color };
@@ -2003,7 +2043,7 @@ function StationLastDayModal({ onConfirm, onCancel, saving, existingEndDate }) {
             style={{
               flex: 2, padding: '0.7rem', borderRadius: 8, border: 'none',
               background: saving ? 'var(--bg-chip)' : isToday ? 'rgba(232,111,111,0.85)' : 'var(--accent)',
-              color: saving ? 'var(--text-ghost)' : isToday ? '#fff' : '#0d1017',
+              color: saving ? 'var(--text-ghost)' : isToday ? '#fff' : '#0a0a0a',
               cursor: saving ? 'default' : 'pointer', fontSize: '0.9rem', fontWeight: 700, fontFamily: 'inherit',
             }}
           >
