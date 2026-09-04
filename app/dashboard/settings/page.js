@@ -1120,6 +1120,7 @@ export default function SettingsPage() {
                         <label style={s.commissionInputWrap}>
                           <span style={s.visuallyHidden}>{label} studio commission percentage</span>
                           <input
+                            className="studio-commission-input"
                             style={s.commissionInput}
                             type="number" min="0" max="100" step="0.5"
                             inputMode="decimal"

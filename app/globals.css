@@ -132,6 +132,17 @@ select:focus {
   box-shadow: 0 0 0 2px rgba(213,208,199,0.055);
 }
 
+.studio-commission-input {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.studio-commission-input::-webkit-inner-spin-button,
+.studio-commission-input::-webkit-outer-spin-button {
+  margin: 0;
+  -webkit-appearance: none;
+}
+
 @media (max-width: 900px) {
   .studio-home-four-col {
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
