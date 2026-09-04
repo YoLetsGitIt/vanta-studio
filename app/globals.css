@@ -190,6 +190,15 @@ button:focus-visible {
   box-shadow: none;
 }
 
+.studio-attention-item[role="button"]:hover {
+  background: var(--bg-row-active);
+}
+
+.studio-attention-item[role="button"]:focus-visible {
+  outline: 1px solid var(--border-strong);
+  outline-offset: -1px;
+}
+
 .selection-link-overlay {
   position: fixed;
   inset: 0;

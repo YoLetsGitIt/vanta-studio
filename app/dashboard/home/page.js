@@ -81,6 +81,7 @@ export default function HomePage() {
   const [unpaidDepositBookings, setUnpaidDepositBookings] = useState([]);
   const [sentDepositLink, setSentDepositLink] = useState(null);
   const [sendLinkOpen, setSendLinkOpen] = useState(false);
+  const [sendLinkBooking, setSendLinkBooking] = useState(null);
   const [stripeConnected, setStripeConnected] = useState(false);
   const [loadError, setLoadError] = useState('');
   const router = useRouter();
@@ -268,12 +269,26 @@ export default function HomePage() {
   }
 
   function openSendLink() {
+    setSendLinkBooking(reviewBooking);
     setSendLinkOpen(true);
+  }
+
+  async function openPendingSendLink(booking) {
+    setAttentionAction(`send-${booking.id}`);
+    try {
+      const fullBooking = await getStudioBooking(booking.id);
+      setSendLinkBooking(fullBooking);
+      setSendLinkOpen(true);
+    } catch (error) {
+      showError(error);
+    } finally {
+      setAttentionAction(null);
+    }
   }
 
   async function handleSelectionLinkSent(id) {
     const refreshed = await getStudioBooking(id);
-    setReviewBooking(refreshed);
+    if (reviewBooking?.id === id) setReviewBooking(refreshed);
     setUnpaidDepositBookings(items => {
       const withoutBooking = items.filter(item => item.id !== refreshed.id);
       return needsDepositPayment(refreshed) ? [...withoutBooking, refreshed] : withoutBooking;
@@ -390,8 +405,11 @@ export default function HomePage() {
               {pendingCount > 0 && (
                 <AttentionGroup title="Pending bookings" icon="calendar" count={pendingCount} subtitle="Awaiting your approval" open={!!openAttentionGroups.pending} onToggle={() => toggleAttentionGroup('pending')}>
                   {pendingBookings.map(booking => (
-                    <AttentionItem key={booking.id} title={booking.requester_name ?? 'Client'} subtitle={bookingSubtitle(booking)}>
-                      <button style={s.inlinePrimary} onClick={() => openBookingReview(booking)}>Review booking</button>
+                    <AttentionItem key={booking.id} title={booking.requester_name ?? 'Client'} subtitle={bookingSubtitle(booking)} onClick={() => openBookingReview(booking)}>
+                      <button style={s.inlinePrimary} disabled={attentionAction === `send-${booking.id}`} onClick={() => openPendingSendLink(booking)}>
+                        {attentionAction === `send-${booking.id}` ? 'Loading…' : 'Send link'}
+                      </button>
+                      <button style={s.inlineDanger} disabled={attentionAction === booking.id} onClick={() => setRejectBooking(booking)}>Reject</button>
                     </AttentionItem>
                   ))}
                 </AttentionGroup>
@@ -410,7 +428,7 @@ export default function HomePage() {
               {awaitingPaymentCount > 0 && (
                 <AttentionGroup title="Unpaid deposits" icon="card" count={awaitingPaymentCount} subtitle="Deposit not yet received" open={!!openAttentionGroups.payment} onToggle={() => toggleAttentionGroup('payment')}>
                   {unpaidDepositBookings.map(booking => (
-                    <AttentionItem key={booking.id} title={booking.requester_name ?? 'Client'} subtitle={bookingSubtitle(booking)}>
+                    <AttentionItem key={booking.id} title={booking.requester_name ?? 'Client'} subtitle={bookingSubtitle(booking)} onClick={() => openBookingReview(booking)}>
                       <button
                         style={s.inlinePrimary}
                         disabled={attentionAction === `deposit-${booking.id}` || !booking.requester_email}
@@ -427,7 +445,7 @@ export default function HomePage() {
               {overdueBookings.length > 0 && (
                 <AttentionGroup title="Incomplete past sessions" icon="clock" count={overdueBookings.length} subtitle="Past sessions still need an outcome and payment" open={!!openAttentionGroups.overdue} onToggle={() => toggleAttentionGroup('overdue')}>
                   {overdueBookings.map(booking => (
-                    <AttentionItem key={booking.id} title={booking.requester_name ?? 'Client'} subtitle={bookingSubtitle(booking)}>
+                    <AttentionItem key={booking.id} title={booking.requester_name ?? 'Client'} subtitle={bookingSubtitle(booking)} onClick={() => openBookingReview(booking)}>
                       <button style={s.inlinePrimary} onClick={() => setCompleteBooking(booking)}>Record outcome</button>
                     </AttentionItem>
                   ))}
@@ -442,7 +460,13 @@ export default function HomePage() {
                     const isSent = sentLink === entry.requesterEmail;
                     const wasSentToday = sentToday.has(entry.requesterEmail);
                     return (
-                      <AttentionItem key={entry.requesterEmail} title={entry.clientName} subtitle={`${formatTime(entry.chosenTime)} · ${status === 'outdated' ? 'Outdated consent' : 'Not consented'}`} badge={wasSentToday ? 'Consent sent today' : null}>
+                      <AttentionItem
+                        key={entry.requesterEmail}
+                        title={entry.clientName}
+                        subtitle={`${formatTime(entry.chosenTime)} · ${status === 'outdated' ? 'Outdated consent' : 'Not consented'}`}
+                        badge={wasSentToday ? 'Consent sent today' : null}
+                        onClick={() => router.push(`/dashboard/clients?client=${encodeURIComponent(entry.requesterEmail)}`)}
+                      >
                         <button style={{ ...s.inlinePrimary, opacity: isSending ? 0.6 : 1 }} onClick={() => handleSendLink(entry.requesterEmail)} disabled={isSending}>
                           {isSent ? 'Sent ✓' : isSending ? 'Sending…' : 'Send link'}
                         </button>
@@ -590,8 +614,14 @@ export default function HomePage() {
         />
       )}
 
-      {sendLinkOpen && reviewBooking && (
-        <SendSelectionLinkModal booking={reviewBooking} artists={artists} stripeConnected={stripeConnected} onClose={() => setSendLinkOpen(false)} onSent={handleSelectionLinkSent} />
+      {sendLinkOpen && sendLinkBooking && (
+        <SendSelectionLinkModal
+          booking={sendLinkBooking}
+          artists={artists}
+          stripeConnected={stripeConnected}
+          onClose={() => { setSendLinkOpen(false); setSendLinkBooking(null); }}
+          onSent={handleSelectionLinkSent}
+        />
       )}
 
       {completeBooking && (
@@ -702,9 +732,20 @@ function AttentionGroup({ title, icon, count, subtitle, open, onToggle, children
   );
 }
 
-function AttentionItem({ title, subtitle, badge, children }) {
+function AttentionItem({ title, subtitle, badge, children, onClick }) {
   return (
-    <div style={s.attentionItem} className="studio-attention-item">
+    <div
+      style={{ ...s.attentionItem, ...(onClick ? s.attentionItemClickable : {}) }}
+      className="studio-attention-item"
+      onClick={onClick}
+      onKeyDown={event => {
+        if (!onClick || (event.key !== 'Enter' && event.key !== ' ')) return;
+        event.preventDefault();
+        onClick();
+      }}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+    >
       <div style={s.attentionBody}>
         <div style={s.attentionItemTitleRow}>
           <span style={s.attentionTitle}>{title}</span>
@@ -712,7 +753,7 @@ function AttentionItem({ title, subtitle, badge, children }) {
         </div>
         <span style={s.attentionSub}>{subtitle}</span>
       </div>
-      <div style={s.attentionActions} className="studio-attention-actions">{children}</div>
+      <div style={s.attentionActions} className="studio-attention-actions" onClick={event => event.stopPropagation()} onKeyDown={event => event.stopPropagation()}>{children}</div>
     </div>
   );
 }
@@ -839,6 +880,7 @@ const s = {
   groupCount: { minWidth: 25, height: 21, padding: '0 0.4rem', display: 'grid', placeItems: 'center', borderRadius: 99, background: 'var(--accent)', color: 'var(--accent-contrast)', fontSize: '0.68rem', lineHeight: 1 },
   attentionItems: { padding: '0 0.65rem 0.65rem 2.05rem', display: 'flex', flexDirection: 'column' },
   attentionItem: { minHeight: 54, padding: '0.7rem 0.45rem', borderTop: '1px solid var(--border-faint)', display: 'flex', alignItems: 'center', gap: '0.75rem' },
+  attentionItemClickable: { cursor: 'pointer', borderRadius: 7, transition: 'background 0.15s ease' },
   attentionItemTitleRow: { display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' },
   attentionActions: { display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.4rem', flexWrap: 'wrap' },
   inlinePrimary: { padding: '0.38rem 0.65rem', border: 0, borderRadius: 6, background: 'var(--accent)', color: 'var(--accent-contrast)', fontSize: '0.69rem', fontWeight: 700, whiteSpace: 'nowrap' },
