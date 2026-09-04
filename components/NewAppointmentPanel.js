@@ -659,8 +659,20 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
             )}
 
             {essentialsComplete && bookingType === 'walkin' && (
-              <button type="button" style={bd.optionalToggle} onClick={() => setShowOptional(value => !value)} aria-expanded={showOptional}>
-                {showOptional ? 'Hide optional details' : 'Add tattoo, pricing, deposit, or notes'} <span>{showOptional ? '↑' : '↓'}</span>
+              <button
+                type="button"
+                style={{ ...bd.optionalToggle, ...(showOptional ? bd.optionalToggleOpen : {}) }}
+                onClick={() => setShowOptional(value => !value)}
+                aria-expanded={showOptional}
+              >
+                <span style={bd.optionalToggleCopy}>
+                  <span style={bd.optionalToggleTitle}>Optional details</span>
+                  <span style={bd.optionalToggleDescription}>Tattoo, pricing, deposit and notes</span>
+                </span>
+                <span style={bd.optionalToggleAction}>
+                  {showOptional ? 'Hide' : 'Show'}
+                  <span aria-hidden="true" style={{ ...bd.optionalChevron, transform: showOptional ? 'rotate(180deg)' : 'rotate(0deg)' }}>⌄</span>
+                </span>
               </button>
             )}
 
@@ -955,7 +967,13 @@ const bd = {
   unitBtnActive: {
     background: 'var(--bg-chip)', color: 'var(--text)', fontWeight: 600,
   },
-  optionalToggle: { margin: '-0.5rem 0 1.25rem', padding: '0.7rem 0.8rem', borderRadius: 8, border: '1px dashed var(--border)', background: 'transparent', color: 'var(--accent)', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer', display: 'flex', justifyContent: 'space-between' },
+  optionalToggle: { width: '100%', margin: '-0.5rem 0 1.25rem', padding: '0.85rem 0.9rem', borderRadius: 10, border: '1px solid var(--border-faint)', background: 'var(--bg-card)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', textAlign: 'left' },
+  optionalToggleOpen: { background: 'var(--bg-input)', borderColor: 'var(--border)' },
+  optionalToggleCopy: { display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 },
+  optionalToggleTitle: { color: 'var(--text)', fontSize: '0.8rem', fontWeight: 650 },
+  optionalToggleDescription: { color: 'var(--text-secondary)', fontSize: '0.7rem', fontWeight: 400, lineHeight: 1.35 },
+  optionalToggleAction: { display: 'flex', alignItems: 'center', gap: '0.45rem', flexShrink: 0, color: 'var(--text-muted)', fontSize: '0.72rem', fontWeight: 600 },
+  optionalChevron: { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: '50%', background: 'var(--bg-chip)', border: '1px solid var(--border)', color: 'var(--text-dim)', fontSize: '1rem', lineHeight: 1, transition: 'transform 0.2s ease' },
   depositModes: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 5 },
   depositMode: { padding: '0.5rem 0.35rem', borderRadius: 7, border: '1px solid var(--border)', background: 'var(--bg-input)', color: 'var(--text-muted)', fontSize: '0.7rem', cursor: 'pointer' },
   depositModeActive: { borderColor: 'var(--accent)', background: 'var(--accent-tint)', color: 'var(--accent)', fontWeight: 700 },
