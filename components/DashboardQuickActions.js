@@ -138,7 +138,7 @@ function ReimbursementDialog({ artists, onClose }) {
     <Dialog title="Record reimbursement" onClose={onClose}>
       <form onSubmit={submit} style={styles.form}>
         <label style={styles.label}>Artist<select autoFocus value={artistId} onChange={event => setArtistId(event.target.value)} style={styles.input}><option value="">Select artist</option>{artists.map(artist => <option key={artist.artistId ?? artist.id} value={artist.artistId ?? artist.id}>{artist.name}</option>)}</select></label>
-        <label style={styles.label}>Amount<div style={styles.money}><span>$</span><input type="number" min="0.01" step="0.01" value={amount} onChange={event => setAmount(event.target.value)} style={styles.moneyInput} /></div></label>
+        <label style={styles.label}>Amount<div style={styles.money}><span>$</span><input className="reimbursement-number-input" type="number" min="0.01" step="0.01" value={amount} onChange={event => setAmount(event.target.value)} style={styles.moneyInput} /></div></label>
         <label style={styles.label}>Description<textarea value={description} onChange={event => setDescription(event.target.value)} placeholder="What was reimbursed?" style={{ ...styles.input, minHeight: 82, resize: 'vertical' }} /></label>
         {artists.length === 0 && <p role="alert" style={styles.error}>There are no approved artists to reimburse.</p>}
         {error && <p role="alert" style={styles.error}>{error}</p>}

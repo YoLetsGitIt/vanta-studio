@@ -233,6 +233,9 @@ button:focus-visible {
 .selection-link-number-input { appearance: textfield; -moz-appearance: textfield; }
 .selection-link-number-input::-webkit-inner-spin-button,
 .selection-link-number-input::-webkit-outer-spin-button { margin: 0; -webkit-appearance: none; }
+.reimbursement-number-input { appearance: textfield; -moz-appearance: textfield; }
+.reimbursement-number-input::-webkit-inner-spin-button,
+.reimbursement-number-input::-webkit-outer-spin-button { margin: 0; -webkit-appearance: none; }
 .selection-link-check { display: flex; align-items: center; gap: 0.5rem; color: var(--text-muted); font-size: 0.8rem; }
 .selection-link-check input { width: auto; accent-color: var(--accent); }
 .selection-link-actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 0.35rem; }
