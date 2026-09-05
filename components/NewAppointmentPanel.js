@@ -372,40 +372,66 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
       if (notes.trim()) body.notes = notes.trim();
       body.source = bookingType;
       const createdBooking = await createManualBooking(body);
+      const bookingId = createdBooking?.id;
+      const requesterEmail = clientEmail.trim();
+      const requesterDob = clientDob.trim();
+      const shouldSendDepositLink = Boolean(bookingId && requesterEmail && depositEnabled && depositMode === 'later' && da > 0 && stripeConnected);
+      const sendDepositLink = () => bookingActions.sendSelectionLink(bookingId, {
+        expiresHours: 168,
+        depositRequired: true,
+        depositAmount: da,
+        durationMinutes: durationMins,
+        estimatedQuote: fp || null,
+        artistId,
+      });
+      let depositLinkSent = false;
+      let depositLinkError = null;
+      if (shouldSendDepositLink) {
+        try {
+          await sendDepositLink();
+          depositLinkSent = true;
+        } catch (sendError) {
+          depositLinkError = sendError;
+        }
+      }
       invalidatePrefix('bookings:');
       invalidatePrefix('schedule:');
       window.dispatchEvent(new CustomEvent('booking-created'));
       resetForm();
       onCreated?.();
       onClose();
-      const bookingId = createdBooking?.id;
       const actions = [{
         label: 'View booking',
-        onClick: () => router.push(`/dashboard/appointments?status=confirmed${bookingId ? `&booking=${encodeURIComponent(bookingId)}` : ''}`),
+        onClick: () => router.push(`/dashboard/appointments?status=${depositLinkSent ? 'awaiting_payment' : 'confirmed'}${bookingId ? `&booking=${encodeURIComponent(bookingId)}` : ''}`),
       }];
-      if (bookingId && clientEmail.trim() && depositEnabled && depositMode === 'later' && da > 0 && stripeConnected) {
+      if (depositLinkError) {
         actions.push({
-          label: 'Send deposit link',
+          label: 'Retry deposit link',
           onClick: async () => {
             try {
-              await bookingActions.sendSelectionLink(bookingId, { expiresHours: 168, depositRequired: true, depositAmount: da, durationMinutes: durationMins, estimatedQuote: fp || null, artistId });
+              await sendDepositLink();
               showFeedback('Deposit payment link sent.', 'success');
             } catch (sendError) { showError(sendError); }
           },
         });
       }
-      if (clientEmail.trim()) {
+      if (requesterEmail) {
         actions.push({
           label: 'Send consent form',
           onClick: async () => {
             try {
-              await generateConsentLink(clientEmail.trim(), undefined, clientDob.trim() || undefined);
+              await generateConsentLink(requesterEmail, undefined, requesterDob || undefined);
               showFeedback('Consent form sent.', 'success');
             } catch (sendError) { showError(sendError); }
           },
         });
       }
-      showFeedback('Appointment created successfully.', 'success', actions);
+      const successMessage = depositLinkSent
+        ? 'Appointment created and deposit payment link sent.'
+        : depositLinkError
+          ? `Appointment created, but the deposit link could not be sent: ${depositLinkError.message}`
+          : 'Appointment created successfully.';
+      showFeedback(successMessage, 'success', actions);
     } catch (err) {
       setError(err.message);
     } finally {

@@ -13,7 +13,8 @@ export default function FeedbackHost() {
     function onFeedback(event) {
       clearTimeout(timerRef.current);
       setNotice(event.detail);
-      timerRef.current = setTimeout(() => setNotice(null), event.detail?.action ? 8000 : 5000);
+      const hasActions = event.detail?.actions?.length || event.detail?.action;
+      if (!hasActions) timerRef.current = setTimeout(() => setNotice(null), 5000);
     }
     function onConfirm(event) { setConfirmation(event.detail); }
     window.addEventListener(FEEDBACK_EVENT, onFeedback);

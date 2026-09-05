@@ -425,11 +425,16 @@ function ClientDetail({ client, onClose, consentTemplates = [], onSendConsentLin
       </div>
       <div style={s.panelBody}>
         {client.email ? (
-          <a href={`mailto:${client.email}`} style={s.contactRow}>
+          <button
+            type="button"
+            onClick={() => { window.location.href = `mailto:${encodeURIComponent(client.email.trim())}`; }}
+            style={s.contactRow}
+            aria-label={`Email ${client.name} at ${client.email}`}
+          >
             <span style={s.contactIcon}>✉</span>
             <span style={s.contactValue}>{client.email}</span>
             <span style={s.contactArrow}>↗</span>
-          </a>
+          </button>
         ) : (
           <div style={s.contactRowMissing}><span style={s.contactIcon}>✉</span><span>{t('clients_no_email')}</span></div>
         )}

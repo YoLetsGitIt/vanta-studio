@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { createStudioReimbursement, getStudioClients } from '@/lib/api';
-import { formatDob } from '@/lib/format';
+import { formatDob, initials } from '@/lib/format';
 import { showError, showFeedback } from '@/lib/feedback';
 
 export default function DashboardQuickActions({ artists = [] }) {
@@ -52,7 +52,10 @@ function FindClientDialog({ onClose }) {
 
   return (
     <Dialog title="Find a client" onClose={onClose}>
-      <input autoFocus type="search" value={query} onChange={event => { setQuery(event.target.value); setSelected(null); }} placeholder="Search name, email, or phone…" aria-label="Search clients" style={styles.input} />
+      {!selected && <div style={styles.searchWrap}>
+        <span aria-hidden="true" style={styles.searchIcon}>⌕</span>
+        <input autoFocus type="search" value={query} onChange={event => { setQuery(event.target.value); setSelected(null); }} placeholder="Search name, email, or phone…" aria-label="Search clients" style={styles.searchInput} />
+      </div>}
       {loading && <p role="status" style={styles.muted}>Loading clients…</p>}
       {error && <p role="alert" style={styles.error}>{error}</p>}
       {!loading && !error && !selected && (
@@ -68,13 +71,29 @@ function FindClientDialog({ onClose }) {
       )}
       {selected && (
         <div style={styles.clientCard}>
-          <button type="button" onClick={() => setSelected(null)} style={styles.back}>← Results</button>
-          <strong style={styles.clientName}>{selected.name || 'Unnamed client'}</strong>
-          <ClientField label="Email" value={selected.email} />
-          <ClientField label="Phone" value={selected.phone} />
-          <ClientField label="Date of birth" value={selected.dob ? formatDob(selected.dob) : null} />
-          <ClientField label="Allergies" value={selected.allergies} />
-          <ClientField label="Notes" value={selected.notes} />
+          <button type="button" onClick={() => setSelected(null)} style={styles.back}><span aria-hidden="true">←</span> Back to results</button>
+          <div style={styles.clientIdentity}>
+            <span style={styles.clientAvatar}>{initials(selected.name || '?')}</span>
+            <div style={styles.clientIdentityCopy}>
+              <strong style={styles.clientName}>{selected.name || 'Unnamed client'}</strong>
+              <span style={styles.clientIdentityMeta}>{selected.email || selected.phone || 'No contact details'}</span>
+            </div>
+          </div>
+          <div style={styles.clientSection}>
+            <span style={styles.clientSectionLabel}>Contact</span>
+            <div style={styles.clientFields}>
+              <ClientField label="Email" value={selected.email} />
+              <ClientField label="Phone" value={selected.phone} />
+              <ClientField label="Date of birth" value={selected.dob ? formatDob(selected.dob) : null} />
+            </div>
+          </div>
+          <div style={styles.clientSection}>
+            <span style={styles.clientSectionLabel}>Client information</span>
+            <div style={styles.clientFields}>
+              <ClientField label="Allergies" value={selected.allergies} />
+              <ClientField label="Notes" value={selected.notes} />
+            </div>
+          </div>
         </div>
       )}
     </Dialog>
@@ -82,7 +101,8 @@ function FindClientDialog({ onClose }) {
 }
 
 function ClientField({ label, value }) {
-  return <div style={styles.clientField}><span style={styles.fieldLabel}>{label}</span><span>{value || 'Not recorded'}</span></div>;
+  const missing = !value;
+  return <div style={styles.clientField}><span style={styles.fieldLabel}>{label}</span><span style={missing ? styles.missingValue : styles.fieldValue}>{value || 'Not recorded'}</span></div>;
 }
 
 function ReimbursementDialog({ artists, onClose }) {
@@ -146,8 +166,24 @@ const styles = {
   dialog: { width: 'min(500px, 100%)', maxHeight: 'min(720px, calc(100vh - 40px))', overflow: 'auto', padding: '1.25rem', borderRadius: 14, border: '1px solid var(--border)', background: 'var(--bg-modal)', boxShadow: 'var(--shadow-modal)' },
   header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }, title: { margin: 0, color: 'var(--text)', fontSize: '1.05rem' }, close: { border: 0, background: 'transparent', color: 'var(--text-muted)', fontSize: '1.35rem', cursor: 'pointer' },
   input: { width: '100%', boxSizing: 'border-box', padding: '0.65rem 0.75rem', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-input)', color: 'var(--text)', font: 'inherit' },
+  searchWrap: { position: 'relative', display: 'flex', alignItems: 'center' },
+  searchIcon: { position: 'absolute', left: '0.8rem', color: 'var(--text-ghost)', fontSize: '1rem', pointerEvents: 'none' },
+  searchInput: { width: '100%', boxSizing: 'border-box', padding: '0.7rem 0.8rem 0.7rem 2.25rem', borderRadius: 9, border: '1px solid var(--border)', background: 'var(--bg-input)', color: 'var(--text)', font: 'inherit' },
   results: { display: 'flex', flexDirection: 'column', marginTop: '0.75rem' }, result: { display: 'flex', flexDirection: 'column', gap: 3, padding: '0.75rem', textAlign: 'left', border: 0, borderBottom: '1px solid var(--border-faint)', background: 'transparent', color: 'var(--text)', cursor: 'pointer' }, muted: { margin: 0, color: 'var(--text-muted)', fontSize: '0.78rem' }, error: { margin: 0, color: '#e86f6f', fontSize: '0.78rem' },
-  clientCard: { display: 'flex', flexDirection: 'column', gap: '0.8rem' }, back: { alignSelf: 'flex-start', border: 0, padding: 0, background: 'transparent', color: 'var(--accent)', cursor: 'pointer' }, clientName: { color: 'var(--text)', fontSize: '1rem' }, clientField: { display: 'grid', gridTemplateColumns: '110px 1fr', gap: 12, color: 'var(--text)', fontSize: '0.82rem' }, fieldLabel: { color: 'var(--text-ghost)' },
+  clientCard: { display: 'flex', flexDirection: 'column', gap: '1rem' },
+  back: { alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: '0.4rem', border: 0, padding: 0, background: 'transparent', color: 'var(--text-muted)', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' },
+  clientIdentity: { display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.9rem', borderRadius: 10, background: 'var(--bg-input)', border: '1px solid var(--border-faint)' },
+  clientAvatar: { width: 42, height: 42, flexShrink: 0, display: 'grid', placeItems: 'center', borderRadius: '50%', background: 'var(--accent-tint)', border: '1px solid var(--accent-tint-border)', color: 'var(--accent)', fontSize: '0.78rem', fontWeight: 700 },
+  clientIdentityCopy: { display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 },
+  clientName: { color: 'var(--text)', fontSize: '1rem' },
+  clientIdentityMeta: { color: 'var(--text-secondary)', fontSize: '0.74rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
+  clientSection: { display: 'flex', flexDirection: 'column', gap: '0.55rem' },
+  clientSectionLabel: { color: 'var(--text-ghost)', fontSize: '0.64rem', fontWeight: 700, letterSpacing: '0.09em', textTransform: 'uppercase' },
+  clientFields: { overflow: 'hidden', borderRadius: 9, border: '1px solid var(--border-faint)', background: 'var(--bg-card)' },
+  clientField: { display: 'grid', gridTemplateColumns: '110px minmax(0, 1fr)', gap: 12, padding: '0.65rem 0.75rem', borderBottom: '1px solid var(--border-faint)', color: 'var(--text)', fontSize: '0.8rem' },
+  fieldLabel: { color: 'var(--text-secondary)' },
+  fieldValue: { color: 'var(--text-dim)', overflowWrap: 'anywhere' },
+  missingValue: { color: 'var(--text-ghost)', fontStyle: 'italic' },
   form: { display: 'flex', flexDirection: 'column', gap: '0.9rem' }, label: { display: 'flex', flexDirection: 'column', gap: '0.35rem', color: 'var(--text-muted)', fontSize: '0.76rem' }, money: { display: 'flex', alignItems: 'center', gap: 7, paddingLeft: '0.75rem', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-input)', color: 'var(--text-muted)' }, moneyInput: { width: '100%', padding: '0.65rem 0.75rem 0.65rem 0', border: 0, outline: 0, background: 'transparent', color: 'var(--text)', font: 'inherit' },
   actions: { display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: '0.35rem' }, cancel: { border: '1px solid var(--border)', borderRadius: 8, padding: '0.6rem 0.8rem', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer' }, confirm: { border: 0, borderRadius: 8, padding: '0.6rem 0.8rem', background: 'var(--accent)', color: 'var(--accent-contrast)', fontWeight: 700, cursor: 'pointer' },
 };

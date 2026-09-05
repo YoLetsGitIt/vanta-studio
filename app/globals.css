@@ -226,6 +226,8 @@ button:focus-visible {
 .selection-link-modal > p { color: var(--text-ghost); font-size: 0.78rem; line-height: 1.45; }
 .selection-link-field { display: flex; flex-direction: column; gap: 0.4rem; }
 .selection-link-field > span { color: var(--text-faint); font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+.selection-link-field select:disabled { cursor: not-allowed; color: var(--text-dim); opacity: 0.72; }
+.selection-link-locked-hint { color: var(--text-ghost); font-size: 0.68rem; line-height: 1.35; }
 .selection-link-modal input,
 .selection-link-modal select { width: 100%; padding: 0.55rem 0.7rem; border: 1px solid var(--border); border-radius: 7px; background: var(--bg-input); color: var(--text); font: inherit; font-size: 0.82rem; }
 .selection-link-number-input { appearance: textfield; -moz-appearance: textfield; }
