@@ -402,7 +402,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
       onClose();
       const actions = [{
         label: 'View booking',
-        onClick: () => router.push(`/dashboard/appointments?status=${depositLinkSent ? 'awaiting_payment' : 'confirmed'}${bookingId ? `&booking=${encodeURIComponent(bookingId)}` : ''}`),
+        onClick: () => router.push(`/dashboard/appointments?status=${depositEnabled && depositMode === 'later' ? 'awaiting_payment' : 'confirmed'}${bookingId ? `&booking=${encodeURIComponent(bookingId)}` : ''}`),
       }];
       if (depositLinkError) {
         actions.push({
