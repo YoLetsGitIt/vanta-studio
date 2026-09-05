@@ -228,6 +228,9 @@ button:focus-visible {
 .selection-link-field > span { color: var(--text-faint); font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
 .selection-link-modal input,
 .selection-link-modal select { width: 100%; padding: 0.55rem 0.7rem; border: 1px solid var(--border); border-radius: 7px; background: var(--bg-input); color: var(--text); font: inherit; font-size: 0.82rem; }
+.selection-link-number-input { appearance: textfield; -moz-appearance: textfield; }
+.selection-link-number-input::-webkit-inner-spin-button,
+.selection-link-number-input::-webkit-outer-spin-button { margin: 0; -webkit-appearance: none; }
 .selection-link-check { display: flex; align-items: center; gap: 0.5rem; color: var(--text-muted); font-size: 0.8rem; }
 .selection-link-check input { width: auto; accent-color: var(--accent); }
 .selection-link-actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 0.35rem; }

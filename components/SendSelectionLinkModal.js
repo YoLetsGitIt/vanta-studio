@@ -51,12 +51,12 @@ export default function SendSelectionLinkModal({ booking, artists = [], stripeCo
       <div className="selection-link-modal">
         <h3>{booking?.status === 'awaiting_payment' ? 'Resend selection link' : 'Send selection link'}</h3>
         <p>Choose the appointment details included in the client&apos;s secure selection link.</p>
-        {needsArtist && <Field label="Assign artist"><select value={artistId} onChange={e => setArtistId(e.target.value)}><option value="">Select an artist</option>{artists.map(a => { const id = a.artistId ?? a.artist_id ?? a.id; return <option key={id} value={id}>{a.name}</option>; })}</select></Field>}
+        <Field label={needsArtist ? 'Assign artist' : 'Artist'}><select value={artistId} onChange={e => setArtistId(e.target.value)}><option value="">Select an artist</option>{artists.map(a => { const id = a.artistId ?? a.artist_id ?? a.id; return <option key={id} value={id}>{a.name}</option>; })}</select></Field>
         <Field label="Duration"><select value={duration} onChange={e => setDuration(Number(e.target.value))}>{[60,90,120,180,240,300,360,480].map(m => <option key={m} value={m}>{m === 480 ? 'Full day (8 hrs)' : `${m / 60} hour${m === 60 ? '' : 's'}`}</option>)}</select></Field>
-        <Field label="Quote"><input type="number" min="0" value={quote} onChange={e => setQuote(e.target.value)} placeholder="e.g. 350" /></Field>
+        <Field label="Quote"><input className="selection-link-number-input" type="number" min="0" value={quote} onChange={e => setQuote(e.target.value)} placeholder="e.g. 350" /></Field>
         <Field label="Link expires"><select value={hours} onChange={e => setHours(Number(e.target.value))}><option value={24}>24 hours</option><option value={48}>48 hours</option><option value={72}>72 hours</option><option value={168}>7 days</option><option value={336}>14 days</option></select></Field>
-        {stripeConnected && <><label className="selection-link-check"><input type="checkbox" checked={deposit} onChange={e => setDeposit(e.target.checked)} /> Require a deposit</label>{deposit && <input type="number" min="0" value={depositAmount} onChange={e => setDepositAmount(e.target.value)} placeholder="Deposit amount ($)" />}</>}
-        <div className="selection-link-actions"><button onClick={onClose}>Cancel</button><button className="primary" disabled={saving || (needsArtist && !artistId)} onClick={submit}>{saving ? 'Sending…' : 'Send link'}</button></div>
+        {stripeConnected && <><label className="selection-link-check"><input type="checkbox" checked={deposit} onChange={e => setDeposit(e.target.checked)} /> Require a deposit</label>{deposit && <input className="selection-link-number-input" type="number" min="0" value={depositAmount} onChange={e => setDepositAmount(e.target.value)} placeholder="Deposit amount ($)" />}</>}
+        <div className="selection-link-actions"><button onClick={onClose}>Cancel</button><button className="primary" disabled={saving || !artistId} onClick={submit}>{saving ? 'Sending…' : 'Send link'}</button></div>
       </div>
     </div>
   );
