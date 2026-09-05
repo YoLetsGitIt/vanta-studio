@@ -15,6 +15,25 @@ import { formatDob } from '@/lib/format';
 import { useLanguage } from '@/lib/i18n';
 import { showError } from '@/lib/feedback';
 
+const CLIENTS_PER_PAGE = 25;
+
+async function listAllStudioBookings() {
+  const bookings = [];
+  const seenCursors = new Set();
+  let cursor = '';
+
+  do {
+    const data = await listStudioBookings('', cursor);
+    bookings.push(...(data.bookings ?? []));
+    const nextCursor = data.next_cursor ?? '';
+    if (!nextCursor || seenCursors.has(nextCursor)) break;
+    seenCursors.add(nextCursor);
+    cursor = nextCursor;
+  } while (cursor);
+
+  return bookings;
+}
+
 function ClientsInner() {
   const { t } = useLanguage();
   const params = useSearchParams();
@@ -23,6 +42,7 @@ function ClientsInner() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
   const [selected, setSelected] = useState(null);
   const [consents, setConsents] = useState({});
   const [consentVersion, setConsentVersion] = useState('1');
@@ -37,7 +57,7 @@ function ClientsInner() {
 
   useEffect(() => {
     async function load() {
-      const key = 'clients:all';
+      const key = 'clients:all:v2';
       const contactsKey = 'clients:contacts';
       const cached = getCached(key);
       const cachedContacts = getCached(contactsKey);
@@ -49,12 +69,12 @@ function ClientsInner() {
       }
       try {
         const [data, contactData, templateData] = await Promise.all([
-          listStudioBookings(''),
+          listAllStudioBookings(),
           getStudioClients().catch(() => ({ clients: [] })), // contact book is optional
           listConsentTemplates().catch(() => ({ templates: [] })),
         ]);
         setConsentTemplates(templateData.templates ?? []);
-        const b = data.bookings ?? [];
+        const b = data;
         const c = contactData.clients ?? [];
         setCached(key, b);
         setCached(contactsKey, c);
@@ -168,7 +188,21 @@ function ClientsInner() {
     );
   }, [clients, search]);
 
-  const selectedClient = selected ? filtered.find(c => (c.email || c.name) === selected) : null;
+  const pageCount = Math.max(1, Math.ceil(filtered.length / CLIENTS_PER_PAGE));
+  const paginatedClients = useMemo(() => {
+    const start = (page - 1) * CLIENTS_PER_PAGE;
+    return filtered.slice(start, start + CLIENTS_PER_PAGE);
+  }, [filtered, page]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [search]);
+
+  useEffect(() => {
+    setPage(current => Math.min(current, pageCount));
+  }, [pageCount]);
+
+  const selectedClient = selected ? clients.find(c => (c.email || c.name) === selected) : null;
 
   // Client data export disabled for now — re-enable when the export flow is finalised.
   // function exportCSV() {
@@ -228,7 +262,7 @@ function ClientsInner() {
           {!loading && !error && filtered.length === 0 && (
             <p style={s.msg}>{t('clients_none')}</p>
           )}
-          {filtered.map(client => {
+          {paginatedClients.map(client => {
             const key = client.email || client.name;
             const active = selected === key;
             const consent = client.email ? consents[client.email] : null;
@@ -257,6 +291,32 @@ function ClientsInner() {
               </div>
             );
           })}
+          {!loading && !error && filtered.length > 0 && (
+            <div style={s.pagination}>
+              <span style={s.pageSummary}>
+                {`${(page - 1) * CLIENTS_PER_PAGE + 1}–${Math.min(page * CLIENTS_PER_PAGE, filtered.length)} of ${filtered.length}`}
+              </span>
+              <div style={s.pageActions}>
+                <button
+                  type="button"
+                  onClick={() => setPage(current => Math.max(1, current - 1))}
+                  disabled={page === 1}
+                  style={{ ...s.pageButton, opacity: page === 1 ? 0.4 : 1 }}
+                >
+                  Previous
+                </button>
+                <span style={s.pageNumber}>Page {page} of {pageCount}</span>
+                <button
+                  type="button"
+                  onClick={() => setPage(current => Math.min(pageCount, current + 1))}
+                  disabled={page === pageCount}
+                  style={{ ...s.pageButton, opacity: page === pageCount ? 0.4 : 1 }}
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {selectedClient && (
@@ -425,16 +485,10 @@ function ClientDetail({ client, onClose, consentTemplates = [], onSendConsentLin
       </div>
       <div style={s.panelBody}>
         {client.email ? (
-          <button
-            type="button"
-            onClick={() => { window.location.href = `mailto:${encodeURIComponent(client.email.trim())}`; }}
-            style={s.contactRow}
-            aria-label={`Email ${client.name} at ${client.email}`}
-          >
+          <div style={s.contactRowStatic}>
             <span style={s.contactIcon}>✉</span>
-            <span style={s.contactValue}>{client.email}</span>
-            <span style={s.contactArrow}>↗</span>
-          </button>
+            <span style={s.contactValueStatic}>{client.email}</span>
+          </div>
         ) : (
           <div style={s.contactRowMissing}><span style={s.contactIcon}>✉</span><span>{t('clients_no_email')}</span></div>
         )}
@@ -763,6 +817,39 @@ const s = {
     color: 'var(--text-faint)',
     padding: '0.5rem 0',
   },
+  pagination: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: '1rem',
+    padding: '0.75rem 0.1rem 0.25rem',
+  },
+  pageSummary: {
+    color: 'var(--text-faint)',
+    fontSize: '0.75rem',
+  },
+  pageActions: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.65rem',
+  },
+  pageButton: {
+    padding: '0.4rem 0.7rem',
+    borderRadius: 7,
+    border: '1px solid var(--border)',
+    background: 'transparent',
+    color: 'var(--text-muted)',
+    fontSize: '0.75rem',
+    fontWeight: 600,
+    fontFamily: 'inherit',
+    cursor: 'pointer',
+  },
+  pageNumber: {
+    minWidth: 84,
+    color: 'var(--text-dim)',
+    fontSize: '0.75rem',
+    textAlign: 'center',
+  },
   row: {
     display: 'flex',
     alignItems: 'center',
@@ -907,6 +994,12 @@ const s = {
     borderRadius: 8, padding: '0.5rem 0.75rem',
     cursor: 'pointer', width: '100%', textAlign: 'left', marginBottom: '0.35rem',
   },
+  contactRowStatic: {
+    display: 'flex', alignItems: 'center', gap: '0.5rem',
+    background: 'var(--bg-input)', border: '1px solid var(--border-faint)',
+    borderRadius: 8, padding: '0.5rem 0.75rem',
+    width: '100%', marginBottom: '0.35rem',
+  },
   contactRowMissing: {
     display: 'flex', alignItems: 'center', gap: '0.5rem',
     padding: '0.5rem 0.75rem', marginBottom: '0.35rem',
@@ -914,6 +1007,7 @@ const s = {
   },
   contactIcon: { fontSize: '0.85rem', color: 'var(--text-ghost)', flexShrink: 0, width: 16, textAlign: 'center' },
   contactValue: { fontSize: '0.82rem', color: 'var(--accent)', fontWeight: 500, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  contactValueStatic: { fontSize: '0.82rem', color: 'var(--text-dim)', fontWeight: 500, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   contactArrow: { fontSize: '0.7rem', color: 'var(--text-ghost)', flexShrink: 0 },
   fieldLabel: {
     display: 'block',
