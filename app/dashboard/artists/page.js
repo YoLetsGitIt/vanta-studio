@@ -859,9 +859,25 @@ function ArtistRemoveModal({ onConfirm, onCancel, saving, existingEndDate }) {
           </p>
         )}
         <div style={{ display: 'flex', gap: '0.75rem' }}>
-          <button onClick={onCancel} disabled={saving} style={{ flex: 1, padding: '0.7rem', borderRadius: 8, border: '1px solid var(--border-strong)', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '0.9rem', fontWeight: 600, fontFamily: 'inherit' }}>
+          <button onClick={onCancel} disabled={saving} style={{ flex: 1, padding: '0.7rem', borderRadius: 8, border: '1px solid var(--border-strong)', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '0.9rem', fontWeight: 600, fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
             Cancel
           </button>
+          {isChanging && (
+            <button
+              type="button"
+              onClick={() => onConfirm(null)}
+              disabled={saving}
+              style={{
+                flex: 1.35, padding: '0.7rem', borderRadius: 8,
+                border: '1px solid rgba(232,111,111,0.45)', background: 'transparent',
+                color: '#e86f6f', cursor: saving ? 'default' : 'pointer',
+                fontSize: '0.82rem', fontWeight: 650, fontFamily: 'inherit',
+                opacity: saving ? 0.5 : 1, whiteSpace: 'nowrap',
+              }}
+            >
+              Remove last day
+            </button>
+          )}
           <button
             onClick={() => onConfirm(lastDay)}
             disabled={saving}
@@ -875,22 +891,6 @@ function ArtistRemoveModal({ onConfirm, onCancel, saving, existingEndDate }) {
             {saving ? 'Saving…' : isToday ? 'Remove from studio' : isChanging ? 'Update last day' : 'Set last day'}
           </button>
         </div>
-        {isChanging && (
-          <button
-            type="button"
-            onClick={() => onConfirm(null)}
-            disabled={saving}
-            style={{
-              width: '100%', marginTop: '0.75rem', padding: '0.65rem', borderRadius: 8,
-              border: '1px solid var(--border-strong)', background: 'transparent',
-              color: 'var(--text-muted)', cursor: saving ? 'default' : 'pointer',
-              fontSize: '0.85rem', fontWeight: 600, fontFamily: 'inherit',
-              opacity: saving ? 0.5 : 1,
-            }}
-          >
-            Remove last day
-          </button>
-        )}
       </div>
     </div>
   );
