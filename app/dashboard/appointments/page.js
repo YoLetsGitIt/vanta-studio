@@ -63,6 +63,8 @@ function AppointmentsInner() {
   const [nextCursor, setNextCursor] = useState('');
   const [error, setError] = useState('');
   const [selected, setSelected] = useState(null);
+  const [selectedBooking, setSelectedBooking] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [completeTarget, setCompleteTarget] = useState(null);
   const [noShowTarget, setNoShowTarget] = useState(null);
@@ -109,7 +111,7 @@ function AppointmentsInner() {
 
   const load = useCallback(async (bust = false) => {
     if (bust) invalidatePrefix('bookings:');
-    const key = `bookings:${effectiveStatus}:${effectiveOutcome}:${sortDir}`;
+    const key = `bookings:summary:${effectiveStatus}:${effectiveOutcome}:${sortDir}`;
     const cached = getCached(key);
     if (cached) {
       setBookings(cached.bookings);
@@ -121,7 +123,7 @@ function AppointmentsInner() {
     setError('');
     setNextCursor('');
     try {
-      const data = await listStudioBookings(effectiveStatus, '', sortDir, effectiveOutcome);
+      const data = await listStudioBookings(effectiveStatus, '', sortDir, effectiveOutcome, true);
       const b = data.bookings ?? [];
       const next = data.next_cursor ?? '';
       setCached(key, { bookings: b, next });
@@ -136,20 +138,20 @@ function AppointmentsInner() {
 
   useEffect(() => {
     if (!requestedBookingId || loading) return;
-    if (bookings.some(booking => booking.id === requestedBookingId)) {
-      setSelected(requestedBookingId);
-      return;
-    }
-    let cancelled = false;
-    getStudioBooking(requestedBookingId)
-      .then(booking => {
-        if (cancelled || !booking?.id) return;
-        setBookings(current => current.some(item => item.id === booking.id) ? current : [booking, ...current]);
-        setSelected(booking.id);
-      })
-      .catch(showError);
-    return () => { cancelled = true; };
-  }, [requestedBookingId, loading, bookings]);
+    setSelected(requestedBookingId);
+  }, [requestedBookingId, loading]);
+
+  useEffect(() => {
+    if (!selected) { setSelectedBooking(null); return; }
+    let active = true;
+    setSelectedBooking(null);
+    setDetailLoading(true);
+    getStudioBooking(selected)
+      .then(booking => { if (active) setSelectedBooking(booking); })
+      .catch(showError)
+      .finally(() => { if (active) setDetailLoading(false); });
+    return () => { active = false; };
+  }, [selected]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -163,7 +165,7 @@ function AppointmentsInner() {
     if (!nextCursor || loadingMore) return;
     setLoadingMore(true);
     try {
-      const data = await listStudioBookings(effectiveStatus, nextCursor, sortDir, effectiveOutcome);
+      const data = await listStudioBookings(effectiveStatus, nextCursor, sortDir, effectiveOutcome, true);
       const more = data.bookings ?? [];
       const next = data.next_cursor ?? '';
       setBookings(prev => [...prev, ...more]);
@@ -317,8 +319,10 @@ function AppointmentsInner() {
     );
   }, [bookings, search, activeFilter, confirmedSubFilter]);
 
-  const selectedBooking = selected ? bookings.find(b => b.id === selected) : null;
-  const sendLinkBooking = sendLinkTarget ? bookings.find(b => b.id === sendLinkTarget) : null;
+  const selectedSummary = selected ? bookings.find(b => b.id === selected) : null;
+  const sendLinkBooking = sendLinkTarget === selectedBooking?.id
+    ? selectedBooking
+    : bookings.find(b => b.id === sendLinkTarget);
 
   return (
     <div style={s.page}>
@@ -474,20 +478,32 @@ function AppointmentsInner() {
         )}
       </div>
 
-      {selectedBooking && (
+      {selected && (
         <BookingDetailPanel
           booking={selectedBooking}
+          entry={selectedSummary ? {
+            bookingId: selectedSummary.id,
+            clientName: selectedSummary.requester_name,
+            artistId: selectedSummary.artist_id,
+            artistName: selectedSummary.artist_name,
+            sessionType: selectedSummary.session_type,
+            placement: selectedSummary.body_location,
+            chosenTime: selectedSummary.chosen_time,
+            estimatedQuote: selectedSummary.estimated_quote,
+            status: selectedSummary.status,
+          } : undefined}
           allBookings={bookings}
+          loading={detailLoading}
           onClose={() => setSelected(null)}
-          onAccept={(stationId) => handleAccept(selectedBooking.id, stationId)}
-          onReject={() => handleReject(selectedBooking.id)}
-          onCancel={() => handleCancel(selectedBooking.id)}
-          onComplete={() => handleComplete(selectedBooking.id, selectedBooking.estimated_quote ?? selectedBooking.final_price, selectedBooking.deposit_amount ?? null)}
-          onNoShow={() => handleNoShow(selectedBooking.id)}
-          onSendLink={() => handleSendLink(selectedBooking.id)}
-          onConfirm={() => handleConfirm(selectedBooking.id)}
-          onReassign={() => openReassign(selectedBooking.id)}
-          onReschedule={() => openReschedule(selectedBooking)}
+          onAccept={selectedBooking ? (stationId) => handleAccept(selectedBooking.id, stationId) : undefined}
+          onReject={selectedBooking ? () => handleReject(selectedBooking.id) : undefined}
+          onCancel={selectedBooking ? () => handleCancel(selectedBooking.id) : undefined}
+          onComplete={selectedBooking ? () => handleComplete(selectedBooking.id, selectedBooking.estimated_quote ?? selectedBooking.final_price, selectedBooking.deposit_amount ?? null) : undefined}
+          onNoShow={selectedBooking ? () => handleNoShow(selectedBooking.id) : undefined}
+          onSendLink={selectedBooking ? () => handleSendLink(selectedBooking.id) : undefined}
+          onConfirm={selectedBooking ? () => handleConfirm(selectedBooking.id) : undefined}
+          onReassign={selectedBooking ? () => openReassign(selectedBooking.id) : undefined}
+          onReschedule={selectedBooking ? () => openReschedule(selectedBooking) : undefined}
           actionLoading={actionLoading}
         />
       )}

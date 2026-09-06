@@ -301,18 +301,33 @@ export default function HomePage() {
 
   async function sendDepositPaymentLink(booking) {
     const actionKey = `deposit-${booking.id}`;
-    await runAttentionAction(actionKey, () => bookingActions.sendSelectionLink(booking.id, {
-      expiresHours: 168,
-      depositRequired: true,
-      depositAmount: Number(booking.deposit_amount),
-      durationMinutes: booking.proposed_duration_minutes ?? booking.duration_minutes ?? 60,
-      estimatedQuote: booking.estimated_quote ?? null,
-      artistId: booking.artist_id || null,
-    }), () => {
+    await runAttentionAction(actionKey, async () => {
+      const fullBooking = await getStudioBooking(booking.id);
+      return bookingActions.sendSelectionLink(booking.id, {
+        expiresHours: 168,
+        depositRequired: true,
+        depositAmount: Number(fullBooking.deposit_amount),
+        durationMinutes: fullBooking.proposed_duration_minutes ?? fullBooking.duration_minutes ?? 60,
+        estimatedQuote: fullBooking.estimated_quote ?? null,
+        artistId: fullBooking.artist_id || null,
+      });
+    }, () => {
       setSentDepositLink(booking.id);
       showFeedback('Deposit payment link sent.', 'success');
       setTimeout(() => setSentDepositLink(current => current === booking.id ? null : current), 3000);
     });
+  }
+
+  async function openCompleteBooking(booking) {
+    const actionKey = `outcome-${booking.id}`;
+    setAttentionAction(actionKey);
+    try {
+      setCompleteBooking(await getStudioBooking(booking.id));
+    } catch (error) {
+      showError(error);
+    } finally {
+      setAttentionAction(null);
+    }
   }
 
   // Group today by artist
@@ -446,7 +461,9 @@ export default function HomePage() {
                 <AttentionGroup title="Incomplete past sessions" icon="clock" count={overdueBookings.length} subtitle="Past sessions still need an outcome and payment" open={!!openAttentionGroups.overdue} onToggle={() => toggleAttentionGroup('overdue')}>
                   {overdueBookings.map(booking => (
                     <AttentionItem key={booking.id} title={booking.requester_name ?? 'Client'} subtitle={bookingSubtitle(booking)} onClick={() => openBookingReview(booking)}>
-                      <button style={s.inlinePrimary} onClick={() => setCompleteBooking(booking)}>Record outcome</button>
+                      <button style={s.inlinePrimary} disabled={attentionAction === `outcome-${booking.id}`} onClick={() => openCompleteBooking(booking)}>
+                        {attentionAction === `outcome-${booking.id}` ? 'Loading…' : 'Record outcome'}
+                      </button>
                     </AttentionItem>
                   ))}
                 </AttentionGroup>

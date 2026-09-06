@@ -2,14 +2,13 @@
 
 import { useState, useEffect, useMemo, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { listStudioBookings, getStudioClients, getClientConsents, getNotes, addNote, deleteNote, ensureStudioClient, patchStudioClient, generateConsentLink, listConsentTemplates, getClientConsentSubmissions, getBatchClientConsentSubmissions } from '@/lib/api';
+import { getStudioClients, getStudioClient, getClientConsents, getNotes, addNote, deleteNote, ensureStudioClient, patchStudioClient, generateConsentLink, listConsentTemplates, getClientConsentSubmissions, getBatchClientConsentSubmissions } from '@/lib/api';
 
 const TATTOO_STYLES = [
   'Traditional', 'Neo Traditional', 'Blackwork', 'Fine Line', 'Realism',
   'Japanese', 'Watercolor', 'Geometric', 'Tribal', 'Dotwork',
   'Illustrative', 'New School', 'Biomechanical', 'Lettering', 'Minimalist',
 ];
-import { getCached, setCached } from '@/lib/cache';
 import { statusColors, capitalise } from '@/lib/status';
 import { formatDob } from '@/lib/format';
 import { useLanguage } from '@/lib/i18n';
@@ -17,68 +16,31 @@ import { showError } from '@/lib/feedback';
 
 const CLIENTS_PER_PAGE = 25;
 
-async function listAllStudioBookings() {
-  const bookings = [];
-  const seenCursors = new Set();
-  let cursor = '';
-
-  do {
-    const data = await listStudioBookings('', cursor);
-    bookings.push(...(data.bookings ?? []));
-    const nextCursor = data.next_cursor ?? '';
-    if (!nextCursor || seenCursors.has(nextCursor)) break;
-    seenCursors.add(nextCursor);
-    cursor = nextCursor;
-  } while (cursor);
-
-  return bookings;
-}
-
 function ClientsInner() {
   const { t } = useLanguage();
   const params = useSearchParams();
-  const [bookings, setBookings] = useState([]);
   const [contacts, setContacts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState(null);
+  const [selectedClient, setSelectedClient] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
   const [consents, setConsents] = useState({});
   const [consentVersion, setConsentVersion] = useState('1');
   const [consentTemplates, setConsentTemplates] = useState([]);
   const [submissionsByEmail, setSubmissionsByEmail] = useState({});
 
-  // Auto-select a client when navigated from booking detail.
-  useEffect(() => {
-    const client = params.get('client');
-    if (client) setSelected(client);
-  }, [params]);
-
   useEffect(() => {
     async function load() {
-      const key = 'clients:all:v2';
-      const contactsKey = 'clients:contacts';
-      const cached = getCached(key);
-      const cachedContacts = getCached(contactsKey);
-      if (cached && cachedContacts) {
-        setBookings(cached);
-        setContacts(cachedContacts);
-        setLoading(false);
-        return;
-      }
       try {
-        const [data, contactData, templateData] = await Promise.all([
-          listAllStudioBookings(),
+        const [contactData, templateData] = await Promise.all([
           getStudioClients().catch(() => ({ clients: [] })), // contact book is optional
           listConsentTemplates().catch(() => ({ templates: [] })),
         ]);
         setConsentTemplates(templateData.templates ?? []);
-        const b = data;
         const c = contactData.clients ?? [];
-        setCached(key, b);
-        setCached(contactsKey, c);
-        setBookings(b);
         setContacts(c);
       } catch (e) {
         setError(e.message);
@@ -89,93 +51,22 @@ function ClientsInner() {
     load();
   }, []);
 
-  // Once bookings load, batch-fetch consent statuses from both systems.
-  useEffect(() => {
-    if (bookings.length === 0) return;
-    const emails = [...new Set(bookings.map(b => b.requester_email).filter(Boolean))];
-    if (emails.length === 0) return;
-    getClientConsents(emails)
-      .then(data => {
-        setConsents(data.consents ?? {});
-        setConsentVersion(data.current_version ?? '1');
-      })
-      .catch(showError);
-    getBatchClientConsentSubmissions(emails)
-      .then(data => {
-        const map = {};
-        for (const sub of (data.submissions ?? [])) {
-          if (!sub.client_email) continue;
-          if (!map[sub.client_email]) map[sub.client_email] = [];
-          map[sub.client_email].push(sub);
-        }
-        setSubmissionsByEmail(map);
-      })
-      .catch(showError);
-  }, [bookings]);
-
   const clients = useMemo(() => {
-    const map = new Map();
-    for (const b of bookings) {
-      const key = b.requester_email || b.requester_name;
-      if (!map.has(key)) {
-        map.set(key, {
-          name: b.requester_name,
-          email: b.requester_email,
-          phone: b.requester_phone,
-          dob: b.dob || null,
-          bookings: [],
-          lastBooking: null,
-        });
-      }
-      const client = map.get(key);
-      client.bookings.push(b);
-      if (!client.dob && b.dob) client.dob = b.dob;
-      const date = b.chosen_time || b.proposed_time_primary || b.created_at;
-      if (date && (!client.lastBooking || new Date(date) > new Date(client.lastBooking))) {
-        client.lastBooking = date;
-      }
-    }
-    // Merge in imported contact-book entries (may have zero bookings).
-    const byEmail = new Map();
-    const byPhone = new Map();
-    for (const c of map.values()) {
-      if (c.email) byEmail.set(c.email.toLowerCase(), c);
-      if (c.phone) byPhone.set(c.phone.replace(/[^0-9+]/g, ''), c);
-    }
-    for (const contact of contacts) {
-      const existing =
-        (contact.email && byEmail.get(contact.email)) ||
-        (contact.phone && byPhone.get(contact.phone));
-      if (existing) {
-        if (!existing.dob && contact.dob) existing.dob = contact.dob;
-        if (!existing.phone && contact.phone) existing.phone = contact.phone;
-        existing.contactId = contact.id;
-        existing.designPreferences = parseStyles(contact.design_preferences);
-        existing.allergies = contact.allergies ?? null;
-        existing.painTolerance = contact.pain_tolerance ?? null;
-        continue;
-      }
-      map.set(contact.email || contact.phone || contact.name, {
+    return contacts.map(contact => ({
+        id: contact.id,
         name: contact.name,
         email: contact.email ?? null,
         phone: contact.phone ?? null,
-        dob: contact.dob ?? null,
-        bookings: [],
-        lastBooking: null,
-        imported: true,
+        bookingCount: Number(contact.booking_count ?? 0),
+        lastBooking: contact.last_booking ?? null,
+        imported: contact.source === 'import' || contact.source === 'imported',
         contactId: contact.id,
-        designPreferences: parseStyles(contact.design_preferences),
-        allergies: contact.allergies ?? null,
-        painTolerance: contact.pain_tolerance ?? null,
-      });
-    }
-
-    return Array.from(map.values()).sort((a, b) => {
+      })).sort((a, b) => {
       if (!a.lastBooking) return 1;
       if (!b.lastBooking) return -1;
       return new Date(b.lastBooking) - new Date(a.lastBooking);
     });
-  }, [bookings, contacts]);
+  }, [contacts]);
 
   const filtered = useMemo(() => {
     if (!search.trim()) return clients;
@@ -202,7 +93,52 @@ function ClientsInner() {
     setPage(current => Math.min(current, pageCount));
   }, [pageCount]);
 
-  const selectedClient = selected ? clients.find(c => (c.email || c.name) === selected) : null;
+  useEffect(() => {
+    const requested = params.get('client');
+    if (!requested || clients.length === 0) return;
+    const match = clients.find(client => client.email === requested || client.name === requested || client.id === requested);
+    if (match) setSelected(match.id);
+  }, [params, clients]);
+
+  useEffect(() => {
+    if (!selected) { setSelectedClient(null); return; }
+    let active = true;
+    setSelectedClient(null);
+    setDetailLoading(true);
+    getStudioClient(selected)
+      .then(data => {
+        if (!active) return;
+        const detail = data.client ?? {};
+        setSelectedClient({
+          ...detail,
+          contactId: detail.id,
+          bookings: data.bookings ?? [],
+          designPreferences: parseStyles(detail.design_preferences),
+          painTolerance: detail.pain_tolerance ?? null,
+        });
+      })
+      .catch(showError)
+      .finally(() => { if (active) setDetailLoading(false); });
+    return () => { active = false; };
+  }, [selected]);
+
+  useEffect(() => {
+    const emails = paginatedClients.map(client => client.email).filter(Boolean);
+    if (emails.length === 0) return;
+    getClientConsents(emails).then(data => {
+      setConsents(current => ({ ...current, ...(data.consents ?? {}) }));
+      setConsentVersion(data.current_version ?? '1');
+    }).catch(showError);
+    getBatchClientConsentSubmissions(emails).then(data => {
+      const map = {};
+      for (const sub of (data.submissions ?? [])) {
+        if (!sub.client_email) continue;
+        if (!map[sub.client_email]) map[sub.client_email] = [];
+        map[sub.client_email].push(sub);
+      }
+      setSubmissionsByEmail(current => ({ ...current, ...map }));
+    }).catch(showError);
+  }, [paginatedClients]);
 
   // Client data export disabled for now — re-enable when the export flow is finalised.
   // function exportCSV() {
@@ -263,7 +199,7 @@ function ClientsInner() {
             <p style={s.msg}>{t('clients_none')}</p>
           )}
           {paginatedClients.map(client => {
-            const key = client.email || client.name;
+            const key = client.id;
             const active = selected === key;
             const consent = client.email ? consents[client.email] : null;
             const clientSubs = client.email ? (submissionsByEmail[client.email] ?? []) : [];
@@ -284,7 +220,7 @@ function ClientsInner() {
                   </span>
                 </div>
                 <div style={s.clientStats}>
-                  <span style={s.sessionCount}>{client.bookings.length} {t('clients_sessions')}</span>
+                  <span style={s.sessionCount}>{client.bookingCount} {t('clients_sessions')}</span>
                   {client.imported && <span style={{ ...s.badge, ...s.badgeGrey }}>{t('clients_imported')}</span>}
                   <ConsentBadge status={consentStatus} />
                 </div>
@@ -319,7 +255,8 @@ function ClientsInner() {
           )}
         </div>
 
-        {selectedClient && (
+        {detailLoading && <aside style={s.panel}><p style={s.msg}>{t('loading')}</p></aside>}
+        {!detailLoading && selectedClient && (
           <ClientDetail
             client={selectedClient}
             onClose={() => setSelected(null)}

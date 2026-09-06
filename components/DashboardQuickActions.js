@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { createStudioReimbursement, getStudioClients } from '@/lib/api';
+import { useEffect, useState } from 'react';
+import { createStudioReimbursement, getStudioClient, getStudioClients } from '@/lib/api';
 import { formatDob, initials } from '@/lib/format';
 import { showError, showFeedback } from '@/lib/feedback';
 
@@ -34,21 +34,48 @@ function FindClientDialog({ onClose }) {
   const [clients, setClients] = useState([]);
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [detailLoading, setDetailLoading] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    getStudioClients()
-      .then(data => setClients(data.clients ?? []))
-      .catch(err => setError(err?.message || 'Clients could not be loaded.'))
-      .finally(() => setLoading(false));
-  }, []);
+    const search = query.trim();
+    if (!search) {
+      setClients([]);
+      setLoading(false);
+      setError('');
+      return undefined;
+    }
 
-  const matches = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    if (!needle) return clients.slice(0, 8);
-    return clients.filter(client => [client.name, client.email, client.phone].some(value => String(value ?? '').toLowerCase().includes(needle))).slice(0, 12);
-  }, [clients, query]);
+    let active = true;
+    setClients([]);
+    setLoading(true);
+    setError('');
+    const timer = window.setTimeout(() => {
+      getStudioClients(search)
+        .then(data => { if (active) setClients(data.clients ?? []); })
+        .catch(err => { if (active) setError(err?.message || 'Clients could not be loaded.'); })
+        .finally(() => { if (active) setLoading(false); });
+    }, 300);
+
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [query]);
+
+  async function selectClient(client) {
+    setDetailLoading(true);
+    setError('');
+    try {
+      const data = await getStudioClient(client.id);
+      setSelected(data.client);
+    } catch (err) {
+      setError(err?.message || 'Client details could not be loaded.');
+    } finally {
+      setDetailLoading(false);
+    }
+  }
 
   return (
     <Dialog title="Find a client" onClose={onClose}>
@@ -56,17 +83,18 @@ function FindClientDialog({ onClose }) {
         <span aria-hidden="true" style={styles.searchIcon}>⌕</span>
         <input autoFocus type="search" value={query} onChange={event => { setQuery(event.target.value); setSelected(null); }} placeholder="Search name, email, or phone…" aria-label="Search clients" style={styles.searchInput} />
       </div>}
-      {loading && <p role="status" style={styles.muted}>Loading clients…</p>}
+      {(loading || detailLoading) && <p role="status" style={styles.muted}>{detailLoading ? 'Loading client details…' : 'Searching clients…'}</p>}
       {error && <p role="alert" style={styles.error}>{error}</p>}
       {!loading && !error && !selected && (
         <div role="listbox" aria-label="Clients" style={styles.results}>
-          {matches.map(client => (
-            <button key={client.id ?? client.email ?? client.phone ?? client.name} type="button" role="option" onClick={() => setSelected(client)} style={styles.result}>
+          {clients.map(client => (
+            <button key={client.id ?? client.email ?? client.phone ?? client.name} type="button" role="option" disabled={detailLoading} onClick={() => selectClient(client)} style={styles.result}>
               <strong>{client.name || 'Unnamed client'}</strong>
               <span style={styles.muted}>{[client.email, client.phone].filter(Boolean).join(' · ') || 'No contact details'}</span>
             </button>
           ))}
-          {matches.length === 0 && <p style={styles.muted}>No matching clients.</p>}
+          {!query.trim() && <p style={styles.muted}>Start typing to search clients.</p>}
+          {query.trim() && clients.length === 0 && <p style={styles.muted}>No matching clients.</p>}
         </div>
       )}
       {selected && (
