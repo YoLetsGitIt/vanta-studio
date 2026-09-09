@@ -44,3 +44,41 @@
   .table th:first-child { width: 48px; }
   .legend { gap: 10px; }
 }
+
+.steps { display: grid; gap: 16px; min-width: 0; }
+.stageTitle { display: flex; align-items: center; gap: 10px; color: var(--text); font-size: .9rem; margin: 0 0 18px; }
+.stageTitle > span { display: grid; place-items: center; flex-shrink: 0; width: 26px; height: 26px; border: 1px solid var(--border-strong); border-radius: 6px; color: var(--text-muted); font-size: .75rem; }
+.viewLabel { color: var(--text-muted); font-size: .75rem; line-height: 1.5; margin: 0 0 12px; }
+.monthOverview { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; max-width: 540px; }
+.monthTile { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; padding: 10px 4px; border: 1px solid var(--control-border); border-radius: 8px; color: var(--text); aspect-ratio: 1; box-sizing: border-box; }
+.monthTile strong { font-size: .8rem; }
+.monthTile b { font-size: 1.4rem; font-weight: 500; }
+.monthTile span, .monthTile small { font-size: .7rem; color: var(--text-muted); }
+.monthTile small { margin-top: 4px; }
+.excluded { border-style: dashed; background: var(--bg-input); }
+.clientView { border-top: 1px solid var(--border-strong); padding-top: 14px; margin-top: 16px; }
+.choiceRow { display: flex; flex-wrap: wrap; gap: 8px; }
+.monthButton, .dateButton, .timeTile { border: 1px solid var(--control-border); background: var(--bg-card); border-radius: 6px; color: var(--text); font: inherit; font-size: .8125rem; padding: 12px 16px; }
+.monthButton, .dateButton { cursor: pointer; }
+.monthButton { min-height: 48px; }
+.dateChoices { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 8px; max-width: 460px; }
+.dateButton { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 8px; aspect-ratio: 1; }
+.dateButton span { font-size: .75rem; }
+.dateButton strong { font-size: 1.3rem; font-weight: 500; }
+.activeChoice { background: var(--accent); color: var(--accent-contrast); border-color: var(--accent); }
+.expandButton { font: inherit; font-size: .8rem; color: var(--text); border: 0; background: none; text-decoration: underline; text-underline-offset: 4px; cursor: pointer; padding: 12px 0 4px; min-height: 44px; }
+.eligibility { text-align: center; font-size: .6875rem; color: var(--text-muted); }
+.steps .table { max-width: 650px; }
+.steps .table th:first-child { width: auto; }
+.steps .table[aria-label="Example studio date availability"] th:first-child { width: 82px; }
+.steps .table[aria-label="Example studio date availability"] th:last-child { width: 68px; }
+@media (max-width: 600px) {
+ .monthOverview { gap: 6px; }
+ .monthTile { aspect-ratio: auto; min-height: 104px; }
+ .monthTile strong { font-size: .6875rem; }
+ .monthTile b { font-size: 1.1rem; }
+ .steps .table[aria-label="Example studio date availability"] th:first-child { width: 48px; }
+ .steps .table[aria-label="Example studio date availability"] th:last-child { width: 44px; }
+ .steps .table .square { font-size: 14px; }
+ .steps .table th, .eligibility { font-size: .625rem; }
+}

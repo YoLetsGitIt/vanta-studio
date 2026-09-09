@@ -1,83 +1,70 @@
 # Smart scheduling: implementation and decisions
 
-Implemented 9 September 2026 across `vanta-studio`, `vanta-backend` and `vanta-website`.
+Revised 9 September 2026. Settings → Bookings → Smart scheduling.
 
-## What studios and clients get
+## Behaviour
 
-Open **Settings → Bookings → Smart scheduling** and independently tick either option or both:
-
-| Fill quieter days | Minimise gaps | Client experience |
+| Prioritise quieter periods | Minimise gaps | Client choices |
 | --- | --- | --- |
-| Off | Off | All valid dates and start times, chronologically. |
-| On | Off | Three suggested quieter dates; all valid start times on the selected day. |
-| Off | On | Any available date; up to three start times closest to existing commitments. |
-| On | On | Three suggested quieter dates, then up to three close-fitting start times on the selected day. |
+| Off | Off | All valid dates and times. |
+| On | Off | Only eligible quieter months/dates; all valid times on those dates. |
+| Off | On | All valid dates; up to three closest-fitting times initially. |
+| On | On | Only eligible quieter months/dates; up to three closest-fitting times initially. |
 
-Whenever Minimise gaps is on, **Show all times** expands the selected date; **Show suggested times** restores its recommendations. A day with no commitments shows all valid times. Changing dates, artists or months clears the previous selection. Display and submission use the studio timezone.
+**Show all times** expands only the selected date. It never reveals excluded months or dates. Days without commitments show all valid times. These controls affect client selection links, including existing links when reloaded; staff calendars and the separate rescheduling journey retain their existing behaviour.
 
-Settings includes interactive HTML tables of square availability cells. The example week shows five six-hour working days; quieter dates are Tuesday and Thursday (1/6 booked), then Wednesday (3/6 booked). The example Tuesday has an 11am–12pm booking: with gap minimisation on, 10am and 12pm are the closest fits, followed by 9am (earlier times break ties). Suggestions display as 9am, 10am and 12pm, with 1pm and 2pm available through Show all times. These diagrams explicitly use hourly starts and one-hour appointments for clarity; live availability retains its 30-minute grid and the real appointment duration.
+## Algorithm decisions
 
-## Decisions and reasons
+1. Keep the controls independent and the stored enum unchanged: `all`, `quieter_days`, `minimize_gaps`, `combined`. Existing quieter preferences now apply strict filtering. No studio preference is automatically enabled and no new database migration is needed for this revision.
+2. Use a rolling **90 calendar days**, starting today in the studio timezone. Quiet-period filtering compares this whole window, so navigating cannot reveal a busier month. Other modes keep the existing month calendar.
+3. Measure workload **per selected artist**, using booked minutes divided by future working capacity. This avoids treating one long appointment as equivalent to one short appointment. Monthly ratios use total minutes, not an unweighted average of daily percentages.
+4. Count confirmed, requires-confirmation and awaiting-payment sessions using the existing blocking policy. Merge overlapping intervals and clip them to working hours. Only future portions of today's hours contribute.
+5. Weekly working hours and date overrides determine capacity. Leave and calendar-only busy time reduce capacity; mirrored Vanta calendar events are not deducted twice. External commitments still block slots and affect gap ranking, but do not count as Vanta bookings. Station restrictions constrain which slots can be offered; utilisation measures artist workload, not station occupancy.
+6. A candidate month must contain at least one valid appointment slot. Fully booked scheduled dates still contribute to its workload, preventing a busy month with one empty day from looking empty.
+7. Select at most **two months** within **15 percentage points** of the least-booked eligible month. Rank by utilisation, then earlier month. Example: 20% and 30% qualify together; 75% does not.
+8. Within each selected month, select at most **six dates** within **15 percentage points** of that month's least-booked eligible date. Rank by utilisation, then earlier date. These are maximums, not quotas: never pad the choices with busier periods. The boundary is inclusive.
+9. Display the surviving months and dates chronologically. If nothing has a valid slot, show an empty state and a contact-studio message; do not fall back to excluded dates.
+10. Minimise gaps retains the existing nearest-commitment-boundary score. Starting immediately after or ending immediately before a commitment scores zero. Select up to three starts, breaking ties by earlier start, then display chronologically. This favours close fits; it does not optimise the whole week's schedule.
+11. Keep the real appointment duration and 30-minute start grid. No new buffers, prices or artist-matching rules. Weekly schedules still represent one working interval per weekday; split and overnight intervals are outside this change.
+12. Use studio-local dates and explicit offset timestamps. Daylight-saving transitions use calendar-day arithmetic; nonexistent local start times and past starts are excluded. An ambiguous fall-back wall time has one offered occurrence.
 
-1. **Make the two preferences independent.** Neither controls the other: quieter days ranks dates, and gap minimisation ranks times. Both may be enabled together. Both off means show all availability. This does not introduce Acuity’s separate “Look busy” percentage-hiding feature.
-2. **Preserve saved preferences and the existing API field.** Two checkboxes map to `scheduling_mode`: `all`, `quieter_days`, `minimize_gaps`, or `combined`. The default remains `all`; a constraint-widening migration allows `combined` without rewriting any studio’s existing selection. The model and API accept all four combinations. A saved quieter-only choice now ranks dates without implicitly applying gap minimisation.
-3. **Apply the preference to client selection links.** This extends the existing `/booking/{token}` journey. It does not change staff calendar ordering, the public intake form, or the separate rescheduling page. Existing selection links pick up the preference when availability is loaded again.
-4. **Recommendations remain optional.** Ranking does not remove valid slots from the API or create artificial unavailability. Staff can still use their existing workflow. Existing confirmation and deposit behaviour remains in place.
-5. **Compare dates within the displayed month.** One request loads up to 31 days; the database and Google Calendar are read for that range rather than making one external-calendar request per date. Navigating months loads a new range. This is a recommendation window, not a new booking-horizon restriction.
-6. **Measure quieter days per selected artist.** Utilisation is occupied Vanta booking time divided by the artist's scheduled working time for that day. It is not appointment count or whole-studio utilisation. Work outside that day's hours is clipped, and overlapping records are merged to avoid double counting.
-7. **Retain existing blocking statuses.** Confirmed, requires-confirmation and awaiting-payment bookings count as occupied time. Hold-release/payment-expiry policy is unchanged; the ranking does not independently release unpaid bookings.
-8. **Keep external calendar commitments separate from booked utilisation.** They block times and influence gap suggestions, but do not count as Vanta-booked hours. A day with no valid artist-and-station slot cannot be recommended.
-9. **Gap ranking uses the nearest commitment boundary.** A slot ending at the next commitment's start, or starting at the previous commitment's end, has a gap score of zero. Otherwise, its smallest gap to a commitment determines its rank. Overlapping commitments are merged. This favours close fits; it is not a global optimisation of the entire week's schedule.
-10. **Use three suggestions and stable ties.** Quieter dates sort by utilisation, then earlier date. Suggested times sort by gap, then earlier time. Suggested times are displayed chronologically within the chosen subset. Time ranking is applied only when Minimise gaps is enabled, including the combined setting. Without it, all valid times are shown. Every combination shows all times on days without commitments.
-11. **Keep the existing 30-minute start grid and appointment duration.** No new buffer, pricing, appointment-template or artist-matching rules were added. Configurable cleanup buffers would need to become a shared availability rule before ranking can account for them. Current work schedules provide one opening interval per weekday; split and overnight schedules remain outside this change.
-12. **Use studio-local calendar boundaries and explicit timestamps.** Month ranges use local midnight and calendar-day arithmetic, which accommodates daylight-saving days. Each slot includes `starts_at` with its timezone offset; the browser submits that instant, not a browser-local reinterpretation of `HH:MM`. Past starts and nonexistent spring-forward wall times are excluded. The start grid offers one occurrence of an ambiguous fall-back wall time.
-13. **Preserve resource checks and improve overlap reads.** Artist working days, artist booking eligibility/end dates, station closures/end dates, overlapping bookings and connected-calendar busy periods constrain availability. Range reads include bookings that began before the range but overlap it. Studios without stations retain the previous artist-only behaviour.
-14. **Treat failed checks as errors.** Database or connected-calendar failures produce a retryable availability error, rather than an empty-looking schedule that could be mistaken for free time. Google Free/Busy responses with missing calendars or calendar-level errors are rejected. Availability requests have a 15-second deadline. As before, external checks depend on the calendar service being configured on the backend.
-15. **Keep private calendar details off the public response.** The API exposes valid slots and recommendations, not utilisation figures, busy event spans or station IDs. The old public `debug=1` details are no longer returned.
-16. **Prevent stale request results from replacing newer ones.** The client aborts obsolete requests, keys results by artist and month, clears old slots during loading, and offers a retry on errors. Responses are marked `no-store`. Slot reservation still uses the existing submission endpoint and conflict checks; this work does not make that endpoint's writes atomic.
-17. **Extend the existing stack.** No new production dependency, AI model, scheduling vendor or additional credential is required. The original single-day API still returns `slots: ["HH:MM", ...]`, with additional metadata. The updated website requires the backend's new range response, so release the backend first.
-18. **Keep changes reviewable.** The implementation pass stayed local and preserved existing source edits; production builds regenerate local export artifacts. The subsequent deployment was explicitly requested by the user.
-19. **Embed timezone data for production.** The Alpine container does not ship a system timezone database, so the Go binary includes `time/tzdata`. An `X-Vanta-Scheduling-Version: 2` response header identifies the deployed availability implementation without requiring a real booking link.
+## Stable selection and enforcement
 
-20. **Keep the examples readable on mobile.** Visual review found that the fixed desktop sidebar squeezed the settings page. Below 760px, settings now uses the full width, with navigation in a horizontal scrollable row. The diagrams stack vertically, retain square cells, and use symbols and accessible labels as well as colour. Browser checks assert minimum card/cell widths, not only absence of page overflow.
+13. Return one signed **15-minute offer** covering the eligible dates, so switching between offered months does not recalculate or move the choices. This is date eligibility, not a slot reservation.
+14. Bind the HMAC-SHA256 offer to booking ID, artist, scheduling mode, appointment duration, eligible dates, expiry and a hash of the selection token. Sign with the existing server-only `SUPABASE_JWT_SECRET`, with a scheduling-specific domain prefix. No new credential or dependency. Missing signing configuration fails closed.
+15. The selection endpoint requires a valid offer when quieter filtering is on, so posting a hidden date directly cannot bypass it. Changed mode, duration or selection token invalidates the offer. Already-issued offers remain valid for their short lifetime even if workload rankings change.
+16. Recheck the selected slot against current hours, date overrides, artist eligibility/end date, bookings, connected-calendar commitments and station availability at submission. Expired eligibility or a lost slot returns HTTP 409; the website reloads choices and asks the client to choose again.
+17. Existing selection writes and conflict checks remain non-atomic. This revision does not promise a reservation during the 15-minute offer or eliminate simultaneous-submission races. Payment, hold release and confirmation behaviour are unchanged.
+18. Batch database and calendar reads for the window. Availability checks have a 15-second deadline and fail with a retryable error when dependencies cannot be checked. They do not interpret failed calendar reads as free time.
+19. Abort obsolete browser requests, key responses by artist/range and clear stale slots during refresh. Filtered month switching uses the same response; other modes fetch by month. Responses use `Cache-Control: no-store`.
+20. Keep workload percentages, busy-event details and station IDs out of the client API. The studio preview uses synthetic data, never a client's real calendar. The deployment header is `X-Vanta-Scheduling-Version: 3`.
 
-## API and files
+## “See how it works” display decisions
 
-`GET /booking/{token}/slots?date=2026-09-01&artist_id=UUID&days=30`
+21. Use three vertically stacked steps: **choose a month → choose a date → choose a time**. Each step shows a labelled **Studio view** followed by **Client sees**, demonstrating the difference between the underlying schedule and offered choices.
+22. Show three illustrative monthly workload cards: September 75%, October 20%, November 30%. With filtering enabled, only October and November appear as client buttons. There is no disabled September button or navigation into it.
+23. Show a square availability table for five sample dates, six working hours each. Booked cells contain ×; available cells are empty. An Offered/Not offered column explains eligibility. Only eligible dates become square client buttons beneath the table.
+24. With filtering on, the one-hour-booked sample dates qualify (about 17%). The two-hour-booked date (about 33%) exceeds the approximately 32% ceiling and is omitted. Monthly totals are explicitly illustrative and include other dates beyond the five-row sample.
+25. Clicking an offered month changes the date example; clicking a date changes the time example. The time table uses stars for suggested starts, followed by the actual displayed time choices. Show all times is interactive and expands that date alone.
+26. Preview controls reflect unsaved preference changes immediately; the existing Save action persists them. Both options support keyboard interaction. Labels and symbols accompany colour, and the preview says it is not a live schedule.
+27. Keep hourly starts and one-hour appointments in the illustration for readability; label this difference from the real 30-minute grid. Retain the mobile settings layout with full-width content and horizontal navigation. Tables and date choices retain readable square cells in light and dark themes.
 
-Returns `mode`, `timezone`, `recommended_dates` and `days`. Each day contains `date`, `slots`, `slot_details` (`time`, `starts_at`) and `recommended_slots`. Omitting `days` retains the single-day top-level fields. The range limit is 1–31 days.
+## API
 
-Main files:
+`GET /booking/{token}/slots?date=2026-09-01&artist_id=UUID&days=30&view=periods`
 
-- `vanta-backend/internal/handlers/smart_scheduling.go`: deterministic availability/ranking helpers.
-- `vanta-backend/internal/handlers/booking_availability.go`: batched availability endpoint.
-- `vanta-backend/internal/models/scheduling.go`: accepted mode values.
-- `vanta-backend/migrations/20260909_add_scheduling_mode.sql`: original additive migration.
-- `vanta-backend/migrations/20260909b_combine_scheduling_preferences.sql`: widens the check constraint for `combined`; startup schema setup also upgrades existing databases.
-- `vanta-studio/components/SmartSchedulingSettings.js` and its CSS module: independent controls and interactive square-grid examples.
-- `vanta-studio/app/dashboard/settings/page.js` and `lib/api.js`: preference editing and persistence request.
-- `vanta-website/app/booking/[token]/BookingSelectionClient.js`: client recommendations and timezone-aware selection.
+Returns `mode`, `timezone`, `filtered_periods`, `months`, `days`, `offer`, `offer_expires_at`, and an empty legacy `recommended_dates` array. Each day has `date`, `slots`, `slot_details` (`time`, `starts_at`) and `recommended_slots`.
 
-## Validation and rollout
+When quieter filtering is enabled, `view=periods` returns the entire filtered 90-day snapshot. Otherwise the requested 1–31-day range is used. Legacy requests without `view=periods` receive only eligible dates intersecting their range. Single-day top-level slot fields are preserved and cannot disclose an excluded date.
 
-Automated Go tests cover mode-independent availability, recommendation validity, gap ranking, empty days, unavailable stations, invalid/oversized duration, booked-hours utilisation, overlapping records, short working days, calendar-only commitments, tie ordering, the recommendation limit, timezone offsets, daylight-saving gaps and past slots. Calendar service tests cover empty, busy, missing and failed calendars.
+`POST /booking/{token}/select` accepts `artist_id`, `chosen_time` and `offer` (required for quieter modes). HTTP 409 triggers fresh availability; offers cannot authorise an otherwise invalid slot.
 
-Browser smoke tests use intercepted API fixtures; they do not contact live booking or payment services. They exercise all four combinations on mobile, expanding/collapsing suggestions, month navigation, failure/retry, overseas time display and the submitted timestamp. A separate studio test exercises all four preference saves/reloads, preview updates, keyboard interaction, and dark/light layouts at desktop and 360px widths against a mocked profile API. These tests do not establish live database or Google/Stripe integration correctness.
+Main implementation: backend `booking_availability.go`, `smart_scheduling.go`, `quiet_periods.go`, `booking_selection.go`; studio `components/SmartSchedulingSettings.js` and its CSS module; website `app/booking/[token]/BookingSelectionClient.js`.
 
-Commands:
+## Verification and rollout
 
-```sh
-# In vanta-backend
-GOCACHE=/private/tmp/vanta-go-cache go test ./...
+Go tests cover weighted workload, fully booked dates, empty capacity, inclusive thresholds, caps, stable ties, past hours, calendar leave, mirrored bookings, signed-offer tampering/expiry/bindings, all four modes, valid gap suggestions, station exclusion and daylight saving. Run `GOCACHE=/private/tmp/vanta-go-cache go test ./...` in the backend.
 
-# In each frontend
-npm run build
+Build each frontend with `npm run build`. Serve their `out/` directories locally (website 3018, studio 3019), then run `VANTA_PLAYWRIGHT_PATH=/path/to/playwright node scripts/smart-scheduling-smoke.cjs` in each repository. Tests intercept account/booking/payment requests with synthetic fixtures. They cover preference save/reload, independent toggles, interactive month/date/time previews, keyboard use, mobile square dimensions, both themes, hidden dates/months, stable month switching, expiry/reselection, empty states and timezone-correct submission. These checks do not establish production database, Google or Stripe integration correctness.
 
-# Serve each out/ directory locally, then run its browser test:
-VANTA_PLAYWRIGHT_PATH=/path/to/playwright node scripts/smart-scheduling-smoke.cjs
-# Website defaults to localhost:3018; studio defaults to localhost:3019.
-```
-
-Roll out the additive database migration and backend before the booking website, then publish studio settings last so both preferences are supported before studios can enable them. The startup schema path should be checked in deployment logs, or apply the migration explicitly through the normal database process. Enable a recommendation mode on a pilot studio and verify its real working hours, station closures, Google connection and client submission before enabling it more widely. Default `all` makes adoption opt-in.
-
-Implementation-time integration limits: the initial checks did not run a live database migration or production provider round trip. See the deployment record for subsequent release verification. Existing selection-time transaction/race handling, payment holds, rescheduling, configurable buffers and calendar synchronisation lifecycle were not redesigned here.
+Release backend first, booking website second and studio controls last. Verify the backend version header with an invalid synthetic token and match each public deployment marker to its source commit. Publish the studio preview only once client filtering support is live. See the workspace deployment record for the actual release state.

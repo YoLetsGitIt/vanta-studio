@@ -29,21 +29,23 @@ const base = process.env.VANTA_STUDIO_TEST_URL || 'http://127.0.0.1:3019';
       return route.fulfill({ json: { hours: [], stations: [], templates: [], fields: {}, connected: false } });
     });
     await page.goto(`${base}/dashboard/settings.html?tab=bookings`, { waitUntil: 'networkidle' });
-    const quieter = page.getByRole('checkbox', { name: 'Fill quieter days', exact: true });
+    const quieter = page.getByRole('checkbox', { name: 'Prioritise quieter periods', exact: true });
     const gaps = page.getByRole('checkbox', { name: 'Minimise gaps', exact: true });
     await quieter.waitFor();
     assert.equal(await quieter.isChecked(), false);
     assert.equal(await gaps.isChecked(), false);
     const section = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Smart scheduling', exact: true }) });
-    const week = page.getByRole('table', { name: 'Example week availability', exact: true });
-    const day = page.getByRole('table', { name: 'Example Tuesday availability', exact: true });
+    const week = page.getByRole('table', { name: 'Example studio date availability', exact: true });
+    const day = page.getByRole('table', { name: 'Example studio time availability', exact: true });
     for (const next of ['quieter_days', 'combined', 'minimize_gaps', 'all']) {
       const wantsQuieter = next === 'quieter_days' || next === 'combined';
       const wantsGaps = next === 'minimize_gaps' || next === 'combined';
       await quieter.setChecked(wantsQuieter);
       await gaps.setChecked(wantsGaps);
-      assert.equal(await day.getByRole('img', { name: /First shown .*: suggested/ }).count(), wantsGaps ? 3 : 0);
-      assert.equal(await week.locator('[aria-label="suggested day"]').count(), wantsQuieter ? 3 : 0);
+      assert.equal(await day.getByRole('img', { name: /: suggested/ }).count(), wantsGaps ? 3 : 0);
+      assert.equal(await page.getByRole('group', { name: 'Example client month options' }).getByRole('button').count(), wantsQuieter ? 2 : 3);
+      assert.equal(await page.getByRole('group', { name: 'Example client date options' }).getByRole('button').count(), wantsQuieter ? 2 : 5);
+      assert.equal(await page.getByRole('group', { name: 'Example client time options' }).locator('span').count(), wantsGaps ? 3 : 5);
       await Promise.all([
         page.waitForResponse(response => response.url().endsWith('/studio/me/profile')),
         section.getByRole('button', { name: /Save/ }).click(),
@@ -61,6 +63,13 @@ const base = process.env.VANTA_STUDIO_TEST_URL || 'http://127.0.0.1:3019';
     assert.equal(await quieter.isChecked(), true);
     assert.equal(await gaps.isChecked(), true);
     assert.equal(updates.length, 4);
+    const months = page.getByRole('group', { name: 'Example client month options' });
+    await months.getByRole('button', { name: 'November' }).click();
+    assert.equal(await months.getByRole('button', { name: 'September' }).count(), 0);
+    await page.getByRole('group', { name: 'Example client date options' }).getByRole('button', { name: 'Thu, 5 Nov' }).click();
+    await page.getByRole('button', { name: 'Show all times', exact: true }).click();
+    assert.equal(await page.getByRole('group', { name: 'Example client time options' }).locator('span').count(), 5);
+    assert.equal(await months.getByRole('button').count(), 2);
     for (const theme of ['dark', 'light']) {
       await page.evaluate(value => document.documentElement.dataset.theme = value, theme);
       for (const width of [1280, 360]) {
@@ -72,7 +81,11 @@ const base = process.env.VANTA_STUDIO_TEST_URL || 'http://127.0.0.1:3019';
           const square = await table.getByRole('img').first().boundingBox();
           assert.ok(square.width >= 20 && Math.abs(square.width - square.height) < 1, 'Availability cells must remain readable squares');
         }
-        await section.screenshot({ path: `/private/tmp/vanta-smart-scheduling-${theme}-${width}.png` });
+        for (const stage of ['Month filtering example', 'Date filtering example', 'Time suggestions example']) {
+          const region = page.getByRole('region', { name: stage, exact: true });
+          await region.scrollIntoViewIfNeeded();
+          await region.screenshot({ path: `/private/tmp/vanta-${stage.split(' ')[0]}-${theme}-${width}.png` });
+        }
       }
     }
     assert.deepEqual(errors, []);
