@@ -10,6 +10,7 @@ import { formatDob } from '@/lib/format';
 import { useLanguage } from '@/lib/i18n';
 import { requestConfirmation, showError, showFeedback } from '@/lib/feedback';
 import { bookingActions } from '@/lib/bookingActions';
+import Button from '@/components/ui/Button';
 
 const DURATION_OPTIONS = [
   { label: '30 min', value: 30 },
@@ -27,7 +28,6 @@ const DURATION_OPTIONS = [
 function todayStr() {
   return new Date().toLocaleDateString('en-CA');
 }
-
 
 function nextAppointmentSlot() {
   const d = new Date();
@@ -329,6 +329,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
     previouslyFocusedRef.current = document.activeElement;
     closeButtonRef.current?.focus();
     function onKeyDown(event) {
+      if (document.querySelector('dialog:modal')) return;
       if (event.key === 'Escape') { event.preventDefault(); handleClose(); return; }
       if (event.key !== 'Tab' || !panelRef.current) return;
       const focusable = [...panelRef.current.querySelectorAll('button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [href], [tabindex]:not([tabindex="-1"])')];
@@ -471,6 +472,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
                 <button
                   type="button"
                   style={{ ...bd.typeCard, ...(bookingType === 'studio' ? bd.typeCardActive : {}) }}
+                  aria-pressed={bookingType === 'studio'}
                   onClick={() => setBookingType('studio')}
                 >
                   <strong>Studio appointment</strong><span>Planned and booked by the studio</span>
@@ -478,6 +480,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
                 <button
                   type="button"
                   style={{ ...bd.typeCard, ...(bookingType === 'walkin' ? bd.typeCardActive : {}) }}
+                  aria-pressed={bookingType === 'walkin'}
                   onClick={() => setBookingType('walkin')}
                 >
                   <strong>Walk-in</strong><span>Client arrived without a planned booking</span>
@@ -485,6 +488,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
                 <button
                   type="button"
                   style={{ ...bd.typeCard, ...(bookingType === 'personal' ? bd.typeCardActive : {}) }}
+                  aria-pressed={bookingType === 'personal'}
                   onClick={() => setBookingType('personal')}
                 >
                   <strong>Personal appointment</strong><span>Client brought in by the artist</span>
@@ -496,7 +500,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
             {artists.length > 0 && (
               <div style={bd.section}>
                 <p style={bd.sectionLabel}>{t('bdp_artist')}</p>
-                <select style={bd.select} value={artistId} onChange={e => setArtistId(e.target.value)} required>
+                <select aria-label={t('bdp_artist')} style={bd.select} value={artistId} onChange={e => setArtistId(e.target.value)} required>
                   <option value="">{t('nap_select_artist')}</option>
                   {artists.map(a => (
                     <option key={a.artistId ?? a.artist_id ?? a.id} value={a.artistId ?? a.artist_id ?? a.id}>
@@ -516,6 +520,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
               <div style={bd.modeTabs}>
                 <button
                   type="button"
+                  aria-pressed={clientMode === 'search'}
                   style={{ ...bd.modeTab, ...(clientMode === 'search' ? bd.modeTabActive : {}) }}
                   onClick={() => { setClientMode('search'); setFirstName(''); setLastName(''); setClientEmail(''); setClientPhone(''); }}
                 >
@@ -523,6 +528,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
                 </button>
                 <button
                   type="button"
+                  aria-pressed={clientMode === 'manual'}
                   style={{ ...bd.modeTab, ...(clientMode === 'manual' ? bd.modeTabActive : {}) }}
                   onClick={() => { setClientMode('manual'); setSelectedClient(null); }}
                 >
@@ -540,7 +546,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
                         {[selectedClient.email, selectedClient.phone, selectedClient.dob ? formatDob(selectedClient.dob) : null].filter(Boolean).join(' · ')}
                       </span>
                     </div>
-                    <button type="button" style={bd.deselectBtn} onClick={clearSelectedClient} title="Remove">✕</button>
+                    <button type="button" style={bd.deselectBtn} onClick={clearSelectedClient} aria-label="Remove selected client">✕</button>
                   </div>
                   {(selectedClient.allergies || selectedClient.pain_tolerance || selectedClient.notes) && (
                     <div role="note" style={bd.clientWarning}>
@@ -552,25 +558,25 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
                   )}
                   </div>
                 ) : (
-                  <div style={{ position: 'relative' }}>
+                  <div style={{ position: 'relative' }} onBlur={event => {
+                    if (!event.currentTarget.contains(event.relatedTarget)) setShowDropdown(false);
+                  }}>
                     <input
                       style={bd.input}
-                      role="combobox"
+                      type="search"
                       aria-label="Search existing clients"
                       aria-expanded={showDropdown && filteredClients.length > 0}
                       aria-controls="new-appointment-client-results"
-                      aria-autocomplete="list"
                       placeholder={t('clients_search')}
                       value={clientSearch}
                       onChange={e => { setClientSearch(e.target.value); setShowDropdown(true); }}
                       onFocus={() => setShowDropdown(true)}
-                      onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
                       autoComplete="off"
                     />
                     {showDropdown && filteredClients.length > 0 && (
-                      <div id="new-appointment-client-results" role="listbox" style={bd.dropdown}>
+                      <div id="new-appointment-client-results" role="group" aria-label="Matching clients" style={bd.dropdown}>
                         {filteredClients.map((c, i) => (
-                          <button key={c.id ?? c.email ?? `${c.name}-${i}`} role="option" type="button" style={bd.dropdownItem} onMouseDown={() => pickClient(c)}>
+                          <button key={c.id ?? c.email ?? `${c.name}-${i}`} type="button" style={bd.dropdownItem} onClick={() => pickClient(c)}>
                             <span style={bd.dropdownName}>{c.name}</span>
                             <span style={bd.dropdownSub}>{[c.email, c.phone].filter(Boolean).join(' · ')}</span>
                           </button>
@@ -591,53 +597,53 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
                 <>
                   <div style={bd.fieldRow}>
                     <div style={bd.field}>
-                      <label style={bd.label}>{t('nap_first_name')}</label>
+                      <label htmlFor="new-appointment-first-name" style={bd.label}>{t('nap_first_name')}</label>
                       <input
                         style={bd.input}
-                        value={firstName}
+                        id="new-appointment-first-name" value={firstName}
                         onChange={e => setFirstName(e.target.value)}
                         placeholder={t('nap_first_name')}
                         autoFocus
                       />
                     </div>
                     <div style={bd.field}>
-                      <label style={bd.label}>{t('nap_last_name')}</label>
+                      <label htmlFor="new-appointment-last-name" style={bd.label}>{t('nap_last_name')}</label>
                       <input
                         style={bd.input}
-                        value={lastName}
+                        id="new-appointment-last-name" value={lastName}
                         onChange={e => setLastName(e.target.value)}
                         placeholder={t('nap_last_name')}
                       />
                     </div>
                   </div>
                   <div style={bd.field}>
-                    <label style={bd.label}>{t('clients_dob')}</label>
+                    <label htmlFor="new-appointment-dob" style={bd.label}>{t('clients_dob')}</label>
                     <input
-                      style={{ ...bd.input, colorScheme: 'dark' }}
+                      style={bd.input}
                       type="date"
-                      value={clientDob}
+                      id="new-appointment-dob" value={clientDob}
                       onChange={e => setClientDob(e.target.value)}
                     />
                   </div>
                   <div style={bd.fieldRow}>
                     <div style={bd.field}>
-                      <label style={bd.label}>{t('sched_email')}</label>
+                      <label htmlFor="new-appointment-email" style={bd.label}>{t('sched_email')}</label>
                       <input
                         style={bd.input}
                         type="email"
                         aria-invalid={emailInvalid}
-                        value={clientEmail}
+                        id="new-appointment-email" value={clientEmail}
                         onChange={e => setClientEmail(e.target.value)}
                         placeholder="email@example.com"
                       />
                     </div>
                     <div style={bd.field}>
-                      <label style={bd.label}>{t('sched_phone')}</label>
+                      <label htmlFor="new-appointment-phone" style={bd.label}>{t('sched_phone')}</label>
                       <input
                         style={bd.input}
                         type="tel"
                         aria-invalid={phoneInvalid}
-                        value={clientPhone}
+                        id="new-appointment-phone" value={clientPhone}
                         onChange={e => setClientPhone(e.target.value)}
                         placeholder="+1 555 0100"
                       />
@@ -652,25 +658,25 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
               <p style={bd.sectionLabel}>{t('nap_booking_details')}</p>
 
               <div style={bd.field}>
-                <label style={bd.label}>{t('sched_date')}</label>
+                <label htmlFor="new-appointment-date" style={bd.label}>{t('sched_date')}</label>
                 <input
                   style={bd.input}
                   type="date"
                   min={todayStr()}
-                  value={bookingDate}
+                  id="new-appointment-date" value={bookingDate}
                   onChange={e => setBookingDate(e.target.value)}
                   required
                 />
               </div>
 
               <div style={bd.field}>
-                <label style={bd.label}>{t('nap_start_time')}</label>
+                <span style={bd.label}>{t('nap_start_time')}</span>
                 <TimeSelect value={startTime} onChange={setStartTime} label={t('nap_start_time')} />
               </div>
 
               <div style={bd.field}>
-                <label style={bd.label}>{t('bdp_duration')}</label>
-                <select style={bd.select} value={durationMins} onChange={e => setDurationMins(Number(e.target.value))}>
+                <label htmlFor="new-appointment-duration" style={bd.label}>{t('bdp_duration')}</label>
+                <select style={bd.select} id="new-appointment-duration" value={durationMins} onChange={e => setDurationMins(Number(e.target.value))}>
                   {DURATION_OPTIONS.map(opt => (
                     <option key={opt.value} value={opt.value}>{opt.label}</option>
                   ))}
@@ -699,7 +705,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
                   <p style={bd.hint}>{t('nap_checking')}</p>
                 ) : (
                   <>
-                    <select style={bd.select} value={stationId} onChange={e => setStationId(e.target.value)}>
+                    <select aria-label={t('bdp_station')} disabled={!!timeError} style={bd.select} value={stationId} onChange={e => setStationId(e.target.value)}>
                       <option value="">{t('nap_no_station')}</option>
                       {(availableStations ?? allStations).map(s => (
                         <option key={s.id} value={s.id}>{s.name}</option>
@@ -742,19 +748,19 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
                 <span>{t('nap_retouch')}</span>
               </label>
               <div style={bd.field}>
-                <label style={bd.label}>{t('bdp_size')}</label>
+                <label htmlFor="new-appointment-size" style={bd.label}>{t('bdp_size')}</label>
                 <div style={{ display: 'flex', gap: '0.4rem' }}>
                   <input
                     style={{ ...bd.input, flex: 1 }}
                     type="number" min="0" step="0.1"
-                    value={size}
+                    id="new-appointment-size" value={size}
                     onChange={e => setSize(e.target.value)}
                     placeholder="e.g. 10"
                   />
                   <div style={bd.unitToggle}>
                     {['cm', 'in'].map(u => (
                       <button
-                        key={u} type="button"
+                        key={u} type="button" aria-pressed={sizeUnit === u}
                         style={{ ...bd.unitBtn, ...(sizeUnit === u ? bd.unitBtnActive : {}) }}
                         onClick={() => setSizeUnit(u)}
                       >
@@ -771,26 +777,26 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
               <p style={bd.sectionLabel}>{t('nap_pricing')}</p>
               <div style={bd.field}>
                 <div style={bd.field}>
-                  <label style={bd.label}>Estimated price</label>
+                  <label htmlFor="new-appointment-estimate" style={bd.label}>Estimated price</label>
                   <div style={bd.prefixWrap}>
                     <span style={bd.prefix}>$</span>
                     <input
                       style={{ ...bd.input, paddingLeft: '1.75rem' }}
                       type="number" min="0" step="0.01"
-                      value={finalPrice}
+                      id="new-appointment-estimate" value={finalPrice}
                       onChange={e => setFinalPrice(e.target.value)}
                       placeholder="0.00"
                     />
                   </div>
                 </div>
                 <div style={bd.field}>
-                  <label style={bd.label}>Deposit</label>
+                  <span style={bd.label}>Deposit</span>
                   <div style={bd.depositModes}>
                     {[
                       ['none', 'No deposit'],
                       ['later', stripeConnected ? 'Collect later' : 'Due later'],
                       ['paid', 'Already paid'],
-                    ].map(([value, label]) => <button key={value} type="button" onClick={() => setDepositMode(value)} style={{ ...bd.depositMode, ...(depositMode === value ? bd.depositModeActive : {}) }}>{label}</button>)}
+                    ].map(([value, label]) => <button key={value} type="button" aria-pressed={depositMode === value} onClick={() => setDepositMode(value)} style={{ ...bd.depositMode, ...(depositMode === value ? bd.depositModeActive : {}) }}>{label}</button>)}
                   </div>
                   {depositMode !== 'none' && <>
                   <div style={bd.prefixWrap}>
@@ -798,7 +804,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
                     <input
                       style={{ ...bd.input, paddingLeft: '1.75rem' }}
                       type="number" min="0" step="0.01"
-                      value={depositAmount}
+                      aria-label="Deposit amount" value={depositAmount}
                       aria-invalid={depositInvalid}
                       onChange={e => setDepositAmount(e.target.value)}
                       placeholder="0.00"
@@ -826,6 +832,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
             <div style={{ ...bd.section, borderBottom: 'none', marginBottom: 0 }}>
               <p style={bd.sectionLabel}>{t('bdp_notes')}</p>
               <textarea
+                aria-label={t('bdp_notes')}
                 style={{ ...bd.input, minHeight: 72, resize: 'vertical' }}
                 value={notes}
                 onChange={e => setNotes(e.target.value)}
@@ -850,15 +857,17 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
 
             {(validationError || error) && <p role="alert" style={bd.errorText}>{error || validationError}</p>}
 
-            <button
+            <Button
               type="submit"
-              style={{ ...bd.submitBtn, opacity: canSubmit && !saving ? 1 : 0.4 }}
-              disabled={!canSubmit || saving}
+              loading={saving}
+              loadingLabel={t('sched_creating')}
+              fullWidth
+              disabled={!canSubmit}
               title={!canSubmit ? disabledReason : undefined}
               aria-describedby={!canSubmit ? 'new-appointment-disabled-reason' : undefined}
             >
-              {saving ? t('sched_creating') : t('nap_create')}
-            </button>
+              {t('nap_create')}
+            </Button>
             {!canSubmit && <span id="new-appointment-disabled-reason" style={bd.disabledReason}>{disabledReason}</span>}
 
           </form>
@@ -1038,10 +1047,5 @@ const bd = {
   summaryText: { color: 'var(--text)', fontSize: '0.8rem', lineHeight: 1.5 },
   errorText: { margin: '0.5rem 0 0', fontSize: '0.8rem', color: '#ff6b6b' },
   disabledReason: { marginTop: '0.45rem', textAlign: 'center', color: 'var(--text-ghost)', fontSize: '0.73rem' },
-  submitBtn: {
-    background: 'var(--accent)', border: 'none', borderRadius: 10,
-    padding: '0.75rem', fontSize: '0.9rem', fontWeight: 700,
-    color: 'var(--bg-sidebar)', cursor: 'pointer', transition: 'opacity 0.15s',
-    marginTop: '1.25rem', flexShrink: 0,
-  },
+
 };

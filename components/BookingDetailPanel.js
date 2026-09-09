@@ -10,12 +10,13 @@ import { getCached, setCached } from '@/lib/cache';
 import { useLanguage } from '@/lib/i18n';
 import { showError } from '@/lib/feedback';
 import { getBookingSourceLabel } from '@/lib/bookingType';
+import Button, { IconButton } from '@/components/ui/Button';
 
 const PAYMENT_LABELS = { cash: 'Cash', card: 'Card / POS', bank_transfer: 'Bank Transfer' };
 const CONSENT_STYLE  = {
-  current:  { bg: 'rgba(76,201,138,0.12)',  text: '#4cc98a' },
-  outdated: { bg: 'rgba(245,158,58,0.12)',  text: '#f59e3a' },
-  none:     { bg: 'rgba(232,111,111,0.12)', text: '#e86f6f' },
+  current:  { bg: 'var(--color-success-surface)', text: 'var(--color-success)' },
+  outdated: { bg: 'var(--color-warning-surface)', text: 'var(--color-warning)' },
+  none:     { bg: 'var(--color-danger-surface)', text: 'var(--color-danger)' },
 };
 
 function fmtDate(iso) {
@@ -318,24 +319,24 @@ export default function BookingDetailPanel({
   // keep the detail sections hidden rather than rendering them from partial data.
   if (loading) {
     return (
-      <aside style={p.panel}>
+      <aside aria-label={`${clientName} booking details`} style={p.panel}>
         <div style={p.header}>
           <span style={p.title}>{clientName}</span>
-          <button onClick={onClose} style={p.closeBtn}>✕</button>
+          <IconButton onClick={onClose} aria-label="Close booking details">✕</IconButton>
         </div>
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{t('loading')}</span>
+          <span role="status" style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{t('loading')}</span>
         </div>
       </aside>
     );
   }
 
   return (
-    <aside style={p.panel}>
+    <aside aria-label={`${clientName} booking details`} style={p.panel}>
       {/* Header */}
       <div style={p.header}>
         <span style={p.title}>{clientName}</span>
-        <button onClick={onClose} style={p.closeBtn}>✕</button>
+        <IconButton onClick={onClose} aria-label="Close booking details">✕</IconButton>
       </div>
 
       <div style={p.body}>
@@ -661,6 +662,7 @@ export default function BookingDetailPanel({
             <div style={p.divider} />
             <button
               style={{ ...p.sectionLabel, background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', gap: '0.35rem', width: '100%' }}
+              aria-expanded={submissionsExpanded}
               onClick={() => setSubmissionsExpanded(x => !x)}
             >
               <span>{t('bdp_consent_forms')} ({consentSubmissions.length})</span>
@@ -751,6 +753,7 @@ export default function BookingDetailPanel({
           <div style={p.divider} />
           <span style={p.sectionLabel}>{t('bdp_studio_notes')}</span>
           <textarea
+            aria-label={t('clients_add_note')}
             value={noteInput}
             onChange={e => setNoteInput(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleAddNote(); }}
@@ -848,25 +851,23 @@ function Row({ label, value, children }) {
 }
 
 function Btn({ onClick, disabled, variant, children }) {
-  const c = variant === 'success' ? { bg: 'rgba(76,201,138,0.12)', border: 'rgba(76,201,138,0.3)', text: '#4cc98a' }
-    : variant === 'primary'  ? { bg: 'rgba(111,163,232,0.12)', border: 'rgba(111,163,232,0.3)', text: '#6fa3e8' }
+  const c = variant === 'success' ? { bg: 'var(--color-success-surface)', border: 'var(--color-success-border)', text: 'var(--color-success)' }
+    : variant === 'primary'  ? { bg: 'var(--color-info-surface)', border: 'var(--color-info-border)', text: 'var(--color-info)' }
     : variant === 'neutral'  ? { bg: 'var(--bg-chip)', border: 'var(--border)', text: 'var(--text-muted)' }
-    : { bg: 'rgba(232,111,111,0.1)', border: 'rgba(232,111,111,0.25)', text: '#e86f6f' };
+    : { bg: 'var(--color-danger-surface)', border: 'var(--color-danger-border)', text: 'var(--color-danger)' };
   return (
-    <button onClick={onClick} disabled={disabled} style={{
-      flex: 1, padding: '0.55rem', borderRadius: 7,
+    <Button onClick={onClick} disabled={disabled} size="sm" style={{
+      flex: 1,
       border: `1px solid ${c.border}`, background: c.bg, color: c.text,
-      fontSize: '0.8rem', fontWeight: 600,
-      cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.5 : 1,
     }}>
       {children}
-    </button>
+    </Button>
   );
 }
 
 const p = {
   panel: {
-    position: 'absolute', top: 0, right: 0, bottom: 0, width: 320,
+    position: 'absolute', top: 0, right: 0, bottom: 0, width: 'min(320px, 100%)',
     background: 'var(--bg-panel)', borderLeft: '1px solid var(--border)',
     display: 'flex', flexDirection: 'column', zIndex: 10,
   },

@@ -1,5 +1,7 @@
 'use client';
 
+import Dialog from '@/components/ui/Dialog';
+
 import { useEffect, useState, useRef, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -481,6 +483,7 @@ export default function SettingsPage() {
   const [aftercareInstructions, setAftercareInstructions] = useState('');
   const [widgetBgColor, setWidgetBgColor] = useState('#111111');
   const [widgetAccentColor, setWidgetAccentColor] = useState('#d5d0c7');
+  const [schedulingMode, setSchedulingMode] = useState('all');
   const [timezone, setTimezone] = useState('Australia/Sydney');
   const [walkinCut, setWalkinCut] = useState('0');
   const [personalCut, setPersonalCut] = useState('0');
@@ -574,6 +577,7 @@ export default function SettingsPage() {
         setWidgetBgColor(account.studio?.widget_bg_color || '#111111');
         setWidgetAccentColor(account.studio?.widget_accent_color || '#d5d0c7');
         setTimezone(account.studio?.timezone || 'Australia/Sydney');
+        setSchedulingMode(account.studio?.scheduling_mode || 'all');
         setWalkinCut(String(account.studio?.walkin_cut_percent ?? account.studio?.studio_cut_percent ?? 0));
         setPersonalCut(String(account.studio?.personal_cut_percent ?? account.studio?.studio_cut_percent ?? 0));
         setPaymentRecordingReq(account.studio?.payment_recording_requirement ?? 'studio_only');
@@ -641,7 +645,7 @@ export default function SettingsPage() {
     try {
       const wc = parseFloat(walkinCut);
       const pc = parseFloat(personalCut);
-      await updateStudioProfile(name.trim(), address.trim(), widgetBgColor, widgetAccentColor, isNaN(wc) ? 0 : wc, isNaN(pc) ? 0 : pc, aftercareInstructions, timezone, addressLat, addressLng, paymentRecordingReq, rescheduleWindow, widgetConsentTemplateId || null, sendReminder7d, sendReminder24h, payForfeitedDeposits);
+      await updateStudioProfile(name.trim(), address.trim(), widgetBgColor, widgetAccentColor, isNaN(wc) ? 0 : wc, isNaN(pc) ? 0 : pc, aftercareInstructions, timezone, addressLat, addressLng, paymentRecordingReq, rescheduleWindow, widgetConsentTemplateId || null, sendReminder7d, sendReminder24h, payForfeitedDeposits, schedulingMode);
       invalidate('studio-account');
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
@@ -972,6 +976,7 @@ export default function SettingsPage() {
           ].map(tb => (
             <button
               key={tb.id}
+              aria-pressed={tab === tb.id}
               data-tour-settings-tab={tb.id}
               onMouseDown={e => e.preventDefault()}
               onClick={() => setTab(tb.id)}
@@ -983,7 +988,7 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      <div style={s.grid}>
+      <div className="studio-feature-grid" style={s.grid}>
 
         {tab === 'studio' && <>
 
@@ -991,8 +996,8 @@ export default function SettingsPage() {
           <h2 style={s.sectionTitle}>{t('profile')}</h2>
           <form onSubmit={handleSaveProfile} style={s.form}>
             <div style={s.field}>
-              <label style={s.label}>Studio Name</label>
-              <input style={s.input} value={name} onChange={e => setName(e.target.value)} placeholder="Studio name" />
+              <label htmlFor="studio-name" style={s.label}>Studio Name</label>
+              <input id="studio-name" autoComplete="organization" style={s.input} value={name} onChange={e => setName(e.target.value)} placeholder="Studio name" />
             </div>
             <div style={s.field}>
               <label style={s.label}>Address</label>
@@ -1004,8 +1009,8 @@ export default function SettingsPage() {
               />
             </div>
             <div style={s.field}>
-              <label style={s.label}>Timezone</label>
-              <select style={s.input} value={timezone} onChange={e => setTimezone(e.target.value)}>
+              <label htmlFor="studio-timezone" style={s.label}>Timezone</label>
+              <select id="studio-timezone" style={s.input} value={timezone} onChange={e => setTimezone(e.target.value)}>
                 <optgroup label="Australia">
                   <option value="Australia/Sydney">Sydney / Melbourne (AEST/AEDT)</option>
                   <option value="Australia/Brisbane">Brisbane (AEST, no DST)</option>
@@ -1042,7 +1047,7 @@ export default function SettingsPage() {
                 </optgroup>
               </select>
             </div>
-            {profileError && <p style={s.errorText}>{profileError}</p>}
+            {profileError && <p role="alert" style={s.errorText}>{profileError}</p>}
             <button type="submit" style={s.saveBtn} disabled={saving}>
               {saving ? t('saving') : saved ? t('saved') : t('save_changes')}
             </button>
@@ -1058,6 +1063,7 @@ export default function SettingsPage() {
                 <label style={s.closedToggle}>
                   <input
                     type="checkbox"
+                    aria-label={`${t(DAY_KEYS[i])}: ${t('closed')}`}
                     checked={day.is_closed}
                     onChange={e => setHourField(i, 'is_closed', e.target.checked)}
                     style={{ accentColor: 'var(--accent)' }}
@@ -1070,6 +1076,7 @@ export default function SettingsPage() {
                   <div style={s.timePair}>
                     <input
                       type="time"
+                      aria-label={`${t(DAY_KEYS[i])} opening time`}
                       value={day.open_time}
                       onChange={e => setHourField(i, 'open_time', e.target.value)}
                       style={s.timeInput}
@@ -1077,6 +1084,7 @@ export default function SettingsPage() {
                     <span style={s.timeSep}>–</span>
                     <input
                       type="time"
+                      aria-label={`${t(DAY_KEYS[i])} closing time`}
                       value={day.close_time}
                       onChange={e => setHourField(i, 'close_time', e.target.value)}
                       style={s.timeInput}
@@ -1244,6 +1252,29 @@ export default function SettingsPage() {
         {tab === 'bookings' && <>
 
         <section style={{ ...s.card, gridColumn: '1 / -1' }}>
+          <h2 style={s.sectionTitle}>Smart scheduling</h2>
+          <p style={s.sectionDesc}>Choose how available times are suggested in client booking links. Clients can always see all available times.</p>
+          <label htmlFor="scheduling-mode" style={s.label}>Scheduling preference</label>
+          <select id="scheduling-mode" style={s.input} value={schedulingMode} onChange={e => setSchedulingMode(e.target.value)}>
+            <option value="all">Show all availability</option>
+            <option value="quieter_days">Fill quieter days</option>
+            <option value="minimize_gaps">Minimise gaps</option>
+          </select>
+          <p style={s.sectionDesc}>
+            {schedulingMode === 'quieter_days'
+              ? 'Suggest days with a lower proportion of the artist’s working hours booked, then times that fit neatly beside existing appointments.'
+              : schedulingMode === 'minimize_gaps'
+              ? 'Suggest times closest to existing appointments and calendar commitments. Days with no commitments show all available times.'
+              : 'Show every available start time in chronological order.'}
+          </p>
+          {profileError && <p role="alert" style={s.errorText}>{profileError}</p>}
+          <button onClick={saveProfile} style={s.saveBtn} disabled={saving}>
+            {saving ? t('saving') : saved ? t('saved') : t('save')}
+          </button>
+        </section>
+
+
+        <section style={{ ...s.card, gridColumn: '1 / -1' }}>
           <h2 style={s.sectionTitle}>{t('reschedule_window')}</h2>
           <p style={s.sectionDesc}>{t('reschedule_window_desc')}</p>
           <select
@@ -1272,6 +1303,9 @@ export default function SettingsPage() {
                 <div style={{ fontSize: 13, color: 'var(--text-ghost)', marginTop: 2 }}>Sent to clients 7 days before their appointment</div>
               </div>
               <button
+                role="switch"
+                aria-label="7-day reminder"
+                aria-checked={sendReminder7d}
                 onClick={() => { setSendReminder7d(v => !v); }}
                 style={{
                   width: 44, height: 24, borderRadius: 12, border: '1px solid var(--switch-edge)', cursor: 'pointer',
@@ -1291,6 +1325,9 @@ export default function SettingsPage() {
                 <div style={{ fontSize: 13, color: 'var(--text-ghost)', marginTop: 2 }}>Sent to clients 24 hours before their appointment</div>
               </div>
               <button
+                role="switch"
+                aria-label="24-hour reminder"
+                aria-checked={sendReminder24h}
                 onClick={() => { setSendReminder24h(v => !v); }}
                 style={{
                   width: 44, height: 24, borderRadius: 12, border: '1px solid var(--switch-edge)', cursor: 'pointer',
@@ -1362,18 +1399,14 @@ export default function SettingsPage() {
 
         {/* ── Template builder modal ── */}
         {templateBuilderOpen && (
-          <div style={s.modalOverlay} onClick={e => e.target === e.currentTarget && setTemplateBuilderOpen(false)}>
-            <div style={{ ...s.templateModal, maxWidth: 980 }}>
-              <h2 style={{ margin: '0 0 1rem', fontSize: '1.05rem', fontWeight: 700, color: 'var(--text)' }}>
-                {editingTemplate ? 'Edit form' : 'New consent form'}
-              </h2>
+          <Dialog title={editingTemplate ? 'Edit form' : 'New consent form'} onClose={() => setTemplateBuilderOpen(false)} dismissDisabled={templateSaving} maxWidth={980}>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', alignItems: 'start' }}>
+              <div className="studio-feature-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', alignItems: 'start' }}>
                 {/* Left — editor */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                   <div style={s.field}>
-                    <label style={s.label}>Form name <span style={{ color: '#e86f6f' }}>*</span></label>
-                    <input style={s.input} type="text" value={templateName} onChange={e => setTemplateName(e.target.value)} placeholder="e.g. Tattoo Consent" />
+                    <label htmlFor="consent-form-name" style={s.label}>Form name <span style={{ color: 'var(--color-danger)' }}>*</span></label>
+                    <input id="consent-form-name" required style={s.input} type="text" value={templateName} onChange={e => setTemplateName(e.target.value)} placeholder="e.g. Tattoo Consent" />
                   </div>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
@@ -1406,20 +1439,21 @@ export default function SettingsPage() {
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.4rem' }}>
                           <span style={s.fieldTypeBadge}>{f.type}</span>
                           <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.25rem' }}>
-                            <button style={s.fieldMoveBtn} onClick={() => moveField(f.id, -1)} disabled={idx === 0}>↑</button>
-                            <button style={s.fieldMoveBtn} onClick={() => moveField(f.id, 1)} disabled={idx === templateFields.length - 1}>↓</button>
-                            <button style={{ ...s.fieldMoveBtn, color: '#e86f6f' }} onClick={() => removeField(f.id)}>✕</button>
+                            <button aria-label={`Move field ${idx + 1} up`} style={s.fieldMoveBtn} onClick={() => moveField(f.id, -1)} disabled={idx === 0}>↑</button>
+                            <button aria-label={`Move field ${idx + 1} down`} style={s.fieldMoveBtn} onClick={() => moveField(f.id, 1)} disabled={idx === templateFields.length - 1}>↓</button>
+                            <button aria-label={`Remove field ${idx + 1}`} style={{ ...s.fieldMoveBtn, color: 'var(--color-danger)' }} onClick={() => removeField(f.id)}>✕</button>
                           </div>
                         </div>
                         {['heading','paragraph','checkbox'].includes(f.type) ? (
                           <textarea
+                            aria-label={`Field ${idx + 1} ${f.type} content`}
                             style={{ ...s.input, minHeight: f.type === 'paragraph' ? 72 : 38, resize: 'vertical', fontSize: '0.82rem' }}
                             value={f.label}
                             onChange={e => updateField(f.id, { label: e.target.value })}
                             placeholder={f.type === 'heading' ? 'Section heading…' : f.type === 'paragraph' ? 'Paragraph text…' : 'Checkbox label (e.g. I agree to…)'}
                           />
                         ) : (
-                          <input style={{ ...s.input, fontSize: '0.82rem' }} type="text" value={f.label}
+                          <input aria-label={`Field ${idx + 1} label`} style={{ ...s.input, fontSize: '0.82rem' }} type="text" value={f.label}
                             onChange={e => updateField(f.id, { label: e.target.value })}
                             placeholder="Field label…" />
                         )}
@@ -1446,16 +1480,15 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              {templateError && <p style={{ fontSize: '0.8rem', color: '#e86f6f', margin: 0 }}>{templateError}</p>}
+              {templateError && <p role="alert" style={{ fontSize: '0.8rem', color: 'var(--color-danger)', margin: 0 }}>{templateError}</p>}
 
               <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
-                <button style={s.cancelBtn} onClick={() => setTemplateBuilderOpen(false)}>Cancel</button>
+                <button style={s.cancelBtn} disabled={templateSaving} onClick={() => setTemplateBuilderOpen(false)}>Cancel</button>
                 <button style={{ ...s.saveBtn, flex: 2 }} onClick={saveTemplate} disabled={templateSaving}>
                   {templateSaving ? 'Saving…' : 'Save form'}
                 </button>
               </div>
-            </div>
-          </div>
+          </Dialog>
         )}
 
         <section style={s.card}>
@@ -1558,14 +1591,15 @@ export default function SettingsPage() {
         <section style={{ ...s.card, gridColumn: '1 / -1' }}>
           <h2 style={s.sectionTitle}>{t('booking_widget')}</h2>
           <p style={s.sectionDesc}>Embed the booking form on your website. Customise the colours to match your brand.</p>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', alignItems: 'start' }}>
+          <div className="studio-feature-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', alignItems: 'start' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div style={s.colorRow}>
                 <div style={s.colorField}>
                   <label style={s.label}>Background</label>
                   <div style={s.colorInputWrap}>
-                    <input type="color" value={widgetBgColor} onChange={e => setWidgetBgColor(e.target.value)} style={s.colorSwatch} />
+                    <input aria-label="Widget background colour" type="color" value={widgetBgColor} onChange={e => setWidgetBgColor(e.target.value)} style={s.colorSwatch} />
                     <input
+                      aria-label="Widget background hex colour"
                       style={{ ...s.input, fontFamily: 'ui-monospace,monospace', fontSize: '0.82rem' }}
                       value={widgetBgColor}
                       onChange={e => setWidgetBgColor(e.target.value)}
@@ -1576,8 +1610,9 @@ export default function SettingsPage() {
                 <div style={s.colorField}>
                   <label style={s.label}>Highlight</label>
                   <div style={s.colorInputWrap}>
-                    <input type="color" value={widgetAccentColor} onChange={e => setWidgetAccentColor(e.target.value)} style={s.colorSwatch} />
+                    <input aria-label="Widget highlight colour" type="color" value={widgetAccentColor} onChange={e => setWidgetAccentColor(e.target.value)} style={s.colorSwatch} />
                     <input
+                      aria-label="Widget highlight hex colour"
                       style={{ ...s.input, fontFamily: 'ui-monospace,monospace', fontSize: '0.82rem' }}
                       value={widgetAccentColor}
                       onChange={e => setWidgetAccentColor(e.target.value)}
@@ -1616,6 +1651,7 @@ export default function SettingsPage() {
                             <label style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', cursor: 'pointer' }}>
                               <input
                                 type="checkbox"
+                                aria-label={`${label} required`}
                                 checked={entry.required}
                                 onChange={e => handleFormFieldToggle(key, 'required', e.target.checked)}
                                 style={{ accentColor: 'var(--accent)' }}
@@ -1625,6 +1661,9 @@ export default function SettingsPage() {
                             </label>
                           )}
                           <button
+                            role="switch"
+                            aria-label={`${label} field`}
+                            aria-checked={entry.enabled}
                             onClick={() => handleFormFieldToggle(key, 'enabled', !entry.enabled)}
                             disabled={formFieldsSaving}
                             style={{
@@ -1660,6 +1699,9 @@ export default function SettingsPage() {
                           )}
                           */}
                           <button
+                            role="switch"
+                            aria-label="Consent form field"
+                            aria-checked={!!widgetConsentTemplateId}
                             onClick={() => setWidgetConsentTemplateId(widgetConsentTemplateId ? '' : (consentTemplates[0]?.id ?? ''))}
                             style={{
                               ...s.fieldToggleBtn,
@@ -1699,8 +1741,8 @@ export default function SettingsPage() {
         <section style={s.card}>
           <h2 style={s.sectionTitle}>{t('account')}</h2>
           <div style={s.field}>
-            <label style={s.label}>Email</label>
-            <input style={{ ...s.input, ...s.inputReadonly }} value={email} readOnly />
+            <label htmlFor="studio-account-email" style={s.label}>Email</label>
+            <input id="studio-account-email" style={{ ...s.input, ...s.inputReadonly }} value={email} readOnly />
           </div>
           <button onClick={handleSignOut} style={s.signOutBtn}>{t('sign_out')}</button>
         </section>
@@ -1807,7 +1849,7 @@ export default function SettingsPage() {
                 {theme === 'dark' ? t('switch_to_light') : t('switch_to_dark')}
               </p>
             </div>
-            <button onClick={toggleTheme} style={s.themeToggle} aria-label="Toggle theme">
+            <button onClick={toggleTheme} style={s.themeToggle} role="switch" aria-checked={theme === 'dark'} aria-label={t('dark_mode')}>
               <span style={s.themeToggleTrack(theme)}>
                 <span style={s.themeToggleThumb(theme)} />
               </span>
@@ -1821,6 +1863,7 @@ export default function SettingsPage() {
             {LANGUAGES.map(l => (
               <button
                 key={l.id}
+                aria-pressed={lang === l.id}
                 onClick={() => switchLanguage(l.id)}
                 style={{
                   display: 'flex', alignItems: 'center', gap: '0.75rem',
@@ -2010,24 +2053,17 @@ function StationLastDayModal({ onConfirm, onCancel, saving, existingEndDate }) {
   const isChanging = !!existingEndDate;
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
-      onClick={e => e.target === e.currentTarget && onCancel()}>
-      <div style={{ background: 'var(--bg-modal)', border: '1px solid var(--border)', borderRadius: 16, padding: '1.5rem', width: '100%', maxWidth: 400 }}>
-        <h2 style={{ margin: '0 0 0.25rem', fontSize: '1.1rem', fontWeight: 700, color: 'var(--text)' }}>
-          {isChanging ? 'Change last day' : "Set station's last day"}
-        </h2>
-        <p style={{ margin: '0 0 1.25rem', fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-          No bookings will be available on or after the station's last day.
-        </p>
-        <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '0.4rem' }}>
+    <Dialog title={isChanging ? 'Change last day' : "Set station's last day"} description="No bookings will be available on or after the station’s last day." onClose={onCancel} dismissDisabled={saving} maxWidth={400}>
+        <label htmlFor="last-day" style={{ display: 'block', fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '0.4rem' }}>
           Last day
         </label>
         <input
+          id="last-day"
           type="date"
           min={todayStr}
           value={lastDay}
           onChange={e => setLastDay(e.target.value)}
-          style={{ width: '100%', boxSizing: 'border-box', background: 'var(--bg-input)', border: `1px solid ${isToday ? 'rgba(232,111,111,0.5)' : 'var(--border-strong)'}`, borderRadius: 8, padding: '0.65rem 0.85rem', fontSize: '0.9rem', color: 'var(--text)', outline: 'none', fontFamily: 'inherit', colorScheme: 'dark', marginBottom: isToday ? '0.5rem' : '1.25rem' }}
+          style={{ width: '100%', boxSizing: 'border-box', background: 'var(--bg-input)', border: `1px solid ${isToday ? 'rgba(232,111,111,0.5)' : 'var(--border-strong)'}`, borderRadius: 8, padding: '0.65rem 0.85rem', fontSize: '0.9rem', color: 'var(--text)', outline: 'none', fontFamily: 'inherit', colorScheme: 'inherit', marginBottom: isToday ? '0.5rem' : '1.25rem' }}
         />
         {isToday && (
           <p style={{ margin: '0 0 1.25rem', fontSize: '0.78rem', color: '#e86f6f', lineHeight: 1.4 }}>
@@ -2040,19 +2076,18 @@ function StationLastDayModal({ onConfirm, onCancel, saving, existingEndDate }) {
           </button>
           <button
             onClick={() => onConfirm(lastDay)}
-            disabled={saving}
+            disabled={saving || !lastDay || lastDay < todayStr}
             style={{
               flex: 2, padding: '0.7rem', borderRadius: 8, border: 'none',
               background: saving ? 'var(--bg-chip)' : isToday ? 'rgba(232,111,111,0.85)' : 'var(--accent)',
-              color: saving ? 'var(--text-ghost)' : isToday ? '#fff' : '#0a0a0a',
+              color: saving ? 'var(--text-ghost)' : isToday ? '#fff' : 'var(--accent-contrast)',
               cursor: saving ? 'default' : 'pointer', fontSize: '0.9rem', fontWeight: 700, fontFamily: 'inherit',
             }}
           >
             {saving ? 'Saving…' : isToday ? 'Deactivate now' : isChanging ? 'Update last day' : 'Set last day'}
           </button>
         </div>
-      </div>
-    </div>
+    </Dialog>
   );
 }
 
@@ -2064,20 +2099,11 @@ function CancelSubscriptionModal({ onConfirm, onCancel, saving, error }) {
   const canSubmit = reason.trim().length >= CANCEL_REASON_MIN_LEN;
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
-      onClick={e => e.target === e.currentTarget && !saving && onCancel()}>
-      <div style={{ background: 'var(--bg-modal)', border: '1px solid var(--border)', borderRadius: 16, padding: '1.5rem', width: '100%', maxWidth: 440 }}>
-        <h2 style={{ margin: '0 0 0.25rem', fontSize: '1.1rem', fontWeight: 700, color: 'var(--text)' }}>
-          Cancel subscription
-        </h2>
-        <p style={{ margin: '0 0 1.25rem', fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-          You'll keep full access through the end of your current billing period — no refund, but no early lockout either.
-          After that, your dashboard will lock until billing is added again. Please tell us why you're canceling — it helps us improve.
-        </p>
-        <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '0.4rem' }}>
+    <Dialog title="Cancel subscription" description="You’ll keep full access through the end of your current billing period. After that, your dashboard will lock until billing is added again. Please tell us why you’re canceling." onClose={onCancel} dismissDisabled={saving} maxWidth={440}>
+        <label htmlFor="cancel-subscription-reason" style={{ display: 'block', fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '0.4rem' }}>
           Reason for canceling
         </label>
-        <textarea
+        <textarea id="cancel-subscription-reason" aria-describedby="cancel-subscription-hint" aria-invalid={reason.length > 0 && !canSubmit}
           value={reason}
           onChange={e => setReason(e.target.value)}
           placeholder="Tell us what's not working, or why you're leaving…"
@@ -2089,10 +2115,10 @@ function CancelSubscriptionModal({ onConfirm, onCancel, saving, error }) {
             outline: 'none', fontFamily: 'inherit', resize: 'vertical', minHeight: 90,
           }}
         />
-        <p style={{ margin: '0.4rem 0 1.1rem', fontSize: '0.75rem', color: canSubmit ? 'var(--text-ghost)' : '#e86f6f' }}>
+        <p id="cancel-subscription-hint" style={{ margin: '0.4rem 0 1.1rem', fontSize: '0.75rem', color: canSubmit ? 'var(--text-ghost)' : '#e86f6f' }}>
           {canSubmit ? `${reason.trim().length} characters` : `${remaining} more character${remaining === 1 ? '' : 's'} required`}
         </p>
-        {error && <p style={{ margin: '0 0 1rem', fontSize: '0.8rem', color: '#e86f6f' }}>{error}</p>}
+        {error && <p role="alert" style={{ margin: '0 0 1rem', fontSize: '0.8rem', color: '#e86f6f' }}>{error}</p>}
         <div style={{ display: 'flex', gap: '0.75rem' }}>
           <button onClick={onCancel} disabled={saving} style={{ flex: 1, padding: '0.7rem', borderRadius: 8, border: '1px solid var(--border-strong)', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '0.9rem', fontWeight: 600, fontFamily: 'inherit' }}>
             Keep subscription
@@ -2110,7 +2136,6 @@ function CancelSubscriptionModal({ onConfirm, onCancel, saving, error }) {
             {saving ? 'Canceling…' : 'Cancel subscription'}
           </button>
         </div>
-      </div>
-    </div>
+    </Dialog>
   );
 }

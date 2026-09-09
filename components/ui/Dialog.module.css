@@ -1,0 +1,73 @@
+.dialog {
+  box-sizing: border-box;
+  width: calc(100% - 2rem);
+  max-height: calc(100vh - 2rem);
+  max-height: calc(100dvh - 2rem);
+  margin: auto;
+  padding: 0;
+  overflow: hidden;
+  color: var(--text);
+  background: var(--bg-modal);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl, 16px);
+  box-shadow: var(--shadow-modal, 0 20px 80px rgb(0 0 0 / 30%));
+}
+
+.dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+.dialog::backdrop {
+  background: var(--overlay-backdrop, rgb(0 0 0 / 60%));
+  backdrop-filter: blur(4px);
+}
+
+.header {
+  flex-shrink: 0;
+  padding: var(--space-6, 1.5rem) var(--space-6, 1.5rem) var(--space-4, 1rem);
+}
+
+.title {
+  margin: 0;
+  color: var(--text);
+  font-size: 1.125rem;
+  font-weight: 700;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.title:focus {
+  outline: none;
+}
+
+.description {
+  margin: var(--space-2, 0.5rem) 0 0;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.content {
+  min-height: 0;
+  padding: 0 var(--space-6, 1.5rem) var(--space-6, 1.5rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.footer {
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-3, 0.75rem);
+  padding: var(--space-4, 1rem) var(--space-6, 1.5rem);
+  border-top: 1px solid var(--border);
+}
+
+@media (max-width: 480px) {
+  .header { padding: var(--space-4, 1rem); }
+  .content { padding: 0 var(--space-4, 1rem) var(--space-4, 1rem); }
+  .footer { padding: var(--space-4, 1rem); }
+  .footer > button { flex: 1; }
+}

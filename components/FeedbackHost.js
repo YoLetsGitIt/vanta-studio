@@ -1,13 +1,17 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { CONFIRM_EVENT, FEEDBACK_EVENT } from '@/lib/feedback';
+import Dialog, { getActiveDialog } from '@/components/ui/Dialog';
+import Button from '@/components/ui/Button';
 
 export default function FeedbackHost() {
   const [notice, setNotice] = useState(null);
+  const [noticeHost, setNoticeHost] = useState(null);
   const [confirmation, setConfirmation] = useState(null);
   const timerRef = useRef(null);
-  const confirmButtonRef = useRef(null);
+  const cancelButtonRef = useRef(null);
 
   useEffect(() => {
     function onFeedback(event) {
@@ -27,14 +31,17 @@ export default function FeedbackHost() {
   }, []);
 
   useEffect(() => {
-    if (!confirmation) return;
-    confirmButtonRef.current?.focus();
-    function onKeyDown(event) {
-      if (event.key === 'Escape') close(false);
+    if (!notice) return undefined;
+    // Native dialogs occupy the top layer. Their notices must live inside the
+    // active dialog to stay visible and keyboard-accessible above its backdrop.
+    function updateHost() {
+      setNoticeHost(getActiveDialog() ?? document.body);
     }
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [confirmation]);
+    updateHost();
+    const observer = new MutationObserver(updateHost);
+    observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['open'] });
+    return () => observer.disconnect();
+  }, [notice]);
 
   function close(result) {
     confirmation?.resolve(result);
@@ -43,8 +50,8 @@ export default function FeedbackHost() {
 
   return (
     <>
-      {notice && (
-        <div role="status" aria-live="polite" style={{ ...styles.notice, ...(notice.type === 'success' ? styles.success : styles.error) }}>
+      {notice && noticeHost && createPortal(
+        <div role="status" aria-live="polite" style={{ ...styles.notice, ...(noticeHost.tagName === 'DIALOG' ? styles.dialogNotice : {}), ...(notice.type === 'success' ? styles.success : styles.error) }}>
           <span aria-hidden="true">{notice.type === 'success' ? '✓' : '!'}</span>
           <span style={styles.noticeMessage}>{notice.message}</span>
           <button aria-label="Dismiss message" onClick={() => setNotice(null)} style={styles.dismiss}>×</button>
@@ -66,20 +73,24 @@ export default function FeedbackHost() {
             </div>
           )}
         </div>
-      )}
+      , noticeHost)}
       {confirmation && (
-        <div style={styles.overlay} role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) close(false); }}>
-          <div role="alertdialog" aria-modal="true" aria-labelledby="vanta-confirm-title" aria-describedby="vanta-confirm-message" style={styles.dialog}>
-            <h2 id="vanta-confirm-title" style={styles.title}>{confirmation.title}</h2>
-            <p id="vanta-confirm-message" style={styles.message}>{confirmation.message}</p>
-            <div style={styles.actions}>
-              <button onClick={() => close(false)} style={styles.cancel}>Cancel</button>
-              <button ref={confirmButtonRef} onClick={() => close(true)} style={{ ...styles.confirm, ...(confirmation.danger ? styles.danger : {}) }}>
+        <Dialog
+          title={confirmation.title}
+          description={confirmation.message}
+          role="alertdialog"
+          onClose={() => close(false)}
+          initialFocusRef={cancelButtonRef}
+          maxWidth={430}
+          footer={(
+            <>
+              <Button ref={cancelButtonRef} variant="secondary" onClick={() => close(false)}>Cancel</Button>
+              <Button variant={confirmation.danger ? 'danger' : 'primary'} onClick={() => close(true)}>
                 {confirmation.confirmLabel}
-              </button>
-            </div>
-          </div>
-        </div>
+              </Button>
+            </>
+          )}
+        />
       )}
     </>
   );
@@ -87,18 +98,11 @@ export default function FeedbackHost() {
 
 const styles = {
   notice: { position: 'fixed', zIndex: 10000, right: 24, top: 24, width: 'min(430px, calc(100vw - 32px))', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 10, padding: '0.8rem 0.9rem', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--bg-modal)', color: 'var(--text)', boxShadow: '0 16px 45px rgba(0,0,0,0.32)', fontSize: '0.84rem' },
-  error: { borderColor: 'rgba(224,96,96,0.42)' },
-  success: { borderColor: 'var(--accent-tint-border)' },
+  dialogNotice: { position: 'relative', top: 'auto', right: 'auto', width: 'calc(100% - 32px)', margin: '16px auto', flexShrink: 0, order: -1 },
+  error: { borderColor: 'var(--color-danger-border)' },
+  success: { borderColor: 'var(--color-success-border)' },
   noticeMessage: { flex: 1, minWidth: 0 },
   noticeActions: { width: '100%', display: 'flex', flexWrap: 'wrap', gap: 6, paddingLeft: 24 },
   noticeAction: { flexShrink: 0, border: '1px solid var(--accent-tint-border)', borderRadius: 7, background: 'var(--accent-tint)', color: 'var(--accent)', padding: '0.38rem 0.62rem', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 700 },
-  dismiss: { marginLeft: 'auto', border: 0, background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '1.1rem', lineHeight: 1 },
-  overlay: { position: 'fixed', inset: 0, zIndex: 10001, display: 'grid', placeItems: 'center', padding: 20, background: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(3px)' },
-  dialog: { width: 'min(430px, 100%)', borderRadius: 14, border: '1px solid var(--border)', background: 'var(--bg-modal)', boxShadow: '0 24px 80px rgba(0,0,0,0.5)', padding: '1.4rem' },
-  title: { margin: 0, color: 'var(--text)', fontSize: '1.05rem' },
-  message: { margin: '0.65rem 0 1.3rem', color: 'var(--text-muted)', fontSize: '0.87rem', lineHeight: 1.55 },
-  actions: { display: 'flex', justifyContent: 'flex-end', gap: 8 },
-  cancel: { border: '1px solid var(--border)', borderRadius: 8, background: 'transparent', color: 'var(--text-muted)', padding: '0.58rem 0.85rem', cursor: 'pointer' },
-  confirm: { border: 0, borderRadius: 8, background: 'var(--accent)', color: 'var(--accent-contrast)', padding: '0.58rem 0.85rem', cursor: 'pointer', fontWeight: 700 },
-  danger: { background: '#cf5555', color: '#fff' },
+  dismiss: { minWidth: 32, minHeight: 32, marginLeft: 'auto', border: 0, background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '1.1rem', lineHeight: 1 },
 };

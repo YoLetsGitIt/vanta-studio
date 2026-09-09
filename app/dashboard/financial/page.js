@@ -1,5 +1,7 @@
 'use client';
 
+import Dialog from '@/components/ui/Dialog';
+
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { getStudioRevenueStats, getPayoutSummaries, createPayout, deletePayout, getArtistPayoutHistory, getArtistEarningsBreakdown, getReimbursements, reviewReimbursement, getMyStudioAccount } from '@/lib/api';
 import { getSupabase } from '@/lib/supabase';
@@ -172,7 +174,7 @@ export default function FinancialPage() {
         <div style={st.controls}>
           <div style={st.quickPicker}>
             {QUICK_OPTIONS.map(opt => (
-              <button key={opt.label} onMouseDown={e => e.preventDefault()} onClick={() => applyQuick(opt)}
+              <button key={opt.label} aria-pressed={activeQuick === opt.label} aria-label={opt.days === null ? 'Year to date' : `Last ${opt.days / 7} weeks`} onClick={() => applyQuick(opt)}
                 style={{ ...st.weekBtn, ...(activeQuick === opt.label ? st.weekBtnActive : {}) }}>
                 {opt.label}
               </button>
@@ -180,9 +182,9 @@ export default function FinancialPage() {
           </div>
           <div style={st.dateSep} />
           <div style={st.dateRange}>
-            <input type="date" value={startDate} max={endDate} onChange={onStartChange} style={st.dateInput} />
+            <input type="date" aria-label="Start date" value={startDate} max={endDate} onChange={onStartChange} style={st.dateInput} />
             <span style={st.dateArrow}>→</span>
-            <input type="date" value={endDate} min={startDate} max={today} onChange={onEndChange} style={st.dateInput} />
+            <input type="date" aria-label="End date" value={endDate} min={startDate} max={today} onChange={onEndChange} style={st.dateInput} />
           </div>
           <div style={st.dateSep} />
           <button onClick={exportCSV} disabled={!stats?.weekly?.length} style={st.exportBtn} title="Export weekly stats as CSV">
@@ -193,11 +195,11 @@ export default function FinancialPage() {
 
       {/* ── Tab bar ────────────────────────────────────────────────────────── */}
       <div style={st.tabBar}>
-        <button onMouseDown={e => e.preventDefault()} onClick={() => setTab('financial')}
+        <button aria-pressed={tab === 'financial'} onClick={() => setTab('financial')}
           style={{ ...st.tabBtn, ...(tab === 'financial' ? st.tabActive : {}) }}>
           {t('revenue_financial')}
         </button>
-        <button onMouseDown={e => e.preventDefault()} onClick={() => setTab('artists')}
+        <button aria-pressed={tab === 'artists'} onClick={() => setTab('artists')}
           style={{ ...st.tabBtn, ...(tab === 'artists' ? st.tabActive : {}) }}>
           Artists & Payouts
         </button>
@@ -229,8 +231,8 @@ export default function FinancialPage() {
 
       {/* ── Body ───────────────────────────────────────────────────────────── */}
       <div style={st.body}>
-        {loading && <p style={st.msg}>{t('loading')}</p>}
-        {error   && <p style={{ ...st.msg, color: '#e86f6f' }}>{error}</p>}
+        {loading && <p role="status" style={st.msg}>{t('loading')}</p>}
+        {error   && <p role="alert" style={{ ...st.msg, color: 'var(--color-danger)' }}>{error}</p>}
 
         {!loading && !error && stats && (
           <>
@@ -384,13 +386,16 @@ function PasswordGate({ email, onUnlock }) {
           <input
             ref={inputRef}
             type="password"
+            aria-label={t('revenue_password')}
+            aria-invalid={wrong}
+            aria-describedby={wrong ? 'financial-password-error' : undefined}
             value={value}
             onChange={e => { setValue(e.target.value); setWrong(false); }}
             placeholder={t('revenue_password')}
             style={{ ...st.gateInput, borderColor: wrong ? '#e86f6f' : 'var(--border)' }}
-            autoComplete="off"
+            autoComplete="current-password"
           />
-          {wrong && <p style={st.gateError}>{t('revenue_wrong_password')}</p>}
+          {wrong && <p id="financial-password-error" role="alert" style={st.gateError}>{t('revenue_wrong_password')}</p>}
           <button type="submit" style={{ ...st.gateBtn, opacity: loading ? 0.6 : 1 }} disabled={loading}>
             {t(loading ? 'revenue_verifying' : 'revenue_unlock')}
           </button>
@@ -534,7 +539,7 @@ function PayoutsSection({ payouts, onPay, onViewEarnings }) {
               return (
                 <tr key={p.artist_id} style={st.trClickable} onClick={() => onPay(p)} title="View payout history">
                   <td style={{ ...st.td, color: 'var(--text)', fontWeight: 500 }}>
-                    <span style={st.artistLink}>{p.artist_name}</span>
+                    <button type="button" onClick={e => { e.stopPropagation(); onPay(p); }} aria-label={`View payout history for ${p.artist_name}`} style={st.artistLink}>{p.artist_name}</button>
                     {hasIncomplete && (
                       <span title={`${p.incomplete_recordings} booking${p.incomplete_recordings > 1 ? 's' : ''} with missing payment recordings`}
                         style={{ marginLeft: '0.4rem', fontSize: '0.68rem', fontWeight: 600, padding: '0.15rem 0.4rem', borderRadius: 4,
@@ -567,9 +572,9 @@ function PayoutsSection({ payouts, onPay, onViewEarnings }) {
                     color: p.outstanding > 0 ? 'var(--accent)' : 'var(--text-secondary)',
                     fontWeight: 600,
                   }}>
-                    <span onClick={e => { e.stopPropagation(); onViewEarnings(p); }} style={st.earningsLink} title="View per-booking payout status">
+                    <button type="button" onClick={e => { e.stopPropagation(); onViewEarnings(p); }} style={st.earningsLink} aria-label={`View per-booking payout status for ${p.artist_name}: ${fmt(p.outstanding)} outstanding`}>
                       {fmt(p.outstanding)}
-                    </span>
+                    </button>
                   </td>
                   <td style={{ ...st.td, textAlign: 'right' }}>
                     {p.outstanding > 0
@@ -661,20 +666,7 @@ function PayoutPanel({ artist, onClose, onPaid }) {
   }
 
   return (
-    <div style={st.overlay} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div style={{ ...st.panel, maxHeight: '90vh', overflow: 'auto' }}>
-        <div style={st.panelHeader}>
-          <div>
-            <p style={st.panelTitle}>{artist.artist_name}</p>
-            <p style={st.panelSub}>
-              {artist.outstanding > 0
-                ? `Outstanding: ${fmt(artist.outstanding)}`
-                : t('revenue_all_paid')}
-            </p>
-          </div>
-          <button onClick={onClose} style={st.closeBtn}>✕</button>
-        </div>
-
+    <Dialog title={artist.artist_name} description={artist.outstanding > 0 ? `Outstanding: ${fmt(artist.outstanding)}` : t('revenue_all_paid')} onClose={onClose} dismissDisabled={saving || !!deleting} maxWidth={440} contentStyle={{ padding: 0 }} footer={<button type="button" style={st.payBtn} disabled={saving || !!deleting} onClick={onClose}>Close</button>}>
         <div style={st.panelBody}>
           {artist.incomplete_recordings > 0 && (
             <div style={{
@@ -693,12 +685,14 @@ function PayoutPanel({ artist, onClose, onPaid }) {
             {/* Mode toggle */}
             <div style={st.modeRow}>
               <button
+                aria-pressed={mode === 'full'}
                 onClick={() => setMode('full')}
                 style={{ ...st.modeBtn, ...(mode === 'full' ? st.modeBtnActive : {}) }}
               >
                 Full amount
               </button>
               <button
+                aria-pressed={mode === 'custom'}
                 onClick={() => setMode('custom')}
                 style={{ ...st.modeBtn, ...(mode === 'custom' ? st.modeBtnActive : {}) }}
               >
@@ -713,6 +707,7 @@ function PayoutPanel({ artist, onClose, onPaid }) {
                 <span style={st.currencySign}>$</span>
                 <input
                   type="number"
+                  aria-label="Custom payout amount"
                   inputMode="decimal"
                   min="0.01"
                   max={artist.outstanding}
@@ -727,7 +722,7 @@ function PayoutPanel({ artist, onClose, onPaid }) {
               </div>
             )}
 
-            <select value={method} onChange={e => setMethod(e.target.value)} style={st.noteInput}>
+            <select aria-label="Payout method" value={method} onChange={e => setMethod(e.target.value)} style={st.noteInput}>
               <option value="bank_transfer">Bank transfer</option>
               <option value="cash">Cash</option>
               <option value="card">Card</option>
@@ -737,13 +732,14 @@ function PayoutPanel({ artist, onClose, onPaid }) {
 
             <input
               type="text"
+              aria-label="Payout note (optional)"
               value={note}
               onChange={e => setNote(e.target.value)}
               placeholder="Note (optional)"
               style={st.noteInput}
             />
 
-            {error && <p style={{ fontSize: '0.78rem', color: '#e86f6f', margin: 0 }}>{error}</p>}
+            {error && <p role="alert" style={{ fontSize: '0.78rem', color: 'var(--color-danger)', margin: 0 }}>{error}</p>}
 
             <button
               onClick={handlePay}
@@ -826,8 +822,7 @@ function PayoutPanel({ artist, onClose, onPaid }) {
             )}
           </div>
         </div>
-      </div>
-    </div>
+    </Dialog>
   );
 }
 
@@ -897,17 +892,8 @@ function EarningsPanel({ artist, requirement, onClose }) {
   const total = entries ? entries.reduce((s, e) => s + (e.artist_cut ?? 0), 0) : null;
 
   return (
-    <div style={st.overlay} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div style={{ ...st.panel, width: 'min(95vw, 820px)', maxWidth: 'unset', maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-        <div style={st.panelHeader}>
-          <div>
-            <p style={st.panelTitle}>Earnings breakdown · {artist.artist_name}</p>
-            <p style={st.panelSub}>{t('revenue_earnings_desc')}</p>
-          </div>
-          <button onClick={onClose} style={st.closeBtn}>✕</button>
-        </div>
-
-        <div style={{ overflowY: 'auto', flex: 1 }}>
+    <Dialog title={`Earnings breakdown · ${artist.artist_name}`} description={t('revenue_earnings_desc')} onClose={onClose} maxWidth={820} contentStyle={{ padding: 0 }} footer={<button type="button" style={st.payBtn} onClick={onClose}>Close</button>}>
+        <div style={{ overflow: 'auto', flex: 1 }}>
           {entries === null && (
             <p style={{ padding: '1.5rem', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{t('loading')}</p>
           )}
@@ -949,8 +935,7 @@ function EarningsPanel({ artist, requirement, onClose }) {
             </>
           )}
         </div>
-      </div>
-    </div>
+    </Dialog>
   );
 }
 
@@ -965,9 +950,9 @@ const st = {
   },
   title:   { fontSize: '1.2rem', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.01em' },
   controls: { display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' },
-  quickPicker: { display: 'flex', gap: '0.35rem' },
+  quickPicker: { display: 'flex', gap: '0.35rem', flexWrap: 'wrap' },
   dateSep: { width: 1, height: 18, background: 'var(--border)' },
-  dateRange: { display: 'flex', alignItems: 'center', gap: '0.5rem' },
+  dateRange: { display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' },
   dateInput: {
     background: 'var(--bg-chip)', border: '1px solid var(--border)',
     borderRadius: 8, color: 'var(--text-dim)', fontSize: '0.78rem',
@@ -988,7 +973,7 @@ const st = {
   },
 
   tabBar: {
-    display: 'flex', alignItems: 'center', gap: '0.25rem',
+    display: 'flex', alignItems: 'center', gap: '0.25rem', flexWrap: 'wrap',
     padding: '0 2rem', borderBottom: '1px solid var(--border-faint)',
     flexShrink: 0,
   },
@@ -1049,9 +1034,11 @@ const st = {
     color: 'var(--accent)', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer',
   },
   artistLink: {
+    background: 'transparent', color: 'inherit', font: 'inherit', textAlign: 'left', border: 0,
     cursor: 'pointer', borderBottom: '1px dashed var(--border)', paddingBottom: 1,
   },
   earningsLink: {
+    background: 'transparent', color: 'inherit', font: 'inherit', textAlign: 'left', border: 0,
     cursor: 'pointer', borderBottom: '1px dashed var(--accent)', paddingBottom: 1,
   },
   historyHint: {
@@ -1059,14 +1046,14 @@ const st = {
   },
   paidBadge: {
     display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
-    fontSize: '0.72rem', fontWeight: 700, color: '#4cc98a',
-    background: 'rgba(76,201,138,0.1)', border: '1px solid rgba(76,201,138,0.3)',
+    fontSize: '0.72rem', fontWeight: 700, color: 'var(--color-success)',
+    background: 'var(--color-success-surface)', border: '1px solid var(--color-success-border)',
     borderRadius: 6, padding: '0.25rem 0.6rem', whiteSpace: 'nowrap',
   },
   unpaidBadge: {
     display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
-    fontSize: '0.72rem', fontWeight: 700, color: '#f59e3a',
-    background: 'rgba(245,158,58,0.12)', border: '1px solid rgba(245,158,58,0.35)',
+    fontSize: '0.72rem', fontWeight: 700, color: 'var(--color-warning)',
+    background: 'var(--color-warning-surface)', border: '1px solid var(--color-warning-border)',
     borderRadius: 6, padding: '0.25rem 0.6rem', whiteSpace: 'nowrap',
   },
 

@@ -36,6 +36,7 @@ export default function ImportPage() {
   const [artists, setArtists] = useState([]);
   const [artistMap, setArtistMap] = useState({});
   const [progress, setProgress] = useState(0);
+  const [importTotal, setImportTotal] = useState(0);
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
   const fileRef = useRef(null);
@@ -161,6 +162,7 @@ export default function ImportPage() {
   // ── Step 4: import ──────────────────────────────────────────────────────────
 
   async function runImport() {
+    setImportTotal(validRows.length);
     setStep('importing');
     setError('');
     setProgress(0);
@@ -211,14 +213,23 @@ export default function ImportPage() {
       </div>
 
       <div style={s.body}>
-        {error && <div style={s.error}>{error}</div>}
+        {error && <div role="alert" style={s.error}>{error}</div>}
 
         {step === 'upload' && (
           <div
             style={s.dropZone}
+            role="button"
+            tabIndex={0}
+            aria-label="Choose a CSV file to import"
             onDragOver={e => e.preventDefault()}
             onDrop={e => { e.preventDefault(); handleFile(e.dataTransfer.files?.[0]); }}
             onClick={() => fileRef.current?.click()}
+            onKeyDown={e => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                fileRef.current?.click();
+              }
+            }}
           >
             <span style={s.dropTitle}>{t('import_drop')}</span>
             <span style={s.dropSub}>
@@ -245,6 +256,7 @@ export default function ImportPage() {
                     {['clients', 'appointments'].map(k => (
                       <button
                         key={k}
+                        aria-pressed={kind === k}
                         style={{ ...s.segBtn, ...(kind === k ? s.segBtnActive : {}) }}
                         onClick={() => { setKind(k); setMapping(suggestMapping(headers, k, preset)); }}
                       >
@@ -254,8 +266,8 @@ export default function ImportPage() {
                   </div>
                 </div>
                 <div style={s.control}>
-                  <label style={s.label}>{t('import_source')}</label>
-                  <select style={s.select} value={preset} onChange={e => applyPreset(e.target.value)}>
+                  <label htmlFor="import-source" style={s.label}>{t('import_source')}</label>
+                  <select id="import-source" style={s.select} value={preset} onChange={e => applyPreset(e.target.value)}>
                     {Object.entries(PRESETS).map(([key, p]) => (
                       <option key={key} value={key}>{p.label}</option>
                     ))}
@@ -264,8 +276,8 @@ export default function ImportPage() {
                 <div style={s.control}>
                   <label style={s.label}>{t('import_date_format')}</label>
                   <div style={s.segmented}>
-                    <button style={{ ...s.segBtn, ...(dayFirst ? s.segBtnActive : {}) }} onClick={() => setDayFirst(true)}>DD/MM/YYYY</button>
-                    <button style={{ ...s.segBtn, ...(!dayFirst ? s.segBtnActive : {}) }} onClick={() => setDayFirst(false)}>MM/DD/YYYY</button>
+                    <button aria-pressed={dayFirst} style={{ ...s.segBtn, ...(dayFirst ? s.segBtnActive : {}) }} onClick={() => setDayFirst(true)}>DD/MM/YYYY</button>
+                    <button aria-pressed={!dayFirst} style={{ ...s.segBtn, ...(!dayFirst ? s.segBtnActive : {}) }} onClick={() => setDayFirst(false)}>MM/DD/YYYY</button>
                   </div>
                 </div>
               </div>
@@ -281,6 +293,7 @@ export default function ImportPage() {
                       {f.hint && <span style={s.mapHint}> — {f.hint}</span>}
                     </span>
                     <select
+                      aria-label={`CSV column for ${f.label}`}
                       style={s.select}
                       value={mapping[f.key] ?? ''}
                       onChange={e => setMapping(m => ({ ...m, [f.key]: e.target.value || undefined }))}
@@ -302,6 +315,7 @@ export default function ImportPage() {
                     <div key={raw} style={s.mapRow}>
                       <span style={s.mapField}>{raw}</span>
                       <select
+                        aria-label={`Studio artist matching ${raw}`}
                         style={s.select}
                         value={artistMap[raw] ?? UNASSIGNED}
                         onChange={e => setArtistMap(m => ({ ...m, [raw]: e.target.value }))}
@@ -353,10 +367,10 @@ export default function ImportPage() {
             <div style={s.card}>
               <div style={s.cardTitle}>Preview</div>
               <div style={{ overflowX: 'auto' }}>
-                <table style={s.table}>
+                <table aria-label="Import preview" style={s.table}>
                   <thead>
                     <tr>
-                      {previewColumns(kind).map(c => <th key={c.key} style={s.th}>{c.label}</th>)}
+                      {previewColumns(kind).map(c => <th key={c.key} scope="col" style={s.th}>{c.label}</th>)}
                     </tr>
                   </thead>
                   <tbody>
@@ -389,10 +403,10 @@ export default function ImportPage() {
         {step === 'importing' && (
           <div style={s.card}>
             <div style={s.cardTitle}>{t('import_importing')}</div>
-            <div style={s.progressTrack}>
-              <div style={{ ...s.progressFill, width: `${Math.round((progress / Math.max(validRows.length, 1)) * 100)}%` }} />
+            <div role="progressbar" aria-label="Import progress" aria-valuemin={0} aria-valuemax={importTotal} aria-valuenow={Math.min(progress, importTotal)} style={s.progressTrack}>
+              <div style={{ ...s.progressFill, width: `${Math.round((progress / Math.max(importTotal, 1)) * 100)}%` }} />
             </div>
-            <span style={s.cardSub}>{Math.min(progress, validRows.length)} / {validRows.length} rows</span>
+            <span role="status" style={s.cardSub}>{Math.min(progress, importTotal)} / {importTotal} rows</span>
           </div>
         )}
 
@@ -499,7 +513,7 @@ const s = {
   },
 
   mapGrid: { display: 'flex', flexDirection: 'column', gap: '0.45rem' },
-  mapRow: { display: 'flex', alignItems: 'center', gap: '1rem', justifyContent: 'space-between' },
+  mapRow: { display: 'flex', alignItems: 'center', gap: '0.5rem 1rem', justifyContent: 'space-between', flexWrap: 'wrap' },
   mapField: { fontSize: '0.8rem', color: 'var(--text-dim)', fontWeight: 500 },
   mapHint: { fontSize: '0.7rem', color: 'var(--text-ghost)', fontWeight: 400 },
 

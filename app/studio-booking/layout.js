@@ -3,5 +3,5 @@ export const metadata = {
 };
 
 export default function StudioBookingLayout({ children }) {
-  return children;
+  return <div data-theme="dark" style={{ colorScheme: 'dark' }}>{children}</div>;
 }

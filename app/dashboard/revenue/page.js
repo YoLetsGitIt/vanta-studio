@@ -77,7 +77,7 @@ export default function RevenuePage() {
         <div style={st.controls}>
           <div style={st.quickPicker}>
             {QUICK_OPTIONS.map(opt => (
-              <button key={opt.label} onMouseDown={e => e.preventDefault()} onClick={() => applyQuick(opt)}
+              <button key={opt.label} aria-pressed={activeQuick === opt.label} aria-label={opt.days === null ? 'Year to date' : `Last ${opt.days / 7} weeks`} onClick={() => applyQuick(opt)}
                 style={{ ...st.weekBtn, ...(activeQuick === opt.label ? st.weekBtnActive : {}) }}>
                 {opt.label}
               </button>
@@ -85,17 +85,17 @@ export default function RevenuePage() {
           </div>
           <div style={st.dateSep} />
           <div style={st.dateRange}>
-            <input type="date" value={startDate} max={endDate} onChange={onStartChange} style={st.dateInput} />
+            <input type="date" aria-label="Start date" value={startDate} max={endDate} onChange={onStartChange} style={st.dateInput} />
             <span style={st.dateArrow}>→</span>
-            <input type="date" value={endDate} min={startDate} max={today} onChange={onEndChange} style={st.dateInput} />
+            <input type="date" aria-label="End date" value={endDate} min={startDate} max={today} onChange={onEndChange} style={st.dateInput} />
           </div>
         </div>
       </div>
 
       {/* ── Body ───────────────────────────────────────────────────────────── */}
       <div style={st.body}>
-        {loading && <p style={st.msg}>{t('loading')}</p>}
-        {error   && <p style={{ ...st.msg, color: '#e86f6f' }}>{error}</p>}
+        {loading && <p role="status" style={st.msg}>{t('loading')}</p>}
+        {error   && <p role="alert" style={{ ...st.msg, color: 'var(--status-rejected)' }}>{error}</p>}
 
         {!loading && !error && stats && (
           <>
@@ -124,9 +124,9 @@ export default function RevenuePage() {
                 <>
                   <p style={st.sectionSub}>{t('revenue_top_clients')}</p>
                   <div style={st.tableScroll}>
-                    <table style={st.table}>
+                    <table aria-label={t('revenue_top_clients')} style={st.table}>
                       <thead>
-                        <tr>{[t('revenue_client'), t('revenue_visits'), t('revenue_last_visit'), t('revenue_spend'), t('revenue_avg_spend')].map(h => <th key={h} style={st.th}>{h}</th>)}</tr>
+                        <tr>{[t('revenue_client'), t('revenue_visits'), t('revenue_last_visit'), t('revenue_spend'), t('revenue_avg_spend')].map(h => <th key={h} scope="col" style={st.th}>{h}</th>)}</tr>
                       </thead>
                       <tbody>
                         {c.top_clients.map((cl, i) => (
@@ -235,9 +235,9 @@ const st = {
   },
   title:   { fontSize: '1.2rem', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.01em' },
   controls: { display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' },
-  quickPicker: { display: 'flex', gap: '0.35rem' },
+  quickPicker: { display: 'flex', gap: '0.35rem', flexWrap: 'wrap' },
   dateSep: { width: 1, height: 18, background: 'var(--border)' },
-  dateRange: { display: 'flex', alignItems: 'center', gap: '0.5rem' },
+  dateRange: { display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' },
   dateInput: {
     background: 'var(--bg-chip)', border: '1px solid var(--border)',
     borderRadius: 8, color: 'var(--text-dim)', fontSize: '0.78rem',

@@ -241,7 +241,7 @@ function DashboardShell({ children }) {
               {t('new_appointment')}
             </button>
 
-            <nav style={s.nav}>
+            <nav aria-label="Studio navigation" style={s.nav}>
               {NAV.map(({ href, tKey, icon: Icon }, index) => {
                 const active = pathname.startsWith(href);
                 const highlighted = TOUR_STEPS[tourStep]?.target === 'nav' && TOUR_STEPS[tourStep]?.targetIndex === index;
@@ -249,6 +249,7 @@ function DashboardShell({ children }) {
                   <Link
                     key={href}
                     href={href}
+                    aria-current={active ? "page" : undefined}
                     style={{
                       ...s.navItem,
                       ...(active ? s.navActive : {}),

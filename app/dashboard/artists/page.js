@@ -1,5 +1,7 @@
 'use client';
 
+import Dialog from '@/components/ui/Dialog';
+
 import { useState, useEffect, useCallback, Suspense, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { QRCodeSVG } from 'qrcode.react';
@@ -233,6 +235,7 @@ function ArtistsInner() {
           </p>
         </div>
         <button
+          aria-pressed={showPending}
           onMouseDown={e => e.preventDefault()}
           onClick={() => setShowPending(v => !v)}
           style={{ ...s.pendingBtn, ...(showPending ? s.pendingBtnActive : {}) }}
@@ -247,8 +250,8 @@ function ArtistsInner() {
       </div>
 
       <div style={s.body}>
-        {loading && <p style={s.msg}>{t('loading')}</p>}
-        {error && <p style={{ ...s.msg, color: '#e86f6f' }}>{error}</p>}
+        {loading && <p role="status" style={s.msg}>{t('loading')}</p>}
+        {error && <p role="alert" style={{ ...s.msg, color: 'var(--color-danger)' }}>{error}</p>}
         {!loading && !error && artists.length === 0 && (
           <p style={s.msg}>{t(showPending ? 'artists_none_pending' : 'artists_none_approved')}</p>
         )}
@@ -266,6 +269,7 @@ function ArtistsInner() {
         {!loading && !showPending && removed.length > 0 && (
           <div style={{ marginTop: '1rem' }}>
             <button
+              aria-expanded={showPast}
               onClick={() => setShowPast(v => !v)}
               style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', background: 'none', border: 'none', cursor: 'pointer', padding: '0.25rem 0', color: 'var(--text-ghost)', fontSize: '0.75rem', fontWeight: 600, fontFamily: 'inherit', letterSpacing: '0.04em', textTransform: 'uppercase' }}
             >
@@ -304,12 +308,11 @@ function ArtistOnboardingGuide({ studioName, copied, onCopy, onSkip, onViewReque
   const isDownload = step === 0;
 
   return (
-    <div style={s.artistGuideOverlay} role="dialog" aria-modal="true" aria-label="Add your first artist">
-      <div style={s.artistGuideCard}>
+    <Dialog title={current.title} onClose={onSkip} maxWidth={1000} contentStyle={{ padding: 0 }}>
+      <div className="studio-feature-grid" style={{ ...s.artistGuideCard, width: '100%', minHeight: 0, maxHeight: 'none', border: 0, borderRadius: 0, boxShadow: 'none', padding: '1.5rem' }}>
         <button type="button" style={s.artistGuideClose} onClick={onSkip} aria-label="Skip artist setup">×</button>
         <section style={s.artistGuideContent}>
-          <span style={s.artistGuideEyebrow}>{current.kicker}</span>
-          <h2 style={s.artistGuideTitle}>{current.title}</h2>
+          <span role="status" style={s.artistGuideEyebrow}>{current.kicker}</span>
           <p style={s.artistGuideText}>{current.body}</p>
 
           {isDownload ? (
@@ -334,12 +337,12 @@ function ArtistOnboardingGuide({ studioName, copied, onCopy, onSkip, onViewReque
             <button type="button" style={s.artistGuidePrimary} onClick={() => step === steps.length - 1 ? onViewRequests() : setStep(step + 1)}>{current.action} <span>→</span></button>
           </div>
           <div style={s.guideProgress}>
-            {steps.map((item, index) => <button key={item.kicker} type="button" aria-label={`Go to ${item.kicker}`} onClick={() => setStep(index)} style={{ ...s.guideProgressDot, ...(index === step ? s.guideProgressDotActive : {}) }} />)}
+            {steps.map((item, index) => <button key={item.kicker} type="button" aria-current={index === step ? 'step' : undefined} aria-label={`Go to ${item.kicker}`} onClick={() => setStep(index)} style={{ ...s.guideProgressDot, ...(index === step ? s.guideProgressDotActive : {}) }} />)}
           </div>
         </section>
         <ArtistAppScreen step={step} />
       </div>
-    </div>
+    </Dialog>
   );
 }
 
@@ -393,7 +396,9 @@ function ArtistRow({ artist, onClick, onApprove, onReject, onRemove, actionLoadi
 
         <div style={s.cardInfo}>
           <div style={s.nameRow}>
-            <span style={s.name}>{artist.name || t('artists_unnamed')}</span>
+            <button type="button" onClick={e => { e.stopPropagation(); onClick(); }} style={{ ...s.name, textAlign: 'left', background: 'transparent', border: 0, padding: 0 }}>
+              {artist.name || t('artists_unnamed')}
+            </button>
             {artist.studioType === 'guest' && <span style={s.guestBadge}>{t('artists_guest')}</span>}
             {artist.status !== 'approved' && (
               <span style={{ ...s.statusBadge, background: sc.bg, color: sc.text, border: `1px solid ${sc.border}` }}>
@@ -531,10 +536,10 @@ function ArtistDetail({ artist, onBack, onApprove, onReject, onRemove, onToggleA
       </div>
 
       <div style={s.detailBody}>
-        <div style={{ display: 'flex', gap: '2rem', alignItems: 'flex-start' }}>
+        <div style={{ display: 'flex', gap: '2rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
 
           {/* Left column */}
-          <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          <div style={{ flex: '1 1 340px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
             <div style={s.detailHero}>
               {artist.profileImage ? (
                 <img src={artist.profileImage} alt={artist.name} style={s.detailAvatar} />
@@ -637,6 +642,7 @@ function ArtistDetail({ artist, onBack, onApprove, onReject, onRemove, onToggleA
                           <>
                             <input
                               type="time"
+                              aria-label={`${label} start time`}
                               value={e.start}
                               onChange={ev => setScheduleEdits(prev => ({ ...prev, [dow]: { ...prev[dow], start: ev.target.value } }))}
                               style={s.schedTimeInput}
@@ -644,6 +650,7 @@ function ArtistDetail({ artist, onBack, onApprove, onReject, onRemove, onToggleA
                             <span style={{ fontSize: '0.72rem', color: 'var(--text-ghost)' }}>–</span>
                             <input
                               type="time"
+                              aria-label={`${label} end time`}
                               value={e.end}
                               onChange={ev => setScheduleEdits(prev => ({ ...prev, [dow]: { ...prev[dow], end: ev.target.value } }))}
                               style={s.schedTimeInput}
@@ -655,7 +662,7 @@ function ArtistDetail({ artist, onBack, onApprove, onReject, onRemove, onToggleA
                       </div>
                     );
                   })}
-                  {scheduleError && <p style={{ fontSize: '0.75rem', color: 'var(--error)', margin: 0 }}>{scheduleError}</p>}
+                  {scheduleError && <p role="alert" style={{ fontSize: '0.75rem', color: 'var(--color-danger)', margin: 0 }}>{scheduleError}</p>}
                   <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem' }}>
                     <button onClick={saveSchedule} disabled={scheduleSaving} style={s.schedSaveBtn}>
                       {t(scheduleSaving ? 'saving' : 'save')}
@@ -739,6 +746,9 @@ function ArtistDetail({ artist, onBack, onApprove, onReject, onRemove, onToggleA
                   </p>
                 </div>
                 <button
+                  role="switch"
+                  aria-label="Accepting bookings"
+                  aria-checked={artist.acceptingBookings}
                   onClick={onToggleAccepting}
                   disabled={actionLoading}
                   style={{
@@ -795,14 +805,11 @@ function ArtistRejectModal({ onConfirm, onCancel, saving }) {
   const { t } = useLanguage();
   const [reason, setReason] = useState('');
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
-      onClick={e => e.target === e.currentTarget && onCancel()}>
-      <div style={{ background: 'var(--bg-modal)', border: '1px solid var(--border)', borderRadius: 16, padding: '1.5rem', width: '100%', maxWidth: 400 }}>
-        <h2 style={{ margin: '0 0 1.25rem', fontSize: '1.1rem', fontWeight: 700, color: 'var(--text)' }}>{t('artists_reject')}</h2>
-        <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '0.4rem' }}>
+    <Dialog title={t('artists_reject')} onClose={onCancel} dismissDisabled={saving} maxWidth={400}>
+        <label htmlFor="artist-reject-reason" style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '0.4rem' }}>
           {t('artists_reason')} <span style={{ color: 'var(--text-ghost)', fontWeight: 400 }}>{t('optional')}</span>
         </label>
-        <textarea
+        <textarea id="artist-reject-reason"
           rows={4}
           placeholder="e.g. Not a good fit for the studio at this time…"
           value={reason}
@@ -817,8 +824,7 @@ function ArtistRejectModal({ onConfirm, onCancel, saving }) {
             {saving ? t('saving') : t('artists_reject')}
           </button>
         </div>
-      </div>
-    </div>
+    </Dialog>
   );
 }
 
@@ -834,24 +840,17 @@ function ArtistRemoveModal({ onConfirm, onCancel, saving, existingEndDate }) {
   const isChanging = !!existingEndDate;
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
-      onClick={e => e.target === e.currentTarget && onCancel()}>
-      <div style={{ background: 'var(--bg-modal)', border: '1px solid var(--border)', borderRadius: 16, padding: '1.5rem', width: '100%', maxWidth: 400 }}>
-        <h2 style={{ margin: '0 0 0.25rem', fontSize: '1.1rem', fontWeight: 700, color: 'var(--text)' }}>
-          {isChanging ? 'Change last day' : "Set artist's last day"}
-        </h2>
-        <p style={{ margin: '0 0 1.25rem', fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-          Clients won't be able to book on or after their last day. The artist stays listed until then.
-        </p>
-        <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '0.4rem' }}>
+    <Dialog title={isChanging ? 'Change last day' : "Set artist's last day"} description="Clients won’t be able to book on or after their last day. The artist stays listed until then." onClose={onCancel} dismissDisabled={saving} maxWidth={400}>
+        <label htmlFor="last-day" style={{ display: 'block', fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '0.4rem' }}>
           Last day
         </label>
         <input
+          id="last-day"
           type="date"
           min={todayStr}
           value={lastDay}
           onChange={e => setLastDay(e.target.value)}
-          style={{ width: '100%', boxSizing: 'border-box', background: 'var(--bg-input)', border: `1px solid ${isToday ? 'rgba(232,111,111,0.5)' : 'var(--border-strong)'}`, borderRadius: 8, padding: '0.65rem 0.85rem', fontSize: '0.9rem', color: 'var(--text)', outline: 'none', fontFamily: 'inherit', colorScheme: 'dark', marginBottom: isToday ? '0.5rem' : '1.25rem' }}
+          style={{ width: '100%', boxSizing: 'border-box', background: 'var(--bg-input)', border: `1px solid ${isToday ? 'rgba(232,111,111,0.5)' : 'var(--border-strong)'}`, borderRadius: 8, padding: '0.65rem 0.85rem', fontSize: '0.9rem', color: 'var(--text)', outline: 'none', fontFamily: 'inherit', colorScheme: 'inherit', marginBottom: isToday ? '0.5rem' : '1.25rem' }}
         />
         {isToday && (
           <p style={{ margin: '0 0 1.25rem', fontSize: '0.78rem', color: '#e86f6f', lineHeight: 1.4 }}>
@@ -880,19 +879,18 @@ function ArtistRemoveModal({ onConfirm, onCancel, saving, existingEndDate }) {
           )}
           <button
             onClick={() => onConfirm(lastDay)}
-            disabled={saving}
+            disabled={saving || !lastDay || lastDay < todayStr}
             style={{
               flex: 2, padding: '0.7rem', borderRadius: 8, border: 'none',
               background: saving ? 'var(--bg-chip)' : isToday ? 'rgba(232,111,111,0.85)' : 'var(--accent)',
-              color: saving ? 'var(--text-ghost)' : isToday ? '#fff' : '#0a0a0a',
+              color: saving ? 'var(--text-ghost)' : isToday ? '#fff' : 'var(--accent-contrast)',
               cursor: saving ? 'default' : 'pointer', fontSize: '0.9rem', fontWeight: 700, fontFamily: 'inherit',
             }}
           >
             {saving ? 'Saving…' : isToday ? 'Remove from studio' : isChanging ? 'Update last day' : 'Set last day'}
           </button>
         </div>
-      </div>
-    </div>
+    </Dialog>
   );
 }
 
@@ -1097,19 +1095,19 @@ const s = {
   },
   rejectionLabel: { fontWeight: 600, color: '#e86f6f' },
   approveBtn: {
-    background: 'rgba(76,201,138,0.1)',
-    borderColor: 'rgba(76,201,138,0.25)',
-    color: '#4cc98a',
+    background: 'var(--color-success-surface)',
+    borderColor: 'var(--color-success-border)',
+    color: 'var(--color-success)',
   },
   rejectBtn: {
-    background: 'rgba(232,111,111,0.08)',
-    borderColor: 'rgba(232,111,111,0.2)',
-    color: '#e86f6f',
+    background: 'var(--color-danger-surface)',
+    borderColor: 'var(--color-danger-border)',
+    color: 'var(--color-danger)',
   },
   removeBtn: {
-    background: 'rgba(232,111,111,0.08)',
-    borderColor: 'rgba(232,111,111,0.2)',
-    color: '#e86f6f',
+    background: 'var(--color-danger-surface)',
+    borderColor: 'var(--color-danger-border)',
+    color: 'var(--color-danger)',
   },
 
   // Detail view
@@ -1222,7 +1220,7 @@ const s = {
   // Stats grid
   statsGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(4, 1fr)',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 120px), 1fr))',
     gap: '0.6rem',
   },
   statCard: {

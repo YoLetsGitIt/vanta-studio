@@ -5,6 +5,9 @@ import { useRouter } from 'next/navigation';
 import { getSupabase } from '@/lib/supabase';
 import { completeStudioSignup, getMyStudioAccount } from '@/lib/api';
 import SignUpFlow from '@/components/SignUpFlow';
+import Button from '@/components/ui/Button';
+import Field from '@/components/ui/Field';
+import StatePanel from '@/components/ui/StatePanel';
 
 
 export default function HomePage() {
@@ -74,10 +77,10 @@ export default function HomePage() {
     }
   }
 
-  if (checking) return null;
+  if (checking) return <StatePanel title="Loading your studio…" busy />;
 
   return (
-    <div className={`vanta-page${tab === 'signup' ? ' vanta-page--signup' : ''}`} style={s.page}>
+    <div data-theme={tab === 'signup' ? 'dark' : undefined} className={`vanta-page${tab === 'signup' ? ' vanta-page--signup' : ''}`} style={s.page}>
       <div style={s.noise} />
       <style>{GLOBAL_CSS}</style>
 
@@ -91,10 +94,11 @@ export default function HomePage() {
           <>
             <h1 style={s.authHeading}>Welcome back</h1>
             <p style={s.authSubheading}>Sign in to manage your studio.</p>
-            {notice && <p style={s.noticeBox}>{notice}</p>}
+            {notice && <p role="status" style={s.noticeBox}>{notice}</p>}
             <form onSubmit={handleSignIn} style={s.form}>
-              <Field label="Email">
+              <Field label="Email" id="signin-email" required>
                 <InputWithIcon
+                  id="signin-email"
                   icon={<MailIcon size={15} />}
                   type="email"
                   value={email}
@@ -104,8 +108,9 @@ export default function HomePage() {
                   placeholder="you@studio.com"
                 />
               </Field>
-              <Field label="Password">
+              <Field label="Password" id="signin-password" required>
                 <InputWithIcon
+                  id="signin-password"
                   icon={<LockIcon size={15} />}
                   type="password"
                   value={password}
@@ -115,10 +120,10 @@ export default function HomePage() {
                   placeholder="••••••••"
                 />
               </Field>
-              {error && <p style={s.errorBox}>{error}</p>}
-              <button type="submit" disabled={loading} className="vanta-btn" style={{ ...s.btn, opacity: loading ? 0.6 : 1 }}>
-                {loading ? 'Signing in…' : 'Sign in'}
-              </button>
+              {error && <p role="alert" style={s.errorBox}>{error}</p>}
+              <Button type="submit" loading={loading} loadingLabel="Signing in…" fullWidth>
+                Sign in
+              </Button>
             </form>
             <p style={s.switchLine}>
               New to Vanta?{' '}
@@ -135,19 +140,10 @@ export default function HomePage() {
   );
 }
 
-function Field({ label, children }) {
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-      <label style={{ fontSize: '0.8rem', fontWeight: 500, color: 'rgba(255,255,255,0.55)' }}>{label}</label>
-      {children}
-    </div>
-  );
-}
-
 function InputWithIcon({ icon, style, ...props }) {
   return (
     <div style={{ position: 'relative' }}>
-      <span style={s.inputIcon}>{icon}</span>
+      <span aria-hidden="true" style={s.inputIcon}>{icon}</span>
       <input {...props} className="vanta-input" style={{ ...s.input, ...style, paddingLeft: '2.3rem' }} />
     </div>
   );
@@ -240,25 +236,25 @@ const s = {
   wordmark: {
     fontSize: '1.6rem',
     fontWeight: 700,
-    color: '#ffffff',
+    color: 'var(--text)',
     letterSpacing: '-0.02em',
   },
   wordmarkSub: {
     fontSize: '1.1rem',
     fontWeight: 500,
-    color: 'rgba(213,208,199,0.7)',
+    color: 'var(--text-muted)',
     letterSpacing: '0.02em',
   },
   authHeading: {
     fontSize: '1.3rem',
     fontWeight: 700,
-    color: '#ffffff',
+    color: 'var(--text)',
     margin: '0 0 0.35rem',
     letterSpacing: '-0.01em',
   },
   authSubheading: {
     fontSize: '0.85rem',
-    color: 'rgba(255,255,255,0.45)',
+    color: 'var(--text-muted)',
     margin: '0 0 1.5rem',
     lineHeight: 1.5,
   },
@@ -267,20 +263,20 @@ const s = {
     left: '0.75rem',
     top: '50%',
     transform: 'translateY(-50%)',
-    color: 'rgba(255,255,255,0.3)',
+    color: 'var(--text-secondary)',
     display: 'flex',
     pointerEvents: 'none',
   },
   switchLine: {
     fontSize: '0.85rem',
-    color: 'rgba(255,255,255,0.45)',
+    color: 'var(--text-muted)',
     textAlign: 'center',
     marginTop: '1.5rem',
   },
   switchLink: {
     background: 'none',
     border: 'none',
-    color: '#d5d0c7',
+    color: 'var(--accent)',
     fontWeight: 600,
     fontSize: 'inherit',
     cursor: 'pointer',
@@ -299,15 +295,15 @@ const s = {
     borderRadius: 8,
     padding: '0.65rem 0.85rem',
     fontSize: '0.9rem',
-    color: '#ffffff',
+    color: 'var(--text)',
     outline: 'none',
     width: '100%',
   },
   errorBox: {
     fontSize: '0.8rem',
-    color: '#e86f6f',
-    background: 'rgba(232,111,111,0.08)',
-    border: '1px solid rgba(232,111,111,0.2)',
+    color: 'var(--color-danger)',
+    background: 'var(--color-danger-surface)',
+    border: '1px solid var(--color-danger-border)',
     borderRadius: 6,
     padding: '0.5rem 0.75rem',
   },
@@ -317,9 +313,9 @@ const s = {
     borderRadius: 8,
     fontSize: '0.78rem',
     lineHeight: 1.45,
-    color: '#8bdcb4',
-    background: 'rgba(76,201,138,0.08)',
-    border: '1px solid rgba(76,201,138,0.22)',
+    color: 'var(--color-success)',
+    background: 'var(--color-success-surface)',
+    border: '1px solid var(--color-success-border)',
   },
   btn: {
     marginTop: '0.25rem',

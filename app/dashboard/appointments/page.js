@@ -14,6 +14,7 @@ import { useLanguage } from '@/lib/i18n';
 import SendSelectionLinkModal from '@/components/SendSelectionLinkModal';
 import { showError } from '@/lib/feedback';
 import { bookingActions } from '@/lib/bookingActions';
+import StatePanel from '@/components/ui/StatePanel';
 
 const STATUS_FILTERS = [
   { value: 'pending',                              tKey: 'status_pending' },
@@ -403,6 +404,7 @@ function AppointmentsInner() {
         <input
           type="search"
           placeholder={t('appt_search')}
+          aria-label={t('appt_search')}
           value={search}
           onChange={e => setSearch(e.target.value)}
           style={s.searchInput}
@@ -414,6 +416,7 @@ function AppointmentsInner() {
                 key={f.value}
                 onMouseDown={e => e.preventDefault()}
                 onClick={() => selectFilter(f.value)}
+                aria-pressed={activeFilter === f.value}
                 style={{ ...s.filterBtn, ...(activeFilter === f.value ? s.filterActive : {}) }}
               >
                 {f.label ?? t(f.tKey)}
@@ -433,6 +436,7 @@ function AppointmentsInner() {
               key={f.value}
               onMouseDown={e => e.preventDefault()}
               onClick={() => { setConfirmedSubFilter(f.value); setSelected(null); }}
+              aria-pressed={confirmedSubFilter === f.value}
               style={{ ...s.subFilterBtn, ...(confirmedSubFilter === f.value ? s.subFilterActive : {}) }}
             >
               {f.label}
@@ -448,6 +452,7 @@ function AppointmentsInner() {
               key={f.value}
               onMouseDown={e => e.preventDefault()}
               onClick={() => { setCompletedSubFilter(f.value); setSelected(null); }}
+              aria-pressed={completedSubFilter === f.value}
               style={{ ...s.subFilterBtn, ...(completedSubFilter === f.value ? s.subFilterActive : {}) }}
             >
               {f.label}
@@ -458,9 +463,9 @@ function AppointmentsInner() {
 
       <div style={s.body}>
         {loading && <SkeletonList />}
-        {error && <p style={{ ...s.msg, color: '#e86f6f' }}>{error}</p>}
+        {error && <StatePanel title={error} tone="error" compact />}
         {!loading && !error && filteredBookings.length === 0 && (
-          <p style={s.msg}>{t(search ? 'appt_no_results' : 'appt_none')}</p>
+          <StatePanel title={t(search ? 'appt_no_results' : 'appt_none')} compact />
         )}
         {!loading && filteredBookings.map(b => (
           <BookingRow

@@ -182,7 +182,8 @@ function ClientsInner() {
         </div>
         <div style={s.searchWrap}>
           <input
-            type="text"
+            type="search"
+            aria-label={t('clients_search')}
             placeholder={t('clients_search')}
             value={search}
             onChange={e => setSearch(e.target.value)}
@@ -193,8 +194,8 @@ function ClientsInner() {
 
       <div style={s.layout}>
         <div style={s.list}>
-          {loading && <p style={s.msg}>{t('loading')}</p>}
-          {error && <p style={{ ...s.msg, color: '#e86f6f' }}>{error}</p>}
+          {loading && <p role="status" style={s.msg}>{t('loading')}</p>}
+          {error && <p role="alert" style={{ ...s.msg, color: 'var(--status-rejected)' }}>{error}</p>}
           {!loading && !error && filtered.length === 0 && (
             <p style={s.msg}>{t('clients_none')}</p>
           )}
@@ -207,7 +208,17 @@ function ClientsInner() {
             return (
               <div
                 key={key}
+                role="button"
+                tabIndex={0}
+                aria-expanded={active}
+                aria-controls={active ? 'client-detail' : undefined}
                 onClick={() => setSelected(prev => prev === key ? null : key)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setSelected(prev => prev === key ? null : key);
+                  }
+                }}
                 style={{ ...s.row, background: active ? 'var(--bg-row-active)' : undefined, borderColor: active ? 'var(--border-strong)' : 'var(--border-faint)' }}
               >
                 <div style={s.clientAvatar}>
@@ -415,10 +426,10 @@ function ClientDetail({ client, onClose, consentTemplates = [], onSendConsentLin
   }
 
   return (
-    <aside style={s.panel}>
+    <aside id="client-detail" className="studio-client-detail" aria-label={`${client.name} details`} style={s.panel}>
       <div style={s.panelHeader}>
         <span style={s.panelTitle}>{client.name}</span>
-        <button onClick={onClose} style={s.closeBtn}>✕</button>
+        <button type="button" aria-label="Close client details" onClick={onClose} style={s.closeBtn}>✕</button>
       </div>
       <div style={s.panelBody}>
         {client.email ? (
@@ -522,6 +533,7 @@ function ClientDetail({ client, onClose, consentTemplates = [], onSendConsentLin
                   return (
                     <button
                       key={style}
+                      aria-pressed={active}
                       onMouseDown={e => e.preventDefault()}
                       onClick={() => setStyles(prev => active ? prev.filter(s => s !== style) : [...prev, style])}
                       style={{
@@ -546,6 +558,8 @@ function ClientDetail({ client, onClose, consentTemplates = [], onSendConsentLin
                   return (
                     <button
                       key={opt}
+                      aria-pressed={active}
+                      aria-label={`${t('clients_allergies')}: ${opt === 'No' ? t('no') : t('yes')}`}
                       onMouseDown={e => e.preventDefault()}
                       onClick={() => setHasAllergies(opt === 'Yes')}
                       style={{
@@ -561,6 +575,7 @@ function ClientDetail({ client, onClose, consentTemplates = [], onSendConsentLin
               </div>
               {hasAllergies && (
                 <textarea
+                  aria-label="Allergy details"
                   rows={2}
                   placeholder="e.g. latex allergy, sensitive skin, keloid-prone…"
                   value={allergyDetails}
@@ -580,6 +595,8 @@ function ClientDetail({ client, onClose, consentTemplates = [], onSendConsentLin
               </div>
               <input
                 type="range"
+                aria-label={t('clients_pain')}
+                aria-valuetext={pain === '' ? 'Not recorded; adjust to set a value out of 10' : `${pain} out of 10`}
                 min={0}
                 max={10}
                 step={1}
@@ -614,6 +631,7 @@ function ClientDetail({ client, onClose, consentTemplates = [], onSendConsentLin
           <span style={s.sectionLabel}>{t('clients_notes')}</span>
           <div style={{ marginTop: '0.6rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
             <textarea
+              aria-label={t('clients_add_note')}
               rows={2}
               placeholder={t('clients_add_note')}
               value={noteInput}
@@ -756,6 +774,7 @@ const s = {
   },
   pagination: {
     display: 'flex',
+    flexWrap: 'wrap',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: '1rem',

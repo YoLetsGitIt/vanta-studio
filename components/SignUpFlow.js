@@ -1,7 +1,9 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { createPortal } from 'react-dom';
+import Field from '@/components/ui/Field';
+import Button from '@/components/ui/Button';
+import Dialog from '@/components/ui/Dialog';
 import { checkStudioSignupEmail, registerStudio, searchStudios } from '@/lib/api';
 
 // ── Main flow ─────────────────────────────────────────────────────────────────
@@ -83,7 +85,7 @@ export default function SignUpFlow({ onSwitchToSignIn, onWideChange }) {
             <div style={s.stepLine} />
           </div>
 
-          {error && <p style={s.errorBox}>{error}</p>}
+          {error && <p role="alert" style={s.errorBox}>{error}</p>}
 
           {step === 1 && (
             <AccountStep initial={account} onBack={() => setStep(0)} onNext={handleAccountNext} />
@@ -259,8 +261,6 @@ const INTRO_LAYOUT_CSS = `
   .vanta-intro-heading { flex-direction: row; align-items: flex-start; justify-content: space-between; gap: 2rem; }
   .vanta-intro-access { flex-shrink: 0; padding-top: 0.2rem; }
 }
-@keyframes vantaModalIn { from { opacity: 0; transform: scale(0.96) translateY(6px); } to { opacity: 1; transform: scale(1) translateY(0); } }
-.vanta-modal-panel { animation: vantaModalIn 0.18s ease; }
 .vanta-modal-video-frame { display: flex; align-items: center; justify-content: center; background: #090c11 !important; }
 .vanta-modal-video-frame--consent { padding-left: 3%; box-sizing: border-box; }
 .vanta-modal-video { display: block; width: 100%; height: 100%; object-fit: contain; object-position: center; }
@@ -293,9 +293,9 @@ function IntroStep({ onNext, onSwitchToSignIn }) {
       </div>
 
       <div style={s.featureSections}>
-        <div className="vanta-feature-tabs" role="tablist" aria-label="Vanta Studio features">
+        <div className="vanta-feature-tabs" role="group" aria-label="Vanta Studio features">
           {FEATURE_SECTIONS.map(section => (
-            <button key={section.title} type="button" role="tab" aria-selected={activeSection === section.title} className={`vanta-feature-tab${activeSection === section.title ? ' is-active' : ''}`} onClick={() => setActiveSection(section.title)}>
+            <button key={section.title} type="button" aria-pressed={activeSection === section.title} className={`vanta-feature-tab${activeSection === section.title ? ' is-active' : ''}`} onClick={() => setActiveSection(section.title)}>
               {section.title}
             </button>
           ))}
@@ -309,6 +309,12 @@ function IntroStep({ onNext, onSwitchToSignIn }) {
                   key={f.title}
                   className={hasDetail ? 'vanta-feature-card' : 'vanta-feature-card vanta-feature-card-static'}
                   style={{ ...s.featureGridCard, cursor: hasDetail ? 'pointer' : 'default' }}
+                  role={hasDetail ? 'button' : undefined}
+                  tabIndex={hasDetail ? 0 : undefined}
+                  aria-label={hasDetail ? `Learn more about ${f.title}` : undefined}
+                  onKeyDown={hasDetail ? event => {
+                    if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setActiveFeature(f); }
+                  } : undefined}
                   onClick={hasDetail ? () => setActiveFeature(f) : undefined}
                 >
                   <div style={s.featureArtFrame}>
@@ -360,10 +366,7 @@ function IntroStep({ onNext, onSwitchToSignIn }) {
   );
 }
 
-// Opens on hovering a feature card (desktop) or tapping one (mobile, via onClick) — a
-// bigger version of the same art plus the longer `detail` copy. Escape and clicking the
-// backdrop both close it; clicking the panel itself doesn't, so it survives incidental
-// mouse movement while reading.
+// Feature details share the app modal, including keyboard focus and dismissal.
 function FeatureDetailModal({ feature, onClose }) {
   const useNaturalMedia = feature.mediaLayout === 'stacked';
   const media = feature.media ?? [
@@ -371,29 +374,10 @@ function FeatureDetailModal({ feature, onClose }) {
     ...(feature.videos ?? (feature.video ? [feature.video] : [])).map(src => ({ type: 'video', src })),
   ];
 
-  useEffect(() => {
-    function handleKey(e) { if (e.key === 'Escape') onClose(); }
-    window.addEventListener('keydown', handleKey);
-    return () => window.removeEventListener('keydown', handleKey);
-  }, [onClose]);
-
-  // Rendered into document.body via a portal rather than in place: the auth card this
-  // would otherwise nest inside has backdrop-filter set (for its glass effect), and per
-  // spec that makes the card — not the viewport — the containing block for any
-  // position:fixed descendant. Left in place, the "full-screen" backdrop would actually
-  // be sized/positioned relative to the card, so a tap meant for the backdrop (e.g. to
-  // close the modal) could land outside its real box and hit the page behind it instead.
-  return createPortal(
-    <div className="vanta-modal-backdrop" style={s.modalBackdrop} onClick={onClose}>
-      <div className="vanta-modal-panel" style={{ ...s.modalPanel, ...(feature.mediaPresentation === 'artist-focus' ? { maxWidth: 1100 } : {}) }} onClick={e => e.stopPropagation()}>
-        <div style={s.modalHeader}>
-          <div style={s.featureCardHeader}>
-            <span style={s.modalIcon}>{feature.icon}</span>
-            <h3 style={s.modalTitle}>{feature.title}</h3>
-          </div>
-          <button type="button" onClick={onClose} style={s.modalClose} aria-label="Close">✕</button>
-        </div>
-        <div style={s.modalBody}>
+  return (
+    <Dialog title={feature.title} onClose={onClose}
+      maxWidth={feature.mediaPresentation === 'artist-focus' ? 1100 : 780}
+      footer={<Button variant="secondary" onClick={onClose}>Close</Button>}>
           <div style={{ ...s.modalGallery, gridTemplateColumns: media.length > 1 && !useNaturalMedia ? 'repeat(auto-fit, minmax(240px, 1fr))' : '1fr' }}>
             {media.map(({ type, src, presentation }) => (
               <div
@@ -424,10 +408,7 @@ function FeatureDetailModal({ feature, onClose }) {
           {(feature.detail ?? [feature.desc]).map((paragraph, i) => (
             <p key={i} style={s.modalDesc}>{paragraph}</p>
           ))}
-        </div>
-      </div>
-    </div>,
-    document.body
+    </Dialog>
   );
 }
 
@@ -727,10 +708,10 @@ function AccountStep({ initial, onBack, onNext }) {
       <Field label="Confirm password">
         <InputWithIcon icon={<LockIcon size={15} />} type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} required placeholder="Re-enter password" autoComplete="new-password" />
       </Field>
-      {error && <p style={s.errorBox}>{error}</p>}
+      {error && <p role="alert" style={s.errorBox}>{error}</p>}
       <div style={s.rowBtns}>
         <button type="button" onClick={onBack} className="vanta-back-btn" style={s.backBtn}>Back</button>
-        <button type="submit" disabled={checkingEmail} className="vanta-btn" style={{ ...s.btn, flex: 1, opacity: checkingEmail ? 0.6 : 1 }}>{checkingEmail ? 'Checking…' : 'Continue'}</button>
+        <Button type="submit" loading={checkingEmail} loadingLabel="Checking…" style={{ flex: 1 }}>Continue</Button>
       </div>
     </form>
   );
@@ -739,7 +720,7 @@ function AccountStep({ initial, onBack, onNext }) {
 function InputWithIcon({ icon, style, ...props }) {
   return (
     <div style={{ position: 'relative' }}>
-      <span style={s.inputIcon}>{icon}</span>
+      <span aria-hidden="true" style={s.inputIcon}>{icon}</span>
       <input {...props} className="vanta-input" style={{ ...s.input, ...style, paddingLeft: '2.3rem' }} />
     </div>
   );
@@ -826,9 +807,10 @@ function StudioStep({ onBack, onSubmit, submitting }) {
 
   return (
     <div style={s.form}>
-      <Field label="Search for your studio">
+      <Field label="Search for your studio" id="signup-studio-search">
         <div style={{ position: 'relative' }}>
           <input
+            id="signup-studio-search"
             type="text"
             value={query}
             onChange={e => setQuery(e.target.value)}
@@ -1010,9 +992,10 @@ function CreateStudioForm({ initialName, initialResolved, onBack, onSubmit, subm
         <input type="text" value={name} onChange={e => setName(e.target.value)} required className="vanta-input" style={s.input} placeholder="e.g. Dark Matter Tattoo" />
       </Field>
 
-      <Field label="Address">
+      <Field label="Address" id="signup-studio-address">
         <div style={{ position: 'relative' }}>
           <input
+            id="signup-studio-address"
             type="text"
             value={addressQuery}
             onChange={e => { setAddressQuery(e.target.value); setResolved(null); }}
@@ -1030,7 +1013,7 @@ function CreateStudioForm({ initialName, initialResolved, onBack, onSubmit, subm
                   onClick={() => selectSuggestion(place)}
                   style={s.dropdownItem}
                 >
-                  <span style={{ fontSize: '0.82rem', color: 'rgba(255,255,255,0.8)', textAlign: 'left' }}>
+                  <span style={{ fontSize: '0.82rem', color: 'var(--text-dim)', textAlign: 'left' }}>
                     {place.display_name}
                   </span>
                 </button>
@@ -1042,14 +1025,14 @@ function CreateStudioForm({ initialName, initialResolved, onBack, onSubmit, subm
 
       {resolved && (
         <div style={s.resolvedBadge}>
-          <span style={{ fontSize: '0.8rem', color: '#4cc98a' }}>✓ Location confirmed</span>
+          <span style={{ fontSize: '0.8rem', color: 'var(--color-success)' }}>✓ Location confirmed</span>
           <button type="button" onClick={() => { setResolved(null); setAddressQuery(''); }} className="vanta-link" style={s.clearBtn}>
             Change
           </button>
         </div>
       )}
 
-      {error && <p style={s.errorBox}>{error}</p>}
+      {error && <p role="alert" style={s.errorBox}>{error}</p>}
 
       <p style={s.trialNote}>
         Next, add a card to start your 14-day free trial — you won't be charged until it ends.
@@ -1057,24 +1040,13 @@ function CreateStudioForm({ initialName, initialResolved, onBack, onSubmit, subm
 
       <div style={s.rowBtns}>
         <button type="button" onClick={onBack} className="vanta-back-btn" style={s.backBtn}>Back</button>
-        <button type="submit" disabled={submitting} className="vanta-btn" style={{ ...s.btn, flex: 1, opacity: submitting ? 0.5 : 1 }}>
-          {submitting ? 'Redirecting to checkout…' : 'Continue to payment'}
-        </button>
+        <Button type="submit" loading={submitting} loadingLabel="Redirecting to checkout…" style={{ flex: 1 }}>Continue to payment</Button>
       </div>
     </form>
   );
 }
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
-
-function Field({ label, children }) {
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-      <label style={{ fontSize: '0.8rem', fontWeight: 500, color: 'rgba(255,255,255,0.55)' }}>{label}</label>
-      {children}
-    </div>
-  );
-}
 
 const s = {
   steps: {
@@ -1128,7 +1100,7 @@ const s = {
     left: '0.75rem',
     top: '50%',
     transform: 'translateY(-50%)',
-    color: 'rgba(255,255,255,0.3)',
+    color: 'var(--text-muted)',
     display: 'flex',
     pointerEvents: 'none',
   },
@@ -1149,14 +1121,14 @@ const s = {
     borderRadius: 8,
     padding: '0.75rem 1rem',
     fontSize: '0.875rem',
-    color: 'rgba(255,255,255,0.6)',
+    color: 'var(--text-dim)',
     cursor: 'pointer',
     flexShrink: 0,
   },
   rowBtns: { display: 'flex', gap: '0.6rem', marginTop: '0.25rem' },
   trialNote: {
     fontSize: '0.78rem',
-    color: 'rgba(255,255,255,0.4)',
+    color: 'var(--text-muted)',
     lineHeight: 1.5,
     margin: 0,
   },
@@ -1164,7 +1136,7 @@ const s = {
   introHeading: { paddingBottom: '0.15rem' },
   introAccess: {
     fontSize: '0.76rem',
-    color: 'rgba(255,255,255,0.42)',
+    color: 'var(--text-muted)',
     whiteSpace: 'nowrap',
   },
   featureSections: { display: 'flex', flexDirection: 'column', gap: '1.3rem' },
@@ -1173,7 +1145,7 @@ const s = {
     fontWeight: 700,
     letterSpacing: '0.08em',
     textTransform: 'uppercase',
-    color: 'rgba(255,255,255,0.4)',
+    color: 'var(--text-muted)',
     margin: '0 0 0.55rem',
   },
   switchRow: {
@@ -1185,7 +1157,7 @@ const s = {
   },
   switchRowText: {
     fontSize: '0.78rem',
-    color: 'rgba(255,255,255,0.4)',
+    color: 'var(--text-muted)',
   },
   switchLink: {
     background: 'none',
@@ -1227,7 +1199,7 @@ const s = {
     height: 22,
     borderRadius: '50%',
     background: 'rgba(0,0,0,0.55)',
-    color: 'rgba(255,255,255,0.75)',
+    color: 'var(--text-dim)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -1240,63 +1212,7 @@ const s = {
     objectFit: 'contain',
     display: 'block',
   },
-  modalBackdrop: {
-    position: 'fixed',
-    inset: 0,
-    background: 'rgba(0,0,0,0.6)',
-    backdropFilter: 'blur(2px)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: '1.5rem',
-    zIndex: 1000,
-  },
-  modalPanel: {
-    position: 'relative',
-    width: '100%',
-    maxWidth: 760,
-    maxHeight: '92vh',
-    display: 'flex',
-    flexDirection: 'column',
-    overflow: 'hidden',
-    background: '#151b24',
-    border: '1px solid rgba(255,255,255,0.1)',
-    borderRadius: 16,
-    boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
-  },
-  // Lives outside the scrollable body (rather than position:sticky within it) so it never
-  // has to fight the scroll container's stacking/overflow for the "stay put" behavior —
-  // it's just a normal flex sibling above the part that scrolls.
-  modalHeader: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: '0.75rem',
-    padding: '1.25rem 1.5rem',
-    flexShrink: 0,
-    borderBottom: '1px solid rgba(255,255,255,0.08)',
-  },
-  modalBody: {
-    flex: 1,
-    minHeight: 0,
-    overflowY: 'auto',
-    padding: '1.25rem 1.5rem 1.5rem',
-  },
-  modalClose: {
-    flexShrink: 0,
-    width: 28,
-    height: 28,
-    borderRadius: '50%',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    background: 'rgba(255,255,255,0.06)',
-    border: '1px solid rgba(255,255,255,0.1)',
-    color: 'rgba(255,255,255,0.6)',
-    cursor: 'pointer',
-    fontSize: '0.75rem',
-    padding: 0,
-  },
+
   modalGallery: {
     display: 'grid',
     gap: '0.75rem',
@@ -1310,21 +1226,10 @@ const s = {
     flexShrink: 0,
     aspectRatio: '16 / 10',
   },
-  modalIcon: {
-    display: 'flex',
-    alignItems: 'center',
-    color: '#d5d0c7',
-    flexShrink: 0,
-  },
-  modalTitle: {
-    fontSize: '1.1rem',
-    fontWeight: 700,
-    color: '#ffffff',
-    margin: 0,
-  },
+
   modalDesc: {
     fontSize: '0.85rem',
-    color: 'rgba(255,255,255,0.6)',
+    color: 'var(--text-dim)',
     lineHeight: 1.6,
     margin: '0 0 0.7rem',
   },
@@ -1346,7 +1251,7 @@ const s = {
   },
   featureCardDesc: {
     fontSize: '0.75rem',
-    color: 'rgba(255,255,255,0.5)',
+    color: 'var(--text-muted)',
     lineHeight: 1.45,
   },
   miniGrid: {
@@ -1386,10 +1291,10 @@ const s = {
   miniAvatar: { width: 12, height: 12, borderRadius: '50%', flexShrink: 0, background: 'rgba(255,255,255,0.15)' },
   miniBarTrack: { flex: 1, height: 5, borderRadius: 3, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' },
   miniBarFill: { display: 'block', height: '100%', borderRadius: 3, background: 'rgba(213,208,199,0.5)' },
-  miniTagGood: { fontSize: '0.55rem', color: '#4cc98a', flexShrink: 0 },
+  miniTagGood: { fontSize: '0.55rem', color: 'var(--color-success)', flexShrink: 0 },
   miniTagWarn: { fontSize: '0.6rem', fontWeight: 700, color: '#e8c56f', flexShrink: 0 },
-  miniPct: { fontSize: '0.5rem', color: 'rgba(255,255,255,0.4)', flexShrink: 0, width: 20, textAlign: 'right' },
-  miniPillLabel: { fontSize: '0.55rem', color: 'rgba(255,255,255,0.55)', width: 34, flexShrink: 0 },
+  miniPct: { fontSize: '0.5rem', color: 'var(--text-muted)', flexShrink: 0, width: 20, textAlign: 'right' },
+  miniPillLabel: { fontSize: '0.55rem', color: 'var(--text-muted)', width: 34, flexShrink: 0 },
   miniStationRow: { display: 'flex', gap: 4, width: '100%', height: '100%' },
   miniStationCol: { flex: 1, display: 'flex', flexDirection: 'column', gap: 3 },
   miniStationSlot: { flex: 1, borderRadius: 2, background: 'rgba(255,255,255,0.06)' },
@@ -1400,7 +1305,7 @@ const s = {
   miniChip: {
     fontSize: '0.55rem',
     fontWeight: 600,
-    color: 'rgba(255,255,255,0.4)',
+    color: 'var(--text-muted)',
     background: 'rgba(255,255,255,0.05)',
     border: '1px solid rgba(255,255,255,0.08)',
     borderRadius: 999,
@@ -1420,7 +1325,7 @@ const s = {
   },
   introSubtitle: {
     fontSize: '0.9rem',
-    color: 'rgba(255,255,255,0.55)',
+    color: 'var(--text-muted)',
     margin: 0,
     lineHeight: 1.6,
     maxWidth: 520,
@@ -1443,7 +1348,7 @@ const s = {
     fontWeight: 700,
     letterSpacing: '0.02em',
     textTransform: 'uppercase',
-    color: '#4cc98a',
+    color: 'var(--color-success)',
     background: 'rgba(76,201,138,0.12)',
     borderRadius: 999,
     padding: '0.2rem 0.55rem',
@@ -1457,7 +1362,7 @@ const s = {
   planLabel: {
     display: 'block',
     marginBottom: '0.28rem',
-    color: 'rgba(255,255,255,0.46)',
+    color: 'var(--text-muted)',
     fontSize: '0.67rem',
     fontWeight: 700,
     letterSpacing: '0.08em',
@@ -1470,16 +1375,16 @@ const s = {
   },
   planPriceUnit: {
     fontSize: '0.8rem',
-    color: 'rgba(255,255,255,0.5)',
+    color: 'var(--text-muted)',
   },
   planPriceDetail: {
     fontSize: '0.78rem',
-    color: 'rgba(255,255,255,0.55)',
+    color: 'var(--text-muted)',
     margin: '0.35rem 0 0',
   },
   errorBox: {
     fontSize: '0.8rem',
-    color: '#e86f6f',
+    color: 'var(--color-danger)',
     background: 'rgba(232,111,111,0.08)',
     border: '1px solid rgba(232,111,111,0.2)',
     borderRadius: 6,
@@ -1512,9 +1417,9 @@ const s = {
     textAlign: 'left',
   },
   dropdownName: { fontSize: '0.875rem', color: '#ffffff', fontWeight: 500 },
-  dropdownAddr: { fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)' },
+  dropdownAddr: { fontSize: '0.75rem', color: 'var(--text-muted)' },
   selectedName: { fontSize: '0.875rem', fontWeight: 600, color: '#ffffff' },
-  selectedAddr: { fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)', marginTop: 2 },
+  selectedAddr: { fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 2 },
   claimedNotice: {
     display: 'flex',
     flexDirection: 'column',
@@ -1524,12 +1429,12 @@ const s = {
     borderRadius: 8,
     padding: '0.9rem',
   },
-  claimedBody: { fontSize: '0.82rem', color: 'rgba(255,255,255,0.6)', lineHeight: 1.5, margin: '0.4rem 0 0' },
+  claimedBody: { fontSize: '0.82rem', color: 'var(--text-dim)', lineHeight: 1.5, margin: '0.4rem 0 0' },
   claimedLink: { color: '#d5d0c7' },
   clearBtn: {
     background: 'none',
     border: 'none',
-    color: 'rgba(255,255,255,0.4)',
+    color: 'var(--text-muted)',
     fontSize: '0.78rem',
     cursor: 'pointer',
     flexShrink: 0,
@@ -1555,7 +1460,7 @@ const s = {
     padding: '0.5rem 0',
     background: 'none',
     border: 'none',
-    color: 'rgba(255,255,255,0.35)',
+    color: 'var(--text-muted)',
     fontSize: '0.78rem',
     cursor: 'pointer',
     textDecoration: 'underline',
@@ -1566,7 +1471,7 @@ const s = {
     right: 10,
     top: '50%',
     transform: 'translateY(-50%)',
-    color: 'rgba(255,255,255,0.3)',
+    color: 'var(--text-muted)',
     fontSize: '1.5rem',
   },
   resolvedBadge: {

@@ -1,4 +1,5 @@
 import './globals.css';
+import { getThemeInitScript } from '@/lib/theme';
 import { Space_Grotesk } from 'next/font/google';
 
 const spaceGrotesk = Space_Grotesk({
@@ -15,8 +16,11 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en">
-      <body className={spaceGrotesk.variable}>{children}</body>
+    <html lang="en" suppressHydrationWarning>
+      <body className={spaceGrotesk.variable}>
+        <script dangerouslySetInnerHTML={{ __html: getThemeInitScript() }} />
+        {children}
+      </body>
     </html>
   );
 }

@@ -1,5 +1,8 @@
 'use client';
 
+import Button from '@/components/ui/Button';
+import StatePanel from '@/components/ui/StatePanel';
+
 import { useState, useEffect } from 'react';
 import {
   getStudioArtists,
@@ -380,16 +383,15 @@ export default function HomePage() {
       </div>
 
       <div style={s.body} className="studio-home-body">
-        {loading && <p style={s.msg}>Loading...</p>}
+        {loading && <StatePanel title="Loading your dashboard…" busy compact />}
 
         {!loading && loadError && (
-          <div role="alert" style={s.loadError}>
-            <div>
-              <strong style={s.loadErrorTitle}>Dashboard couldn&apos;t be loaded</strong>
-              <p style={s.loadErrorText}>{loadError}</p>
-            </div>
-            <button type="button" style={s.inlinePrimary} onClick={() => window.location.reload()}>Try again</button>
-          </div>
+          <StatePanel
+            title="Dashboard couldn't be loaded"
+            description={loadError}
+            tone="error"
+            action={<Button onClick={() => window.location.reload()}>Try again</Button>}
+          />
         )}
 
         {!loading && isEmptyDashboard && (

@@ -873,7 +873,7 @@ function ManualBookingModal({ artists, defaultDate, onClose, onCreated }) {
       <div style={s.modal}>
         <div style={s.panelHeader}>
           <span style={s.panelTitle}>{t('sched_new_booking')}</span>
-          <button onClick={onClose} style={s.panelClose}>✕</button>
+          <button aria-label="Close booking panel" onClick={onClose} style={s.panelClose}>✕</button>
         </div>
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', padding: '1rem 1.1rem', overflowY: 'auto', flex: 1 }}>
           <div>
@@ -1206,30 +1206,30 @@ export default function SchedulePage() {
         <div style={s.headerLeft}>
           <h1 style={s.title}>{t('nav_schedule')}</h1>
           <div style={s.viewToggle}>
-            <button onClick={() => setView('month')} style={{ ...s.toggleBtn, ...(view === 'month' ? s.toggleActive : {}) }}>{t('sched_month')}</button>
-            <button onClick={() => setView('day')}   style={{ ...s.toggleBtn, ...(view === 'day'   ? s.toggleActive : {}) }}>{t('sched_day')}</button>
+            <button aria-pressed={view === 'month'} onClick={() => setView('month')} style={{ ...s.toggleBtn, ...(view === 'month' ? s.toggleActive : {}) }}>{t('sched_month')}</button>
+            <button aria-pressed={view === 'day'} onClick={() => setView('day')}   style={{ ...s.toggleBtn, ...(view === 'day'   ? s.toggleActive : {}) }}>{t('sched_day')}</button>
           </div>
           <div style={{ ...s.viewToggle, marginLeft: '0.25rem' }}>
-            <button onClick={() => setLens('artist')}  style={{ ...s.toggleBtn, ...(lens === 'artist'  ? s.toggleActive : {}) }}>{t('bdp_artist')}</button>
-            <button onClick={() => setLens('station')} style={{ ...s.toggleBtn, ...(lens === 'station' ? s.toggleActive : {}) }}>{t('bdp_station')}</button>
+            <button aria-pressed={lens === 'artist'} onClick={() => setLens('artist')}  style={{ ...s.toggleBtn, ...(lens === 'artist'  ? s.toggleActive : {}) }}>{t('bdp_artist')}</button>
+            <button aria-pressed={lens === 'station'} onClick={() => setLens('station')} style={{ ...s.toggleBtn, ...(lens === 'station' ? s.toggleActive : {}) }}>{t('bdp_station')}</button>
           </div>
         </div>
 
         <div style={s.nav}>
           {view === 'month' ? (
             <>
-              <button onClick={() => setMonthStart(d => getMonthStart(new Date(d.getFullYear(), d.getMonth() - 1, 1)))} style={s.navBtn}>←</button>
+              <button aria-label="Previous month" onClick={() => setMonthStart(d => getMonthStart(new Date(d.getFullYear(), d.getMonth() - 1, 1)))} style={s.navBtn}>←</button>
               <span style={s.navLabel}>{monthLabel}</span>
-              <button onClick={() => setMonthStart(d => getMonthStart(new Date(d.getFullYear(), d.getMonth() + 1, 1)))} style={s.navBtn}>→</button>
+              <button aria-label="Next month" onClick={() => setMonthStart(d => getMonthStart(new Date(d.getFullYear(), d.getMonth() + 1, 1)))} style={s.navBtn}>→</button>
               {!isCurrentMonth && (
                 <button onClick={() => setMonthStart(getMonthStart(today))} style={s.todayBtn}>{t('today')}</button>
               )}
             </>
           ) : (
             <>
-              <button onClick={() => setDayDate(d => addDays(d, -1))} style={s.navBtn}>←</button>
+              <button aria-label="Previous day" onClick={() => setDayDate(d => addDays(d, -1))} style={s.navBtn}>←</button>
               <span style={s.navLabel}>{dayLabel}</span>
-              <button onClick={() => setDayDate(d => addDays(d, 1))}  style={s.navBtn}>→</button>
+              <button aria-label="Next day" onClick={() => setDayDate(d => addDays(d, 1))}  style={s.navBtn}>→</button>
               {toISO(dayDate) !== toISO(today) && (
                 <button onClick={() => setDayDate(today)} style={s.todayBtn}>{t('today')}</button>
               )}

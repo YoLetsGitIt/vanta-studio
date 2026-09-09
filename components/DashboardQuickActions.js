@@ -1,6 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import Dialog from '@/components/ui/Dialog';
+import Button from '@/components/ui/Button';
+import Field, { Input, Select, Textarea } from '@/components/ui/Field';
 import { createStudioReimbursement, getStudioClient, getStudioClients } from '@/lib/api';
 import { formatDob, initials } from '@/lib/format';
 import { showError, showFeedback } from '@/lib/feedback';
@@ -31,6 +34,7 @@ export default function DashboardQuickActions({ artists = [] }) {
 }
 
 function FindClientDialog({ onClose }) {
+  const searchRef = useRef(null);
   const [clients, setClients] = useState([]);
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState(null);
@@ -78,17 +82,17 @@ function FindClientDialog({ onClose }) {
   }
 
   return (
-    <Dialog title="Find a client" onClose={onClose}>
+    <Dialog title="Find a client" onClose={onClose} initialFocusRef={searchRef} maxWidth={500} footer={<Button variant="secondary" onClick={onClose}>Close</Button>}>
       {!selected && <div style={styles.searchWrap}>
         <span aria-hidden="true" style={styles.searchIcon}>⌕</span>
-        <input autoFocus type="search" value={query} onChange={event => { setQuery(event.target.value); setSelected(null); }} placeholder="Search name, email, or phone…" aria-label="Search clients" style={styles.searchInput} />
+        <input ref={searchRef} type="search" value={query} onChange={event => { setQuery(event.target.value); setSelected(null); }} placeholder="Search name, email, or phone…" aria-label="Search clients" style={styles.searchInput} />
       </div>}
       {(loading || detailLoading) && <p role="status" style={styles.muted}>{detailLoading ? 'Loading client details…' : 'Searching clients…'}</p>}
       {error && <p role="alert" style={styles.error}>{error}</p>}
       {!loading && !error && !selected && (
-        <div role="listbox" aria-label="Clients" style={styles.results}>
+        <div role="group" aria-label="Client search results" style={styles.results}>
           {clients.map(client => (
-            <button key={client.id ?? client.email ?? client.phone ?? client.name} type="button" role="option" disabled={detailLoading} onClick={() => selectClient(client)} style={styles.result}>
+            <button key={client.id ?? client.email ?? client.phone ?? client.name} type="button" disabled={detailLoading} onClick={() => selectClient(client)} style={styles.result}>
               <strong>{client.name || 'Unnamed client'}</strong>
               <span style={styles.muted}>{[client.email, client.phone].filter(Boolean).join(' · ') || 'No contact details'}</span>
             </button>
@@ -142,6 +146,7 @@ function ReimbursementDialog({ artists, onClose }) {
 
   async function submit(event) {
     event.preventDefault();
+    if (saving) return;
     const value = Number(amount);
     if (!artistId || !description.trim() || !Number.isFinite(value) || value <= 0) {
       setError('Choose an artist, enter a positive amount, and add a description.');
@@ -163,26 +168,17 @@ function ReimbursementDialog({ artists, onClose }) {
   }
 
   return (
-    <Dialog title="Record reimbursement" onClose={onClose}>
+    <Dialog title="Record reimbursement" onClose={onClose} dismissDisabled={saving} maxWidth={500}>
       <form onSubmit={submit} style={styles.form}>
-        <label style={styles.label}>Artist<select autoFocus value={artistId} onChange={event => setArtistId(event.target.value)} style={styles.input}><option value="">Select artist</option>{artists.map(artist => <option key={artist.artistId ?? artist.id} value={artist.artistId ?? artist.id}>{artist.name}</option>)}</select></label>
-        <label style={styles.label}>Amount<div style={styles.money}><span>$</span><input className="reimbursement-number-input" type="number" min="0.01" step="0.01" value={amount} onChange={event => setAmount(event.target.value)} style={styles.moneyInput} /></div></label>
-        <label style={styles.label}>Description<textarea value={description} onChange={event => setDescription(event.target.value)} placeholder="What was reimbursed?" style={{ ...styles.input, minHeight: 82, resize: 'vertical' }} /></label>
+        <Field label="Artist" required><Select disabled={saving} value={artistId} onChange={event => setArtistId(event.target.value)}><option value="">Select artist</option>{artists.map(artist => <option key={artist.artistId ?? artist.id} value={artist.artistId ?? artist.id}>{artist.name}</option>)}</Select></Field>
+        <Field label="Amount" hint="Amount in dollars" required><Input disabled={saving} className="reimbursement-number-input" type="number" min="0.01" step="0.01" value={amount} onChange={event => setAmount(event.target.value)} /></Field>
+        <Field label="Description" required><Textarea disabled={saving} value={description} onChange={event => setDescription(event.target.value)} placeholder="What was reimbursed?" /></Field>
         {artists.length === 0 && <p role="alert" style={styles.error}>There are no approved artists to reimburse.</p>}
         {error && <p role="alert" style={styles.error}>{error}</p>}
-        <div style={styles.actions}><button type="button" onClick={onClose} style={styles.cancel}>Cancel</button><button type="submit" disabled={saving || artists.length === 0} style={styles.confirm}>{saving ? 'Recording…' : 'Record reimbursement'}</button></div>
+        <div style={styles.actions}><Button variant="secondary" onClick={onClose} disabled={saving}>Cancel</Button><Button type="submit" loading={saving} loadingLabel="Recording…" disabled={artists.length === 0}>Record reimbursement</Button></div>
       </form>
     </Dialog>
   );
-}
-
-function Dialog({ title, onClose, children }) {
-  useEffect(() => {
-    const handler = event => { if (event.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [onClose]);
-  return <div style={styles.overlay} onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}><section role="dialog" aria-modal="true" aria-label={title} style={styles.dialog}><div style={styles.header}><h2 style={styles.title}>{title}</h2><button type="button" onClick={onClose} aria-label="Close" style={styles.close}>×</button></div>{children}</section></div>;
 }
 
 const styles = {
@@ -190,14 +186,11 @@ const styles = {
   action: { minHeight: 70, padding: '0.8rem 0.9rem', border: '1px solid var(--border-faint)', borderRadius: 10, background: 'var(--bg-card)', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: '0.65rem', textAlign: 'left', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer' },
   icon: { width: 27, height: 27, flexShrink: 0, display: 'grid', placeItems: 'center', borderRadius: 7, background: 'var(--accent-tint)', color: 'var(--accent)', fontSize: '0.88rem' },
   copy: { display: 'flex', flexDirection: 'column', gap: 3 }, detail: { color: 'var(--text-ghost)', fontSize: '0.66rem', fontWeight: 400 }, arrow: { marginLeft: 'auto', color: 'var(--text-ghost)' },
-  overlay: { position: 'fixed', inset: 0, zIndex: 1200, display: 'grid', placeItems: 'center', padding: 20, background: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(3px)' },
-  dialog: { width: 'min(500px, 100%)', maxHeight: 'min(720px, calc(100vh - 40px))', overflow: 'auto', padding: '1.25rem', borderRadius: 14, border: '1px solid var(--border)', background: 'var(--bg-modal)', boxShadow: 'var(--shadow-modal)' },
-  header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }, title: { margin: 0, color: 'var(--text)', fontSize: '1.05rem' }, close: { border: 0, background: 'transparent', color: 'var(--text-muted)', fontSize: '1.35rem', cursor: 'pointer' },
-  input: { width: '100%', boxSizing: 'border-box', padding: '0.65rem 0.75rem', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-input)', color: 'var(--text)', font: 'inherit' },
+
   searchWrap: { position: 'relative', display: 'flex', alignItems: 'center' },
   searchIcon: { position: 'absolute', left: '0.8rem', color: 'var(--text-ghost)', fontSize: '1rem', pointerEvents: 'none' },
   searchInput: { width: '100%', boxSizing: 'border-box', padding: '0.7rem 0.8rem 0.7rem 2.25rem', borderRadius: 9, border: '1px solid var(--border)', background: 'var(--bg-input)', color: 'var(--text)', font: 'inherit' },
-  results: { display: 'flex', flexDirection: 'column', marginTop: '0.75rem' }, result: { display: 'flex', flexDirection: 'column', gap: 3, padding: '0.75rem', textAlign: 'left', border: 0, borderBottom: '1px solid var(--border-faint)', background: 'transparent', color: 'var(--text)', cursor: 'pointer' }, muted: { margin: 0, color: 'var(--text-muted)', fontSize: '0.78rem' }, error: { margin: 0, color: '#e86f6f', fontSize: '0.78rem' },
+  results: { display: 'flex', flexDirection: 'column', marginTop: '0.75rem' }, result: { display: 'flex', flexDirection: 'column', gap: 3, padding: '0.75rem', textAlign: 'left', border: 0, borderBottom: '1px solid var(--border-faint)', background: 'transparent', color: 'var(--text)', cursor: 'pointer' }, muted: { margin: 0, color: 'var(--text-muted)', fontSize: '0.78rem' }, error: { margin: 0, color: 'var(--color-danger)', fontSize: '0.78rem' },
   clientCard: { display: 'flex', flexDirection: 'column', gap: '1rem' },
   back: { alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: '0.4rem', border: 0, padding: 0, background: 'transparent', color: 'var(--text-muted)', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' },
   clientIdentity: { display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.9rem', borderRadius: 10, background: 'var(--bg-input)', border: '1px solid var(--border-faint)' },
@@ -212,6 +205,6 @@ const styles = {
   fieldLabel: { color: 'var(--text-secondary)' },
   fieldValue: { color: 'var(--text-dim)', overflowWrap: 'anywhere' },
   missingValue: { color: 'var(--text-ghost)', fontStyle: 'italic' },
-  form: { display: 'flex', flexDirection: 'column', gap: '0.9rem' }, label: { display: 'flex', flexDirection: 'column', gap: '0.35rem', color: 'var(--text-muted)', fontSize: '0.76rem' }, money: { display: 'flex', alignItems: 'center', gap: 7, paddingLeft: '0.75rem', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-input)', color: 'var(--text-muted)' }, moneyInput: { width: '100%', padding: '0.65rem 0.75rem 0.65rem 0', border: 0, outline: 0, background: 'transparent', color: 'var(--text)', font: 'inherit' },
-  actions: { display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: '0.35rem' }, cancel: { border: '1px solid var(--border)', borderRadius: 8, padding: '0.6rem 0.8rem', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer' }, confirm: { border: 0, borderRadius: 8, padding: '0.6rem 0.8rem', background: 'var(--accent)', color: 'var(--accent-contrast)', fontWeight: 700, cursor: 'pointer' },
+  form: { display: 'flex', flexDirection: 'column', gap: '0.9rem' },
+  actions: { display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: '0.35rem' },
 };

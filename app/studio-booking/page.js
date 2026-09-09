@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
+import Field from '@/components/ui/Field';
+import Button from '@/components/ui/Button';
 import { getStudioPublic, createWalkIn, walkinUploadSign, signatureUploadSign, getStudioConsentTemplates, getFormConfigPublic } from '@/lib/api';
-
 
 function detectCountry() {
   try {
@@ -111,6 +112,7 @@ function WalkInInner() {
   const [hasAllergies, setHasAllergies] = useState(false);
   const [allergyDetails, setAllergyDetails] = useState('');
   const [notes, setNotes]           = useState('');
+  const photoInputRef = useRef(null);
   const [photos, setPhotos]         = useState([]);
   const [photoPreviews, setPhotoPreviews] = useState([]);
   // Consent template system
@@ -317,7 +319,7 @@ function WalkInInner() {
   }
 
   if (!studioId) return <p style={s.msg}>Invalid link — no studio ID.</p>;
-  if (studioErr) return <p style={{ ...s.msg, color: '#e86f6f' }}>{studioErr}</p>;
+  if (studioErr) return <p role="alert" style={{ ...s.msg, color: 'var(--color-danger)' }}>{studioErr}</p>;
   if (!studio || formConfig === null) return <p style={s.msg}>Loading…</p>;
 
   if (done) {
@@ -342,22 +344,23 @@ function WalkInInner() {
           {/* ── About you ── */}
           <Section title="About you" first>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-              <Field label={<>First name<Required /></>}>
+              <Field label="First name">
                 <input style={s.input} type="text" value={firstName} required onChange={e => setFirstName(e.target.value)} placeholder="First" />
               </Field>
-              <Field label={<>Last name<Required /></>}>
+              <Field label="Last name">
                 <input style={s.input} type="text" value={lastName} required onChange={e => setLastName(e.target.value)} placeholder="Last" />
               </Field>
             </div>
-            <Field label={<>Date of birth<Required /></>}>
+            <Field label="Date of birth">
               <input style={{ ...s.input, colorScheme: 'dark' }} type="date" value={dob} required onChange={e => setDob(e.target.value)} />
             </Field>
-            <Field label={<>Email<Required /></>}>
+            <Field label="Email">
               <input style={s.input} type="email" value={email} required onChange={e => setEmail(e.target.value)} placeholder="you@example.com" />
             </Field>
-            <Field label={<>Phone<Required /></>}>
+            <Field label="Phone" id="booking-phone" required>
               <div style={s.phoneRow}>
                 <select
+                  aria-label="Phone country code"
                   style={{ ...s.input, ...s.phoneCodeSelect }}
                   value={phoneCode}
                   onChange={e => setPhoneCode(e.target.value)}
@@ -368,6 +371,7 @@ function WalkInInner() {
                 </select>
                 <input
                   style={{ ...s.input, flex: 1 }}
+                  id="booking-phone"
                   type="tel"
                   value={phoneNum}
                   required
@@ -381,7 +385,7 @@ function WalkInInner() {
           {/* ── Your tattoo ── */}
           <Section title="Your tattoo">
             {field('artist_id').enabled && (
-              <Field label={<>Artist preference{field('artist_id').required ? <Required /> : <Optional />}</>}>
+              <Field label={<>Artist preference{field('artist_id').required ? null : <Optional />}</>}>
                 <select style={s.input} value={artistId} required={field('artist_id').required} onChange={e => setArtistId(e.target.value)}>
                   <option value="">No preference — studio will assign</option>
                   {studio.artists.map(a => (
@@ -397,7 +401,7 @@ function WalkInInner() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
                 <label style={s.label}>
                   Placement{field('body_location').required ? <Required /> : null}
-                  <span style={{ color: 'rgba(255,255,255,0.2)', fontWeight: 400, marginLeft: 6 }}>
+                  <span style={{ color: 'var(--text-muted)', fontWeight: 400, marginLeft: 6 }}>
                     {placements.length}/3
                   </span>
                 </label>
@@ -408,6 +412,8 @@ function WalkInInner() {
                       <button
                         key={p}
                         type="button"
+                        aria-pressed={active}
+                        disabled={!active && placements.length >= 3}
                         onClick={() => {
                           if (active) {
                             setPlacements(prev => prev.filter(x => x !== p));
@@ -426,13 +432,13 @@ function WalkInInner() {
             )}
 
             {field('design_details').enabled && (
-              <Field label={<>Design description{field('design_details').required ? <Required /> : <Optional />}</>}>
+              <Field label={<>Design description{field('design_details').required ? null : <Optional />}</>}>
                 <textarea style={{ ...s.input, ...s.textarea }} value={design} required={field('design_details').required} onChange={e => setDesign(e.target.value)} placeholder="Describe what you'd like…" />
               </Field>
             )}
 
             {field('skin_tone').enabled && (
-              <Field label={<>Skin tone{field('skin_tone').required ? <Required /> : <Optional />}</>}>
+              <Field label={<>Skin tone{field('skin_tone').required ? null : <Optional />}</>}>
                 <select style={s.input} value={skinTone} required={field('skin_tone').required} onChange={e => setSkinTone(e.target.value)}>
                   <option value="">Select skin tone…</option>
                   {['Very light', 'Light', 'Medium', 'Olive', 'Brown', 'Dark'].map(t => (
@@ -443,11 +449,12 @@ function WalkInInner() {
             )}
 
             {field('size').enabled && (
-              <Field label={<>Size{field('size').required ? <Required /> : <Optional />}</>}>
+              <Field id="booking-size" required={field('size').required} label={<>Size{!field('size').required && <Optional />}</>}>
                 <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                   <input
                     style={{ ...s.input, flex: 1 }}
                     type="number" min="0" step="0.1"
+                    id="booking-size"
                     inputMode="decimal"
                     value={size}
                     required={field('size').required}
@@ -458,7 +465,7 @@ function WalkInInner() {
                   <div style={{ display: 'flex', background: 'rgba(255,255,255,0.06)', borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)', flexShrink: 0 }}>
                     {['cm', 'in'].map(u => (
                       <button
-                        key={u} type="button"
+                        key={u} type="button" aria-pressed={sizeUnit === u}
                         onClick={() => setSizeUnit(u)}
                         style={{
                           padding: '0.55rem 0.75rem', border: 'none', cursor: 'pointer',
@@ -476,7 +483,7 @@ function WalkInInner() {
             )}
 
             {field('retouch').enabled && (
-              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: 'rgba(255,255,255,0.7)', cursor: 'pointer' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: 'var(--text-dim)', cursor: 'pointer' }}>
                 <input type="checkbox" checked={retouch} onChange={e => setRetouch(e.target.checked)} style={{ width: 16, height: 16, accentColor: '#d5d0c7', cursor: 'pointer' }} />
                 This is a touch-up / retouch
               </label>
@@ -491,6 +498,7 @@ function WalkInInner() {
                     <button
                       key={opt}
                       type="button"
+                      aria-pressed={active}
                       onClick={() => setColorStyle(active ? '' : opt)}
                       style={{
                         flex: 1,
@@ -513,21 +521,21 @@ function WalkInInner() {
             </div>
 
             {field('notes').enabled && (
-              <Field label={<>Additional notes{field('notes').required ? <Required /> : <Optional />}</>}>
+              <Field label={<>Additional notes{field('notes').required ? null : <Optional />}</>}>
                 <textarea style={{ ...s.input, ...s.textarea }} value={notes} required={field('notes').required} onChange={e => setNotes(e.target.value)} placeholder="Anything else the artist should know" />
               </Field>
             )}
 
             {field('allergies').enabled && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: 'rgba(255,255,255,0.7)', cursor: 'pointer' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: 'var(--text-dim)', cursor: 'pointer' }}>
                   <input type="checkbox" checked={hasAllergies} onChange={e => { setHasAllergies(e.target.checked); if (!e.target.checked) setAllergyDetails(''); }} style={{ width: 16, height: 16, accentColor: '#d5d0c7', cursor: 'pointer' }} />
                   I have allergies or sensitivities{field('allergies').required ? '' : ' (optional)'}
                 </label>
                 {hasAllergies && (
                   <textarea
                     style={{ ...s.input, ...s.textarea }}
-                    value={allergyDetails}
+                    aria-label="Allergies or sensitivities" value={allergyDetails}
                     required={field('allergies').required}
                     onChange={e => setAllergyDetails(e.target.value)}
                     placeholder="Please describe your allergies or sensitivities…"
@@ -541,16 +549,14 @@ function WalkInInner() {
           {field('image_paths').enabled && (
             <Section title="Reference photos">
               <p style={s.sectionHint}>{field('image_paths').required ? 'Required — up to 5 images' : 'Optional — up to 5 images'}</p>
-              <label style={s.uploadLabel}>
-                <input type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={handlePhotoChange} />
-                + Add photos
-              </label>
+              <input ref={photoInputRef} type="file" accept="image/*" multiple hidden onChange={handlePhotoChange} />
+              <Button variant="secondary" onClick={() => photoInputRef.current?.click()}>+ Add photos</Button>
               {photoPreviews.length > 0 && (
                 <div style={s.photoGrid}>
                   {photoPreviews.map((url, i) => (
                     <div key={i} style={s.photoThumb}>
                       <img src={url} alt="" style={s.thumbImg} />
-                      <button type="button" style={s.thumbRemove} onClick={() => removePhoto(i)}>✕</button>
+                      <button type="button" aria-label={`Remove reference photo ${i + 1}`} style={s.thumbRemove} onClick={() => removePhoto(i)}>✕</button>
                     </div>
                   ))}
                 </div>
@@ -584,8 +590,8 @@ function WalkInInner() {
                         onChange={e => setTemplateAnswer(t.id, '__agreed__', e.target.checked ? 'true' : '')}
                         style={{ accentColor: '#d5d0c7', flexShrink: 0, marginTop: 2 }}
                       />
-                      <span style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.7)', lineHeight: 1.5 }}>
-                        I have read and agreed to the above <span style={{ color: '#e86f6f' }}>*</span>
+                      <span style={{ fontSize: '0.8rem', color: 'var(--text-dim)', lineHeight: 1.5 }}>
+                        I have read and agreed to the above <span style={{ color: 'var(--color-danger)' }}>*</span>
                       </span>
                     </label>
 
@@ -598,13 +604,13 @@ function WalkInInner() {
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
                             <div>
-                              <label style={s.label}>Guardian name <span style={{ color: '#e86f6f' }}>*</span></label>
-                              <input style={s.input} type="text" value={guardianName} required
+                              <label htmlFor={`guardian-name-${t.id}`} style={s.label}>Guardian name <span style={{ color: 'var(--color-danger)' }}>*</span></label>
+                              <input id={`guardian-name-${t.id}`} style={s.input} type="text" value={guardianName} required
                                 onChange={e => setGuardianName(e.target.value)} placeholder="Full name" />
                             </div>
                             <div>
-                              <label style={s.label}>Relationship</label>
-                              <select style={s.input} value={guardianRelationship} onChange={e => setGuardianRelationship(e.target.value)}>
+                              <label htmlFor={`guardian-relationship-${t.id}`} style={s.label}>Relationship</label>
+                              <select id={`guardian-relationship-${t.id}`} style={s.input} value={guardianRelationship} onChange={e => setGuardianRelationship(e.target.value)}>
                                 <option>Parent</option>
                                 <option>Legal Guardian</option>
                                 <option>Other</option>
@@ -612,18 +618,18 @@ function WalkInInner() {
                             </div>
                           </div>
                           <div>
-                            <label style={s.label}>Guardian email</label>
-                            <input style={s.input} type="email" value={guardianEmail}
+                            <label htmlFor={`guardian-email-${t.id}`} style={s.label}>Guardian email</label>
+                            <input id={`guardian-email-${t.id}`} style={s.input} type="email" value={guardianEmail}
                               onChange={e => setGuardianEmail(e.target.value)} placeholder="guardian@example.com" />
                           </div>
                           <div>
-                            <label style={s.label}>Guardian phone</label>
-                            <input style={s.input} type="tel" value={guardianPhone}
+                            <label htmlFor={`guardian-phone-${t.id}`} style={s.label}>Guardian phone</label>
+                            <input id={`guardian-phone-${t.id}`} style={s.input} type="tel" value={guardianPhone}
                               onChange={e => setGuardianPhone(e.target.value)} placeholder="Phone number" />
                           </div>
                           <div>
-                            <label style={s.label}>Guardian signature <span style={{ color: '#e86f6f' }}>*</span></label>
-                            <SignaturePad onCapture={blob => setTemplateGuardianSigBlob(t.id, blob)} />
+                            <label style={s.label}>Guardian signature <span style={{ color: 'var(--color-danger)' }}>*</span></label>
+                            <SignaturePad label="Guardian signature" onCapture={blob => setTemplateGuardianSigBlob(t.id, blob)} />
                           </div>
                         </div>
                       </div>
@@ -631,7 +637,7 @@ function WalkInInner() {
 
                     {t.requires_signature && (
                       <div>
-                        <label style={s.label}>{isMinor ? 'Client signature' : 'Signature'} <span style={{ color: '#e86f6f' }}>*</span></label>
+                        <label style={s.label}>{isMinor ? 'Client signature' : 'Signature'} <span style={{ color: 'var(--color-danger)' }}>*</span></label>
                         <SignaturePad onCapture={blob => setTemplateSigBlob(t.id, blob)} />
                       </div>
                     )}
@@ -643,10 +649,8 @@ function WalkInInner() {
 
           {/* ── Submit ── */}
           <div style={s.submitSection}>
-            {submitError && <p style={s.error}>{submitError}</p>}
-            <button type="submit" disabled={submitting} style={s.submitBtn}>
-              {submitting ? 'Submitting…' : 'Request booking'}
-            </button>
+            {submitError && <p role="alert" style={s.error}>{submitError}</p>}
+            <Button type="submit" loading={submitting} loadingLabel="Submitting…" fullWidth>Request booking</Button>
           </div>
 
         </form>
@@ -657,21 +661,21 @@ function WalkInInner() {
 // Renders a single field from a consent template
 function ConsentFormField({ field, value, onChange }) {
   const labelStyle = {
-    fontSize: '0.75rem', fontWeight: 600, color: 'rgba(255,255,255,0.5)',
+    fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)',
     display: 'flex', gap: '0.25rem', alignItems: 'center',
   };
   switch (field.type) {
     case 'heading':
       return <p style={{ fontSize: '0.9rem', fontWeight: 700, color: '#d5d0c7', margin: 0 }}>{field.label}</p>;
     case 'paragraph':
-      return <p style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.55)', margin: 0, lineHeight: 1.65, maxHeight: 160, overflowY: 'auto', whiteSpace: 'pre-wrap' }}>{field.label}</p>;
+      return <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0, lineHeight: 1.65, maxHeight: 160, overflowY: 'auto', whiteSpace: 'pre-wrap' }}>{field.label}</p>;
     case 'checkbox':
       return (
         <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6rem', cursor: 'pointer' }}>
           <input type="checkbox" checked={!!value} onChange={e => onChange(e.target.checked ? 'true' : '')}
             style={{ accentColor: '#d5d0c7', flexShrink: 0, marginTop: 2 }} />
-          <span style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.7)', lineHeight: 1.5 }}>
-            {field.label}{field.required && <span style={{ color: '#e86f6f', marginLeft: 2 }}>*</span>}
+          <span style={{ fontSize: '0.8rem', color: 'var(--text-dim)', lineHeight: 1.5 }}>
+            {field.label}{field.required && <span style={{ color: 'var(--color-danger)', marginLeft: 2 }}>*</span>}
           </span>
         </label>
       );
@@ -679,11 +683,11 @@ function ConsentFormField({ field, value, onChange }) {
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
           <span style={labelStyle}>
-            {field.label}{field.required && <span style={{ color: '#e86f6f' }}>*</span>}
+            {field.label}{field.required && <span style={{ color: 'var(--color-danger)' }}>*</span>}
           </span>
           <div style={{ display: 'flex', gap: '0.5rem' }}>
             {['Yes', 'No'].map(opt => (
-              <button key={opt} type="button"
+              <button key={opt} type="button" aria-pressed={value === opt}
                 onClick={() => onChange(opt)}
                 style={{
                   padding: '0.45rem 1.2rem', borderRadius: 8,
@@ -700,9 +704,9 @@ function ConsentFormField({ field, value, onChange }) {
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
           <span style={labelStyle}>
-            {field.label}{field.required && <span style={{ color: '#e86f6f' }}>*</span>}
+            {field.label}{field.required && <span style={{ color: 'var(--color-danger)' }}>*</span>}
           </span>
-          <textarea style={{ ...s.input, minHeight: 70, resize: 'vertical' }}
+          <textarea aria-label={field.label} required={field.required} style={{ ...s.input, minHeight: 70, resize: 'vertical' }}
             value={value} onChange={e => onChange(e.target.value)} placeholder="Your answer…" />
         </div>
       );
@@ -710,15 +714,15 @@ function ConsentFormField({ field, value, onChange }) {
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
           <span style={labelStyle}>
-            {field.label}{field.required && <span style={{ color: '#e86f6f' }}>*</span>}
+            {field.label}{field.required && <span style={{ color: 'var(--color-danger)' }}>*</span>}
           </span>
-          <input type="text" style={s.input} value={value} onChange={e => onChange(e.target.value)} placeholder="Your answer…" />
+          <input type="text" aria-label={field.label} required={field.required} style={s.input} value={value} onChange={e => onChange(e.target.value)} placeholder="Your answer…" />
         </div>
       );
   }
 }
 
-function SignaturePad({ onCapture }) {
+function SignaturePad({ onCapture, label = 'Client signature' }) {
   const canvasRef = useRef(null);
   const [drawing, setDrawing] = useState(false);
   const [hasDrawn, setHasDrawn] = useState(false);
@@ -772,6 +776,8 @@ function SignaturePad({ onCapture }) {
     <div style={s.sigWrap}>
       <canvas
         ref={canvasRef}
+        role="img"
+        aria-label={`${label}: draw using a pointer or touch`}
         width={440}
         height={140}
         style={s.sigCanvas}
@@ -780,18 +786,18 @@ function SignaturePad({ onCapture }) {
       />
       <div style={s.sigFooter}>
         <span style={s.sigHint}>Draw your signature above</span>
-        <button type="button" onClick={clear} style={s.sigClear}>Clear</button>
+        <button type="button" aria-label={`Clear ${label.toLowerCase()}`} onClick={clear} style={s.sigClear}>Clear</button>
       </div>
     </div>
   );
 }
 
 function Required() {
-  return <span style={{ color: '#e86f6f', marginLeft: 3 }}>*</span>;
+  return <span aria-hidden="true" style={{ color: 'var(--color-danger)', marginLeft: 3 }}>*</span>;
 }
 
 function Optional() {
-  return <span style={{ color: 'rgba(255,255,255,0.25)', fontWeight: 400, marginLeft: 4 }}>(optional)</span>;
+  return <span style={{ color: 'var(--text-muted)', fontWeight: 400, marginLeft: 4 }}>(optional)</span>;
 }
 
 function Section({ title, children, first = false }) {
@@ -802,15 +808,6 @@ function Section({ title, children, first = false }) {
       paddingTop: first ? 0 : '1.5rem',
     }}>
       <span style={s.sectionTitle}>{title}</span>
-      {children}
-    </div>
-  );
-}
-
-function Field({ label, children }) {
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-      <span style={s.label}>{label}</span>
       {children}
     </div>
   );
@@ -854,34 +851,34 @@ const s = {
   },
   studioLabel: {
     fontSize: '0.7rem', fontWeight: 600, letterSpacing: '0.08em',
-    textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)',
+    textTransform: 'uppercase', color: 'var(--text-muted)',
   },
   studioName: {
     fontSize: '1.5rem', fontWeight: 700, color: '#ffffff',
     margin: 0, letterSpacing: '-0.02em',
   },
   studioAddress: {
-    fontSize: '0.78rem', color: 'rgba(255,255,255,0.35)',
+    fontSize: '0.78rem', color: 'var(--text-muted)',
   },
   authIntro: {
-    fontSize: '0.85rem', color: 'rgba(255,255,255,0.55)', margin: 0,
+    fontSize: '0.85rem', color: 'var(--text-muted)', margin: 0,
   },
   form: {
     display: 'flex', flexDirection: 'column', gap: '1.5rem',
   },
   sectionTitle: {
     fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.12em',
-    textTransform: 'uppercase', color: 'rgba(255,255,255,0.22)',
+    textTransform: 'uppercase', color: 'var(--text-muted)',
   },
   sectionHint: {
-    fontSize: '0.78rem', color: 'rgba(255,255,255,0.3)', margin: 0,
+    fontSize: '0.78rem', color: 'var(--text-muted)', margin: 0,
   },
   submitSection: {
     display: 'flex', flexDirection: 'column', gap: '0.75rem',
     borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '1.5rem',
   },
   label: {
-    fontSize: '0.72rem', fontWeight: 600, color: 'rgba(255,255,255,0.45)',
+    fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-muted)',
   },
   input: {
     background: 'rgba(255,255,255,0.05)',
@@ -905,18 +902,7 @@ const s = {
     minHeight: 90,
     resize: 'vertical',
   },
-  submitBtn: {
-    background: '#d5d0c7',
-    border: 'none',
-    borderRadius: 10,
-    color: '#0e0e0e',
-    fontSize: '0.9rem',
-    fontWeight: 700,
-    padding: '0.85rem',
-    cursor: 'pointer',
-    marginTop: '0.25rem',
-    fontFamily: 'inherit',
-  },
+
   chipGrid: {
     display: 'flex', flexWrap: 'wrap', gap: '0.4rem',
   },
@@ -924,7 +910,7 @@ const s = {
     background: 'rgba(255,255,255,0.05)',
     border: '1px solid rgba(255,255,255,0.1)',
     borderRadius: 20,
-    color: 'rgba(255,255,255,0.6)',
+    color: 'var(--text-dim)',
     fontSize: '0.78rem', fontWeight: 500,
     padding: '0.35rem 0.75rem',
     cursor: 'pointer',
@@ -939,12 +925,7 @@ const s = {
     opacity: 0.3,
     cursor: 'default',
   },
-  uploadLabel: {
-    display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
-    background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
-    borderRadius: 8, padding: '0.5rem 0.85rem', fontSize: '0.82rem',
-    color: 'rgba(255,255,255,0.55)', cursor: 'pointer', alignSelf: 'flex-start',
-  },
+
   photoGrid: { display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.5rem' },
   photoThumb: { position: 'relative', width: 72, height: 72, borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)' },
   thumbImg: { width: '100%', height: '100%', objectFit: 'cover' },
@@ -953,16 +934,16 @@ const s = {
   sigWrap: { display: 'flex', flexDirection: 'column', gap: '0.4rem' },
   sigCanvas: { width: '100%', height: 140, borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.12)', display: 'block', touchAction: 'none', cursor: 'crosshair' },
   sigFooter: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
-  sigHint: { fontSize: '0.7rem', color: 'rgba(255,255,255,0.25)' },
-  sigClear: { background: 'none', border: 'none', fontSize: '0.72rem', color: 'rgba(255,255,255,0.35)', cursor: 'pointer', padding: '0.15rem 0', fontFamily: 'inherit' },
-  consentText: { fontSize: '0.8rem', color: 'rgba(255,255,255,0.55)', margin: 0, lineHeight: 1.65, maxHeight: 160, overflowY: 'auto' },
-  consentCheck: { display: 'flex', alignItems: 'flex-start', gap: '0.6rem', fontSize: '0.8rem', color: 'rgba(255,255,255,0.7)', cursor: 'pointer' },
+  sigHint: { fontSize: '0.7rem', color: 'var(--text-muted)' },
+  sigClear: { background: 'none', border: 'none', fontSize: '0.72rem', color: 'var(--text-muted)', cursor: 'pointer', padding: '0.15rem 0', fontFamily: 'inherit' },
+  consentText: { fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0, lineHeight: 1.65, maxHeight: 160, overflowY: 'auto' },
+  consentCheck: { display: 'flex', alignItems: 'flex-start', gap: '0.6rem', fontSize: '0.8rem', color: 'var(--text-dim)', cursor: 'pointer' },
   consentFormTitle: { fontSize: '0.9rem', fontWeight: 700, color: '#d5d0c7' },
   formTypeBadge: { fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', padding: '0.15rem 0.5rem', borderRadius: 4 },
   formTypeBadgeColors: {
     consent: { background: 'rgba(213,208,199,0.1)', color: '#d5d0c7' },
-    waiver:  { background: 'rgba(232,111,111,0.12)', color: '#e86f6f' },
-    health:  { background: 'rgba(76,201,138,0.12)', color: '#4cc98a' },
+    waiver:  { background: 'rgba(232,111,111,0.12)', color: 'var(--color-danger)' },
+    health:  { background: 'rgba(76,201,138,0.12)', color: 'var(--color-success)' },
   },
   guardianBox: {
     background: 'rgba(213,208,199,0.04)', border: '1px solid rgba(213,208,199,0.12)',
@@ -971,21 +952,21 @@ const s = {
   guardianTitle: { fontSize: '0.8rem', fontWeight: 700, color: '#d5d0c7', margin: 0 },
   switchLink: {
     background: 'none', border: 'none',
-    color: 'rgba(255,255,255,0.35)',
+    color: 'var(--text-muted)',
     fontSize: '0.75rem', cursor: 'pointer',
     textAlign: 'center', padding: '0.25rem',
     fontFamily: 'inherit',
   },
   error: {
-    fontSize: '0.78rem', color: '#e86f6f', margin: 0,
+    fontSize: '0.78rem', color: 'var(--color-danger)', margin: 0,
   },
   msg: {
-    color: 'rgba(255,255,255,0.35)', fontSize: '0.875rem', padding: '2rem',
+    color: 'var(--text-muted)', fontSize: '0.875rem', padding: '2rem',
   },
   successIcon: {
     width: 48, height: 48, borderRadius: '50%',
     background: 'rgba(76,201,138,0.15)',
-    color: '#4cc98a',
+    color: 'var(--color-success)',
     fontSize: '1.4rem',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
   },
@@ -993,6 +974,6 @@ const s = {
     fontSize: '1.3rem', fontWeight: 700, color: '#ffffff', margin: 0,
   },
   successSub: {
-    fontSize: '0.85rem', color: 'rgba(255,255,255,0.45)', margin: 0, lineHeight: 1.6,
+    fontSize: '0.85rem', color: 'var(--text-muted)', margin: 0, lineHeight: 1.6,
   },
 };
