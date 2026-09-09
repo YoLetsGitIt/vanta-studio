@@ -1,6 +1,7 @@
 'use client';
 
 import Dialog from '@/components/ui/Dialog';
+import SmartSchedulingSettings from '@/components/SmartSchedulingSettings';
 
 import { useEffect, useState, useRef, useCallback } from 'react';
 import dynamic from 'next/dynamic';
@@ -964,8 +965,8 @@ export default function SettingsPage() {
   if (loading) return <div style={s.page}><div style={s.loadingDot} /></div>;
 
   return (
-    <div style={s.page}>
-      <div style={s.pageHeader}>
+    <div className="studio-settings-page" style={s.page}>
+      <div className="studio-settings-header" style={s.pageHeader}>
         <h1 style={s.pageTitle}>{t('settings')}</h1>
         <div style={s.tabBar}>
           {[
@@ -1253,20 +1254,7 @@ export default function SettingsPage() {
 
         <section style={{ ...s.card, gridColumn: '1 / -1' }}>
           <h2 style={s.sectionTitle}>Smart scheduling</h2>
-          <p style={s.sectionDesc}>Choose how available times are suggested in client booking links. Clients can always see all available times.</p>
-          <label htmlFor="scheduling-mode" style={s.label}>Scheduling preference</label>
-          <select id="scheduling-mode" style={s.input} value={schedulingMode} onChange={e => setSchedulingMode(e.target.value)}>
-            <option value="all">Show all availability</option>
-            <option value="quieter_days">Fill quieter days</option>
-            <option value="minimize_gaps">Minimise gaps</option>
-          </select>
-          <p style={s.sectionDesc}>
-            {schedulingMode === 'quieter_days'
-              ? 'Suggest days with a lower proportion of the artist’s working hours booked, then times that fit neatly beside existing appointments.'
-              : schedulingMode === 'minimize_gaps'
-              ? 'Suggest times closest to existing appointments and calendar commitments. Days with no commitments show all available times.'
-              : 'Show every available start time in chronological order.'}
-          </p>
+          <SmartSchedulingSettings mode={schedulingMode} onChange={setSchedulingMode} disabled={saving} />
           {profileError && <p role="alert" style={s.errorText}>{profileError}</p>}
           <button onClick={saveProfile} style={s.saveBtn} disabled={saving}>
             {saving ? t('saving') : saved ? t('saved') : t('save')}

@@ -228,9 +228,9 @@ function DashboardShell({ children }) {
   return (
     <div style={s.shell}>
       <style>{TOUR_HIGHLIGHT_CSS}</style>
-      <div style={s.body}>
-        <aside style={s.sidebar}>
-          <div style={s.sidebarTop}>
+      <div className="studio-dashboard-body" style={s.body}>
+        <aside className="studio-dashboard-sidebar" style={s.sidebar}>
+          <div className="studio-dashboard-sidebar-top" style={s.sidebarTop}>
             <Link href="/dashboard/appointments" style={s.logo}>
               <span style={s.logoMark}>vanta</span>
               <span style={s.logoSub}>studio</span>
@@ -241,7 +241,7 @@ function DashboardShell({ children }) {
               {t('new_appointment')}
             </button>
 
-            <nav aria-label="Studio navigation" style={s.nav}>
+            <nav className="studio-dashboard-navigation" aria-label="Studio navigation" style={s.nav}>
               {NAV.map(({ href, tKey, icon: Icon }, index) => {
                 const active = pathname.startsWith(href);
                 const highlighted = TOUR_STEPS[tourStep]?.target === 'nav' && TOUR_STEPS[tourStep]?.targetIndex === index;
@@ -265,7 +265,7 @@ function DashboardShell({ children }) {
             </nav>
           </div>
 
-          <div style={s.sidebarBottom}>
+          <div className="studio-dashboard-sidebar-bottom" style={s.sidebarBottom}>
             <div style={s.userRow}>
               <div style={s.avatar}>{displayName[0].toUpperCase()}</div>
               <div style={s.userInfo}>
@@ -287,7 +287,7 @@ function DashboardShell({ children }) {
           </div>
         </aside>
 
-        <main style={s.main}>{children}</main>
+        <main className="studio-dashboard-main" style={s.main}>{children}</main>
       </div>
 
       <NewAppointmentPanel
