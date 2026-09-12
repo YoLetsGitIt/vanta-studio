@@ -29,8 +29,8 @@ const base = process.env.VANTA_STUDIO_TEST_URL || 'http://127.0.0.1:3019';
       return route.fulfill({ json: { hours: [], stations: [], templates: [], fields: {}, connected: false } });
     });
     await page.goto(`${base}/dashboard/settings.html?tab=bookings`, { waitUntil: 'networkidle' });
-    const quieter = page.getByRole('checkbox', { name: 'Prioritise quieter periods', exact: true });
-    const gaps = page.getByRole('checkbox', { name: 'Minimise gaps', exact: true });
+    const quieter = page.getByRole('checkbox', { name: 'Only offer quieter dates', exact: true });
+    const gaps = page.getByRole('checkbox', { name: 'Keep appointments together', exact: true });
     await quieter.waitFor();
     assert.equal(await quieter.isChecked(), false);
     assert.equal(await gaps.isChecked(), false);
@@ -42,10 +42,13 @@ const base = process.env.VANTA_STUDIO_TEST_URL || 'http://127.0.0.1:3019';
       const wantsGaps = next === 'minimize_gaps' || next === 'combined';
       await quieter.setChecked(wantsQuieter);
       await gaps.setChecked(wantsGaps);
-      assert.equal(await day.getByRole('img', { name: /: suggested/ }).count(), wantsGaps ? 3 : 0);
+      await page.getByRole('navigation', { name: 'Example booking steps' }).getByRole('button', { name: '1 Month' }).click();
       assert.equal(await page.getByRole('group', { name: 'Example client month options' }).getByRole('button').count(), wantsQuieter ? 2 : 3);
+      await page.getByRole('group', { name: 'Example client month options' }).getByRole('button', { name: /October/ }).click();
       assert.equal(await page.getByRole('group', { name: 'Example client date options' }).getByRole('button').count(), wantsQuieter ? 2 : 5);
-      assert.equal(await page.getByRole('group', { name: 'Example client time options' }).locator('span').count(), wantsGaps ? 3 : 5);
+      await page.getByRole('group', { name: 'Example client date options' }).getByRole('button').first().click();
+      assert.equal(await day.getByRole('img', { name: /: suggested/ }).count(), wantsGaps ? 3 : 0);
+      assert.equal(await page.getByRole('group', { name: 'Example client time options' }).getByRole('button').count(), wantsGaps ? 3 : 5);
       await Promise.all([
         page.waitForResponse(response => response.url().endsWith('/studio/me/profile')),
         section.getByRole('button', { name: /Save/ }).click(),
@@ -64,27 +67,33 @@ const base = process.env.VANTA_STUDIO_TEST_URL || 'http://127.0.0.1:3019';
     assert.equal(await gaps.isChecked(), true);
     assert.equal(updates.length, 4);
     const months = page.getByRole('group', { name: 'Example client month options' });
-    await months.getByRole('button', { name: 'November' }).click();
-    assert.equal(await months.getByRole('button', { name: 'September' }).count(), 0);
+    await months.getByRole('button', { name: /November/ }).click();
+    assert.equal(await months.getByRole('button', { name: /September/ }).count(), 0);
     await page.getByRole('group', { name: 'Example client date options' }).getByRole('button', { name: 'Thu, 5 Nov' }).click();
     await page.getByRole('button', { name: 'Show all times', exact: true }).click();
-    assert.equal(await page.getByRole('group', { name: 'Example client time options' }).locator('span').count(), 5);
-    assert.equal(await months.getByRole('button').count(), 2);
+    assert.equal(await page.getByRole('group', { name: 'Example client time options' }).getByRole('button').count(), 5);
+    await page.getByRole('group', { name: 'Example client time options' }).getByRole('button', { name: '9am', exact: true }).click();
+    await page.getByText(/Selected:.*9am/).waitFor();
+    assert.equal(await page.locator('details').filter({ hasText: 'How dates are chosen' }).getAttribute('open'), null);
+    await page.getByText('How dates are chosen', { exact: true }).click();
+    await page.getByText(/We compare booked hours/).waitFor();
     for (const theme of ['dark', 'light']) {
       await page.evaluate(value => document.documentElement.dataset.theme = value, theme);
       for (const width of [1280, 360]) {
         await page.setViewportSize({ width, height: 1000 });
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth), false);
         assert.ok((await section.boundingBox()).width >= 280, 'Settings card must retain a usable mobile width');
-        for (const table of [week, day]) {
-          assert.equal(await table.evaluate(element => element.scrollWidth > element.clientWidth), false);
-          const square = await table.getByRole('img').first().boundingBox();
-          assert.ok(square.width >= 20 && Math.abs(square.width - square.height) < 1, 'Availability cells must remain readable squares');
-        }
-        for (const stage of ['Month filtering example', 'Date filtering example', 'Time suggestions example']) {
-          const region = page.getByRole('region', { name: stage, exact: true });
+        for (const [index, label] of ['Month', 'Date', 'Time'].entries()) {
+          await page.getByRole('navigation', { name: 'Example booking steps' }).getByRole('button', { name: `${index + 1} ${label}` }).click();
+          if (index > 0) {
+            const table = index === 1 ? week : day;
+            assert.equal(await table.evaluate(element => element.scrollWidth > element.clientWidth), false);
+            const square = await table.getByRole('img').first().boundingBox();
+            assert.ok(square.width >= 20 && Math.abs(square.width - square.height) < 1, 'Availability cells must remain readable squares');
+          }
+          const region = page.getByRole('region', { name: 'Interactive booking example', exact: true });
           await region.scrollIntoViewIfNeeded();
-          await region.screenshot({ path: `/private/tmp/vanta-${stage.split(' ')[0]}-${theme}-${width}.png` });
+          await region.screenshot({ animations: 'disabled', path: `/private/tmp/vanta-demo-${label}-${theme}-${width}.png` });
         }
       }
     }

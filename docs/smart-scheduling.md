@@ -41,13 +41,15 @@ Revised 9 September 2026. Settings → Bookings → Smart scheduling.
 
 ## “See how it works” display decisions
 
-21. Use three vertically stacked steps: **choose a month → choose a date → choose a time**. Each step shows a labelled **Studio view** followed by **Client sees**, demonstrating the difference between the underlying schedule and offered choices.
-22. Show three illustrative monthly workload cards: September 75%, October 20%, November 30%. With filtering enabled, only October and November appear as client buttons. There is no disabled September button or navigation into it.
-23. Show a square availability table for five sample dates, six working hours each. Booked cells contain ×; available cells are empty. An Offered/Not offered column explains eligibility. Only eligible dates become square client buttons beneath the table.
-24. With filtering on, the one-hour-booked sample dates qualify (about 17%). The two-hour-booked date (about 33%) exceeds the approximately 32% ceiling and is omitted. Monthly totals are explicitly illustrative and include other dates beyond the five-row sample.
-25. Clicking an offered month changes the date example; clicking a date changes the time example. The time table uses stars for suggested starts, followed by the actual displayed time choices. Show all times is interactive and expands that date alone.
-26. Preview controls reflect unsaved preference changes immediately; the existing Save action persists them. Both options support keyboard interaction. Labels and symbols accompany colour, and the preview says it is not a live schedule.
-27. Keep hourly starts and one-hour appointments in the illustration for readability; label this difference from the real 30-minute grid. Retain the mobile settings layout with full-width content and horizontal navigation. Tables and date choices retain readable square cells in light and dark themes.
+Revised 12 September 2026 following feedback that the explanations were hard to follow.
+
+21. Rename the controls **Only offer quieter dates** and **Keep appointments together**, with one plain sentence each. Stored preferences and backend behaviour are unchanged.
+22. Use one interactive demo with Month → Date → Time navigation. Clicking a client month or date advances to the next step; each step can also be revisited. Show **Before · studio availability** beside **What your client sees**, stacking these on smaller screens.
+23. Represent month workload with filled square grids and “Mostly booked” / “More room” labels. Busy September is absent from client choices when quieter filtering is on. Retain square tables for date and time availability, with × for bookings and stars for suggested times.
+24. Explain the immediate result in one sentence. Keep percentages, limits, capacity calculations and illustration assumptions under the collapsed **How dates are chosen** disclosure.
+25. Preference changes immediately update the displayed choices. Animate the refreshed choices and suggested-square colours; respect reduced-motion settings. Never leave excluded dates as disabled client buttons.
+26. Client time buttons let the user complete a sample selection, clearly marked as a demo. Show all times expands only that date. The demo never submits a real booking or implicitly saves preferences.
+27. Retain synthetic monthly totals and sample dates, hourly starts and one-hour appointments. Live booking still uses its existing 30-minute grid and real duration. Month totals include dates outside the sample. Keep visible keyboard focus, focus the new step heading after navigation, and test readable mobile squares in both themes.
 
 ## API
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import styles from './SmartSchedulingSettings.module.css';
 
 const HOURS = ['9am', '10am', '11am', '12pm', '1pm', '2pm'];
@@ -21,6 +21,10 @@ function Square({ state, label }) {
 export default function SmartSchedulingSettings({ mode, onChange, disabled = false }) {
   const quieter = mode === 'quieter_days' || mode === 'combined';
   const gaps = mode === 'minimize_gaps' || mode === 'combined';
+  const [step, setStep] = useState(0);
+  const [chosenTime, setChosenTime] = useState(null);
+  const heading = useRef(null);
+  function navigate(next) { setStep(next); setChosenTime(null); requestAnimationFrame(() => heading.current?.focus()); }
   const [monthChoice, setMonthChoice] = useState('2026-10');
   const [dateChoice, setDateChoice] = useState('');
   const [expandedTimes, setExpandedTimes] = useState('');
@@ -41,93 +45,81 @@ export default function SmartSchedulingSettings({ mode, onChange, disabled = fal
     onChange(nextQuieter && nextGaps ? 'combined' : nextQuieter ? 'quieter_days' : nextGaps ? 'minimize_gaps' : 'all');
   }
 
+  const explanation = step === 0
+    ? quieter ? 'September already has plenty of bookings. Offer October and November.' : 'Every month with an opening is available to choose.'
+    : step === 1 ? quieter ? 'Only these quieter days are offered.' : 'Every day with an opening is available to choose.'
+    : gaps ? `There’s already a booking at ${HOURS[day.booked[0]]}. Suggest nearby times to keep appointments together.` : 'Every available start time on this date is shown.';
+
   return <div className={styles.root}>
-    <p className={styles.description}>Choose which booking periods clients can access, then how times are suggested within those periods. Use either option or both.</p>
+    <p className={styles.description}>Use either option or both. Try them in the example below.</p>
     <fieldset className={styles.options} disabled={disabled}>
       <legend className={styles.srOnly}>Scheduling preferences</legend>
       <label className={`${styles.option} ${quieter ? styles.selected : ''}`}>
-        <input type="checkbox" aria-label="Prioritise quieter periods" checked={quieter} onChange={event => update(event.target.checked, gaps)} aria-describedby="quieter-days-description" />
-        <span><strong>Prioritise quieter periods</strong><span id="quieter-days-description">Only offer less-booked months and days in the next 90 days. Busier periods are omitted from client options.</span></span>
+        <input type="checkbox" aria-label="Only offer quieter dates" checked={quieter} onChange={event => { update(event.target.checked, gaps); setChosenTime(null); }} aria-describedby="quieter-days-description" />
+        <span><strong>Only offer quieter dates</strong><span id="quieter-days-description">Hide busier months and days from online booking.</span></span>
       </label>
       <label className={`${styles.option} ${gaps ? styles.selected : ''}`}>
-        <input type="checkbox" aria-label="Minimise gaps" checked={gaps} onChange={event => update(quieter, event.target.checked)} aria-describedby="minimise-gaps-description" />
-        <span><strong>Minimise gaps</strong><span id="minimise-gaps-description">Suggest up to three times closest to bookings and calendar commitments within an available date.</span></span>
+        <input type="checkbox" aria-label="Keep appointments together" checked={gaps} onChange={event => { update(quieter, event.target.checked); setChosenTime(null); }} aria-describedby="minimise-gaps-description" />
+        <span><strong>Keep appointments together</strong><span id="minimise-gaps-description">Suggest times beside existing appointments.</span></span>
       </label>
     </fieldset>
-    <p className={styles.summary} role="status">{quieter
-      ? gaps ? 'Both on: only quieter months and dates are offered, then nearby start times are suggested.' : 'Only quieter months and dates are offered. All valid times on those dates are shown.'
-      : gaps ? 'All available dates remain accessible. Nearby start times are suggested.' : 'Both off: show all available dates and times.'}</p>
 
     <div className={styles.previewHeader}>
-      <div><h3>See how it works</h3><p>Interactive example, not your live schedule. Compare the studio view with the exact options a client sees. Choose a month or date below to explore.</p></div>
-      <div className={styles.legend} aria-label="Availability legend">
-        <span><Square state="booked" label="Legend" /> Booked</span>
-        <span><Square state="available" label="Legend" /> Available</span>
-        <span><Square state="suggested" label="Legend" /> Suggested time</span>
+      <h3>See how it works</h3>
+      <p>Try booking from this sample schedule. Change the options above to see the difference.</p>
+    </div>
+    <section className={styles.demo} aria-label="Interactive booking example">
+      <nav className={styles.stepNav} aria-label="Example booking steps">
+        {['Month', 'Date', 'Time'].map((label, index) => <button key={label} type="button" aria-current={step === index ? 'step' : undefined} onClick={() => navigate(index)}><span>{index + 1}</span>{label}</button>)}
+      </nav>
+      <h4 ref={heading} tabIndex={-1} className={styles.stageTitle}>{step === 0 ? 'Choose a month' : step === 1 ? `Choose a date in ${month.name}` : `Choose a time on ${formatDate(day.key)}`}</h4>
+      <div className={styles.comparison}>
+        <div className={styles.before}>
+          <h5>Before · studio availability</h5>
+          {step === 0 && <div className={styles.monthOverview}>
+            {MONTHS.map(item => <div key={item.key} className={styles.monthTile}>
+              <strong>{item.name}</strong>
+              <div className={styles.miniGrid} aria-hidden="true">{Array.from({ length: 12 }, (_, i) => <i key={i} className={i < Math.round(item.utilization * 12) ? styles.filled : ''} />)}</div>
+              <small>{item.key === '2026-09' ? 'Mostly booked' : 'More room'}</small>
+            </div>)}
+          </div>}
+          {step === 1 && <table className={`${styles.table} ${styles.dateTable}`} aria-label="Example studio date availability">
+            <thead><tr><th scope="col">Date</th>{HOURS.map(hour => <th scope="col" key={hour}>{hour}</th>)}</tr></thead>
+            <tbody>{dates.map(item => <tr key={item.key}><th scope="row">{formatDate(item.key)}</th>{HOURS.map((hour, index) => <td key={hour}><Square label={`${formatDate(item.key)} ${hour}`} state={item.booked.includes(index) ? 'booked' : 'available'} /></td>)}</tr>)}</tbody>
+          </table>}
+          {step === 2 && <table className={styles.table} aria-label="Example studio time availability">
+            <thead><tr>{HOURS.map(hour => <th scope="col" key={hour}>{hour}</th>)}</tr></thead>
+            <tbody><tr>{HOURS.map((hour, index) => <td key={hour}><Square label={hour} state={day.booked.includes(index) ? 'booked' : gaps && recommendedTimes.includes(index) ? 'suggested' : 'available'} /></td>)}</tr></tbody>
+          </table>}
+          <p className={styles.legend}>{step === 0 ? 'Filled squares represent bookings.' : '× Booked · Empty square: available'}{step === 2 && gaps ? ' · ★ Suggested' : ''}</p>
+        </div>
+        <div className={styles.after}>
+          <h5>What your client sees</h5>
+          <div key={`${step}:${mode}:${month.key}:${day.key}:${expanded}`} className={styles.choices}>
+            {step === 0 && <div className={styles.choiceRow} role="group" aria-label="Example client month options">
+              {offeredMonths.map(item => <button type="button" key={item.key} className={styles.choice} onClick={() => { setMonthChoice(item.key); setDateChoice(''); navigate(1); }}>{item.name}<span aria-hidden="true"> →</span></button>)}
+            </div>}
+            {step === 1 && <div className={styles.dateChoices} role="group" aria-label="Example client date options">
+              {offeredDates.map(item => <button type="button" key={item.key} aria-label={formatDate(item.key)} className={`${styles.choice} ${styles.dateButton}`} onClick={() => { setDateChoice(item.key); navigate(2); }}><span>{new Date(`${item.key}T12:00:00`).toLocaleDateString('en-AU', { weekday: 'short' })}</span><strong>{Number(item.key.slice(-2))}</strong></button>)}
+            </div>}
+            {step === 2 && <div className={styles.choiceRow} role="group" aria-label="Example client time options">
+              {shownTimes.map(index => <button type="button" key={index} aria-pressed={chosenTime === index} className={`${styles.choice} ${chosenTime === index ? styles.activeChoice : ''}`} onClick={() => setChosenTime(index)}>{HOURS[index]}</button>)}
+            </div>}
+          </div>
+          {step === 2 && gaps && availableTimes.length > recommendedTimes.length && <button type="button" className={styles.expandButton} aria-expanded={expanded} onClick={() => { setExpandedTimes(expanded ? '' : previewKey); setChosenTime(null); }}>{expanded ? 'Show suggested times' : 'Show all times'}</button>}
+          <p className={styles.explanation} role="status">{explanation}</p>
+          {step === 2 && chosenTime !== null && <p className={styles.selection} role="status">Selected: {formatDate(day.key)} at {HOURS[chosenTime]}. This is just a demo.</p>}
+          {step === 2 && gaps && <p className={styles.note}>“Show all times” reveals more times on this date only.</p>}
+        </div>
       </div>
-    </div>
-
-    <div className={styles.steps}>
-      <section className={styles.example} aria-label="Month filtering example">
-        <h4 className={styles.stageTitle}><span>1</span> Choose a month</h4>
-        <p className={styles.viewLabel}>Studio view · illustrative month totals</p>
-        <div className={styles.monthOverview}>
-          {MONTHS.map(item => {
-            const offered = offeredMonths.includes(item);
-            return <div key={item.key} className={`${styles.monthTile} ${!offered ? styles.excluded : ''}`}>
-              <strong>{item.name}</strong><b>{Math.round(item.utilization * 100)}%</b><span>booked</span><small>{offered ? 'Offered' : 'Not offered'}</small>
-            </div>;
-          })}
-        </div>
-        <p className={styles.explanation}>{quieter ? 'October is least booked at 20%. November at 30% is within 15 percentage points, so both qualify. September at 75% is not offered.' : 'With quieter-period filtering off, all three months remain accessible.'}</p>
-        <div className={styles.clientView}>
-          <p className={styles.viewLabel}>Client sees · available months</p>
-          <div className={styles.choiceRow} role="group" aria-label="Example client month options">
-            {offeredMonths.map(item => <button type="button" key={item.key} className={`${styles.monthButton} ${month.key === item.key ? styles.activeChoice : ''}`} aria-pressed={month.key === item.key} onClick={() => { setMonthChoice(item.key); setDateChoice(''); }}>{item.name}</button>)}
-          </div>
-          {quieter && <p className={styles.note}>No September option, disabled card or navigation into it.</p>}
-        </div>
-      </section>
-
-      <section className={styles.example} aria-label="Date filtering example">
-        <h4 className={styles.stageTitle}><span>2</span> Choose a date in {month.name}</h4>
-        <p className={styles.viewLabel}>Studio view · five sample dates, six working hours each</p>
-        <table className={styles.table} aria-label="Example studio date availability">
-          <thead><tr><th scope="col">Date</th>{HOURS.map(hour => <th scope="col" key={hour}>{hour}</th>)}<th scope="col">Client</th></tr></thead>
-          <tbody>{dates.map(item => <tr key={item.key}>
-            <th scope="row">{formatDate(item.key)}<small>{Math.round(item.utilization * 100)}% booked</small></th>
-            {HOURS.map((hour, index) => <td key={hour}><Square label={`${formatDate(item.key)} ${hour}`} state={item.booked.includes(index) ? 'booked' : 'available'} /></td>)}
-            <td className={styles.eligibility}>{offeredDates.includes(item) ? 'Offered' : 'Not offered'}</td>
-          </tr>)}</tbody>
-        </table>
-        <p className={styles.explanation}>{quieter ? 'The quietest sample dates are 17% booked. Dates above 32% do not qualify, even if some times are free.' : 'All five sample dates have openings and remain accessible.'}</p>
-        <div className={styles.clientView}>
-          <p className={styles.viewLabel}>Client sees · available dates</p>
-          <div className={styles.dateChoices} role="group" aria-label="Example client date options">
-            {offeredDates.map(item => <button type="button" key={item.key} aria-label={formatDate(item.key)} aria-pressed={day.key === item.key} className={`${styles.dateButton} ${day.key === item.key ? styles.activeChoice : ''}`} onClick={() => setDateChoice(item.key)}>
-              <span>{new Date(`${item.key}T12:00:00`).toLocaleDateString('en-AU', { weekday: 'short' })}</span><strong>{Number(item.key.slice(-2))}</strong>
-            </button>)}
-          </div>
-          {quieter && <p className={styles.note}>Excluded dates disappear entirely. There is no “Show all dates” control.</p>}
-        </div>
-      </section>
-
-      <section className={styles.example} aria-label="Time suggestions example">
-        <h4 className={styles.stageTitle}><span>3</span> Choose a time on {formatDate(day.key)}</h4>
-        <p className={styles.viewLabel}>Studio view · one-hour appointments, hourly starts for illustration</p>
-        <table className={styles.table} aria-label="Example studio time availability">
-          <thead><tr>{HOURS.map(hour => <th scope="col" key={hour}>{hour}</th>)}</tr></thead>
-          <tbody><tr>{HOURS.map((hour, index) => <td key={hour}><Square label={hour} state={day.booked.includes(index) ? 'booked' : gaps && recommendedTimes.includes(index) ? 'suggested' : 'available'} /></td>)}</tr></tbody>
-        </table>
-        <p className={styles.explanation}>{gaps ? 'The closest fits are selected first; earlier starts break ties. Suggested times are then displayed in time order.' : 'Gap minimisation is off, so every valid start time on this date is shown.'}</p>
-        <div className={styles.clientView}>
-          <p className={styles.viewLabel}>Client sees · {expanded || !gaps ? 'available times' : 'suggested times'}</p>
-          <div className={styles.choiceRow} role="group" aria-label="Example client time options">{shownTimes.map(index => <span key={index} className={styles.timeTile}>{HOURS[index]}</span>)}</div>
-          {gaps && availableTimes.length > recommendedTimes.length && <button type="button" className={styles.expandButton} aria-expanded={expanded} onClick={() => setExpandedTimes(expanded ? '' : previewKey)}>{expanded ? 'Show suggested times' : 'Show all times'}</button>}
-          <p className={styles.note}>{quieter ? '“Show all times” only expands this eligible date. It never reveals excluded dates or months.' : 'Other valid times remain accessible through “Show all times”.'}</p>
-        </div>
-      </section>
-    </div>
-    {quieter && <p className={styles.note}>Live rule: next 90 days · up to 2 months · up to 6 dates per month · within 15 percentage points of the least-booked eligible period. Future working hours and leave are accounted for. The example month totals include dates not shown in the sample.</p>}
+      <p className={styles.demoNote}>Sample schedule · no real appointment is made</p>
+    </section>
+    <details className={styles.rules}>
+      <summary>How dates are chosen</summary>
+      <p>We compare booked hours with the artist’s remaining working hours over the next 90 days, accounting for leave.</p>
+      <p>Only offer quieter dates: choose up to two months within 15 percentage points of the least-booked eligible month, then up to six dates per month within 15 points of its quietest eligible date. Busier periods are hidden.</p>
+      <p>Keep appointments together: suggest up to three starts nearest existing bookings or calendar commitments. Earlier starts break ties. Days without commitments show every available time.</p>
+      <p>This example uses one-hour appointments and hourly starts. Real bookings use the appointment’s duration and a 30-minute start grid. Month totals include dates outside the five sample dates.</p>
+    </details>
   </div>;
 }
