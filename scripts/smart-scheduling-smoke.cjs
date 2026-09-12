@@ -48,8 +48,12 @@ const base = process.env.VANTA_STUDIO_TEST_URL || 'http://127.0.0.1:3019';
       await page.getByRole('navigation', { name: 'Example booking steps' }).getByRole('button', { name: '1 Month' }).click();
       assert.equal(await page.getByRole('group', { name: 'Example client month options' }).getByRole('button').count(), wantsMonths ? 2 : 3);
       await page.getByRole('group', { name: 'Example client month options' }).getByRole('button', { name: /October/ }).click();
+      assert.equal(await page.getByRole('navigation', { name: 'Example booking steps' }).getByRole('button', { name: '1 Month' }).getAttribute('aria-current'), 'step');
+      await page.getByRole('navigation', { name: 'Example booking steps' }).getByRole('button', { name: '2 Date' }).click();
       assert.equal(await page.getByRole('group', { name: 'Example client date options' }).getByRole('button').count(), wantsQuieter ? 2 : 5);
       await page.getByRole('group', { name: 'Example client date options' }).getByRole('button').first().click();
+      assert.equal(await page.getByRole('navigation', { name: 'Example booking steps' }).getByRole('button', { name: '2 Date' }).getAttribute('aria-current'), 'step');
+      await page.getByRole('navigation', { name: 'Example booking steps' }).getByRole('button', { name: '3 Time' }).click();
       assert.equal(await day.getByRole('img', { name: /: suggested/ }).count(), wantsGaps ? 3 : 0);
       assert.equal(await page.getByRole('group', { name: 'Example client time options' }).getByRole('button').count(), wantsGaps ? 3 : 5);
       await Promise.all([
@@ -62,14 +66,18 @@ const base = process.env.VANTA_STUDIO_TEST_URL || 'http://127.0.0.1:3019';
       assert.equal(await quieter.isChecked(), wantsQuieter);
       assert.equal(await gaps.isChecked(), wantsGaps);
     }
-    // Each toggle activates and highlights its affected tab, including reduced motion.
+    // Each toggle highlights its affected tab without changing the selected tab.
     for (const reducedMotion of ['no-preference', 'reduce']) {
       await page.emulateMedia({ reducedMotion });
       for (const [index, control] of [quieterMonths, quieter, gaps].entries()) {
+        const navigation = page.getByRole('navigation', { name: 'Example booking steps' });
+        const unchangedTab = navigation.getByRole('button').nth((index + 1) % 3);
+        await unchangedTab.click();
         await control.focus();
         await page.keyboard.press('Space');
         const tab = page.getByRole('navigation', { name: 'Example booking steps' }).getByRole('button').nth(index);
-        assert.equal(await tab.getAttribute('aria-current'), 'step');
+        assert.equal(await tab.getAttribute('aria-current'), null);
+        assert.equal(await unchangedTab.getAttribute('aria-current'), 'step');
         assert.match(await tab.getAttribute('class'), /tabHighlight/);
         const animation = await tab.evaluate(el => getComputedStyle(el).animationName);
         if (reducedMotion === 'reduce') {
@@ -86,7 +94,9 @@ const base = process.env.VANTA_STUDIO_TEST_URL || 'http://127.0.0.1:3019';
     const months = page.getByRole('group', { name: 'Example client month options' });
     await months.getByRole('button', { name: /November/ }).click();
     assert.equal(await months.getByRole('button', { name: /September/ }).count(), 0);
+    await page.getByRole('navigation', { name: 'Example booking steps' }).getByRole('button', { name: '2 Date' }).click();
     await page.getByRole('group', { name: 'Example client date options' }).getByRole('button', { name: 'Thu, 5 Nov' }).click();
+    await page.getByRole('navigation', { name: 'Example booking steps' }).getByRole('button', { name: '3 Time' }).click();
     await page.getByRole('button', { name: 'Show all times', exact: true }).click();
     assert.equal(await page.getByRole('group', { name: 'Example client time options' }).getByRole('button').count(), 5);
     await page.getByRole('group', { name: 'Example client time options' }).getByRole('button', { name: '9am', exact: true }).click();

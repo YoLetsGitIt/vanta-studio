@@ -31,7 +31,7 @@ export default function SmartSchedulingSettings({ mode, onChange, disabled = fal
   const [step, setStep] = useState(0);
   const [chosenTime, setChosenTime] = useState(null);
   const heading = useRef(null);
-  function navigate(next) { setStep(next); setChosenTime(null); requestAnimationFrame(() => heading.current?.focus()); }
+  function navigate(next) { setStep(next); setChosenTime(null); heading.current?.focus(); }
   const [monthChoice, setMonthChoice] = useState('2026-10');
   const [dateChoice, setDateChoice] = useState('');
   const [expandedTimes, setExpandedTimes] = useState('');
@@ -54,7 +54,6 @@ export default function SmartSchedulingSettings({ mode, onChange, disabled = fal
     const modes = ['all', 'quieter_months', 'quieter_days_only', 'quieter_days', 'minimize_gaps', 'quieter_months_gaps', 'quieter_days_gaps', 'combined'];
     onChange(modes[(flags[0] ? 1 : 0) + (flags[1] ? 2 : 0) + (flags[2] ? 4 : 0)]);
     setChosenTime(null);
-    setStep(index);
     setHighlight(current => ({ tab: index, revision: current.revision + 1 }));
   }
 
@@ -79,7 +78,7 @@ export default function SmartSchedulingSettings({ mode, onChange, disabled = fal
 
     <div className={styles.previewHeader}>
       <h3>See how it works</h3>
-      <p>Try booking from this sample schedule. Change the options above to see the difference.</p>
+      <p>Explore this sample schedule using the Month, Date and Time tabs. Change the options above to see the difference.</p>
     </div>
     <section className={styles.demo} aria-label="Interactive booking example">
       <nav className={styles.stepNav} aria-label="Example booking steps">
@@ -110,10 +109,10 @@ export default function SmartSchedulingSettings({ mode, onChange, disabled = fal
           <h5>What your client sees</h5>
           <div key={`${step}:${mode}:${month.key}:${day.key}:${expanded}`} className={styles.choices}>
             {step === 0 && <div className={styles.choiceRow} role="group" aria-label="Example client month options">
-              {offeredMonths.map(item => <button type="button" key={item.key} className={styles.choice} onClick={() => { setMonthChoice(item.key); setDateChoice(''); navigate(1); }}>{item.name}<span aria-hidden="true"> →</span></button>)}
+              {offeredMonths.map(item => <button type="button" key={item.key} className={`${styles.choice} ${month.key === item.key ? styles.activeChoice : ''}`} aria-pressed={month.key === item.key} onClick={() => { setMonthChoice(item.key); setDateChoice(''); setChosenTime(null); }}>{item.name}</button>)}
             </div>}
             {step === 1 && <div className={styles.dateChoices} role="group" aria-label="Example client date options">
-              {offeredDates.map(item => <button type="button" key={item.key} aria-label={formatDate(item.key)} className={`${styles.choice} ${styles.dateButton}`} onClick={() => { setDateChoice(item.key); navigate(2); }}><span>{new Date(`${item.key}T12:00:00`).toLocaleDateString('en-AU', { weekday: 'short' })}</span><strong>{Number(item.key.slice(-2))}</strong></button>)}
+              {offeredDates.map(item => <button type="button" key={item.key} aria-label={formatDate(item.key)} className={`${styles.choice} ${styles.dateButton} ${day.key === item.key ? styles.activeChoice : ''}`} aria-pressed={day.key === item.key} onClick={() => { setDateChoice(item.key); setChosenTime(null); }}><span>{new Date(`${item.key}T12:00:00`).toLocaleDateString('en-AU', { weekday: 'short' })}</span><strong>{Number(item.key.slice(-2))}</strong></button>)}
             </div>}
             {step === 2 && <div className={styles.choiceRow} role="group" aria-label="Example client time options">
               {shownTimes.map(index => <button type="button" key={index} aria-pressed={chosenTime === index} className={`${styles.choice} ${chosenTime === index ? styles.activeChoice : ''}`} onClick={() => setChosenTime(index)}>{HOURS[index]}</button>)}
