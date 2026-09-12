@@ -4,25 +4,33 @@ Revised 9 September 2026. Settings → Bookings → Smart scheduling.
 
 ## Behaviour
 
-| Prioritise quieter periods | Minimise gaps | Client choices |
-| --- | --- | --- |
-| Off | Off | All valid dates and times. |
-| On | Off | Only eligible quieter months/dates; all valid times on those dates. |
-| Off | On | All valid dates; up to three closest-fitting times initially. |
-| On | On | Only eligible quieter months/dates; up to three closest-fitting times initially. |
+Three independent controls support eight combinations:
 
-**Show all times** expands only the selected date. It never reveals excluded months or dates. Days without commitments show all valid times. These controls affect client selection links, including existing links when reloaded; staff calendars and the separate rescheduling journey retain their existing behaviour.
+| Only offer quieter months | Only offer quieter days | Keep appointments together | Stored mode |
+| --- | --- | --- | --- |
+| Off | Off | Off | `all` |
+| On | Off | Off | `quieter_months` |
+| Off | On | Off | `quieter_days_only` |
+| On | On | Off | `quieter_days` (legacy) |
+| Off | Off | On | `minimize_gaps` |
+| On | Off | On | `quieter_months_gaps` |
+| Off | On | On | `quieter_days_gaps` |
+| On | On | On | `combined` (legacy) |
+
+Months-only hides busier months but offers every valid date within eligible months. Days-only preserves all eligible months and selects quieter dates within each. Both applies the filters in order. Either period filter uses a rolling 90-day window and signed date eligibility. With neither on, the existing monthly calendar remains.
+
+**Show all times** expands only the selected date. Existing saved `quieter_days` and `combined` preferences retain both period filters; no studio settings are rewritten.
 
 ## Algorithm decisions
 
-1. Keep the controls independent and the stored enum unchanged: `all`, `quieter_days`, `minimize_gaps`, `combined`. Existing quieter preferences now apply strict filtering. No studio preference is automatically enabled and no new database migration is needed for this revision.
+1. Keep three controls independent. Preserve the four legacy modes and add four modes for months-only/days-only with or without gap minimisation. Migration `20260912_split_quiet_periods.sql` widens the constraint without rewriting settings; startup schema setup applies the same change.
 2. Use a rolling **90 calendar days**, starting today in the studio timezone. Quiet-period filtering compares this whole window, so navigating cannot reveal a busier month. Other modes keep the existing month calendar.
 3. Measure workload **per selected artist**, using booked minutes divided by future working capacity. This avoids treating one long appointment as equivalent to one short appointment. Monthly ratios use total minutes, not an unweighted average of daily percentages.
 4. Count confirmed, requires-confirmation and awaiting-payment sessions using the existing blocking policy. Merge overlapping intervals and clip them to working hours. Only future portions of today's hours contribute.
 5. Weekly working hours and date overrides determine capacity. Leave and calendar-only busy time reduce capacity; mirrored Vanta calendar events are not deducted twice. External commitments still block slots and affect gap ranking, but do not count as Vanta bookings. Station restrictions constrain which slots can be offered; utilisation measures artist workload, not station occupancy.
 6. A candidate month must contain at least one valid appointment slot. Fully booked scheduled dates still contribute to its workload, preventing a busy month with one empty day from looking empty.
-7. Select at most **two months** within **15 percentage points** of the least-booked eligible month. Rank by utilisation, then earlier month. Example: 20% and 30% qualify together; 75% does not.
-8. Within each selected month, select at most **six dates** within **15 percentage points** of that month's least-booked eligible date. Rank by utilisation, then earlier date. These are maximums, not quotas: never pad the choices with busier periods. The boundary is inclusive.
+7. When quieter months is on, select at most **two months** within **15 percentage points** of the least-booked eligible month. Rank by utilisation, then earlier month. Example: 20% and 30% qualify together; 75% does not.
+8. When quieter days is on, within each available month select at most **six dates** within **15 percentage points** of that month's least-booked eligible date. Rank by utilisation, then earlier date. These are maximums, not quotas: never pad the choices with busier periods. The boundary is inclusive.
 9. Display the surviving months and dates chronologically. If nothing has a valid slot, show an empty state and a contact-studio message; do not fall back to excluded dates.
 10. Minimise gaps retains the existing nearest-commitment-boundary score. Starting immediately after or ending immediately before a commitment scores zero. Select up to three starts, breaking ties by earlier start, then display chronologically. This favours close fits; it does not optimise the whole week's schedule.
 11. Keep the real appointment duration and 30-minute start grid. No new buffers, prices or artist-matching rules. Weekly schedules still represent one working interval per weekday; split and overnight intervals are outside this change.
@@ -37,17 +45,17 @@ Revised 9 September 2026. Settings → Bookings → Smart scheduling.
 17. Existing selection writes and conflict checks remain non-atomic. This revision does not promise a reservation during the 15-minute offer or eliminate simultaneous-submission races. Payment, hold release and confirmation behaviour are unchanged.
 18. Batch database and calendar reads for the window. Availability checks have a 15-second deadline and fail with a retryable error when dependencies cannot be checked. They do not interpret failed calendar reads as free time.
 19. Abort obsolete browser requests, key responses by artist/range and clear stale slots during refresh. Filtered month switching uses the same response; other modes fetch by month. Responses use `Cache-Control: no-store`.
-20. Keep workload percentages, busy-event details and station IDs out of the client API. The studio preview uses synthetic data, never a client's real calendar. The deployment header is `X-Vanta-Scheduling-Version: 3`.
+20. Keep workload percentages, busy-event details and station IDs out of the client API. The studio preview uses synthetic data, never a client's real calendar. The deployment header is `X-Vanta-Scheduling-Version: 4`.
 
 ## “See how it works” display decisions
 
 Revised 12 September 2026 following feedback that the explanations were hard to follow.
 
-21. Rename the controls **Only offer quieter dates** and **Keep appointments together**, with one plain sentence each. Stored preferences and backend behaviour are unchanged.
+21. Show **Only offer quieter months**, **Only offer quieter days**, and **Keep appointments together**, each with a short explanation. All three can be selected independently.
 22. Use one interactive demo with Month → Date → Time navigation. Clicking a client month or date advances to the next step; each step can also be revisited. Show **Before · studio availability** beside **What your client sees**, stacking these on smaller screens.
 23. Represent month workload with filled square grids and “Mostly booked” / “More room” labels. Busy September is absent from client choices when quieter filtering is on. Retain square tables for date and time availability, with × for bookings and stars for suggested times.
 24. Explain the immediate result in one sentence. Keep percentages, limits, capacity calculations and illustration assumptions under the collapsed **How dates are chosen** disclosure.
-25. Preference changes immediately update the displayed choices. Animate the refreshed choices and suggested-square colours; respect reduced-motion settings. Never leave excluded dates as disabled client buttons.
+25. Each preference change opens its corresponding Month, Date or Time step and restarts a 1.1-second tab highlight. Keyboard focus stays on the checkbox. Reduced-motion users receive a temporary static outline. Choice updates remain immediate, and excluded options are removed. The highlight applies to turning settings both on and off.
 26. Client time buttons let the user complete a sample selection, clearly marked as a demo. Show all times expands only that date. The demo never submits a real booking or implicitly saves preferences.
 27. Retain synthetic monthly totals and sample dates, hourly starts and one-hour appointments. Live booking still uses its existing 30-minute grid and real duration. Month totals include dates outside the sample. Keep visible keyboard focus, focus the new step heading after navigation, and test readable mobile squares in both themes.
 
@@ -69,4 +77,4 @@ Go tests cover weighted workload, fully booked dates, empty capacity, inclusive 
 
 Build each frontend with `npm run build`. Serve their `out/` directories locally (website 3018, studio 3019), then run `VANTA_PLAYWRIGHT_PATH=/path/to/playwright node scripts/smart-scheduling-smoke.cjs` in each repository. Tests intercept account/booking/payment requests with synthetic fixtures. They cover preference save/reload, independent toggles, interactive month/date/time previews, keyboard use, mobile square dimensions, both themes, hidden dates/months, stable month switching, expiry/reselection, empty states and timezone-correct submission. These checks do not establish production database, Google or Stripe integration correctness.
 
-Release backend first, booking website second and studio controls last. Verify the backend version header with an invalid synthetic token and match each public deployment marker to its source commit. Publish the studio preview only once client filtering support is live. See the workspace deployment record for the actual release state.
+Apply or verify the widened database constraint and release backend first, booking website second and studio controls last. Verify the backend version header with an invalid synthetic token and match each public deployment marker to its source commit. Publish the studio preview only once client filtering support is live. See the workspace deployment record for the actual release state.

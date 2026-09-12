@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import styles from './SmartSchedulingSettings.module.css';
 
 const HOURS = ['9am', '10am', '11am', '12pm', '1pm', '2pm'];
@@ -19,8 +19,15 @@ function Square({ state, label }) {
 }
 
 export default function SmartSchedulingSettings({ mode, onChange, disabled = false }) {
-  const quieter = mode === 'quieter_days' || mode === 'combined';
-  const gaps = mode === 'minimize_gaps' || mode === 'combined';
+  const quieterMonths = ['quieter_days', 'combined', 'quieter_months', 'quieter_months_gaps'].includes(mode);
+  const quieter = ['quieter_days', 'combined', 'quieter_days_only', 'quieter_days_gaps'].includes(mode);
+  const gaps = ['minimize_gaps', 'combined', 'quieter_months_gaps', 'quieter_days_gaps'].includes(mode);
+  const [highlight, setHighlight] = useState({ tab: -1, revision: 0 });
+  useEffect(() => {
+    if (highlight.tab < 0) return;
+    const timer = setTimeout(() => setHighlight(current => ({ ...current, tab: -1 })), 1100);
+    return () => clearTimeout(timer);
+  }, [highlight.revision, highlight.tab]);
   const [step, setStep] = useState(0);
   const [chosenTime, setChosenTime] = useState(null);
   const heading = useRef(null);
@@ -29,7 +36,7 @@ export default function SmartSchedulingSettings({ mode, onChange, disabled = fal
   const [dateChoice, setDateChoice] = useState('');
   const [expandedTimes, setExpandedTimes] = useState('');
   const minimumMonth = Math.min(...MONTHS.map(month => month.utilization));
-  const offeredMonths = quieter ? MONTHS.filter(month => month.utilization <= minimumMonth + .15).slice(0, 2) : MONTHS;
+  const offeredMonths = quieterMonths ? MONTHS.filter(month => month.utilization <= minimumMonth + .15).slice(0, 2) : MONTHS;
   const month = offeredMonths.find(item => item.key === monthChoice) || offeredMonths[0];
   const dates = month.dates.map((number, index) => ({ key: `${month.key}-${String(number).padStart(2, '0')}`, booked: SAMPLE_BOOKINGS[index], utilization: SAMPLE_BOOKINGS[index].length / HOURS.length }));
   const minimumDay = Math.min(...dates.map(day => day.utilization));
@@ -41,27 +48,33 @@ export default function SmartSchedulingSettings({ mode, onChange, disabled = fal
   const previewKey = `${mode}:${day.key}`;
   const expanded = expandedTimes === previewKey;
   const shownTimes = expanded ? availableTimes : recommendedTimes;
-  function update(nextQuieter, nextGaps) {
-    onChange(nextQuieter && nextGaps ? 'combined' : nextQuieter ? 'quieter_days' : nextGaps ? 'minimize_gaps' : 'all');
+  function update(index, checked) {
+    const flags = [quieterMonths, quieter, gaps];
+    flags[index] = checked;
+    const modes = ['all', 'quieter_months', 'quieter_days_only', 'quieter_days', 'minimize_gaps', 'quieter_months_gaps', 'quieter_days_gaps', 'combined'];
+    onChange(modes[(flags[0] ? 1 : 0) + (flags[1] ? 2 : 0) + (flags[2] ? 4 : 0)]);
+    setChosenTime(null);
+    setStep(index);
+    setHighlight(current => ({ tab: index, revision: current.revision + 1 }));
   }
 
   const explanation = step === 0
-    ? quieter ? 'September already has plenty of bookings. Offer October and November.' : 'Every month with an opening is available to choose.'
+    ? quieterMonths ? 'September already has plenty of bookings. Offer October and November.' : 'Every month with an opening is available to choose.'
     : step === 1 ? quieter ? 'Only these quieter days are offered.' : 'Every day with an opening is available to choose.'
     : gaps ? `There’s already a booking at ${HOURS[day.booked[0]]}. Suggest nearby times to keep appointments together.` : 'Every available start time on this date is shown.';
 
   return <div className={styles.root}>
-    <p className={styles.description}>Use either option or both. Try them in the example below.</p>
+    <p className={styles.description}>Use any combination. Try them in the example below.</p>
     <fieldset className={styles.options} disabled={disabled}>
       <legend className={styles.srOnly}>Scheduling preferences</legend>
-      <label className={`${styles.option} ${quieter ? styles.selected : ''}`}>
-        <input type="checkbox" aria-label="Only offer quieter dates" checked={quieter} onChange={event => { update(event.target.checked, gaps); setChosenTime(null); }} aria-describedby="quieter-days-description" />
-        <span><strong>Only offer quieter dates</strong><span id="quieter-days-description">Hide busier months and days from online booking.</span></span>
-      </label>
-      <label className={`${styles.option} ${gaps ? styles.selected : ''}`}>
-        <input type="checkbox" aria-label="Keep appointments together" checked={gaps} onChange={event => { update(quieter, event.target.checked); setChosenTime(null); }} aria-describedby="minimise-gaps-description" />
-        <span><strong>Keep appointments together</strong><span id="minimise-gaps-description">Suggest times beside existing appointments.</span></span>
-      </label>
+      {[
+        { title: 'Only offer quieter months', description: 'Hide busier months from online booking.', checked: quieterMonths },
+        { title: 'Only offer quieter days', description: 'Hide busier days within each available month.', checked: quieter },
+        { title: 'Keep appointments together', description: 'Suggest times beside existing appointments.', checked: gaps },
+      ].map((option, index) => <label key={option.title} className={`${styles.option} ${option.checked ? styles.selected : ''}`}>
+        <input type="checkbox" aria-label={option.title} checked={option.checked} onChange={event => update(index, event.target.checked)} aria-describedby={`scheduling-description-${index}`} />
+        <span><strong>{option.title}</strong><span id={`scheduling-description-${index}`}>{option.description}</span></span>
+      </label>)}
     </fieldset>
 
     <div className={styles.previewHeader}>
@@ -70,7 +83,7 @@ export default function SmartSchedulingSettings({ mode, onChange, disabled = fal
     </div>
     <section className={styles.demo} aria-label="Interactive booking example">
       <nav className={styles.stepNav} aria-label="Example booking steps">
-        {['Month', 'Date', 'Time'].map((label, index) => <button key={label} type="button" aria-current={step === index ? 'step' : undefined} onClick={() => navigate(index)}><span>{index + 1}</span>{label}</button>)}
+        {['Month', 'Date', 'Time'].map((label, index) => <button key={`${label}:${highlight.tab === index ? highlight.revision : 0}`} className={highlight.tab === index ? styles.tabHighlight : undefined} type="button" aria-current={step === index ? 'step' : undefined} onClick={() => navigate(index)}><span>{index + 1}</span>{label}</button>)}
       </nav>
       <h4 ref={heading} tabIndex={-1} className={styles.stageTitle}>{step === 0 ? 'Choose a month' : step === 1 ? `Choose a date in ${month.name}` : `Choose a time on ${formatDate(day.key)}`}</h4>
       <div className={styles.comparison}>
@@ -117,7 +130,8 @@ export default function SmartSchedulingSettings({ mode, onChange, disabled = fal
     <details className={styles.rules}>
       <summary>How dates are chosen</summary>
       <p>We compare booked hours with the artist’s remaining working hours over the next 90 days, accounting for leave.</p>
-      <p>Only offer quieter dates: choose up to two months within 15 percentage points of the least-booked eligible month, then up to six dates per month within 15 points of its quietest eligible date. Busier periods are hidden.</p>
+      <p>Only offer quieter months: choose up to two months within 15 percentage points of the least-booked eligible month. Other months are hidden.</p>
+      <p>Only offer quieter days: choose up to six dates per available month within 15 percentage points of its quietest eligible date. Other days are hidden. Turn both filters on to apply them together.</p>
       <p>Keep appointments together: suggest up to three starts nearest existing bookings or calendar commitments. Earlier starts break ties. Days without commitments show every available time.</p>
       <p>This example uses one-hour appointments and hourly starts. Real bookings use the appointment’s duration and a 30-minute start grid. Month totals include dates outside the five sample dates.</p>
     </details>

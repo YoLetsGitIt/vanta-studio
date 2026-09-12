@@ -29,7 +29,8 @@ const base = process.env.VANTA_STUDIO_TEST_URL || 'http://127.0.0.1:3019';
       return route.fulfill({ json: { hours: [], stations: [], templates: [], fields: {}, connected: false } });
     });
     await page.goto(`${base}/dashboard/settings.html?tab=bookings`, { waitUntil: 'networkidle' });
-    const quieter = page.getByRole('checkbox', { name: 'Only offer quieter dates', exact: true });
+    const quieter = page.getByRole('checkbox', { name: 'Only offer quieter days', exact: true });
+    const quieterMonths = page.getByRole('checkbox', { name: 'Only offer quieter months', exact: true });
     const gaps = page.getByRole('checkbox', { name: 'Keep appointments together', exact: true });
     await quieter.waitFor();
     assert.equal(await quieter.isChecked(), false);
@@ -37,13 +38,15 @@ const base = process.env.VANTA_STUDIO_TEST_URL || 'http://127.0.0.1:3019';
     const section = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Smart scheduling', exact: true }) });
     const week = page.getByRole('table', { name: 'Example studio date availability', exact: true });
     const day = page.getByRole('table', { name: 'Example studio time availability', exact: true });
-    for (const next of ['quieter_days', 'combined', 'minimize_gaps', 'all']) {
-      const wantsQuieter = next === 'quieter_days' || next === 'combined';
-      const wantsGaps = next === 'minimize_gaps' || next === 'combined';
+    for (const next of ['quieter_months', 'quieter_days_only', 'quieter_days', 'quieter_months_gaps', 'quieter_days_gaps', 'combined', 'minimize_gaps', 'all']) {
+      const wantsMonths = ['quieter_months', 'quieter_months_gaps', 'quieter_days', 'combined'].includes(next);
+      const wantsQuieter = ['quieter_days_only', 'quieter_days_gaps', 'quieter_days', 'combined'].includes(next);
+      const wantsGaps = ['minimize_gaps', 'quieter_months_gaps', 'quieter_days_gaps', 'combined'].includes(next);
+      await quieterMonths.setChecked(wantsMonths);
       await quieter.setChecked(wantsQuieter);
       await gaps.setChecked(wantsGaps);
       await page.getByRole('navigation', { name: 'Example booking steps' }).getByRole('button', { name: '1 Month' }).click();
-      assert.equal(await page.getByRole('group', { name: 'Example client month options' }).getByRole('button').count(), wantsQuieter ? 2 : 3);
+      assert.equal(await page.getByRole('group', { name: 'Example client month options' }).getByRole('button').count(), wantsMonths ? 2 : 3);
       await page.getByRole('group', { name: 'Example client month options' }).getByRole('button', { name: /October/ }).click();
       assert.equal(await page.getByRole('group', { name: 'Example client date options' }).getByRole('button').count(), wantsQuieter ? 2 : 5);
       await page.getByRole('group', { name: 'Example client date options' }).getByRole('button').first().click();
@@ -55,17 +58,31 @@ const base = process.env.VANTA_STUDIO_TEST_URL || 'http://127.0.0.1:3019';
       ]);
       assert.equal(updates.at(-1).scheduling_mode, next);
       await page.reload({ waitUntil: 'networkidle' });
+      assert.equal(await quieterMonths.isChecked(), wantsMonths);
       assert.equal(await quieter.isChecked(), wantsQuieter);
       assert.equal(await gaps.isChecked(), wantsGaps);
     }
-    // Both independent controls work with the keyboard, without saving implicitly.
-    await quieter.focus();
-    await page.keyboard.press('Space');
-    await gaps.focus();
-    await page.keyboard.press('Space');
-    assert.equal(await quieter.isChecked(), true);
-    assert.equal(await gaps.isChecked(), true);
-    assert.equal(updates.length, 4);
+    // Each toggle activates and highlights its affected tab, including reduced motion.
+    for (const reducedMotion of ['no-preference', 'reduce']) {
+      await page.emulateMedia({ reducedMotion });
+      for (const [index, control] of [quieterMonths, quieter, gaps].entries()) {
+        await control.focus();
+        await page.keyboard.press('Space');
+        const tab = page.getByRole('navigation', { name: 'Example booking steps' }).getByRole('button').nth(index);
+        assert.equal(await tab.getAttribute('aria-current'), 'step');
+        assert.match(await tab.getAttribute('class'), /tabHighlight/);
+        const animation = await tab.evaluate(el => getComputedStyle(el).animationName);
+        if (reducedMotion === 'reduce') {
+          assert.equal(animation, 'none');
+          assert.equal(await tab.evaluate(el => getComputedStyle(el).outlineStyle), 'solid');
+        } else assert.notEqual(animation, 'none');
+        assert.equal(await control.evaluate(el => document.activeElement === el), true);
+      }
+    }
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    await quieterMonths.check(); await quieter.check(); await gaps.check();
+    assert.equal(updates.length, 8);
+    await page.getByRole('navigation', { name: 'Example booking steps' }).getByRole('button', { name: '1 Month' }).click();
     const months = page.getByRole('group', { name: 'Example client month options' });
     await months.getByRole('button', { name: /November/ }).click();
     assert.equal(await months.getByRole('button', { name: /September/ }).count(), 0);
@@ -98,6 +115,6 @@ const base = process.env.VANTA_STUDIO_TEST_URL || 'http://127.0.0.1:3019';
       }
     }
     assert.deepEqual(errors, []);
-    console.log('Studio settings: four combinations, save/reload, interactive diagrams, keyboard, mobile and themes passed');
+    console.log('Studio settings: eight combinations, save/reload, interactive diagrams, keyboard, mobile and themes passed');
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });
