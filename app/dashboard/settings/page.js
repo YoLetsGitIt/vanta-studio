@@ -1252,14 +1252,7 @@ export default function SettingsPage() {
 
         {tab === 'bookings' && <>
 
-        <section style={{ ...s.card, gridColumn: '1 / -1' }}>
-          <h2 style={s.sectionTitle}>Smart scheduling</h2>
-          <SmartSchedulingSettings mode={schedulingMode} onChange={setSchedulingMode} disabled={saving} />
-          {profileError && <p role="alert" style={s.errorText}>{profileError}</p>}
-          <button onClick={saveProfile} style={s.saveBtn} disabled={saving}>
-            {saving ? t('saving') : saved ? t('saved') : t('save')}
-          </button>
-        </section>
+
 
 
         <section style={{ ...s.card, gridColumn: '1 / -1' }}>
@@ -1720,6 +1713,15 @@ export default function SettingsPage() {
               <WidgetPreview bg={widgetBgColor} accent={widgetAccentColor} studioName={name || 'Your Studio'} fields={formFields} consentTemplate={widgetConsentTemplateId ? consentTemplates.find(t => t.id === widgetConsentTemplateId) : null} />
             </div>
           </div>
+        </section>
+
+        <section style={{ ...s.card, gridColumn: '1 / -1' }}>
+          <h2 style={s.sectionTitle}>Smart scheduling</h2>
+          <SmartSchedulingSettings mode={schedulingMode} onChange={setSchedulingMode} disabled={saving} />
+          {profileError && <p role="alert" style={s.errorText}>{profileError}</p>}
+          <button onClick={saveProfile} style={s.saveBtn} disabled={saving}>
+            {saving ? t('saving') : saved ? t('saved') : t('save')}
+          </button>
         </section>
 
         </>}
