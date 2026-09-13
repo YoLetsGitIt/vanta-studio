@@ -18,6 +18,10 @@ function Square({ state, label }) {
   </span>;
 }
 
+function SelectionMark({ selected }) {
+  return <span className={styles.selectionMark} aria-hidden="true">{selected ? '✓' : ''}</span>;
+}
+
 export default function SmartSchedulingSettings({ mode, onChange, disabled = false }) {
   const quieterMonths = ['quieter_days', 'combined', 'quieter_months', 'quieter_months_gaps'].includes(mode);
   const quieter = ['quieter_days', 'combined', 'quieter_days_only', 'quieter_days_gaps'].includes(mode);
@@ -107,18 +111,18 @@ export default function SmartSchedulingSettings({ mode, onChange, disabled = fal
           <h5>Client choices</h5>
           <div>
             {step === 0 && <div className={styles.choiceRow} role="group" aria-label="Example client month options">
-              {offeredMonths.map(item => <button type="button" key={item.key} className={`${styles.choice} ${month.key === item.key ? styles.activeChoice : ''}`} aria-pressed={month.key === item.key} onClick={() => { setMonthChoice(item.key); setDateChoice(''); setChosenTime(null); }}>{item.name}</button>)}
+              {offeredMonths.map(item => <button type="button" key={item.key} className={`${styles.choice} ${month.key === item.key ? styles.activeChoice : ''}`} aria-pressed={month.key === item.key} onClick={() => { setMonthChoice(item.key); setDateChoice(''); setChosenTime(null); }}><SelectionMark selected={month.key === item.key} /><span>{item.name}</span></button>)}
             </div>}
             {step === 1 && <div className={styles.dateChoices} role="group" aria-label="Example client date options">
-              {offeredDates.map(item => <button type="button" key={item.key} aria-label={formatDate(item.key)} className={`${styles.choice} ${styles.dateButton} ${day.key === item.key ? styles.activeChoice : ''}`} aria-pressed={day.key === item.key} onClick={() => { setDateChoice(item.key); setChosenTime(null); }}><span>{new Date(`${item.key}T12:00:00`).toLocaleDateString('en-AU', { weekday: 'short' })}</span><strong>{Number(item.key.slice(-2))}</strong></button>)}
+              {offeredDates.map(item => <button type="button" key={item.key} aria-label={formatDate(item.key)} className={`${styles.choice} ${styles.dateButton} ${day.key === item.key ? styles.activeChoice : ''}`} aria-pressed={day.key === item.key} onClick={() => { setDateChoice(item.key); setChosenTime(null); }}><SelectionMark selected={day.key === item.key} /><span>{new Date(`${item.key}T12:00:00`).toLocaleDateString('en-AU', { weekday: 'short' })}</span><strong>{Number(item.key.slice(-2))}</strong></button>)}
             </div>}
-            {step === 2 && <div className={styles.choiceRow} role="group" aria-label="Example client time options">
-              {shownTimes.map(index => <button type="button" key={index} aria-pressed={chosenTime === index} className={`${styles.choice} ${chosenTime === index ? styles.activeChoice : ''}`} onClick={() => setChosenTime(index)}>{HOURS[index]}</button>)}
+            {step === 2 && <div className={`${styles.choiceRow} ${styles.timeChoices}`} role="group" aria-label="Example client time options">
+              {shownTimes.map(index => <button type="button" key={index} aria-pressed={chosenTime === index} className={`${styles.choice} ${chosenTime === index ? styles.activeChoice : ''}`} onClick={() => setChosenTime(index)}><SelectionMark selected={chosenTime === index} /><span>{HOURS[index]}</span></button>)}
             </div>}
           </div>
           {step === 2 && gaps && availableTimes.length > recommendedTimes.length && <button type="button" className={styles.expandButton} aria-expanded={expanded} onClick={() => { setExpandedTimes(expanded ? '' : previewKey); setChosenTime(null); }}>{expanded ? 'Show suggested times' : 'Show all times'}</button>}
           <p className={styles.explanation} role="status">{explanation}</p>
-          {step === 2 && chosenTime !== null && <p className={styles.selection} role="status">Selected: {formatDate(day.key)} at {HOURS[chosenTime]}. This is just a demo.</p>}
+          {step === 2 && chosenTime !== null && <p className={styles.selection} role="status"><span aria-hidden="true">✓ </span>Selected: {formatDate(day.key)} at {HOURS[chosenTime]}</p>}
         </div>
       </div>
     </section>
