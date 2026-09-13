@@ -101,6 +101,10 @@ const base = process.env.VANTA_STUDIO_TEST_URL || 'http://127.0.0.1:3019';
     assert.equal(await page.getByRole('group', { name: 'Example client time options' }).getByRole('button').count(), 5);
     await page.getByRole('group', { name: 'Example client time options' }).getByRole('button', { name: '9am', exact: true }).click();
     await page.getByText(/Selected:.*9am/).waitFor();
+    const tabs = page.getByRole('navigation', { name: 'Example booking steps' });
+    await tabs.getByRole('button', { name: '1 Month' }).click();
+    await tabs.getByRole('button', { name: '3 Time' }).click();
+    assert.equal(await page.getByRole('group', { name: 'Example client time options' }).getByRole('button', { name: '9am', exact: true }).getAttribute('aria-pressed'), 'true');
     assert.equal(await page.locator('details').filter({ hasText: 'How dates are chosen' }).getAttribute('open'), null);
     await page.getByText('How dates are chosen', { exact: true }).click();
     await page.getByText(/We compare booked hours/).waitFor();
@@ -110,6 +114,7 @@ const base = process.env.VANTA_STUDIO_TEST_URL || 'http://127.0.0.1:3019';
         await page.setViewportSize({ width, height: 1000 });
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth), false);
         assert.ok((await section.boundingBox()).width >= 280, 'Settings card must retain a usable mobile width');
+        await page.getByRole('group', { name: 'Scheduling preferences', exact: true }).screenshot({ animations: 'disabled', path: `/private/tmp/vanta-controls-${theme}-${width}.png` });
         for (const [index, label] of ['Month', 'Date', 'Time'].entries()) {
           await page.getByRole('navigation', { name: 'Example booking steps' }).getByRole('button', { name: `${index + 1} ${label}` }).click();
           if (index > 0) {

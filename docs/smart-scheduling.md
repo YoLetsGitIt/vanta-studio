@@ -57,7 +57,7 @@ Revised 12 September 2026 following feedback that the explanations were hard to 
 24. Explain the immediate result in one sentence. Keep percentages, limits, capacity calculations and illustration assumptions under the collapsed **How dates are chosen** disclosure.
 25. Each preference change restarts a 1.1-second highlight on its corresponding Month, Date or Time tab without changing the active tab. Keyboard focus stays on the checkbox. Reduced-motion users receive a temporary static outline. Choice updates remain immediate, and excluded options are removed. The highlight applies to turning settings both on and off.
 26. Client time buttons let the user complete a sample selection, clearly marked as a demo. Show all times expands only that date. The demo never submits a real booking or implicitly saves preferences.
-27. Retain synthetic monthly totals and sample dates, hourly starts and one-hour appointments. Live booking still uses its existing 30-minute grid and real duration. Month totals include dates outside the sample. Keep visible keyboard focus, focus the new step heading after navigation, and test readable mobile squares in both themes.
+27. Retain synthetic monthly totals and sample dates, hourly starts and one-hour appointments. Live booking still uses its existing 30-minute grid and real duration. Month totals include dates outside the sample. Keep visible keyboard focus on the tab or checkbox the user activated, and test readable mobile squares in both themes.
 
 ## API
 
@@ -78,3 +78,12 @@ Go tests cover weighted workload, fully booked dates, empty capacity, inclusive 
 Build each frontend with `npm run build`. Serve their `out/` directories locally (website 3018, studio 3019), then run `VANTA_PLAYWRIGHT_PATH=/path/to/playwright node scripts/smart-scheduling-smoke.cjs` in each repository. Tests intercept account/booking/payment requests with synthetic fixtures. They cover preference save/reload, independent toggles, interactive month/date/time previews, keyboard use, mobile square dimensions, both themes, hidden dates/months, stable month switching, expiry/reselection, empty states and timezone-correct submission. These checks do not establish production database, Google or Stripe integration correctness.
 
 Apply or verify the widened database constraint and release backend first, booking website second and studio controls last. Verify the backend version header with an invalid synthetic token and match each public deployment marker to its source commit. Publish the studio preview only once client filtering support is live. See the workspace deployment record for the actual release state.
+
+## View polish — 13 September 2026
+
+- Setting cards label Months, Days and Times, with visible On/Off states and responsive stacking. A summary describes the resulting client choices.
+- The demo labels its synthetic data, separates studio availability from client options, shows filtering/suggestion status, and reports offered-versus-available counts.
+- A context footer and selected studio month/date styling connect the three views. Sample selections survive tab navigation; only changing their inputs clears them.
+- Tab highlights use a temporary outline pulse, visually distinct from the active-tab indicator. Stable tab elements preserve focus when the pulse ends, and repeated changes restart the animation. Reduced motion retains a static temporary outline.
+- Tabs change only when pressed. Settings and sample choices never navigate. All three settings and eight backend combinations are unchanged.
+- Technical rules remain collapsed, with mobile square grids and light/dark theme checks retained.
