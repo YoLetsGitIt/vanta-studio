@@ -61,12 +61,7 @@ export default function SmartSchedulingSettings({ mode, onChange, disabled = fal
     : step === 1 ? quieter ? 'Only these quieter days are offered.' : 'Every day with an opening is available to choose.'
     : gaps ? `There’s already a booking at ${HOURS[day.booked[0]]}. Suggest nearby times to keep appointments together.` : 'Every available start time on this date is shown.';
 
-  const activeSettings = [quieterMonths, quieter, gaps];
-  const counts = step === 0 ? [offeredMonths.length, MONTHS.length, 'months'] : step === 1 ? [offeredDates.length, dates.length, 'dates'] : [shownTimes.length, availableTimes.length, 'times'];
-  const resultLabel = `${counts[0]} of ${counts[1]} ${counts[2]} ${step === 2 && gaps && !expanded ? 'suggested' : 'offered'}`;
-
   return <div className={styles.root}>
-    <p className={styles.description}>Choose what clients can book. Each setting works independently.</p>
     <fieldset className={styles.options} disabled={disabled}>
       <legend className={styles.srOnly}>Scheduling preferences</legend>
       {[
@@ -75,28 +70,24 @@ export default function SmartSchedulingSettings({ mode, onChange, disabled = fal
         { title: 'Keep appointments together', description: 'Suggest times beside existing appointments.', checked: gaps },
       ].map((option, index) => <label key={option.title} className={`${styles.option} ${option.checked ? styles.selected : ''}`}>
         <input type="checkbox" aria-label={option.title} checked={option.checked} onChange={event => update(index, event.target.checked)} aria-describedby={`scheduling-description-${index}`} />
-        <span className={styles.optionCopy}><span className={styles.optionMeta}><span>{['Months', 'Days', 'Times'][index]}</span><span className={styles.settingState}>{option.checked ? 'On' : 'Off'}</span></span><strong>{option.title}</strong><span id={`scheduling-description-${index}`}>{option.description}</span></span>
+        <span className={styles.optionCopy}><strong>{option.title}</strong><span id={`scheduling-description-${index}`}>{option.description}</span></span>
       </label>)}
     </fieldset>
 
-    <div className={styles.settingsSummary} aria-label="Current scheduling behaviour">
-      <span>Clients can choose</span>
-      <strong>{quieterMonths ? 'Quieter months' : 'All available months'} <span aria-hidden="true">→</span> {quieter ? 'Quieter days' : 'All available days'} <span aria-hidden="true">→</span> {gaps ? 'Nearby times first' : 'All available times'}</strong>
-    </div>
     <div className={styles.previewHeader}>
-      <div className={styles.previewTitle}><h3>See how it works</h3><span className={styles.sampleBadge}>Interactive example</span></div>
-      <p>Choose a tab to explore. Settings highlight the tab they affect; your view stays where it is.</p>
+      <h3>See how it works</h3>
+      <p>Choose a tab to explore this sample schedule.</p>
     </div>
     <section className={styles.demo} aria-label="Interactive booking example">
       <nav className={styles.stepNav} aria-label="Example booking steps">
-        {['Month', 'Date', 'Time'].map((label, index) => <button key={label} className={highlight.tab === index ? `${styles.tabHighlight} ${highlight.revision % 2 ? styles.tabHighlightAgain : ''}` : undefined} type="button" aria-current={step === index ? 'step' : undefined} onClick={() => navigate(index)}><span className={styles.stepNumber}>{index + 1}</span>{label}<span className={`${styles.tabDot} ${activeSettings[index] ? styles.tabDotOn : ''}`} aria-hidden="true" /></button>)}
+        {['Month', 'Date', 'Time'].map((label, index) => <button key={label} className={highlight.tab === index ? `${styles.tabHighlight} ${highlight.revision % 2 ? styles.tabHighlightAgain : ''}` : undefined} type="button" aria-current={step === index ? 'step' : undefined} onClick={() => navigate(index)}><span className={styles.srOnly}>{index + 1}</span>{label}</button>)}
       </nav>
-      <div className={styles.stageHeader}><h4 className={styles.stageTitle}>{step === 0 ? 'Choose a month' : step === 1 ? `Choose a date in ${month.name}` : `Choose a time on ${formatDate(day.key)}`}</h4><span className={styles.filterBadge}>{activeSettings[step] ? step === 2 ? 'Suggestions on' : 'Filter on' : step === 2 ? 'Suggestions off' : 'Filter off'}</span></div>
+      <div className={styles.stageHeader}><h4 className={styles.stageTitle}>{step === 0 ? 'Choose a month' : step === 1 ? `Choose a date in ${month.name}` : `Choose a time on ${formatDate(day.key)}`}</h4></div>
       <div className={styles.comparison}>
         <div className={styles.before}>
-          <h5>Studio availability</h5><p className={styles.panelHint}>{step === 0 ? 'A mix of busy and quieter months' : step === 1 ? 'Five sample days in your schedule' : 'One-hour appointments on this date'}</p>
+          <h5>Studio availability</h5>
           {step === 0 && <div className={styles.monthOverview}>
-            {MONTHS.map(item => <div key={item.key} className={`${styles.monthTile} ${month.key === item.key ? styles.previewSelected : ''}`}>
+            {MONTHS.map(item => <div key={item.key} className={styles.monthTile}>
               <strong>{item.name}</strong>
               <div className={styles.miniGrid} aria-hidden="true">{Array.from({ length: 12 }, (_, i) => <i key={i} className={i < Math.round(item.utilization * 12) ? styles.filled : ''} />)}</div>
               <small>{item.key === '2026-09' ? 'Mostly booked' : 'More room'}</small>
@@ -104,7 +95,7 @@ export default function SmartSchedulingSettings({ mode, onChange, disabled = fal
           </div>}
           {step === 1 && <table className={`${styles.table} ${styles.dateTable}`} aria-label="Example studio date availability">
             <thead><tr><th scope="col">Date</th>{HOURS.map(hour => <th scope="col" key={hour}>{hour}</th>)}</tr></thead>
-            <tbody>{dates.map(item => <tr key={item.key} className={day.key === item.key ? styles.selectedRow : undefined}><th scope="row">{formatDate(item.key)}</th>{HOURS.map((hour, index) => <td key={hour}><Square label={`${formatDate(item.key)} ${hour}`} state={item.booked.includes(index) ? 'booked' : 'available'} /></td>)}</tr>)}</tbody>
+            <tbody>{dates.map(item => <tr key={item.key}><th scope="row">{formatDate(item.key)}</th>{HOURS.map((hour, index) => <td key={hour}><Square label={`${formatDate(item.key)} ${hour}`} state={item.booked.includes(index) ? 'booked' : 'available'} /></td>)}</tr>)}</tbody>
           </table>}
           {step === 2 && <table className={styles.table} aria-label="Example studio time availability">
             <thead><tr>{HOURS.map(hour => <th scope="col" key={hour}>{hour}</th>)}</tr></thead>
@@ -113,8 +104,8 @@ export default function SmartSchedulingSettings({ mode, onChange, disabled = fal
           <p className={styles.legend}>{step === 0 ? 'Filled squares represent bookings.' : '× Booked · Empty square: available'}{step === 2 && gaps ? ' · ★ Suggested' : ''}</p>
         </div>
         <div className={styles.after}>
-          <div className={styles.resultHeader}><h5>What your client sees</h5><span className={styles.resultCount}>{resultLabel}</span></div><p className={styles.panelHint}>{step === 0 ? 'Select a month to use in the Date tab.' : step === 1 ? 'Select a date to use in the Time tab.' : 'Select a time to try the booking example.'}</p>
-          <div key={`${step}:${mode}:${month.key}:${day.key}:${expanded}`} className={styles.choices}>
+          <h5>Client choices</h5>
+          <div>
             {step === 0 && <div className={styles.choiceRow} role="group" aria-label="Example client month options">
               {offeredMonths.map(item => <button type="button" key={item.key} className={`${styles.choice} ${month.key === item.key ? styles.activeChoice : ''}`} aria-pressed={month.key === item.key} onClick={() => { setMonthChoice(item.key); setDateChoice(''); setChosenTime(null); }}>{item.name}</button>)}
             </div>}
@@ -128,10 +119,8 @@ export default function SmartSchedulingSettings({ mode, onChange, disabled = fal
           {step === 2 && gaps && availableTimes.length > recommendedTimes.length && <button type="button" className={styles.expandButton} aria-expanded={expanded} onClick={() => { setExpandedTimes(expanded ? '' : previewKey); setChosenTime(null); }}>{expanded ? 'Show suggested times' : 'Show all times'}</button>}
           <p className={styles.explanation} role="status">{explanation}</p>
           {step === 2 && chosenTime !== null && <p className={styles.selection} role="status">Selected: {formatDate(day.key)} at {HOURS[chosenTime]}. This is just a demo.</p>}
-          {step === 2 && gaps && <p className={styles.note}>“Show all times” reveals more times on this date only.</p>}
         </div>
       </div>
-      <div className={styles.demoFooter}><p className={styles.demoNote}>Sample schedule · no real appointment is made</p><span className={styles.previewContext}>{month.name} · {formatDate(day.key)}{chosenTime !== null ? ` · ${HOURS[chosenTime]}` : ''}</span></div>
     </section>
     <details className={styles.rules}>
       <summary>How dates are chosen</summary>

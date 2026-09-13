@@ -87,3 +87,7 @@ Apply or verify the widened database constraint and release backend first, booki
 - Tab highlights use a temporary outline pulse, visually distinct from the active-tab indicator. Stable tab elements preserve focus when the pulse ends, and repeated changes restart the animation. Reduced motion retains a static temporary outline.
 - Tabs change only when pressed. Settings and sample choices never navigate. All three settings and eight backend combinations are unchanged.
 - Technical rules remain collapsed, with mobile square grids and light/dark theme checks retained.
+
+## Simplification after visual feedback
+
+Removed the settings summary, On/Off pills, category labels, tab numbers/dots, filter badges, option counts, repeated panel instructions and context footer. Controls now use simple checkbox rows with one-line descriptions. The demo retains only plain tabs, a studio/client comparison, square availability diagrams and one short explanation. Removed the extra choice-entry animation and panel tint; affected tabs still pulse without navigating. All eight combinations, selected client options, manual navigation, reduced-motion feedback and collapsed rules remain.
