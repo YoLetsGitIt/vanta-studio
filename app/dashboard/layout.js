@@ -687,6 +687,10 @@ const s = {
     whiteSpace: 'nowrap',
   },
   main: {
+    position: 'relative', // Contain absolute descendants inside the dashboard scroller.
+    minWidth: 0,
+    minHeight: 0,
+    overscrollBehavior: 'none',
     flex: 1,
     overflow: 'auto',
     display: 'flex',

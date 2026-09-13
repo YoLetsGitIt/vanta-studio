@@ -129,6 +129,27 @@ const base = process.env.VANTA_STUDIO_TEST_URL || 'http://127.0.0.1:3019';
         }
       }
     }
+    // The document must never acquire a second scroll area below the dashboard.
+    for (const width of [1524, 1280, 1024, 768, 360]) {
+      await page.setViewportSize({ width, height: 942 });
+      const bounds = await page.evaluate(() => {
+        const main = document.querySelector('main');
+        main.scrollTo({ top: main.scrollHeight, left: 10000 });
+        window.scrollTo(10000, 10000);
+        return {
+          outerX: window.scrollX, outerY: window.scrollY,
+          outerHeight: document.documentElement.scrollHeight, viewportHeight: innerHeight,
+          mainX: main.scrollLeft, mainWidth: main.clientWidth, contentWidth: main.scrollWidth,
+          bottomReached: Math.abs(main.scrollHeight - main.clientHeight - main.scrollTop) < 2,
+          containment: getComputedStyle(main).overscrollBehavior,
+        };
+      });
+      assert.equal(bounds.outerX, 0); assert.equal(bounds.outerY, 0);
+      assert.ok(bounds.outerHeight <= bounds.viewportHeight + 1, 'No blank outer-page scroll area');
+      assert.equal(bounds.mainX, 0); assert.equal(bounds.mainWidth, bounds.contentWidth);
+      assert.equal(bounds.bottomReached, true, 'Settings must remain scrollable to the bottom');
+      assert.equal(bounds.containment, 'none');
+    }
     assert.deepEqual(errors, []);
     console.log('Studio settings: eight combinations, save/reload, interactive diagrams, keyboard, mobile and themes passed');
   } finally { await browser.close(); }

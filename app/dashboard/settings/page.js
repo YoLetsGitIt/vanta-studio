@@ -1887,7 +1887,7 @@ const s = {
   page: { padding: '2rem 2.5rem 4rem', display: 'flex', flexDirection: 'column', gap: '1.25rem', minHeight: '100%', boxSizing: 'border-box' },
   pageHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' },
   pageTitle: { fontSize: '1.4rem', fontWeight: 700, color: 'var(--text)', margin: 0, letterSpacing: '-0.02em' },
-  tabBar: { display: 'flex', gap: '0.35rem' },
+  tabBar: { display: 'flex', flexWrap: 'wrap', gap: '0.35rem' },
   tabBtn: { padding: '0.35rem 0.9rem', borderRadius: 20, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-muted)', fontSize: '0.82rem', fontWeight: 500, cursor: 'pointer' },
   tabBtnActive: { background: 'var(--accent-tint)', border: '1px solid var(--accent-tint-border)', color: 'var(--accent)' },
   grid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gridAutoFlow: 'dense', gap: '1.25rem', alignItems: 'start' },
