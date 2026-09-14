@@ -1,6 +1,6 @@
 .root { display: grid; gap: 20px; min-width: 0; }
 .options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; border: 0; padding: 0; margin: 0; min-width: 0; }
-.option { display: flex; align-items: flex-start; gap: 12px; min-width: 0; padding: 12px 0; border: 0; border-bottom: 1px solid var(--border-strong); cursor: pointer; background: transparent; }
+.option { display: block; min-width: 0; padding: 12px 0; border: 0; border-bottom: 1px solid var(--border-strong); background: transparent; }
 .option input { accent-color: var(--accent); width: 18px; height: 18px; margin: 1px 0 0; flex-shrink: 0; }
 .option strong { display: block; color: var(--text); font-size: .875rem; margin-bottom: 6px; }
 .optionCopy > span:last-child { display: block; color: var(--text-muted); font-size: .8125rem; line-height: 1.5; }
@@ -9,15 +9,7 @@
 .options:disabled { opacity: .6; }
 .options:disabled .option { cursor: wait; }
 
-.previewHeader h3 { margin: 0 0 6px; font-size: .95rem; color: var(--text); }
-.previewHeader p { margin: 0; color: var(--text-muted); font-size: .8125rem; line-height: 1.6; }
-.demo { border: 1px solid var(--border-strong); border-radius: 8px; overflow: hidden; background: transparent; min-width: 0; }
-.stepNav { display: flex; border-bottom: 1px solid var(--border-strong); }
-.stepNav button { flex: 1; display: flex; justify-content: center; align-items: center; gap: 8px; padding: 14px 8px; min-height: 48px; border: 0; border-bottom: 2px solid transparent; color: var(--text-muted); background: transparent; font: inherit; font-size: .8rem; cursor: pointer; }
-.stepNav button[aria-current] { color: var(--text); border-bottom-color: var(--accent); background: var(--accent-tint); }
-.stepNav span { font-size: .7rem; }
 .stageTitle { color: var(--text); font-size: .95rem; margin: 0; line-height: 1.5; }
-.stageTitle:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 4px; }
 .comparison { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
 .before, .after { padding: 18px 20px 24px; min-width: 0; }
 .after { border-left: 1px solid var(--border-strong);  }
@@ -74,24 +66,13 @@
 .stageHeader { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin: 20px; }
 .rules { border-top: 1px solid var(--border-strong); padding-top: 4px; }
 .rules p:last-child { padding-bottom: 8px; }
-.stepNav button.tabHighlight { animation: tabHighlight 1100ms ease-out; }
-.stepNav button.tabHighlightAgain { animation-name: tabHighlightAgain; }
-@keyframes tabHighlight {
-  0%, 40% { box-shadow: inset 0 0 0 2px var(--accent); }
-  100% { box-shadow: inset 0 0 0 2px transparent; }
-}
-@keyframes tabHighlightAgain {
-  0%, 40% { box-shadow: inset 0 0 0 2px var(--accent); }
-  100% { box-shadow: inset 0 0 0 2px transparent; }
-}
+
+
 @media (max-width: 900px) { .options { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 600px) {
  .stageHeader { margin: 18px 12px; }
- .stepNav button { gap: 6px; }
 }
-@media (prefers-reduced-motion: reduce) {
- .stepNav button.tabHighlight { animation: none !important; outline: 2px solid var(--accent); outline-offset: -3px; }
-}
+
 
 .explanation { font-size: .8125rem; line-height: 1.6; }
 .legend { color: var(--text-muted); font-size: .7rem; line-height: 1.6; }
@@ -100,3 +81,18 @@
 .activeChoice .selectionMark { background: var(--accent); color: var(--accent-contrast); border-radius: 50%; }
 .dateButton .selectionMark { position: absolute; top: 5px; right: 5px; font-size: 10px; width: 14px; height: 14px; }
 .timeChoices .choice { min-width: 92px; }
+
+.optionLabel { display: flex; align-items: flex-start; gap: 12px; cursor: pointer; }
+.exampleLink { display: block; margin-left: 30px; padding: 10px 0; min-height: 44px; background: transparent; border: 0; color: var(--text-muted); font: inherit; font-size: .8rem; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.exampleLink:hover { color: var(--text); }
+.exampleModal > header { padding-right: 64px; }
+.closeExample { position: absolute; top: 12px; right: 12px; width: 44px; height: 44px; border: 0; border-radius: 6px; background: transparent; color: var(--text-muted); font-size: 26px; cursor: pointer; }
+.closeExample:focus-visible, .exampleModal button:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -3px; }
+.exampleModal .stageHeader { margin: 4px 0 20px; }
+.exampleModal .before, .exampleModal .after { padding: 0 0 20px; }
+.exampleModal .after { border: 0; padding-left: 20px; }
+.contextNote { font-size: .8rem; color: var(--text-muted); line-height: 1.6; margin: 0 0 20px; }
+@media (max-width: 1100px) { .exampleModal .after { padding: 20px 0; border-top: 1px solid var(--border-strong); } }
+@media (max-width: 600px) {
+ .exampleModal { width: 100%; max-width: 100% !important; margin: auto 0 0; max-height: 90vh; max-height: 90dvh; border-radius: 16px 16px 0 0; border-bottom: 0; }
+}

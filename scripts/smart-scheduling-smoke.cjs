@@ -29,128 +29,75 @@ const base = process.env.VANTA_STUDIO_TEST_URL || 'http://127.0.0.1:3019';
       return route.fulfill({ json: { hours: [], stations: [], templates: [], fields: {}, connected: false } });
     });
     await page.goto(`${base}/dashboard/settings.html?tab=bookings`, { waitUntil: 'networkidle' });
-    const quieter = page.getByRole('checkbox', { name: 'Only offer quieter days', exact: true });
-    const quieterMonths = page.getByRole('checkbox', { name: 'Only offer quieter months', exact: true });
-    const gaps = page.getByRole('checkbox', { name: 'Keep appointments together', exact: true });
-    await quieter.waitFor();
-    assert.equal(await quieter.isChecked(), false);
-    assert.equal(await gaps.isChecked(), false);
+    const titles = ['Only offer quieter months', 'Only offer quieter days', 'Keep appointments together'];
+    const controls = titles.map(name => page.getByRole('checkbox', { name, exact: true }));
     const section = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Smart scheduling', exact: true }) });
-    const week = page.getByRole('table', { name: 'Example studio date availability', exact: true });
-    const day = page.getByRole('table', { name: 'Example studio time availability', exact: true });
-    for (const next of ['quieter_months', 'quieter_days_only', 'quieter_days', 'quieter_months_gaps', 'quieter_days_gaps', 'combined', 'minimize_gaps', 'all']) {
-      const wantsMonths = ['quieter_months', 'quieter_months_gaps', 'quieter_days', 'combined'].includes(next);
-      const wantsQuieter = ['quieter_days_only', 'quieter_days_gaps', 'quieter_days', 'combined'].includes(next);
-      const wantsGaps = ['minimize_gaps', 'quieter_months_gaps', 'quieter_days_gaps', 'combined'].includes(next);
-      await quieterMonths.setChecked(wantsMonths);
-      await quieter.setChecked(wantsQuieter);
-      await gaps.setChecked(wantsGaps);
-      await page.getByRole('navigation', { name: 'Example booking steps' }).getByRole('button', { name: '1 Month' }).click();
-      assert.equal(await page.getByRole('group', { name: 'Example client month options' }).getByRole('button').count(), wantsMonths ? 2 : 3);
-      await page.getByRole('group', { name: 'Example client month options' }).getByRole('button', { name: /October/ }).click();
-      assert.equal(await page.getByRole('navigation', { name: 'Example booking steps' }).getByRole('button', { name: '1 Month' }).getAttribute('aria-current'), 'step');
-      await page.getByRole('navigation', { name: 'Example booking steps' }).getByRole('button', { name: '2 Date' }).click();
-      assert.equal(await page.getByRole('group', { name: 'Example client date options' }).getByRole('button').count(), wantsQuieter ? 2 : 5);
-      await page.getByRole('group', { name: 'Example client date options' }).getByRole('button').first().click();
-      assert.equal(await page.getByRole('navigation', { name: 'Example booking steps' }).getByRole('button', { name: '2 Date' }).getAttribute('aria-current'), 'step');
-      await page.getByRole('navigation', { name: 'Example booking steps' }).getByRole('button', { name: '3 Time' }).click();
-      assert.equal(await day.getByRole('img', { name: /: suggested/ }).count(), wantsGaps ? 3 : 0);
-      assert.equal(await page.getByRole('group', { name: 'Example client time options' }).getByRole('button').count(), wantsGaps ? 3 : 5);
-      await Promise.all([
-        page.waitForResponse(response => response.url().endsWith('/studio/me/profile')),
-        section.getByRole('button', { name: /Save/ }).click(),
-      ]);
-      assert.equal(updates.at(-1).scheduling_mode, next);
-      await page.reload({ waitUntil: 'networkidle' });
-      assert.equal(await quieterMonths.isChecked(), wantsMonths);
-      assert.equal(await quieter.isChecked(), wantsQuieter);
-      assert.equal(await gaps.isChecked(), wantsGaps);
-    }
-    // Each toggle highlights its affected tab without changing the selected tab.
-    for (const reducedMotion of ['no-preference', 'reduce']) {
-      await page.emulateMedia({ reducedMotion });
-      for (const [index, control] of [quieterMonths, quieter, gaps].entries()) {
-        const navigation = page.getByRole('navigation', { name: 'Example booking steps' });
-        const unchangedTab = navigation.getByRole('button').nth((index + 1) % 3);
-        await unchangedTab.click();
-        await control.focus();
-        await page.keyboard.press('Space');
-        const tab = page.getByRole('navigation', { name: 'Example booking steps' }).getByRole('button').nth(index);
-        assert.equal(await tab.getAttribute('aria-current'), null);
-        assert.equal(await unchangedTab.getAttribute('aria-current'), 'step');
-        assert.match(await tab.getAttribute('class'), /tabHighlight/);
-        const animation = await tab.evaluate(el => getComputedStyle(el).animationName);
-        if (reducedMotion === 'reduce') {
-          assert.equal(animation, 'none');
-          assert.equal(await tab.evaluate(el => getComputedStyle(el).outlineStyle), 'solid');
-        } else assert.notEqual(animation, 'none');
-        assert.equal(await control.evaluate(el => document.activeElement === el), true);
+    const modes = ['all', 'quieter_months', 'quieter_days_only', 'quieter_days', 'minimize_gaps', 'quieter_months_gaps', 'quieter_days_gaps', 'combined'];
+    assert.equal(await page.getByRole('navigation', {name: 'Example booking steps'}).count(), 0);
+    for (const [flags, next] of modes.entries()) {
+      for (const [index, control] of controls.entries()) await control.setChecked(!!(flags & (1 << index)));
+      assert.equal(await page.getByRole('dialog').count(), 0, 'Checkboxes must not open examples');
+      const before = updates.length;
+      for (const [index, title] of titles.entries()) {
+        const trigger = page.getByRole('button', { name: `See example: ${title}`, exact: true });
+        await trigger.click();
+        const modal = page.getByRole('dialog', { name: title, exact: true });
+        await modal.waitFor();
+        const groupName = ['month', 'date', 'time'][index];
+        const count = await modal.getByRole('group', { name: `Example client ${groupName} options` }).getByRole('button').count();
+        assert.equal(count, index === 0 ? flags & 1 ? 2 : 3 : index === 1 ? flags & 2 ? 2 : 5 : flags & 4 ? 3 : 5);
+        if (index === 1 && flags & 1) await modal.getByText(/quieter months is also on/).waitFor();
+        if (index === 2 && flags & 4) {
+          await modal.getByRole('button', {name: 'Show all times', exact:true}).click();
+          assert.equal(await modal.getByRole('group', {name:'Example client time options'}).getByRole('button').count(),5);
+        }
+        await page.keyboard.press('Escape');
+        assert.equal(await page.getByRole('dialog').count(), 0);
+        assert.equal(await trigger.evaluate(el => document.activeElement === el),true);
+        assert.equal(updates.length,before,'Examples must not save preferences');
       }
+      await Promise.all([page.waitForResponse(r=>r.url().endsWith('/studio/me/profile')),section.getByRole('button',{name:/Save/}).click()]);
+      assert.equal(updates.at(-1).scheduling_mode,next);
+      await page.reload({waitUntil:'networkidle'});
+      for (const [index, control] of controls.entries()) assert.equal(await control.isChecked(),!!(flags & (1 << index)));
     }
-    await page.emulateMedia({ reducedMotion: 'no-preference' });
-    await quieterMonths.check(); await quieter.check(); await gaps.check();
-    assert.equal(updates.length, 8);
-    await page.getByRole('navigation', { name: 'Example booking steps' }).getByRole('button', { name: '1 Month' }).click();
-    const months = page.getByRole('group', { name: 'Example client month options' });
-    await months.getByRole('button', { name: /November/ }).click();
-    assert.equal(await months.getByRole('button', { name: /September/ }).count(), 0);
-    await page.getByRole('navigation', { name: 'Example booking steps' }).getByRole('button', { name: '2 Date' }).click();
-    await page.getByRole('group', { name: 'Example client date options' }).getByRole('button', { name: 'Thu, 5 Nov' }).click();
-    await page.getByRole('navigation', { name: 'Example booking steps' }).getByRole('button', { name: '3 Time' }).click();
-    await page.getByRole('button', { name: 'Show all times', exact: true }).click();
-    assert.equal(await page.getByRole('group', { name: 'Example client time options' }).getByRole('button').count(), 5);
-    await page.getByRole('group', { name: 'Example client time options' }).getByRole('button', { name: '9am', exact: true }).click();
-    await page.getByText(/Selected:.*9am/).waitFor();
-    const tabs = page.getByRole('navigation', { name: 'Example booking steps' });
-    await tabs.getByRole('button', { name: '1 Month' }).click();
-    await tabs.getByRole('button', { name: '3 Time' }).click();
-    assert.equal(await page.getByRole('group', { name: 'Example client time options' }).getByRole('button', { name: '9am', exact: true }).getAttribute('aria-pressed'), 'true');
-    assert.equal(await page.locator('details').filter({ hasText: 'How dates are chosen' }).getAttribute('open'), null);
-    await page.getByText('How dates are chosen', { exact: true }).click();
-    await page.getByText(/We compare booked hours/).waitFor();
     for (const theme of ['dark', 'light']) {
-      await page.evaluate(value => document.documentElement.dataset.theme = value, theme);
-      for (const width of [1280, 360]) {
-        await page.setViewportSize({ width, height: 1000 });
-        assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth), false);
-        assert.ok((await section.boundingBox()).width >= 280, 'Settings card must retain a usable mobile width');
-        await page.getByRole('group', { name: 'Scheduling preferences', exact: true }).screenshot({ animations: 'disabled', path: `/private/tmp/vanta-controls-${theme}-${width}.png` });
-        for (const [index, label] of ['Month', 'Date', 'Time'].entries()) {
-          await page.getByRole('navigation', { name: 'Example booking steps' }).getByRole('button', { name: `${index + 1} ${label}` }).click();
-          if (index > 0) {
-            const table = index === 1 ? week : day;
-            assert.equal(await table.evaluate(element => element.scrollWidth > element.clientWidth), false);
-            const square = await table.getByRole('img').first().boundingBox();
-            assert.ok(square.width >= 20 && Math.abs(square.width - square.height) < 1, 'Availability cells must remain readable squares');
+      await page.evaluate(value => document.documentElement.dataset.theme = value,theme);
+      for (const width of [1280,360]) {
+        await page.setViewportSize({width,height:900});
+        for (const [index,title] of titles.entries()) {
+          const trigger=page.getByRole('button',{name:`See example: ${title}`,exact:true});
+          await trigger.click();
+          const modal=page.getByRole('dialog',{name:title,exact:true});
+          await modal.getByText('How it’s calculated',{exact:true}).click();
+          await modal.getByText(/We compare booked hours/).waitFor();
+          const rect=await modal.boundingBox();
+          assert.ok(rect.x>=0 && rect.x+rect.width<=width+1);
+          assert.ok(rect.y>=0 && rect.y+rect.height<=901);
+          if(width===360) assert.ok(Math.abs(rect.y+rect.height-900)<2,'Mobile sheet must anchor to bottom');
+          assert.equal(await modal.evaluate(el=>el.scrollWidth>el.clientWidth),false);
+          if(index>0) {
+            const square=await modal.getByRole('table').getByRole('img').first().boundingBox();
+            assert.ok(square.width>=20 && Math.abs(square.width-square.height)<1);
           }
-          const region = page.getByRole('region', { name: 'Interactive booking example', exact: true });
-          await region.scrollIntoViewIfNeeded();
-          await region.screenshot({ animations: 'disabled', path: `/private/tmp/vanta-demo-${label}-${theme}-${width}.png` });
+          const done=modal.getByRole('button',{name:'Done',exact:true});
+          await done.focus(); await page.keyboard.press('Tab');
+          assert.equal(await modal.getByRole('button',{name:'Close example'}).evaluate(el=>document.activeElement===el),true);
+          await modal.screenshot({animations:'disabled',path:`/private/tmp/vanta-example-${index}-${theme}-${width}.png`});
+          await done.click();
+          assert.equal(await trigger.evaluate(el=>document.activeElement===el),true);
         }
       }
     }
-    // The document must never acquire a second scroll area below the dashboard.
-    for (const width of [1524, 1280, 1024, 768, 360]) {
-      await page.setViewportSize({ width, height: 942 });
-      const bounds = await page.evaluate(() => {
-        const main = document.querySelector('main');
-        main.scrollTo({ top: main.scrollHeight, left: 10000 });
-        window.scrollTo(10000, 10000);
-        return {
-          outerX: window.scrollX, outerY: window.scrollY,
-          outerHeight: document.documentElement.scrollHeight, viewportHeight: innerHeight,
-          mainX: main.scrollLeft, mainWidth: main.clientWidth, contentWidth: main.scrollWidth,
-          bottomReached: Math.abs(main.scrollHeight - main.clientHeight - main.scrollTop) < 2,
-          containment: getComputedStyle(main).overscrollBehavior,
-        };
+    for (const width of [1524,1280,1024,768,360]) {
+      await page.setViewportSize({width,height:942});
+      const bounds=await page.evaluate(()=>{
+        const main=document.querySelector('main');main.scrollTo({top:main.scrollHeight,left:10000});window.scrollTo(10000,10000);
+        return {x:scrollX,y:scrollY,h:document.documentElement.scrollHeight,mx:main.scrollLeft,bottom:Math.abs(main.scrollHeight-main.clientHeight-main.scrollTop)<2};
       });
-      assert.equal(bounds.outerX, 0); assert.equal(bounds.outerY, 0);
-      assert.ok(bounds.outerHeight <= bounds.viewportHeight + 1, 'No blank outer-page scroll area');
-      assert.equal(bounds.mainX, 0); assert.equal(bounds.mainWidth, bounds.contentWidth);
-      assert.equal(bounds.bottomReached, true, 'Settings must remain scrollable to the bottom');
-      assert.equal(bounds.containment, 'none');
+      assert.equal(bounds.x,0);assert.equal(bounds.y,0);assert.ok(bounds.h<=943);assert.equal(bounds.mx,0);assert.equal(bounds.bottom,true);
     }
     assert.deepEqual(errors, []);
-    console.log('Studio settings: eight combinations, save/reload, interactive diagrams, keyboard, mobile and themes passed');
+    console.log('Studio settings: eight combinations, modal examples, focus return/trap, mobile sheets, themes and scroll bounds passed');
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

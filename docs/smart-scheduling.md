@@ -91,3 +91,11 @@ Apply or verify the widened database constraint and release backend first, booki
 ## Simplification after visual feedback
 
 Removed the settings summary, On/Off pills, category labels, tab numbers/dots, filter badges, option counts, repeated panel instructions and context footer. Controls now use simple checkbox rows with one-line descriptions. The demo retains only plain tabs, a studio/client comparison, square availability diagrams and one short explanation. Removed the extra choice-entry animation and panel tint; affected tabs still pulse without navigating. All eight combinations, selected client options, manual navigation, reduced-motion feedback and collapsed rules remain.
+
+## Setting-specific examples — 14 September 2026
+
+The permanent demo, tabs and tab-highlight animation have been replaced by a **See example** action beneath each independent setting. Activating a checkbox never opens an explanation. Each action opens only the relevant months, days or times example, reflecting current preferences without saving or toggling them.
+
+The shared native Dialog handles background isolation, Escape, keyboard focus containment and return to the trigger. Examples have an explicit close button and Done action. The scheduling-specific dialog becomes a bottom sheet on phones; its content scrolls within the visible viewport. This styling does not affect other dialogs.
+
+Square studio-availability diagrams and interactive client choices are retained. The day example explains whether quieter months is also enabled. Relevant technical rules are collapsed under **How it’s calculated**. All examples use synthetic data and never book a real appointment. The section remains at the bottom of Bookings settings with its existing Save action.

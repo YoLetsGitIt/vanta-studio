@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import Dialog from './ui/Dialog';
 import styles from './SmartSchedulingSettings.module.css';
 
 const HOURS = ['9am', '10am', '11am', '12pm', '1pm', '2pm'];
@@ -26,15 +27,10 @@ export default function SmartSchedulingSettings({ mode, onChange, disabled = fal
   const quieterMonths = ['quieter_days', 'combined', 'quieter_months', 'quieter_months_gaps'].includes(mode);
   const quieter = ['quieter_days', 'combined', 'quieter_days_only', 'quieter_days_gaps'].includes(mode);
   const gaps = ['minimize_gaps', 'combined', 'quieter_months_gaps', 'quieter_days_gaps'].includes(mode);
-  const [highlight, setHighlight] = useState({ tab: -1, revision: 0 });
-  useEffect(() => {
-    if (highlight.tab < 0) return;
-    const timer = setTimeout(() => setHighlight(current => ({ ...current, tab: -1 })), 1100);
-    return () => clearTimeout(timer);
-  }, [highlight.revision, highlight.tab]);
-  const [step, setStep] = useState(0);
+  const [step, setStep] = useState(null);
   const [chosenTime, setChosenTime] = useState(null);
-  function navigate(next) { setStep(next); }
+  const titles = ['Only offer quieter months', 'Only offer quieter days', 'Keep appointments together'];
+  function closeExample() { setStep(null); }
   const [monthChoice, setMonthChoice] = useState('2026-10');
   const [dateChoice, setDateChoice] = useState('');
   const [expandedTimes, setExpandedTimes] = useState('');
@@ -57,7 +53,6 @@ export default function SmartSchedulingSettings({ mode, onChange, disabled = fal
     const modes = ['all', 'quieter_months', 'quieter_days_only', 'quieter_days', 'minimize_gaps', 'quieter_months_gaps', 'quieter_days_gaps', 'combined'];
     onChange(modes[(flags[0] ? 1 : 0) + (flags[1] ? 2 : 0) + (flags[2] ? 4 : 0)]);
     setChosenTime(null);
-    setHighlight(current => ({ tab: index, revision: current.revision + 1 }));
   }
 
   const explanation = step === 0
@@ -72,21 +67,17 @@ export default function SmartSchedulingSettings({ mode, onChange, disabled = fal
         { title: 'Only offer quieter months', description: 'Hide busier months from online booking.', checked: quieterMonths },
         { title: 'Only offer quieter days', description: 'Hide busier days within each available month.', checked: quieter },
         { title: 'Keep appointments together', description: 'Suggest times beside existing appointments.', checked: gaps },
-      ].map((option, index) => <label key={option.title} className={`${styles.option} ${option.checked ? styles.selected : ''}`}>
+      ].map((option, index) => <div key={option.title} className={`${styles.option} ${option.checked ? styles.selected : ''}`}><label className={styles.optionLabel}>
         <input type="checkbox" aria-label={option.title} checked={option.checked} onChange={event => update(index, event.target.checked)} aria-describedby={`scheduling-description-${index}`} />
         <span className={styles.optionCopy}><strong>{option.title}</strong><span id={`scheduling-description-${index}`}>{option.description}</span></span>
-      </label>)}
+      </label><button type="button" className={styles.exampleLink} aria-label={`See example: ${option.title}`} aria-haspopup="dialog" onClick={() => { setStep(index); setChosenTime(null); setExpandedTimes(''); }}>See example</button></div>)}
     </fieldset>
 
-    <div className={styles.previewHeader}>
-      <h3>See how it works</h3>
-      <p>Choose a tab to explore this sample schedule.</p>
-    </div>
-    <section className={styles.demo} aria-label="Interactive booking example">
-      <nav className={styles.stepNav} aria-label="Example booking steps">
-        {['Month', 'Date', 'Time'].map((label, index) => <button key={label} className={highlight.tab === index ? `${styles.tabHighlight} ${highlight.revision % 2 ? styles.tabHighlightAgain : ''}` : undefined} type="button" aria-current={step === index ? 'step' : undefined} onClick={() => navigate(index)}><span className={styles.srOnly}>{index + 1}</span>{label}</button>)}
-      </nav>
+    {step !== null && <Dialog title={titles[step]} description="See how it works · sample schedule" onClose={closeExample} maxWidth={760} className={styles.exampleModal}
+      footer={<button type="button" className={styles.choice} onClick={closeExample}>Done</button>}>
+      <button type="button" className={styles.closeExample} aria-label="Close example" onClick={closeExample}>×</button>
       <div className={styles.stageHeader}><h4 className={styles.stageTitle}>{step === 0 ? 'Choose a month' : step === 1 ? `Choose a date in ${month.name}` : `Choose a time on ${formatDate(day.key)}`}</h4></div>
+      {step === 1 && <p className={styles.contextNote}>{quieterMonths ? `${month.name} is offered because quieter months is also on.` : 'Quieter months is off, so all months with openings remain available.'}</p>}
       <div className={styles.comparison}>
         <div className={styles.before}>
           <h5>Studio availability</h5>
@@ -125,14 +116,14 @@ export default function SmartSchedulingSettings({ mode, onChange, disabled = fal
           {step === 2 && chosenTime !== null && <p className={styles.selection} role="status"><span aria-hidden="true">✓ </span>Selected: {formatDate(day.key)} at {HOURS[chosenTime]}</p>}
         </div>
       </div>
-    </section>
     <details className={styles.rules}>
-      <summary>How dates are chosen</summary>
+      <summary>How it’s calculated</summary>
       <p>We compare booked hours with the artist’s remaining working hours over the next 90 days, accounting for leave.</p>
-      <p>Only offer quieter months: choose up to two months within 15 percentage points of the least-booked eligible month. Other months are hidden.</p>
-      <p>Only offer quieter days: choose up to six dates per available month within 15 percentage points of its quietest eligible date. Other days are hidden. Turn both filters on to apply them together.</p>
-      <p>Keep appointments together: suggest up to three starts nearest existing bookings or calendar commitments. Earlier starts break ties. Days without commitments show every available time.</p>
+      {step === 0 && <p>Only offer quieter months: choose up to two months within 15 percentage points of the least-booked eligible month. Other months are hidden.</p>}
+      {step === 1 && <p>Only offer quieter days: choose up to six dates per available month within 15 percentage points of its quietest eligible date. Other days are hidden. Turn both filters on to apply them together.</p>}
+      {step === 2 && <p>Keep appointments together: suggest up to three starts nearest existing bookings or calendar commitments. Earlier starts break ties. Days without commitments show every available time.</p>}
       <p>This example uses one-hour appointments and hourly starts. Real bookings use the appointment’s duration and a 30-minute start grid. Month totals include dates outside the five sample dates.</p>
     </details>
+    </Dialog>}
   </div>;
 }
