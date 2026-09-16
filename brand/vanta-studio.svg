@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 252 64" fill="none">
+  <title>Vanta Studio</title>
+  <!-- Custom drawn letterforms: no font dependency. -->
+  <g fill="#F5ECD9">
+    <path d="M2 5h8l12 30L34 5h8L25 46h-6Z"/>
+    <path fill-rule="evenodd" d="M46 46 63 5h8l17 41h-8l-4-10H58l-4 10Zm15-17h12l-6-16Z"/>
+    <path d="M96 46V5h7l24 29V5h7v41h-7l-24-29v29Z"/>
+    <path d="M143 5h38v7h-15v34h-8V12h-15Z"/>
+    <path fill-rule="evenodd" d="m187 46 17-41h8l17 41h-8l-4-10h-18l-4 10Zm15-17h12l-6-16Z"/>
+  </g>
+  <g stroke="#B9BDC4" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" transform="translate(145 54)">
+    <path d="M5 0H1L0 1v2l1 1h3l1 1v2L4 8H0M12 0h6m-3 0v8M25 0v6l2 2h2l2-2V0M39 8V0h3l3 2v4l-3 2ZM53 0v8M63 0h3l2 2v4l-2 2h-3l-2-2V2Z"/>
+  </g>
+</svg>
