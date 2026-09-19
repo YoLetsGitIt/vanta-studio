@@ -157,7 +157,7 @@ function DashboardShell({ children }) {
     async function init() {
       const supabase = getSupabase();
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { router.replace('/'); return; }
+      if (!session) { router.replace('/signin'); return; }
       setUser(session.user);
 
       let studioAccount;
@@ -165,7 +165,7 @@ function DashboardShell({ children }) {
         studioAccount = await getMyStudioAccount();
       } catch {
         await getSupabase().auth.signOut();
-        router.replace('/');
+        router.replace('/signin');
         return;
       }
 
@@ -197,7 +197,7 @@ function DashboardShell({ children }) {
       sessionStorage.removeItem(`vanta-studio-tour-start:${user.id}`);
     }
     await getSupabase().auth.signOut();
-    router.replace('/');
+    router.replace('/signin');
   }
 
   if (!ready) {

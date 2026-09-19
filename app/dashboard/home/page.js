@@ -1,6 +1,7 @@
 'use client';
 
 import Button from '@/components/ui/Button';
+import styles from './home.module.css';
 import StatePanel from '@/components/ui/StatePanel';
 
 import { useState, useEffect } from 'react';
@@ -376,11 +377,10 @@ export default function HomePage() {
   const dateLabel = new Date().toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long' });
 
   return (
-    <div style={s.page}>
-      <div style={s.header}>
-        <h1 style={s.title}>Today</h1>
-        <p style={s.date}>{dateLabel}</p>
-      </div>
+    <div style={s.page} className={styles.page}>
+      <header className={styles.header}>
+        <div><h1 className={styles.title}>Today</h1><p className={styles.date}>{dateLabel}</p></div>
+      </header>
 
       <div style={s.body} className="studio-home-body">
         {loading && <StatePanel title="Loading your dashboard…" busy compact />}
@@ -410,9 +410,25 @@ export default function HomePage() {
         )}
 
 
-        {/* ── NEEDS ATTENTION ───────────────────────────────────── */}
+        {/* ── DAILY MONEY ───────────────────────────────────────── */}
         {!loading && !loadError && !isEmptyDashboard && (
           <div style={s.section}>
+            <div style={s.sectionHeadingRow}>
+              <span style={s.sectionLabel}>TODAY’S FINANCES</span>
+              <button type="button" style={s.textLink} onClick={() => router.push('/dashboard/financial')}>Review finances →</button>
+            </div>
+            <div style={s.moneyGrid} className="studio-home-four-col">
+              <MoneyStat label="Collected today" value={todayRevenue?.gross_sales} accent />
+              <MoneyStat label="Deposits received" value={todayRevenue?.deposits_collected} />
+              <MoneyStat label="Outstanding" value={todayRevenue?.remaining_balances} />
+              <MoneyStat label="Completed sessions" value={todayRevenue?.completed_sessions} money={false} />
+            </div>
+          </div>
+        )}
+
+        {/* ── NEEDS ATTENTION ───────────────────────────────────── */}
+        {!loading && !loadError && hasPending && (
+          <div style={s.section} id="dashboard-attention">
             <button type="button" style={s.sectionToggle} onClick={() => setAttentionOpen(v => !v)} aria-expanded={attentionOpen}>
               <span style={s.sectionLabel}>NEEDS ATTENTION</span>
               <span style={s.attentionHeaderMeta}><b style={s.attentionCount}>{attentionCount}</b>{attentionOpen ? 'Hide' : 'Show'} <span style={{ transform: attentionOpen ? 'rotate(180deg)' : 'none', display: 'inline-block' }}>⌄</span></span>
@@ -523,12 +539,6 @@ export default function HomePage() {
                 </AttentionGroup>
               )}
 
-              {pendingCount === 0 && <EmptyAttentionGroup title="Pending bookings" icon="calendar" />}
-              {unconfirmedCount === 0 && <EmptyAttentionGroup title="Booking confirmations" icon="check" />}
-              {awaitingPaymentCount === 0 && <EmptyAttentionGroup title="Unpaid deposits" icon="card" />}
-              {overdueBookings.length === 0 && <EmptyAttentionGroup title="Incomplete past sessions" icon="clock" />}
-              {consentNeededEntries.length === 0 && <EmptyAttentionGroup title="Clients missing consent forms" icon="document" />}
-              {pendingReimbursements.length === 0 && <EmptyAttentionGroup title="Pending reimbursements" icon="receipt" />}
 
             </div>
             )}
@@ -536,17 +546,17 @@ export default function HomePage() {
         )}
 
         {/* ── TODAY AT THE STUDIO ───────────────────────────────── */}
-        {!loading && !isEmptyDashboard && (
+        {!loading && !loadError && !isEmptyDashboard && (
           <div style={s.section}>
             <div style={s.sectionHeadingRow}>
               <span style={s.sectionLabel}>TODAY AT THE STUDIO</span>
-              <button type="button" style={s.textLink} onClick={() => router.push('/dashboard/schedule')}>Open schedule →</button>
+
             </div>
             <div style={s.twoCol} className="studio-home-two-col">
-              <div style={s.card}>
+              <div style={s.card} className={styles.card}>
                 <span style={s.cardLabel}>Next appointments</span>
                 {upcomingToday.length === 0 ? <span style={s.empty}>No more appointments today</span> : upcomingToday.map(entry => (
-                  <button key={entry.bookingId} type="button" style={s.todayBookingRow} onClick={() => router.push('/dashboard/schedule')}>
+                  <button key={entry.bookingId} type="button" className={styles.appointment} style={s.todayBookingRow} onClick={() => router.push('/dashboard/schedule')}>
                     <span style={s.todayTime}>{formatTime(entry.chosenTime)}</span>
                     <span style={s.todayBookingCopy}>
                       <strong style={s.artistRowName}>{entry.clientName}</strong>
@@ -556,7 +566,7 @@ export default function HomePage() {
                   </button>
                 ))}
               </div>
-              <div style={s.card}>
+              <div style={s.card} className={styles.card}>
                 <span style={s.cardLabel}>Artists in today ({artistsWorkingToday.length})</span>
                 {artistsWorkingToday.length === 0 ? <span style={s.empty}>No artists scheduled</span> : artistsWorkingToday.map(a => (
                   <div key={a.id} style={s.artistRow}>
@@ -575,34 +585,18 @@ export default function HomePage() {
         )}
 
         {/* ── QUICK ACTIONS ─────────────────────────────────────── */}
-        {!loading && !isEmptyDashboard && (
+        {!loading && !loadError && !isEmptyDashboard && (
           <div style={s.section}>
             <span style={s.sectionLabel}>QUICK ACTIONS</span>
             <DashboardQuickActions artists={artists} />
           </div>
         )}
 
-        {/* ── DAILY MONEY ───────────────────────────────────────── */}
-        {!loading && !isEmptyDashboard && (
-          <div style={s.section}>
-            <div style={s.sectionHeadingRow}>
-              <span style={s.sectionLabel}>DAILY MONEY</span>
-              <button type="button" style={s.textLink} onClick={() => router.push('/dashboard/financial')}>Review finances →</button>
-            </div>
-            <div style={s.moneyGrid} className="studio-home-four-col">
-              <MoneyStat label="Collected today" value={todayRevenue?.gross_sales} accent />
-              <MoneyStat label="Deposits received" value={todayRevenue?.deposits_collected} />
-              <MoneyStat label="Outstanding" value={todayRevenue?.remaining_balances} />
-              <MoneyStat label="Completed sessions" value={todayRevenue?.completed_sessions ?? 0} money={false} />
-            </div>
-          </div>
-        )}
-
         {/* ── THIS WEEK ─────────────────────────────────────────── */}
-        {!loading && !isEmptyDashboard && artists.length > 0 && (
+        {!loading && !loadError && !isEmptyDashboard && artists.length > 0 && (
           <div style={s.section}>
-            <span style={s.sectionLabel}>THIS WEEK</span>
-            <div style={s.card}>
+            <span style={s.sectionLabel}>BOOKINGS BY ARTIST · THIS WEEK</span>
+            <div style={s.card} className={styles.card}>
               <div style={s.utilList}>
                 {weekUtilization.map(({ artist, count }) => (
                   <div key={artist.id} style={s.utilRow}>
@@ -716,13 +710,13 @@ function GuideStep({ number, title, body }) {
 }
 
 function MoneyStat({ label, value, accent = false, money = true }) {
-  const display = money
+  const display = value == null ? '—' : money
     ? `$${Number(value ?? 0).toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
     : Number(value ?? 0).toLocaleString('en-AU');
   return (
-    <div style={s.moneyStat}>
+    <div className={`${styles.moneyStat} ${accent ? styles.moneyFeatured : ''}`}>
       <span style={s.moneyLabel}>{label}</span>
-      <strong style={{ ...s.moneyValue, color: accent ? 'var(--accent)' : 'var(--text)' }}>{display}</strong>
+      <strong className={styles.moneyValue}>{display}</strong>
     </div>
   );
 }
@@ -777,15 +771,6 @@ function AttentionItem({ title, subtitle, badge, children, onClick }) {
   );
 }
 
-function EmptyAttentionGroup({ title, icon }) {
-  return (
-    <div style={s.emptyAttentionRow} aria-label={`${title}: none`}>
-      <AttentionIcon name={icon} />
-      <span style={s.emptyAttentionTitle}>{title}</span>
-      <span style={s.noneBadge}>None</span>
-    </div>
-  );
-}
 
 function AttentionIcon({ name }) {
   const paths = {

@@ -1,0 +1,14 @@
+.page { background: var(--bg-base); }
+.header { padding: 2rem 2rem 1.5rem; display: flex; justify-content: space-between; align-items: center; gap: 1.5rem; border-bottom: 1px solid var(--border-faint); }
+.title { margin: 0 0 .4rem; font-size: 1.65rem; font-weight: 600; letter-spacing: -.04em; line-height: 1.2; color: var(--text); }
+.date { margin: 0; font-size: .8rem; color: var(--text-faint); }
+.moneyStat { position: relative; padding: 1.3rem; border: 1px solid var(--border); border-radius: 14px; background: var(--bg-card); display: flex; flex-direction: column; gap: .65rem; min-width: 0; }
+.moneyFeatured { background: var(--accent-tint); border-color: var(--accent-active-border); }
+.moneyValue { font-size: clamp(1.25rem, 2vw, 1.65rem); font-weight: 500; letter-spacing: -.045em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.card { min-width: 0; box-shadow: 0 5px 20px rgb(0 0 0 / 4%); }
+.appointment { transition: background 150ms ease; min-height: 64px; cursor: pointer; }
+.appointment:hover { background: var(--accent-tint) !important; }
+.page button:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 3px; }
+@media (min-width: 1500px) { .header { padding-inline: 3rem; } }
+@media (max-width: 600px) { .header { padding: 1.25rem 1rem; align-items: flex-start; flex-direction: column; gap: 1rem; } .moneyStat { padding: 1rem; } }
+@media (prefers-reduced-motion: reduce) { .appointment { transition: none; } }
