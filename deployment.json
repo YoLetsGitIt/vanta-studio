@@ -1,4 +1,8 @@
 {
-  "release": "studio-mobile-landscape-current-2026-09-24",
-  "source_commit": "5c7da58f0806eb68aa1d5d2e56c242d1740632d0"
+  "release": "studio-landscape-refinement-2026-09-25",
+  "base_commit": "5c7da58f0806eb68aa1d5d2e56c242d1740632d0",
+  "changed_source_sha256": {
+    "app/mobile.css": "300bf732c99c078fe9de4127fbffc6087ff3b12781647517971e6c0e01ad9ffd",
+    "app/dashboard/home/home.module.css": "019daf4d5d5e50dfb236827d79a44225444e3df15ce6651b5bac2d7c13f837f1"
+  }
 }
