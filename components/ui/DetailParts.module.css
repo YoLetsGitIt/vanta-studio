@@ -1,0 +1,12 @@
+.switch { appearance: none; -webkit-appearance: none; flex: none; width: 44px; height: 26px; border-radius: 999px; background: var(--bg-chip); border: 1px solid var(--border-strong); position: relative; cursor: pointer; transition: background 0.15s, border-color 0.15s; margin: 0; }
+.switch::after { content: ''; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%; background: var(--text-muted); transition: transform 0.15s, background 0.15s; }
+.switch:checked { background: var(--color-success); border-color: var(--color-success); }
+.switch:checked::after { transform: translateX(18px); background: var(--color-success-surface); }
+.switch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.switch:disabled { opacity: 0.6; cursor: progress; }
+
+.skeletonWrap { display: flex; flex-direction: column; gap: 1rem; }
+.bar { display: block; border-radius: 8px; background: var(--bg-chip); border: 1px solid var(--border); }
+.card { display: flex; flex-direction: column; gap: 0.85rem; background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; padding: 1.1rem; }
+.statRow { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.6rem; }
+.line { display: flex; justify-content: space-between; gap: 1rem; }

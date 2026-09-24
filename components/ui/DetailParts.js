@@ -1,5 +1,7 @@
 'use client';
 
+import styles from './DetailParts.module.css';
+
 // Shared building blocks for the booking and client detail panels.
 
 const toneColors = tone => ({ bg: `var(--color-${tone}-surface)`, text: `var(--color-${tone})`, border: `var(--color-${tone}-border)` });
@@ -57,6 +59,36 @@ export function Fact({ label, children, value, block = false, strong = false }) 
     <div style={block ? d.factBlock : d.fact}>
       <span style={d.factLabel}>{label}</span>
       <span style={{ ...(block ? d.factValueBlock : d.factValue), ...(strong ? d.factStrong : {}) }}>{content}</span>
+    </div>
+  );
+}
+
+/** Compact on/off switch. Give it an aria-label; it is a real checkbox underneath. */
+export function Switch({ checked, disabled, onChange, ...props }) {
+  return <input {...props} type="checkbox" role="switch" className={styles.switch} checked={checked} disabled={disabled} onChange={e => onChange?.(e.target.checked)} />;
+}
+
+export function SkeletonBar({ w = '100%', h = 14 }) {
+  return <span className={`skeleton ${styles.bar}`} style={{ width: w, height: h }} aria-hidden="true" />;
+}
+
+/** Placeholder that mirrors the real panel layout while its data loads. */
+export function DetailSkeleton({ label = 'Loading details…', stats = false, hero = false, cards = 3 }) {
+  return (
+    <div className={styles.skeletonWrap} role="status" aria-busy="true" aria-label={label}>
+      {hero && <div className={styles.card}><SkeletonBar w="35%" h={12} /><SkeletonBar w="70%" h={24} /><SkeletonBar w="55%" h={14} /></div>}
+      {stats && (
+        <div className={styles.statRow}>
+          {[0, 1, 2].map(i => <div key={i} className={styles.card} style={{ padding: '0.8rem 0.9rem', gap: '0.5rem' }}><SkeletonBar w="40%" h={22} /><SkeletonBar w="80%" h={11} /></div>)}
+        </div>
+      )}
+      {Array.from({ length: cards }, (_, i) => (
+        <div key={i} className={styles.card}>
+          <SkeletonBar w="34%" h={16} />
+          {[0, 1, 2].map(j => <div key={j} className={styles.line}><SkeletonBar w="26%" h={12} /><SkeletonBar w={`${30 + ((i + j) % 3) * 12}%`} h={12} /></div>)}
+        </div>
+      ))}
+      <span className="sr-only">{label}</span>
     </div>
   );
 }

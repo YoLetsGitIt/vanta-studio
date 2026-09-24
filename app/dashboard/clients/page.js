@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { getStudioClients, getStudioClient, getClientConsents, getNotes, addNote, deleteNote, ensureStudioClient, patchStudioClient, generateConsentLink, listConsentTemplates, getClientConsentSubmissions, getBatchClientConsentSubmissions, setClientMarketingConsent } from '@/lib/api';
 
 const TATTOO_STYLES = [
@@ -14,7 +14,7 @@ import { formatDob } from '@/lib/format';
 import { useLanguage } from '@/lib/i18n';
 import { showError } from '@/lib/feedback';
 import Button from '@/components/ui/Button';
-import { Pill, Section, Fact, detailStyles } from '@/components/ui/DetailParts';
+import { Pill, Section, Fact, Switch, SkeletonBar, DetailSkeleton, detailStyles } from '@/components/ui/DetailParts';
 
 const CLIENTS_PER_PAGE = 25;
 
@@ -280,7 +280,18 @@ function ClientsInner() {
           )}
         </div>
 
-        {detailLoading && <aside className="studio-client-detail" style={s.panel}><p style={s.msg}>{t('loading')}</p></aside>}
+        {detailLoading && (
+          <aside id="client-detail" className="studio-client-detail" aria-label="Loading client details" aria-busy="true" style={s.panel}>
+            <div style={s.panelHeader}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', minWidth: 0 }}>
+                <span style={s.panelTitle}>{clients.find(c => c.id === selected)?.name ?? <SkeletonBar w={180} h={22} />}</span>
+                <div style={{ display: 'flex', gap: '0.4rem' }}><SkeletonBar w={92} h={24} /><SkeletonBar w={70} h={24} /></div>
+              </div>
+              <button type="button" aria-label="Close client details" onClick={() => setSelected(null)} style={s.closeBtn}>✕</button>
+            </div>
+            <div style={s.panelBody}><DetailSkeleton label="Loading client details…" stats /></div>
+          </aside>
+        )}
         {!detailLoading && selectedClient && (
           <ClientDetail
             client={selectedClient}
@@ -356,14 +367,12 @@ function MarketingConsent({ client, clientKey, marketing, onChange }) {
     } finally { setSaving(false); }
   }
   if (marketing.unsubscribed) {
-    return <p style={{ ...detailStyles.hint, margin: 0 }}>This client unsubscribed from your marketing emails. Only they can opt back in.</p>;
+    return <Fact label="Marketing emails"><span style={{ color: 'var(--text-muted)' }}>Unsubscribed</span></Fact>;
   }
   return (
-    <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.65rem', fontSize: '0.95rem', color: 'var(--text)', cursor: 'pointer' }}>
-      <input type="checkbox" checked={checked} disabled={saving} onChange={e => toggle(e.target.checked)} style={{ accentColor: 'var(--accent)', marginTop: 4, width: 16, height: 16 }} />
-      <span>This client has agreed to receive marketing emails from us.
-        <span style={{ display: 'block', ...detailStyles.hint }}>Only tick this if they told you or ticked a box. Every email includes an unsubscribe link.</span></span>
-    </label>
+    <Fact label="Marketing emails">
+      <Switch aria-label="Client has agreed to receive marketing emails" title="Turn on only if they agreed to hear from you. Every email has an unsubscribe link." checked={checked} disabled={saving} onChange={toggle} />
+    </Fact>
   );
 }
 
@@ -484,6 +493,7 @@ function ClientDetail({ client, marketing, onMarketingChange, clientKey, onClose
     : new Date(firstSub.submitted_at) < new Date(firstTemplate.updated_at) ? 'outdated' : 'current';
   const consentTone = { current: 'success', outdated: 'warning', none: 'danger' }[consentState];
   const consentLabelText = { current: 'Consented', outdated: 'Consent outdated', none: 'Not consented' }[consentState];
+  const router = useRouter();
   const completedCount = client.bookings.filter(b => b.outcome === 'completed').length;
   const lastVisit = sorted[0]?.created_at ?? null;
 
@@ -526,7 +536,7 @@ function ClientDetail({ client, marketing, onMarketingChange, clientKey, onClose
               const loadingId = linkGeneratingId === ct.id;
               return (
                 <div key={ct.id} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  <Fact label={ct.name}>
+                  <Fact label="Consent form">
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                       <Pill tone={consentTone}>{consentLabelText}</Pill>
                       {client.email && consentState !== 'current' && (
@@ -537,7 +547,6 @@ function ClientDetail({ client, marketing, onMarketingChange, clientKey, onClose
                       )}
                     </span>
                   </Fact>
-                  {firstSub && <span style={detailStyles.hint}>Signed {new Date(firstSub.submitted_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}</span>}
                 </div>
               );
             })}
@@ -679,8 +688,8 @@ function ClientDetail({ client, marketing, onMarketingChange, clientKey, onClose
         <Section title={`${t('clients_booking_history')}${sorted.length ? ` (${sorted.length})` : ''}`}>
           {sorted.length === 0 && <p style={{ ...detailStyles.hint, margin: 0 }}>No bookings yet.</p>}
           {sorted.map(b => (
-            <div key={b.id} style={s.historyRow}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem', minWidth: 0 }}>
+            <button key={b.id} type="button" onClick={() => router.push(`/dashboard/appointments?booking=${b.id}`)} style={s.historyRow} aria-label={`Open booking from ${new Date(b.created_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}`}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem', minWidth: 0, textAlign: 'left' }}>
                 <span style={{ fontSize: '0.95rem', color: 'var(--text)', fontWeight: 600 }}>
                   {[b.session_type ? capitalise(b.session_type.replace(/_/g, ' ')) : null, b.artist_name || null].filter(Boolean).join(' · ') || '—'}
                 </span>
@@ -688,8 +697,11 @@ function ClientDetail({ client, marketing, onMarketingChange, clientKey, onClose
                   {new Date(b.created_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
                 </span>
               </div>
-              <Pill colors={statusColors(b.outcome === 'no_show' ? 'cancelled' : b.status)}>{capitalise((b.outcome ?? b.status).replace(/_/g, ' '))}</Pill>
-            </div>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
+                <Pill colors={statusColors(b.outcome === 'no_show' ? 'cancelled' : b.status)}>{capitalise((b.outcome ?? b.status).replace(/_/g, ' '))}</Pill>
+                <span aria-hidden="true" style={{ color: 'var(--text-muted)', fontSize: '1.1rem' }}>›</span>
+              </span>
+            </button>
           ))}
         </Section>
       </div>
@@ -995,7 +1007,17 @@ const s = {
   historyRow: {
     display: 'flex',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     gap: '0.5rem',
+    width: '100%',
+    padding: '0.6rem 0.7rem',
+    margin: '0 -0.7rem',
+    boxSizing: 'content-box',
+    background: 'transparent',
+    border: '1px solid transparent',
+    borderRadius: 10,
+    color: 'inherit',
+    font: 'inherit',
+    cursor: 'pointer',
   },
 };

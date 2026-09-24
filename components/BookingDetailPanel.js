@@ -12,7 +12,7 @@ import { showError } from '@/lib/feedback';
 import { getBookingSourceLabel } from '@/lib/bookingType';
 import Button, { IconButton } from '@/components/ui/Button';
 import BookingSMS from '@/components/BookingSMS';
-import { Pill, Section, Fact, detailStyles } from '@/components/ui/DetailParts';
+import { Pill, Section, Fact, SkeletonBar, DetailSkeleton, detailStyles } from '@/components/ui/DetailParts';
 
 const PAYMENT_LABELS = { cash: 'Cash', card: 'Card / POS', bank_transfer: 'Bank Transfer' };
 
@@ -315,14 +315,15 @@ export default function BookingDetailPanel({
   // keep the detail sections hidden rather than rendering them from partial data.
   if (loading) {
     return (
-      <aside className="studio-booking-detail" aria-label={`${clientName} booking details`} style={p.panel}>
+      <aside className="studio-booking-detail" aria-label={`${clientName} booking details`} aria-busy="true" style={p.panel}>
         <div style={p.header}>
-          <span style={p.title}>{clientName}</span>
+          <div style={p.headerText}>
+            <span style={p.title}>{clientName}</span>
+            <div style={p.headerPills}><SkeletonBar w={86} h={24} /><SkeletonBar w={64} h={24} /></div>
+          </div>
           <IconButton onClick={onClose} aria-label="Close booking details">✕</IconButton>
         </div>
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <span role="status" style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{t('loading')}</span>
-        </div>
+        <div style={p.body}><DetailSkeleton label={t('loading')} hero cards={3} /></div>
       </aside>
     );
   }

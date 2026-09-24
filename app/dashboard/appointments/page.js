@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo, Suspense } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { listStudioBookings, getStudioArtists, getStripeStatus, getStudioBooking } from '@/lib/api';
 import { getCached, setCached, invalidatePrefix } from '@/lib/cache';
@@ -42,6 +42,11 @@ const COMPLETED_SUB_FILTERS = [
 ];
 
 const DEFAULT_FILTER = 'pending';
+
+function filterForStatus(status) {
+  if (status === 'completed' || status === 'cancelled' || status === 'deposit_expired') return COMPLETED_TAB;
+  return STATUS_FILTERS.some(f => f.value === status) ? status : null;
+}
 
 export default function AppointmentsPage() {
   return <Suspense><AppointmentsInner /></Suspense>;
@@ -86,6 +91,7 @@ function AppointmentsInner() {
   const [studioArtists, setStudioArtists] = useState([]);
   const [stripeConnected, setStripeConnected] = useState(false);
   const requestedBookingId = searchParams.get('booking');
+  const deepLinkTabSet = useRef(false);
 
   const activeSub = activeFilter === COMPLETED_TAB
     ? (COMPLETED_SUB_FILTERS.find(f => f.value === completedSubFilter) ?? COMPLETED_SUB_FILTERS[0])
@@ -148,7 +154,16 @@ function AppointmentsInner() {
     setSelectedBooking(null);
     setDetailLoading(true);
     getStudioBooking(selected)
-      .then(booking => { if (active) setSelectedBooking(booking); })
+      .then(booking => {
+        if (!active) return;
+        setSelectedBooking(booking);
+        // Opened via a link (e.g. a client's booking history): show the tab this booking lives in.
+        if (selected === requestedBookingId && !deepLinkTabSet.current) {
+          deepLinkTabSet.current = true;
+          const tab = filterForStatus(booking.status);
+          if (tab) { setActiveFilter(tab); setCompletedSubFilter('all'); setConfirmedSubFilter('all'); }
+        }
+      })
       .catch(showError)
       .finally(() => { if (active) setDetailLoading(false); });
     return () => { active = false; };
