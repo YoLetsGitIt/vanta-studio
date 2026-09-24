@@ -12,6 +12,7 @@ import { showError } from '@/lib/feedback';
 import { getBookingSourceLabel } from '@/lib/bookingType';
 import Button, { IconButton } from '@/components/ui/Button';
 import BookingSMS from '@/components/BookingSMS';
+import MarketingConsent from '@/components/MarketingConsent';
 import { Pill, Section, Fact, SkeletonBar, DetailSkeleton, detailStyles } from '@/components/ui/DetailParts';
 
 const PAYMENT_LABELS = { cash: 'Cash', card: 'Card / POS', bank_transfer: 'Bank Transfer' };
@@ -83,6 +84,7 @@ export default function BookingDetailPanel({
 
   // ── Contact-book profile (allergies / preferences / pain tolerance) ─────────
   const [clientProfile, setClientProfile] = useState(null);
+  const [marketingOverride, setMarketingOverride] = useState(null);
   const [stationName,   setStationName]   = useState(null);
 
   // ── Consent submissions (new template system) ──────────────────────────────
@@ -223,6 +225,7 @@ export default function BookingDetailPanel({
   // Match this booking's client against the contact book for their saved profile.
   useEffect(() => {
     setClientProfile(null);
+    setMarketingOverride(null);
     if (!email && !phone) return;
     const emailKey = email ? email.toLowerCase() : null;
     const phoneKey = phone ? phone.replace(/[^0-9+]/g, '') : null;
@@ -508,7 +511,7 @@ export default function BookingDetailPanel({
           </Fact>
 
           {email && (
-            <Fact label={t('bdp_consent')}>
+            <Fact label={t('bdp_consent')} control>
               {consentLoading || submissionsLoading ? (
                 <Pill>{t('loading')}</Pill>
               ) : (
@@ -532,6 +535,15 @@ export default function BookingDetailPanel({
               Signed v{consent.consent_version} on {new Date(consent.agreed_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
             </span>
           )}
+
+          <MarketingConsent
+            email={email}
+            clientKey={clientProfile?.id}
+            marketing={clientProfile && clientProfile.email_marketing_opt_in !== undefined
+              ? { optIn: marketingOverride ?? clientProfile.email_marketing_opt_in === true, unsubscribed: clientProfile.email_unsubscribed === true }
+              : null}
+            onChange={setMarketingOverride}
+          />
 
           {booking?.id && <BookingSMS key={booking.id} bookingId={booking.id} />}
 

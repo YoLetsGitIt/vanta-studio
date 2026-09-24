@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { getBookingSMS, updateBookingSMS } from '@/lib/api';
+import { Fact, Switch } from '@/components/ui/DetailParts';
 
 const labels = {
   not_opted_in: 'Client has not opted in', unavailable: 'SMS delivery awaiting activation',
@@ -48,21 +49,24 @@ export default function BookingSMS({ bookingId }) {
   const pill = tone
     ? { background: `var(--color-${tone}-surface)`, color: `var(--color-${tone})`, border: `1px solid var(--color-${tone}-border)` }
     : { background: 'var(--bg-chip)', color: 'var(--text-dim)', border: '1px solid var(--border-strong)' };
+  const hint = { margin: 0, fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.45 };
   return <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '0.85rem 0 0.15rem', borderTop: '1px solid var(--border)' }}>
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
-      <span style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>SMS reminder</span>
-      {status && <span style={{ ...pill, fontSize: '0.8rem', fontWeight: 700, padding: '0.2rem 0.65rem', borderRadius: 20, whiteSpace: 'nowrap' }}>{SHORT[status] || status}</span>}
-    </div>
-    {error && <p role="alert" style={{ margin: 0, fontSize: '0.875rem', color: 'var(--color-danger)' }}>{error}</p>}
-    {!data && !error && <p role="status" style={{ margin: 0, fontSize: '0.875rem', color: 'var(--text-muted)' }}>Loading reminder…</p>}
+    <Fact label="SMS reminder" control>
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.6rem' }}>
+        {status && <span style={{ ...pill, fontSize: '0.8rem', fontWeight: 700, padding: '0.2rem 0.65rem', borderRadius: 20, whiteSpace: 'nowrap' }}>{SHORT[status] || status}</span>}
+        {data && !data.opted_out && (
+          <Switch aria-label="I have the client’s permission to send one SMS reminder for this appointment." checked={data.opt_in} disabled={saving} onChange={toggle} />
+        )}
+      </span>
+    </Fact>
+    {error && <p role="alert" style={{ ...hint, color: 'var(--color-danger)' }}>{error}</p>}
+    {!data && !error && <p role="status" style={hint}>Loading reminder…</p>}
     {data && <>
-      {status !== 'not_opted_in' && <p role="status" style={{ margin: 0, fontSize: '0.875rem', color: 'var(--text-dim)', lineHeight: 1.45 }}>{labels[status] || status}</p>}
-      {data.delivery.error_code && <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)' }}>Reference: {data.delivery.error_code}</p>}
-      {data.opted_out ? <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--text-dim)' }}>The client has opted out of Vanta SMS reminders. Their preference cannot be overridden here.</p> :
-        <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', lineHeight: 1.45, fontSize: '0.9rem', color: 'var(--text)', cursor: 'pointer' }}>
-          <input type="checkbox" checked={data.opt_in} disabled={saving} onChange={toggle} style={{ accentColor: 'var(--accent)', marginTop: 3, width: 16, height: 16 }} />
-          <span>I have the client’s permission to send one SMS reminder for this appointment.</span>
-        </label>}
+      {status !== 'not_opted_in' && <p role="status" style={{ ...hint, color: 'var(--text-dim)' }}>{labels[status] || status}</p>}
+      {data.delivery.error_code && <p style={hint}>Reference: {data.delivery.error_code}</p>}
+      {data.opted_out
+        ? <p style={hint}>The client has opted out of Vanta SMS reminders. Their preference cannot be overridden here.</p>
+        : <p style={hint}>Turn on to confirm the client gave permission for one SMS reminder for this appointment.</p>}
     </>}
   </div>;
 }

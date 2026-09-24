@@ -14,6 +14,8 @@ export const detailStyles = {
   sectionHead: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem' },
   sectionTitle: { margin: 0, fontSize: '1rem', fontWeight: 700, color: 'var(--text)' },
   fact: { display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '1rem' },
+  factControl: { alignItems: 'center', minHeight: 34 },
+  factValueControl: { display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.5rem', flexWrap: 'wrap' },
   factBlock: { display: 'flex', flexDirection: 'column', gap: '0.2rem' },
   factLabel: { fontSize: '0.875rem', color: 'var(--text-muted)', flexShrink: 0 },
   factValue: { fontSize: '0.95rem', color: 'var(--text)', textAlign: 'right', lineHeight: 1.45, overflowWrap: 'anywhere', minWidth: 0 },
@@ -52,13 +54,13 @@ export function Section({ title, aside, children }) {
 }
 
 // One fact per line: label on the left, value on the right. `block` stacks long text under its label.
-export function Fact({ label, children, value, block = false, strong = false }) {
+export function Fact({ label, children, value, block = false, strong = false, control = false }) {
   const content = children ?? value;
   if (!content && content !== 0) return null;
   return (
-    <div style={block ? d.factBlock : d.fact}>
+    <div style={block ? d.factBlock : { ...d.fact, ...(control ? d.factControl : {}) }}>
       <span style={d.factLabel}>{label}</span>
-      <span style={{ ...(block ? d.factValueBlock : d.factValue), ...(strong ? d.factStrong : {}) }}>{content}</span>
+      <span style={{ ...(block ? d.factValueBlock : d.factValue), ...(strong ? d.factStrong : {}), ...(control ? d.factValueControl : {}) }}>{content}</span>
     </div>
   );
 }

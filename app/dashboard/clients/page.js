@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { getStudioClients, getStudioClient, getClientConsents, getNotes, addNote, deleteNote, ensureStudioClient, patchStudioClient, generateConsentLink, listConsentTemplates, getClientConsentSubmissions, getBatchClientConsentSubmissions, setClientMarketingConsent } from '@/lib/api';
+import { getStudioClients, getStudioClient, getClientConsents, getNotes, addNote, deleteNote, ensureStudioClient, patchStudioClient, generateConsentLink, listConsentTemplates, getClientConsentSubmissions, getBatchClientConsentSubmissions } from '@/lib/api';
 
 const TATTOO_STYLES = [
   'Traditional', 'Neo Traditional', 'Blackwork', 'Fine Line', 'Realism',
@@ -14,7 +14,8 @@ import { formatDob } from '@/lib/format';
 import { useLanguage } from '@/lib/i18n';
 import { showError } from '@/lib/feedback';
 import Button from '@/components/ui/Button';
-import { Pill, Section, Fact, Switch, SkeletonBar, DetailSkeleton, detailStyles } from '@/components/ui/DetailParts';
+import MarketingConsent from '@/components/MarketingConsent';
+import { Pill, Section, Fact, SkeletonBar, DetailSkeleton, detailStyles } from '@/components/ui/DetailParts';
 
 const CLIENTS_PER_PAGE = 25;
 
@@ -350,32 +351,6 @@ function MarketingBadge({ marketing }) {
   return null;
 }
 
-function MarketingConsent({ client, clientKey, marketing, onChange }) {
-  const [saving, setSaving] = useState(false);
-  const [checked, setChecked] = useState(marketing?.optIn ?? false);
-  useEffect(() => { setChecked(marketing?.optIn ?? false); }, [marketing?.optIn, clientKey]);
-  if (!marketing || !client.email) return null;
-  async function toggle(next) {
-    setChecked(next);
-    setSaving(true);
-    try {
-      await setClientMarketingConsent(clientKey, next);
-      onChange(next);
-    } catch (err) {
-      setChecked(!next);
-      showError(err);
-    } finally { setSaving(false); }
-  }
-  if (marketing.unsubscribed) {
-    return <Fact label="Marketing emails"><span style={{ color: 'var(--text-muted)' }}>Unsubscribed</span></Fact>;
-  }
-  return (
-    <Fact label="Marketing emails">
-      <Switch aria-label="Client has agreed to receive marketing emails" title="Turn on only if they agreed to hear from you. Every email has an unsubscribe link." checked={checked} disabled={saving} onChange={toggle} />
-    </Fact>
-  );
-}
-
 function ClientDetail({ client, marketing, onMarketingChange, clientKey, onClose, consentTemplates = [], onSendConsentLink }) {
   const { t } = useLanguage();
   const [linkGeneratingId, setLinkGeneratingId] = useState(null);
@@ -536,7 +511,7 @@ function ClientDetail({ client, marketing, onMarketingChange, clientKey, onClose
               const loadingId = linkGeneratingId === ct.id;
               return (
                 <div key={ct.id} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  <Fact label="Consent form">
+                  <Fact label="Consent form" control>
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                       <Pill tone={consentTone}>{consentLabelText}</Pill>
                       {client.email && consentState !== 'current' && (
@@ -550,7 +525,7 @@ function ClientDetail({ client, marketing, onMarketingChange, clientKey, onClose
                 </div>
               );
             })}
-            <MarketingConsent client={client} clientKey={clientKey} marketing={marketing} onChange={onMarketingChange} />
+            <MarketingConsent email={client.email} clientKey={clientKey} marketing={marketing} onChange={onMarketingChange} />
           </Section>
         )}
 
