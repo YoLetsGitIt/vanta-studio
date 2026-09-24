@@ -10,9 +10,9 @@ import { requestConfirmation, showError, showFeedback } from '@/lib/feedback';
 import styles from './marketing.module.css';
 
 function statusBadge(status) {
-  if (status === 'verified') return <span className={`${styles.badge} ${styles.badgeOk}`}>Verified</span>;
-  if (status === 'failed' || status === 'temporary_failure') return <span className={`${styles.badge} ${styles.badgeWarn}`}>Needs attention</span>;
-  return <span className={styles.badge}>Waiting for DNS</span>;
+  if (status === 'verified') return <span className={`${styles.pill} ${styles.pillOn}`}>Verified</span>;
+  if (status === 'failed' || status === 'temporary_failure') return <span className={`${styles.pill} ${styles.pillBad}`}>Needs attention</span>;
+  return <span className={`${styles.pill} ${styles.pillBusy}`}>Waiting for DNS</span>;
 }
 
 export default function SenderSettings({ settings, available, onSaved }) {
@@ -72,7 +72,7 @@ export default function SenderSettings({ settings, available, onSaved }) {
       <section className={styles.card} aria-labelledby="sender-id">
         <div>
           <h2 className={styles.cardTitle} id="sender-id">Who emails come from</h2>
-          <p className={styles.desc}>Until you verify your own domain, emails are sent as “Your Studio via Vanta”. Replies always go to your reply-to address.</p>
+          <p className={styles.desc}>Emails show your studio name, and replies go to the address below.</p>
         </div>
         <div className={styles.row}>
           <Field label="Sender name" hint="Defaults to your studio name."><Input value={form.from_name} maxLength={100} onChange={e => set({ from_name: e.target.value })} /></Field>
@@ -90,14 +90,10 @@ export default function SenderSettings({ settings, available, onSaved }) {
         <div className={styles.actions}><Button onClick={save} loading={saving} loadingLabel="Saving…" disabled={!dirty}>Save</Button></div>
       </section>
 
-      <section className={styles.card} aria-labelledby="sender-domain">
-        <div className={styles.cardHead}>
-          <div>
-            <h2 className={styles.cardTitle} id="sender-domain">Send from your own domain</h2>
-            <p className={styles.desc}>Add the DNS records below at your domain provider so emails come straight from an address like hello@yourstudio.com. Your emails are then signed with your own domain.</p>
-          </div>
-          {settings.domain && statusBadge(settings.domain_status)}
-        </div>
+      <details className={styles.details} open={Boolean(settings.domain)}>
+        <summary><span>Advanced: send from your own domain {settings.domain && statusBadge(settings.domain_status)}</span></summary>
+        <div className={styles.detailsBody}>
+        <p className={styles.desc}>Right now emails are sent as “{form.from_name || 'Your studio'} via Vanta”. To send from an address like hello@yourstudio.com instead, add the records below at your domain provider (where you bought the domain).</p>
         {!settings.domain ? (
           <div className={styles.row}>
             <Field label="Your domain" hint="For example yourstudio.com">
@@ -129,8 +125,9 @@ export default function SenderSettings({ settings, available, onSaved }) {
             <Button variant="ghost" onClick={remove} loading={busy === 'remove'}>Remove domain</Button>
           </div>
         </>}
-        {!available && <p className={styles.hint}>Email sending isn’t switched on yet.</p>}
-      </section>
+        {!available && <p className={styles.hint}>Sending isn’t switched on yet.</p>}
+        </div>
+      </details>
     </>
   );
 }

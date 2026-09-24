@@ -13,6 +13,17 @@ import styles from '@/components/marketing/marketing.module.css';
 const TABS = [['automations', 'Automations'], ['campaigns', 'Campaigns'], ['sender', 'Sender']];
 const EVENT_LABELS = { slot_opened: 'Slot opened', session_completed: 'Session completed' };
 
+function Step({ done, n, title, hint, action }) {
+  return (
+    <li className={`${styles.step} ${done ? styles.stepDone : ''}`}>
+      <span className={styles.stepMark} aria-hidden="true">{done ? '✓' : n}</span>
+      <span className={styles.stepText}>{title}{hint && !done && <span className={styles.stepHint}>{hint}</span>}
+        {done && <span className="sr-only"> (done)</span>}</span>
+      {!done && action}
+    </li>
+  );
+}
+
 export default function MarketingPage() {
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
@@ -34,32 +45,44 @@ export default function MarketingPage() {
   const { stats, settings, automations, events, available, ready } = data;
   const patchSettings = next => setData(prev => ({ ...prev, settings: next, ready: Boolean(next.reply_to || (next.domain && next.domain_status === 'verified')) }));
   const patchAutomation = saved => setData(prev => ({ ...prev, automations: prev.automations.map(a => a.trigger_type === saved.trigger_type ? saved : a) }));
-  const needsSetup = !ready || stats.consented_clients === 0;
+  const goSender = () => { setTab('sender'); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+
+  const hasClients = stats.consented_clients > 0;
+  const inUse = automations.some(a => a.enabled) || stats.sent_this_month > 0;
+  const setupDone = ready && hasClients && inUse;
 
   return (
     <main className={styles.page}>
       <header>
         <h1 className={styles.title}>Marketing</h1>
-        <p className={styles.subtitle}>Email clients who have agreed to hear from you: fill cancelled slots, thank people after a session, or send a campaign.</p>
+        <p className={styles.subtitle}>Email clients who have agreed to hear from you. Only clients you’ve ticked are ever emailed.</p>
       </header>
 
       {!available && (
-        <StatePanel tone="neutral" compact title="Email sending isn’t switched on yet"
-          description="You can set everything up now. Nothing is sent until sending is enabled for Vanta." />
-      )}
-      {needsSetup && (
-        <StatePanel tone="neutral" compact title="Finish setting up"
-          description={[
-            !ready && 'Add a reply-to email in the Sender tab.',
-            stats.consented_clients === 0 && 'Mark which clients have agreed to marketing emails on the Clients page. Only they will ever be emailed.',
-          ].filter(Boolean).join(' ')}
-          action={<Link href="/dashboard/clients" className="studio-button studio-button--secondary studio-button--sm">Go to clients</Link>} />
+        <div className={styles.notice} role="status">
+          <span><span className={styles.noticeStrong}>Sending is off for now.</span> You can set everything up, and nothing goes out until it’s switched on.</span>
+        </div>
       )}
 
-      <div className={styles.stats}>
-        {[['Opted-in clients', stats.consented_clients], ['Unsubscribed', stats.unsubscribed], ['Sent this month', stats.sent_this_month], ['Failed this month', stats.failed_this_month]].map(([label, value]) => (
-          <div key={label} className={styles.stat}><div className={styles.statValue}>{value}</div><div className={styles.statLabel}>{label}</div></div>
-        ))}
+      {!setupDone && (
+        <section className={styles.setup} aria-labelledby="setup-title">
+          <h2 className={styles.setupTitle} id="setup-title">Get started in 3 steps</h2>
+          <ol className={styles.steps}>
+            <Step n="1" done={ready} title="Add a reply-to email" hint="So client replies reach you."
+              action={<Button size="sm" onClick={goSender}>Add it</Button>} />
+            <Step n="2" done={hasClients} title="Choose who can be emailed" hint="Tick “agreed to marketing emails” on a client."
+              action={<Link href="/dashboard/clients" className="studio-button studio-button--secondary studio-button--sm">Go to clients</Link>} />
+            <Step n="3" done={inUse} title="Turn on an automation or send a campaign"
+              action={<Button size="sm" variant="secondary" onClick={() => setTab('campaigns')}>Send a campaign</Button>} />
+          </ol>
+        </section>
+      )}
+
+      <div className={styles.summary} aria-label="Summary">
+        <span className={styles.summaryItem}><span className={`${styles.dot} ${styles.dotBlue}`} />{stats.consented_clients} can be emailed</span>
+        <span className={styles.summaryItem}><span className={`${styles.dot} ${styles.dotGreen}`} />{stats.sent_this_month} sent this month</span>
+        {stats.unsubscribed > 0 && <span className={styles.summaryItem}><span className={styles.dot} />{stats.unsubscribed} unsubscribed</span>}
+        {stats.failed_this_month > 0 && <span className={styles.summaryItem}><span className={`${styles.dot} ${styles.dotRed}`} />{stats.failed_this_month} failed</span>}
       </div>
 
       <div role="tablist" aria-label="Marketing sections" className={styles.tabs}>
@@ -68,25 +91,28 @@ export default function MarketingPage() {
         ))}
       </div>
 
-      <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+      <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
         {tab === 'automations' && <>
-          {automations.map(a => <AutomationCard key={a.trigger_type} automation={a} available={available} onSaved={patchAutomation} />)}
-          <section className={styles.card} aria-labelledby="recent-triggers">
-            <h2 className={styles.cardTitle} id="recent-triggers">Recent activity</h2>
-            {events.length === 0 ? <p className={styles.muted}>Nothing yet. Cancellations and completed sessions will show up here.</p> : (
-              <ul className={styles.list}>
-                {events.map(e => (
-                  <li key={e.id} className={styles.listRow}>
-                    <span>{EVENT_LABELS[e.event_type] || e.event_type}{e.client_name ? ` · ${e.client_name}` : ''}
-                      <span className={styles.muted}> {new Date(e.created_at).toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' })}</span></span>
-                    <span className={styles.muted}>{e.sends > 0 ? `${e.sends} email${e.sends === 1 ? '' : 's'} queued` : 'No emails'}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
+          <p className={styles.hint} style={{ fontSize: '0.9rem' }}>Automations send emails for you when something happens. They’re off until you turn them on.</p>
+          {automations.map(a => <AutomationCard key={a.trigger_type} automation={a} available={available} onSaved={patchAutomation} onNeedSetup={goSender} />)}
+          {events.length > 0 && (
+            <details className={styles.details}>
+              <summary>Recent activity ({events.length})</summary>
+              <div className={styles.detailsBody}>
+                <ul className={styles.list}>
+                  {events.map(e => (
+                    <li key={e.id} className={styles.listRow}>
+                      <span>{EVENT_LABELS[e.event_type] || e.event_type}{e.client_name ? ` · ${e.client_name}` : ''}
+                        <span className={styles.rowSub}>{new Date(e.created_at).toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' })}</span></span>
+                      <span className={styles.muted}>{e.sends > 0 ? `${e.sends} email${e.sends === 1 ? '' : 's'} queued` : 'No emails'}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </details>
+          )}
         </>}
-        {tab === 'campaigns' && <Campaigns available={available} ready={ready} onSent={load} />}
+        {tab === 'campaigns' && <Campaigns available={available} ready={ready} onSent={load} onNeedSetup={goSender} />}
         {tab === 'sender' && <SenderSettings settings={settings} available={available} onSaved={patchSettings} />}
       </div>
     </main>

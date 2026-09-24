@@ -9,14 +9,18 @@ import PreviewDialog from './PreviewDialog';
 import styles from './marketing.module.css';
 
 const SEGMENTS = [
-  ['all', 'All clients who agreed to marketing emails'],
-  ['no_visit_days', 'Haven’t had a tattoo in a while'],
-  ['completed_within_days', 'Had a tattoo recently'],
+  ['all', 'Everyone who agreed to marketing emails'],
+  ['no_visit_days', 'Clients who haven’t had a tattoo in a while'],
+  ['completed_within_days', 'Clients who had a tattoo recently'],
 ];
 
 const STARTER = 'Hi {{client_name}},\n\nWrite your message here.\n\nThanks,\n{{studio_name}}';
 
-export default function Campaigns({ available, ready, onSent }) {
+function StepHead({ n, children }) {
+  return <div className={styles.stepHead}><span className={styles.stepNum} aria-hidden="true">{n}</span><h3 className={styles.cardTitle}>{children}</h3></div>;
+}
+
+export default function Campaigns({ available, ready, onSent, onNeedSetup }) {
   const [name, setName] = useState('');
   const [kind, setKind] = useState('all');
   const [days, setDays] = useState(90);
@@ -68,33 +72,36 @@ export default function Campaigns({ available, ready, onSent }) {
 
   return (
     <>
-      <section className={styles.card} aria-labelledby="campaign-new">
-        <div>
-          <h2 className={styles.cardTitle} id="campaign-new">New campaign</h2>
-          <p className={styles.desc}>Send a one-off email to clients who agreed to marketing emails. Everyone gets an unsubscribe link automatically.</p>
-        </div>
+      <section className={styles.card} aria-label="New campaign">
+        <StepHead n="1">Who should get it?</StepHead>
         <div className={styles.row}>
-          <Field label="Campaign name" hint="Only you see this."><Input value={name} maxLength={200} onChange={e => setName(e.target.value)} /></Field>
-          <Field label="Who should receive it?">
+          <Field label="Audience">
             <Select value={kind} onChange={e => setKind(e.target.value)}>
               {SEGMENTS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </Select>
           </Field>
           {needsDays && (
-            <Field label={kind === 'no_visit_days' ? 'No visit in the last (days)' : 'Visited within the last (days)'}>
+            <Field label={kind === 'no_visit_days' ? 'No visit in the last (days)' : 'Visited in the last (days)'}>
               <Input type="number" min={1} max={3650} value={days} onChange={e => setDays(e.target.value)} />
             </Field>
           )}
         </div>
-        <p className={countError ? styles.error : styles.muted} role="status">
-          {countError || (count === null ? 'Counting…' : `${count} client${count === 1 ? '' : 's'} will receive this.`)}
+        <p className={countError ? styles.error : styles.audience} role="status">
+          {countError || (count === null ? 'Counting…' : `${count} client${count === 1 ? '' : 's'} will receive this`)}
         </p>
+
+        <StepHead n="2">What should it say?</StepHead>
         <Field label="Subject"><Input value={subject} maxLength={200} onChange={e => setSubject(e.target.value)} /></Field>
-        <Field label="Message" hint="Placeholders: {{client_name}}  {{studio_name}}. Separate paragraphs with a blank line.">
-          <Textarea rows={10} value={body} maxLength={50000} onChange={e => setBody(e.target.value)} />
+        <Field label="Message" hint="Use {{client_name}} and {{studio_name}} to personalise. Leave a blank line between paragraphs.">
+          <Textarea rows={8} value={body} maxLength={50000} onChange={e => setBody(e.target.value)} />
         </Field>
-        {!available && <p className={styles.hint}>Email sending isn’t switched on yet.</p>}
-        {available && !ready && <p className={styles.hint}>Add a reply-to email in the Sender tab before sending.</p>}
+        <Field label="Campaign name" hint="Just for you, so you can find it later."><Input value={name} maxLength={200} onChange={e => setName(e.target.value)} /></Field>
+
+        <StepHead n="3">Send it</StepHead>
+        {!available && <p className={styles.hint}>Sending isn’t switched on yet.</p>}
+        {available && !ready && (
+          <p className={styles.hint}>Add a reply-to email first. <button type="button" className={styles.chip} onClick={onNeedSetup}>Set it up</button></p>
+        )}
         <div className={styles.actions}>
           <Button onClick={send} loading={sending} loadingLabel="Sending…" disabled={!canSend}>Send campaign</Button>
           <Button variant="secondary" onClick={() => setPreview(true)} disabled={!body.trim()}>Preview</Button>
@@ -105,20 +112,20 @@ export default function Campaigns({ available, ready, onSent }) {
         <h2 className={styles.cardTitle} id="campaign-history">Past campaigns</h2>
         {campaigns === null ? <p className={styles.muted} role="status">Loading…</p>
           : campaigns.length === 0 ? <p className={styles.muted}>No campaigns yet.</p> : (
-            <div className={styles.scroll}>
-              <table className={styles.table}>
-                <thead><tr><th>Campaign</th><th>Status</th><th>Recipients</th><th>Delivered</th><th>Opened</th><th>Clicked</th><th>Failed</th></tr></thead>
-                <tbody>
-                  {campaigns.map(c => (
-                    <tr key={c.id}>
-                      <td>{c.name}<div className={styles.muted}>{new Date(c.created_at).toLocaleDateString('en-AU', { dateStyle: 'medium' })}</div></td>
-                      <td><span className={`${styles.badge} ${c.status === 'sent' ? styles.badgeOk : styles.badgeWarn}`}>{c.status === 'sent' ? 'Sent' : `Sending (${c.queued} left)`}</span></td>
-                      <td>{c.recipient_count}</td><td>{c.delivered}</td><td>{c.opened}</td><td>{c.clicked}</td><td>{c.failed}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <ul className={styles.list}>
+              {campaigns.map(c => (
+                <li key={c.id} className={styles.listRow}>
+                  <span>{c.name}
+                    <span className={styles.rowSub}>
+                      {new Date(c.created_at).toLocaleDateString('en-AU', { dateStyle: 'medium' })} · {c.recipient_count} recipients · {c.delivered} delivered · {c.opened} opened · {c.clicked} clicked
+                    </span></span>
+                  <span>
+                    {c.failed > 0 && <span className={`${styles.pill} ${styles.pillBad}`} style={{ marginRight: 6 }}>{c.failed} failed</span>}
+                    <span className={`${styles.pill} ${c.status === 'sent' ? styles.pillOn : styles.pillBusy}`}>{c.status === 'sent' ? 'Sent' : `Sending · ${c.queued} left`}</span>
+                  </span>
+                </li>
+              ))}
+            </ul>
           )}
       </section>
       {preview && <PreviewDialog subject={subject} body={body} onClose={() => setPreview(false)} />}
