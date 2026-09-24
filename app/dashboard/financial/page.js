@@ -157,8 +157,8 @@ export default function FinancialPage() {
 
   if (!unlocked) {
     return (
-      <div style={st.page}>
-        <div style={st.header}>
+      <div className="studio-feature-page studio-financial-page" style={st.page}>
+        <div className="studio-feature-header" style={st.header}>
           <h1 style={st.title}>{t('revenue_financial')}</h1>
         </div>
         <PasswordGate email={userEmail} onUnlock={handleUnlock} />
@@ -167,11 +167,11 @@ export default function FinancialPage() {
   }
 
   return (
-    <div style={st.page}>
+    <div className="studio-feature-page studio-financial-page" style={st.page}>
       {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <div style={st.header}>
+      <div className="studio-feature-header" style={st.header}>
         <h1 style={st.title}>{t('revenue_financial')}</h1>
-        <div style={st.controls}>
+        <div className="studio-report-controls" style={st.controls}>
           <div style={st.quickPicker}>
             {QUICK_OPTIONS.map(opt => (
               <button key={opt.label} aria-pressed={activeQuick === opt.label} aria-label={opt.days === null ? 'Year to date' : `Last ${opt.days / 7} weeks`} onClick={() => applyQuick(opt)}
@@ -181,7 +181,7 @@ export default function FinancialPage() {
             ))}
           </div>
           <div style={st.dateSep} />
-          <div style={st.dateRange}>
+          <div className="studio-date-range" style={st.dateRange}>
             <input type="date" aria-label="Start date" value={startDate} max={endDate} onChange={onStartChange} style={st.dateInput} />
             <span style={st.dateArrow}>→</span>
             <input type="date" aria-label="End date" value={endDate} min={startDate} max={today} onChange={onEndChange} style={st.dateInput} />
@@ -194,7 +194,7 @@ export default function FinancialPage() {
       </div>
 
       {/* ── Tab bar ────────────────────────────────────────────────────────── */}
-      <div style={st.tabBar}>
+      <div className="studio-tab-bar" style={st.tabBar}>
         <button aria-pressed={tab === 'financial'} onClick={() => setTab('financial')}
           style={{ ...st.tabBtn, ...(tab === 'financial' ? st.tabActive : {}) }}>
           {t('revenue_financial')}
@@ -230,7 +230,7 @@ export default function FinancialPage() {
       )}
 
       {/* ── Body ───────────────────────────────────────────────────────────── */}
-      <div style={st.body}>
+      <div className="studio-feature-body" style={st.body}>
         {loading && <p role="status" style={st.msg}>{t('loading')}</p>}
         {error   && <p role="alert" style={{ ...st.msg, color: 'var(--color-danger)' }}>{error}</p>}
 
@@ -298,7 +298,7 @@ function FinancialContent({ s, weeklyChart, startDate, endDate, isLight }) {
   return (
     <>
       <Section title={`Revenue summary · ${startDate} – ${endDate}`}>
-        <div style={st.kpiGrid}>
+        <div className="studio-kpi-grid" style={st.kpiGrid}>
           <KpiCard label={t('revenue_gross_sales')}           value={fmt(s?.gross_sales)}       accent />
           <KpiCard label={t('revenue_net_sales')}             value={fmt(s?.net_sales)}          />
           <KpiCard label={t('revenue_deposits')}    value={fmt(s?.deposits_collected)} />

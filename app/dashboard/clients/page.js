@@ -165,8 +165,8 @@ function ClientsInner() {
   }, []);
 
   return (
-    <div style={s.page}>
-      <div style={s.header}>
+    <div className="studio-feature-page studio-clients-page" style={s.page}>
+      <div className="studio-feature-header" style={s.header}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <h1 style={s.title}>{t('nav_clients')}</h1>
           {/* Client data export disabled for now — re-enable when the export flow is finalised.
@@ -193,7 +193,7 @@ function ClientsInner() {
       </div>
 
       <div style={s.layout}>
-        <div style={s.list}>
+        <div className="studio-feature-body studio-client-list" style={s.list}>
           {loading && <p role="status" style={s.msg}>{t('loading')}</p>}
           {error && <p role="alert" style={{ ...s.msg, color: 'var(--status-rejected)' }}>{error}</p>}
           {!loading && !error && filtered.length === 0 && (
@@ -208,6 +208,7 @@ function ClientsInner() {
             return (
               <div
                 key={key}
+                className="studio-client-row"
                 role="button"
                 tabIndex={0}
                 aria-expanded={active}
@@ -230,7 +231,7 @@ function ClientsInner() {
                     {client.email || client.phone || '—'}
                   </span>
                 </div>
-                <div style={s.clientStats}>
+                <div className="studio-client-stats" style={s.clientStats}>
                   <span style={s.sessionCount}>{client.bookingCount} {t('clients_sessions')}</span>
                   {client.imported && <span style={{ ...s.badge, ...s.badgeGrey }}>{t('clients_imported')}</span>}
                   <ConsentBadge status={consentStatus} />
@@ -243,7 +244,7 @@ function ClientsInner() {
               <span style={s.pageSummary}>
                 {`${(page - 1) * CLIENTS_PER_PAGE + 1}–${Math.min(page * CLIENTS_PER_PAGE, filtered.length)} of ${filtered.length}`}
               </span>
-              <div style={s.pageActions}>
+              <div className="studio-client-pagination" style={s.pageActions}>
                 <button
                   type="button"
                   onClick={() => setPage(current => Math.max(1, current - 1))}
@@ -266,7 +267,7 @@ function ClientsInner() {
           )}
         </div>
 
-        {detailLoading && <aside style={s.panel}><p style={s.msg}>{t('loading')}</p></aside>}
+        {detailLoading && <aside className="studio-client-detail" style={s.panel}><p style={s.msg}>{t('loading')}</p></aside>}
         {!detailLoading && selectedClient && (
           <ClientDetail
             client={selectedClient}

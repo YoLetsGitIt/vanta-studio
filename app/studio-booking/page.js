@@ -99,6 +99,7 @@ function WalkInInner() {
   const [email, setEmail]           = useState('');
   const [phoneCode, setPhoneCode]   = useState(() => detectCountry());
   const [phoneNum,  setPhoneNum]    = useState('');
+  const [smsOptIn, setSMSOptIn] = useState(false);
   const [dob, setDob]               = useState('');
   const [skinTone, setSkinTone]     = useState('');
 
@@ -296,6 +297,7 @@ function WalkInInner() {
         name:                 `${firstName} ${lastName}`.trim(),
         email,
         phone: `${COUNTRIES.find(c => c.id === phoneCode)?.dial ?? ''} ${phoneNum}`.trim(),
+        sms_reminder_opt_in: smsOptIn,
         dob,
         skin_tone:            skinTone,
 
@@ -381,6 +383,11 @@ function WalkInInner() {
               </div>
             </Field>
           </Section>
+
+          <label style={{ display: 'flex', gap: 10, fontSize: 13, lineHeight: 1.6, marginBottom: 24 }}>
+            <input type="checkbox" checked={smsOptIn} onChange={e => setSMSOptIn(e.target.checked)} />
+            Send me one SMS reminder before this appointment. Optional; I can stop SMS reminders using the link in the message.
+          </label>
 
           {/* ── Your tattoo ── */}
           <Section title="Your tattoo">

@@ -199,7 +199,7 @@ function ArtistsInner() {
   const artists = showPending ? pending : approved;
 
   return (
-    <div style={s.page}>
+    <div className="studio-feature-page studio-artists-page" style={s.page}>
       {rejectTarget && (
         <ArtistRejectModal
           saving={!!actionLoading}
@@ -227,7 +227,7 @@ function ArtistsInner() {
           onViewRequests={() => { dismissArtistGuide(); router.push('/dashboard/artists?pending=1'); }}
         />
       )}
-      <div style={s.header}>
+      <div className="studio-feature-header" style={s.header}>
         <div style={s.headerLeft}>
           <h1 style={s.title}>{t(showPending ? 'artists_pending_review' : 'artists_my_artists')}</h1>
           <p style={s.subtitle}>
@@ -249,7 +249,7 @@ function ArtistsInner() {
         </button>
       </div>
 
-      <div style={s.body}>
+      <div className="studio-feature-body" style={s.body}>
         {loading && <p role="status" style={s.msg}>{t('loading')}</p>}
         {error && <p role="alert" style={{ ...s.msg, color: 'var(--color-danger)' }}>{error}</p>}
         {!loading && !error && artists.length === 0 && (
@@ -316,7 +316,7 @@ function ArtistOnboardingGuide({ studioName, copied, onCopy, onSkip, onViewReque
           <p style={s.artistGuideText}>{current.body}</p>
 
           {isDownload ? (
-            <div style={s.downloadCard}>
+            <div className="studio-artist-download" style={s.downloadCard}>
               <div style={s.qrBox}><QRCodeSVG value={APP_STORE_URL} size={126} bgColor="#d5d0c7" fgColor="#080808" marginSize={2} /></div>
               <div>
                 <strong style={s.downloadTitle}>Download Vanta for iPhone</strong>
@@ -332,12 +332,12 @@ function ArtistOnboardingGuide({ studioName, copied, onCopy, onSkip, onViewReque
             </div>
           )}
 
-          <div style={s.artistGuideActions}>
+          <div className="studio-wrap-row" style={s.artistGuideActions}>
             <button type="button" style={s.artistGuideSecondary} onClick={onSkip}>Skip for now</button>
             <button type="button" style={s.artistGuidePrimary} onClick={() => step === steps.length - 1 ? onViewRequests() : setStep(step + 1)}>{current.action} <span>→</span></button>
           </div>
           <div style={s.guideProgress}>
-            {steps.map((item, index) => <button key={item.kicker} type="button" aria-current={index === step ? 'step' : undefined} aria-label={`Go to ${item.kicker}`} onClick={() => setStep(index)} style={{ ...s.guideProgressDot, ...(index === step ? s.guideProgressDotActive : {}) }} />)}
+            {steps.map((item, index) => <button className="studio-guide-dot" key={item.kicker} type="button" aria-current={index === step ? 'step' : undefined} aria-label={`Go to ${item.kicker}`} onClick={() => setStep(index)} style={{ ...s.guideProgressDot, ...(index === step ? s.guideProgressDotActive : {}) }} />)}
           </div>
         </section>
         <ArtistAppScreen step={step} />
@@ -416,14 +416,14 @@ function ArtistRow({ artist, onClick, onApprove, onReject, onRemove, actionLoadi
               </span>
             )}
           </div>
-          <div style={s.metaRow}>
+          <div className="studio-wrap-row" style={s.metaRow}>
             <span style={s.email}>{artist.email}</span>
             {artist.instagram && <><span style={s.dot}>·</span><span style={s.instagram}>@{artist.instagram}</span></>}
           </div>
         </div>
 
         {artist.status === 'pending' ? (
-          <div style={s.actions}>
+          <div className="studio-wrap-row" style={s.actions}>
             <button
               onClick={onApprove}
               disabled={actionLoading}
@@ -530,24 +530,24 @@ function ArtistDetail({ artist, onBack, onApprove, onReject, onRemove, onToggleA
   }, [artist.id]);
 
   return (
-    <div style={s.page}>
-      <div style={s.detailHeader}>
+    <div className="studio-feature-page studio-artists-page" style={s.page}>
+      <div className="studio-feature-header" style={s.detailHeader}>
         <button onClick={onBack} style={s.backBtn}>← Artists</button>
       </div>
 
-      <div style={s.detailBody}>
+      <div className="studio-feature-body" style={s.detailBody}>
         <div style={{ display: 'flex', gap: '2rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
 
           {/* Left column */}
           <div style={{ flex: '1 1 340px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-            <div style={s.detailHero}>
+            <div className="studio-wrap-row" style={s.detailHero}>
               {artist.profileImage ? (
                 <img src={artist.profileImage} alt={artist.name} style={s.detailAvatar} />
               ) : (
                 <div style={{ ...s.detailAvatar, ...s.detailAvatarFallback }}>{artistInitials}</div>
               )}
               <div style={s.detailMeta}>
-                <div style={s.detailNameRow}>
+                <div className="studio-wrap-row" style={s.detailNameRow}>
                   <span style={s.detailName}>{artist.name || t('artists_unnamed')}</span>
                   {artist.studioType === 'guest' && <span style={s.guestBadge}>{t('artists_guest')}</span>}
                   {artist.status !== 'approved' && (

@@ -206,13 +206,13 @@ export default function ImportPage() {
   // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
-    <div style={s.page}>
-      <div style={s.header}>
+    <div className="studio-feature-page studio-import-page" style={s.page}>
+      <div className="studio-feature-header" style={s.header}>
         <h1 style={s.title}>{t('import_title')}</h1>
         <p style={s.sub}>{t('import_desc')}</p>
       </div>
 
-      <div style={s.body}>
+      <div className="studio-feature-body" style={s.body}>
         {error && <div role="alert" style={s.error}>{error}</div>}
 
         {step === 'upload' && (

@@ -326,7 +326,7 @@ function AppointmentsInner() {
     : bookings.find(b => b.id === sendLinkTarget);
 
   return (
-    <div style={s.page}>
+    <div className="studio-feature-page studio-appointments-page" style={s.page}>
       {toast && (
         <div style={s.toast}>
           <span style={s.toastCheck}>✓</span>
@@ -375,8 +375,8 @@ function AppointmentsInner() {
       )}
 
       {reassignTarget && (
-        <div style={s.modalOverlay} onClick={() => setReassignTarget(null)}>
-          <div style={s.modal} onClick={e => e.stopPropagation()}>
+        <div className="studio-legacy-overlay" style={s.modalOverlay} onClick={() => setReassignTarget(null)}>
+          <div className="studio-legacy-modal" style={s.modal} onClick={e => e.stopPropagation()}>
             <h3 style={s.modalTitle}>{t('appt_reassign')}</h3>
             <label style={s.modalLabel}>{t('appt_new_artist')}</label>
             <select value={reassignArtistId} onChange={e => setReassignArtistId(e.target.value)} style={s.modalSelect}>
@@ -399,7 +399,7 @@ function AppointmentsInner() {
         </div>
       )}
 
-      <div style={s.header}>
+      <div className="studio-feature-header" style={s.header}>
         <h1 style={s.title}>{t('nav_bookings')}</h1>
         <input
           type="search"
@@ -409,8 +409,8 @@ function AppointmentsInner() {
           onChange={e => setSearch(e.target.value)}
           style={s.searchInput}
         />
-        <div style={s.filterRow}>
-          <div style={s.filters}>
+        <div className="studio-booking-filter-row" style={s.filterRow}>
+          <div className="studio-scroll-tabs" style={s.filters}>
             {STATUS_FILTERS.map(f => (
               <button
                 key={f.value}
@@ -430,7 +430,7 @@ function AppointmentsInner() {
       </div>
 
       {activeFilter === CONFIRMED_TAB && (
-        <div style={s.subFilterRow}>
+        <div className="studio-scroll-tabs studio-booking-subfilters" style={s.subFilterRow}>
           {CONFIRMED_SUB_FILTERS.map(f => (
             <button
               key={f.value}
@@ -446,7 +446,7 @@ function AppointmentsInner() {
       )}
 
       {activeFilter === COMPLETED_TAB && (
-        <div style={s.subFilterRow}>
+        <div className="studio-scroll-tabs studio-booking-subfilters" style={s.subFilterRow}>
           {COMPLETED_SUB_FILTERS.map(f => (
             <button
               key={f.value}
@@ -461,7 +461,7 @@ function AppointmentsInner() {
         </div>
       )}
 
-      <div style={s.body}>
+      <div className="studio-feature-body" style={s.body}>
         {loading && <SkeletonList />}
         {error && <StatePanel title={error} tone="error" compact />}
         {!loading && !error && filteredBookings.length === 0 && (
@@ -515,8 +515,8 @@ function AppointmentsInner() {
 
       {/* ── Reschedule modal ── */}
       {rescheduleTarget && (
-        <div style={s.modalOverlay} onClick={e => e.target === e.currentTarget && setRescheduleTarget(null)}>
-          <div style={s.modal}>
+        <div className="studio-legacy-overlay" style={s.modalOverlay} onClick={e => e.target === e.currentTarget && setRescheduleTarget(null)}>
+          <div className="studio-legacy-modal" style={s.modal}>
             <h3 style={s.modalTitle}>{t('reschedule_booking')}</h3>
             <p style={s.modalSub}>
               {rescheduleTarget.requester_name} · {rescheduleTarget.session_type}
@@ -592,7 +592,7 @@ function SkeletonList() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
       {widths.map((w, i) => (
-        <div key={i} className="skeleton" style={{ ...s.row, cursor: 'default', pointerEvents: 'none' }}>
+        <div key={i} className="skeleton studio-booking-row" style={{ ...s.row, cursor: 'default', pointerEvents: 'none' }}>
           <div style={{ ...s.dateBlock, gap: '0.3rem' }}>
             <div style={{ width: 24, height: 9, borderRadius: 3, background: 'var(--bg-chip)' }} />
             <div style={{ width: 28, height: 22, borderRadius: 4, background: 'var(--bg-chip)' }} />
@@ -635,6 +635,11 @@ function BookingRow({ booking: b, selected, onSelect, labelOverride }) {
 
   return (
     <div
+      className="studio-booking-row"
+      role="button"
+      tabIndex={0}
+      aria-expanded={selected}
+      onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onSelect(); } }}
       onClick={onSelect}
       style={{
         ...s.row,
@@ -665,7 +670,7 @@ function BookingRow({ booking: b, selected, onSelect, labelOverride }) {
       </div>
 
       {/* Main content */}
-      <div style={s.rowMain}>
+      <div className="studio-booking-main" style={s.rowMain}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
           <span style={s.clientName}>{b.requester_name}</span>
           {b.parent_booking_id && <span style={s.followUpTag}>{t('appt_followup')}</span>}
@@ -681,7 +686,7 @@ function BookingRow({ booking: b, selected, onSelect, labelOverride }) {
       </div>
 
       {/* Right */}
-      <div style={s.rowRight}>
+      <div className="studio-booking-status" style={s.rowRight}>
         <span style={{ ...s.statusBadge, background: sc.bg, color: sc.text, border: `1px solid ${sc.border}` }}>
           {labelOverride ?? statusLabel(displayStatus)}
         </span>

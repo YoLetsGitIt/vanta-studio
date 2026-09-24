@@ -1,5 +1,7 @@
 'use client';
 
+import { MOBILE_MEDIA } from '@/lib/responsive';
+
 import { useState, useEffect } from 'react';
 import { getStudioArtists, getStudioSchedule, getStudioScheduleRange, getStudioBooking, createManualBooking, getStations, getStripeStatus } from '@/lib/api';
 import { BOOKING_SOURCES, getBookingStyle, TYPE_STYLE } from '@/lib/bookingType';
@@ -303,8 +305,8 @@ function BookingOverlays({ actions: a }) {
         />
       )}
       {a.sendLinkTarget && (
-        <div style={overlayStyle} onClick={() => a.setSendLinkTarget(null)}>
-          <div style={modalStyle} onClick={e => e.stopPropagation()}>
+        <div className="studio-legacy-overlay" style={overlayStyle} onClick={() => a.setSendLinkTarget(null)}>
+          <div className="studio-legacy-modal" style={modalStyle} onClick={e => e.stopPropagation()}>
             <h3 style={{ margin: '0 0 0.5rem', fontSize: '0.95rem', fontWeight: 700, color: 'var(--text)' }}>
               {t('appt_send_link')}
             </h3>
@@ -381,8 +383,8 @@ function BookingOverlays({ actions: a }) {
         </div>
       )}
       {a.reassignTarget && (
-        <div style={overlayStyle} onClick={() => a.setReassignTarget(null)}>
-          <div style={modalStyle} onClick={e => e.stopPropagation()}>
+        <div className="studio-legacy-overlay" style={overlayStyle} onClick={() => a.setReassignTarget(null)}>
+          <div className="studio-legacy-modal" style={modalStyle} onClick={e => e.stopPropagation()}>
             <h3 style={{ margin: '0 0 1rem', fontSize: '0.95rem', fontWeight: 700, color: 'var(--text)' }}>
               {t('appt_reassign')}
             </h3>
@@ -410,8 +412,8 @@ function BookingOverlays({ actions: a }) {
         </div>
       )}
       {a.rescheduleTarget && (
-        <div style={overlayStyle} onClick={e => e.target === e.currentTarget && a.setRescheduleTarget(null)}>
-          <div style={modalStyle}>
+        <div className="studio-legacy-overlay" style={overlayStyle} onClick={e => e.target === e.currentTarget && a.setRescheduleTarget(null)}>
+          <div className="studio-legacy-modal" style={modalStyle}>
             <h3 style={{ margin: '0 0 0.25rem', fontSize: '0.95rem', fontWeight: 700, color: 'var(--text)' }}>
               {t('reschedule_booking')}
             </h3>
@@ -581,10 +583,10 @@ function MonthView({ monthStart, onDayClick }) {
   return (
     <div style={{ display: 'flex', flex: 1, overflow: 'hidden', position: 'relative' }}>
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+      <div className="studio-calendar-scroll" style={s.calWrap}>
       <div style={s.monthWeekdays}>
         {DAY_NAMES.map(d => <div key={d} style={s.monthWeekday}>{d}</div>)}
       </div>
-      <div style={s.calWrap}>
         <div style={{ ...s.monthGrid, gridTemplateRows: `repeat(${numDays / 7}, minmax(94px, 1fr))` }}>
           {monthDays.map((day, i) => {
             const iso      = toISO(day);
@@ -721,7 +723,7 @@ function DayView({ date }) {
     <div style={{ display: 'flex', flex: 1, overflow: 'hidden', position: 'relative' }}>
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
       {/* Working-today toggle */}
-      <div style={s.dayFilter}>
+      <div className="studio-schedule-filter" style={s.dayFilter}>
         {!showAll ? (
           <>
             <span style={s.dayFilterLabel}>
@@ -746,7 +748,7 @@ function DayView({ date }) {
       {cols.length === 0 ? (
         <p style={s.msg}>{t('sched_no_artists_working')}</p>
       ) : (
-      <div style={s.calWrap}>
+      <div className="studio-calendar-scroll" style={s.calWrap}>
       <div style={{ ...s.grid, gridTemplateColumns: `52px repeat(${cols.length}, minmax(160px, 1fr))` }}>
         <div style={s.cornerCell} />
 
@@ -869,8 +871,8 @@ function ManualBookingModal({ artists, defaultDate, onClose, onCreated }) {
   const lbl = { fontSize: '0.68rem', color: 'var(--text-faint)', fontWeight: 500, display: 'block', marginBottom: 4 };
 
   return (
-    <div style={s.modalOverlay}>
-      <div style={s.modal}>
+    <div className="studio-legacy-overlay" style={s.modalOverlay}>
+      <div className="studio-legacy-modal" style={s.modal}>
         <div style={s.panelHeader}>
           <span style={s.panelTitle}>{t('sched_new_booking')}</span>
           <button aria-label="Close booking panel" onClick={onClose} style={s.panelClose}>✕</button>
@@ -975,10 +977,10 @@ function StationMonthView({ monthStart, onDayClick }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+      <div className="studio-calendar-scroll" style={s.calWrap}>
       <div style={s.monthWeekdays}>
         {DAY_NAMES.map(d => <div key={d} style={s.monthWeekday}>{d}</div>)}
       </div>
-      <div style={s.calWrap}>
         <div style={{ ...s.monthGrid, gridTemplateRows: `repeat(${numDays / 7}, minmax(94px, 1fr))` }}>
           {monthDays.map((day, i) => {
             const iso     = toISO(day);
@@ -1108,7 +1110,7 @@ function StationView({ date }) {
   return (
     <div style={{ display: 'flex', flex: 1, overflow: 'hidden', position: 'relative' }}>
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
-      <div style={s.calWrap}>
+      <div className="studio-calendar-scroll" style={s.calWrap}>
       <div style={{ ...s.grid, gridTemplateColumns: `52px repeat(${cols.length}, minmax(160px, 1fr))` }}>
         <div style={s.cornerCell} />
 
@@ -1189,6 +1191,10 @@ export default function SchedulePage() {
   const [monthStart, setMonthStart] = useState(() => getMonthStart(new Date()));
   const [dayDate,    setDayDate]    = useState(() => new Date());
 
+  useEffect(() => {
+    if (window.matchMedia(MOBILE_MEDIA).matches) setView('day');
+  }, []);
+
   const today          = new Date();
   const isCurrentMonth = isSameMonth(monthStart, today);
 
@@ -1201,9 +1207,9 @@ export default function SchedulePage() {
   const dayLabel   = dayDate.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' });
 
   return (
-    <div style={s.page}>
-      <div style={s.header}>
-        <div style={s.headerLeft}>
+    <div className="studio-feature-page studio-schedule-page" style={s.page}>
+      <div className="studio-feature-header" style={s.header}>
+        <div className="studio-schedule-toggles" style={s.headerLeft}>
           <h1 style={s.title}>{t('nav_schedule')}</h1>
           <div style={s.viewToggle}>
             <button aria-pressed={view === 'month'} onClick={() => setView('month')} style={{ ...s.toggleBtn, ...(view === 'month' ? s.toggleActive : {}) }}>{t('sched_month')}</button>
@@ -1215,11 +1221,11 @@ export default function SchedulePage() {
           </div>
         </div>
 
-        <div style={s.nav}>
+        <div className="studio-schedule-date-nav" style={s.nav}>
           {view === 'month' ? (
             <>
               <button aria-label="Previous month" onClick={() => setMonthStart(d => getMonthStart(new Date(d.getFullYear(), d.getMonth() - 1, 1)))} style={s.navBtn}>←</button>
-              <span style={s.navLabel}>{monthLabel}</span>
+              <span className="studio-schedule-date-label" style={s.navLabel}>{monthLabel}</span>
               <button aria-label="Next month" onClick={() => setMonthStart(d => getMonthStart(new Date(d.getFullYear(), d.getMonth() + 1, 1)))} style={s.navBtn}>→</button>
               {!isCurrentMonth && (
                 <button onClick={() => setMonthStart(getMonthStart(today))} style={s.todayBtn}>{t('today')}</button>
@@ -1228,7 +1234,7 @@ export default function SchedulePage() {
           ) : (
             <>
               <button aria-label="Previous day" onClick={() => setDayDate(d => addDays(d, -1))} style={s.navBtn}>←</button>
-              <span style={s.navLabel}>{dayLabel}</span>
+              <span className="studio-schedule-date-label" style={s.navLabel}>{dayLabel}</span>
               <button aria-label="Next day" onClick={() => setDayDate(d => addDays(d, 1))}  style={s.navBtn}>→</button>
               {toISO(dayDate) !== toISO(today) && (
                 <button onClick={() => setDayDate(today)} style={s.todayBtn}>{t('today')}</button>

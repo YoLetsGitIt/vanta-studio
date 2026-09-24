@@ -419,34 +419,7 @@ textarea {
   .skeleton, .studio-spinner { animation: none !important; }
 }
 
-/* Settings needs the full viewport on phones so availability examples and
-   controls remain usable. Preserve navigation as a horizontal, scrollable row. */
 @media (max-width: 760px) {
-  .studio-dashboard-body:has(.studio-settings-page) { flex-direction: column; }
-  .studio-dashboard-body:has(.studio-settings-page) .studio-dashboard-sidebar {
-    width: 100% !important;
-    padding: 12px 0 8px !important;
-    gap: 8px;
-    border-right: 0 !important;
-    border-bottom: 1px solid var(--border);
-    box-sizing: border-box;
-  }
-  .studio-dashboard-body:has(.studio-settings-page) .studio-dashboard-sidebar-top {
-    display: grid !important;
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: center;
-    gap: 12px !important;
-    min-width: 0;
-  }
-  .studio-dashboard-body:has(.studio-settings-page) .studio-dashboard-navigation {
-    grid-column: 1 / -1;
-    flex-direction: row !important;
-    overflow-x: auto;
-    min-width: 0;
-  }
-  .studio-dashboard-body:has(.studio-settings-page) .studio-dashboard-navigation > a { flex-shrink: 0; }
-  .studio-dashboard-body:has(.studio-settings-page) .studio-dashboard-sidebar-bottom { padding-top: 4px !important; }
-  .studio-dashboard-body:has(.studio-settings-page) .studio-dashboard-main { width: 100%; min-height: 0; }
   .studio-settings-page { padding: 20px 16px 48px !important; min-width: 0; }
   .studio-settings-header { flex-wrap: wrap; gap: 12px; }
 }

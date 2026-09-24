@@ -3,6 +3,7 @@
 import Dialog from '@/components/ui/Dialog';
 import { WidgetPreview, ConsentFormPreview } from '@/components/forms/FormPreviews';
 import SmartSchedulingSettings from '@/components/SmartSchedulingSettings';
+import SMSSettings from '@/components/SMSSettings';
 
 import { useEffect, useState, useRef, useCallback } from 'react';
 import dynamic from 'next/dynamic';
@@ -693,7 +694,7 @@ export default function SettingsPage() {
     <div className="studio-settings-page" style={s.page}>
       <div className="studio-settings-header" style={s.pageHeader}>
         <h1 style={s.pageTitle}>{t('settings')}</h1>
-        <div style={s.tabBar}>
+        <div className="studio-settings-tabs" style={s.tabBar}>
           {[
             { id: 'studio',   label: 'Studio' },
             { id: 'bookings', label: 'Bookings' },
@@ -784,7 +785,7 @@ export default function SettingsPage() {
           <h2 style={s.sectionTitle}>{t('hours')}</h2>
           <div style={s.hoursGrid}>
             {hours.map((day, i) => (
-              <div key={i} style={s.hoursRow}>
+              <div key={i} className="studio-hours-row" style={s.hoursRow}>
                 <span style={s.dayLabel}>{t(DAY_KEYS[i])}</span>
                 <label style={s.closedToggle}>
                   <input
@@ -799,7 +800,7 @@ export default function SettingsPage() {
                   </span>
                 </label>
                 {!day.is_closed && (
-                  <div style={s.timePair}>
+                  <div className="studio-hours-times" style={s.timePair}>
                     <input
                       type="time"
                       aria-label={`${t(DAY_KEYS[i])} opening time`}
@@ -1053,6 +1054,8 @@ export default function SettingsPage() {
           </button>
         </section>
 
+        <SMSSettings styles={s} />
+
         {/* Aftercare instructions — temporarily hidden
         <section style={{ ...s.card, gridColumn: '1 / -1' }}>
           <h2 style={s.sectionTitle}>{t('aftercare_instructions')}</h2>
@@ -1085,7 +1088,7 @@ export default function SettingsPage() {
           )}
 
           {consentTemplates.map(t => (
-            <div key={t.id} style={s.templateRow}>
+            <div key={t.id} className="studio-wrap-row" style={s.templateRow}>
               <div style={s.templateRowLeft}>
                 <span style={s.templateName}>{t.name}</span>
                 <span style={s.templateFieldCount}>{(t.fields ?? []).length} field{(t.fields ?? []).length !== 1 ? 's' : ''}</span>
@@ -1211,7 +1214,7 @@ export default function SettingsPage() {
           <div style={s.stationList}>
             {stations.map(st => (
               <div key={st.id} style={s.stationRow}>
-                <div style={s.stationTop}>
+                <div className="studio-wrap-row" style={s.stationTop}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                     <span style={s.stationName}>{st.name}</span>
                     {st.endDate && (
@@ -1242,7 +1245,7 @@ export default function SettingsPage() {
                 {/* Unavailability panel — re-enable with button above
                 {expandedStation === st.id && (
                   <div style={s.unavailPanel}>
-                    <div style={s.unavailAdd}>
+                    <div className="studio-wrap-row" style={s.unavailAdd}>
                       <input
                         type="date"
                         value={unavailDate}
@@ -1281,7 +1284,7 @@ export default function SettingsPage() {
         <section style={s.card}>
           <h2 style={s.sectionTitle}>{t('booking_link')}</h2>
           <p style={s.sectionDesc}>Share this link or QR code so clients can submit booking requests.</p>
-          <div style={s.walkInCard}>
+          <div className="studio-wrap-row" style={s.walkInCard}>
             <div style={s.walkInLeft}>
               <span style={s.walkInUrl}>{walkInUrl}</span>
               <button onClick={copyLink} style={s.copyBtn}>{copied ? t('copied') : t('copy_link')}</button>
@@ -1299,7 +1302,7 @@ export default function SettingsPage() {
           <p style={s.sectionDesc}>Embed the booking form on your website. Customise the colours to match your brand.</p>
           <div className="studio-feature-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', alignItems: 'start' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div style={s.colorRow}>
+              <div className="studio-form-row" style={s.colorRow}>
                 <div style={s.colorField}>
                   <label style={s.label}>Background</label>
                   <div style={s.colorInputWrap}>
@@ -1530,7 +1533,7 @@ export default function SettingsPage() {
                 {cardBrandLabel(billingDetails.card_brand)}
               </div>
               <span style={s.paymentMethodNumber}>•••• {billingDetails.card_last4}</span>
-              <div style={s.billingActionsRow}>
+              <div className="studio-wrap-row" style={s.billingActionsRow}>
                 <button onClick={handleUpdateCard} style={s.updateCardBtn} disabled={portalLoading}>
                   {portalLoading ? (billingDetails.stripe_managed ? 'Opening…' : 'Updating…') : 'Update card'}
                 </button>

@@ -1,5 +1,7 @@
 'use client';
 
+import { MOBILE_MEDIA } from '@/lib/responsive';
+
 import { useEffect, useRef, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
@@ -9,6 +11,7 @@ import { initTheme } from '@/lib/theme';
 import { useLanguage, LanguageProvider } from '@/lib/i18n';
 import NewAppointmentPanel from '@/components/NewAppointmentPanel';
 import FeedbackHost from '@/components/FeedbackHost';
+import Dialog from '@/components/ui/Dialog';
 
 const NAV = [
   { href: '/dashboard/home',         tKey: 'nav_dashboard', icon: HomeIcon },
@@ -19,6 +22,9 @@ const NAV = [
   { href: '/dashboard/analytics',    tKey: 'nav_analytics', icon: ChartIcon },
   { href: '/dashboard/financial',    tKey: 'revenue_financial', icon: RevenueIcon },
 ];
+
+const MOBILE_NAV = [NAV[0], NAV[1], NAV[4], NAV[3]];
+const MORE_NAV = [NAV[2], NAV[5], NAV[6], { href: '/dashboard/settings', tKey: 'settings', icon: GearIcon }];
 
 const TOUR_STEPS = [
   {
@@ -126,6 +132,15 @@ function DashboardShell({ children }) {
   const [appointmentPanelOpen, setAppointmentPanelOpen] = useState(false);
   const [appointmentType, setAppointmentType] = useState('walkin');
   const [tourStep, setTourStep] = useState(null);
+  const [moreOpen, setMoreOpen] = useState(false);
+
+  useEffect(() => { setMoreOpen(false); }, [pathname]);
+  useEffect(() => {
+    const media = window.matchMedia(MOBILE_MEDIA);
+    const closeOnDesktop = () => { if (!media.matches) setMoreOpen(false); };
+    media.addEventListener('change', closeOnDesktop);
+    return () => media.removeEventListener('change', closeOnDesktop);
+  }, []);
   const initializedRef = useRef(false);
 
   useEffect(() => {
@@ -226,7 +241,15 @@ function DashboardShell({ children }) {
   }
 
   return (
-    <div style={s.shell}>
+    <div className="studio-dashboard-shell" style={s.shell}>
+      <header className="studio-mobile-header">
+        <Link href="/dashboard/home" aria-label="Vanta Studio home" style={s.logo}>
+          <span style={s.logoMark}>vanta</span><span style={s.logoSub}>studio</span>
+        </Link>
+        <button type="button" className="studio-button studio-button--sm" onClick={() => { setAppointmentType('walkin'); setAppointmentPanelOpen(true); }}>
+          <PlusIcon />{t('new_appointment')}
+        </button>
+      </header>
       <style>{TOUR_HIGHLIGHT_CSS}</style>
       <div className="studio-dashboard-body" style={s.body}>
         <aside className="studio-dashboard-sidebar" style={s.sidebar}>
@@ -290,6 +313,27 @@ function DashboardShell({ children }) {
         <main className="studio-dashboard-main" style={s.main}>{children}</main>
       </div>
 
+      <nav className="studio-mobile-nav" aria-label="Mobile studio navigation">
+        {MOBILE_NAV.map(({ href, tKey, icon: Icon }) => (
+          <Link key={href} href={href} aria-current={pathname.startsWith(href) ? 'page' : undefined}>
+            <Icon size={20} /><span>{t(tKey)}</span>
+          </Link>
+        ))}
+        <button type="button" aria-haspopup="dialog" aria-expanded={moreOpen} className={MORE_NAV.some(item => pathname.startsWith(item.href)) || pathname.startsWith('/dashboard/import') ? 'is-active' : ''} onClick={() => setMoreOpen(true)}>
+          <span aria-hidden="true" className="studio-more-icon">•••</span><span>{t('nav_more')}</span>
+        </button>
+      </nav>
+      {moreOpen && (
+        <Dialog title={t('nav_more')} onClose={() => setMoreOpen(false)} footer={<button type="button" className="studio-button studio-button--secondary" onClick={() => setMoreOpen(false)}>{t('close')}</button>}>
+          <p className="studio-mobile-studio-name">{displayName}</p>
+          <nav className="studio-mobile-menu" aria-label="More studio navigation">
+            {MORE_NAV.map(({ href, tKey, icon: Icon }) => (
+              <Link key={href} href={href} onClick={() => setMoreOpen(false)} aria-current={pathname.startsWith(href) ? 'page' : undefined}><Icon size={20} />{t(tKey)}</Link>
+            ))}
+          </nav>
+        </Dialog>
+      )}
+
       <NewAppointmentPanel
         open={appointmentPanelOpen}
         initialBookingType={appointmentType}
@@ -326,7 +370,7 @@ function DashboardTour({ step, onBack, onNext, onSkip }) {
   return (
     <div style={s.tourLayer} role="dialog" aria-modal="true" aria-label="Dashboard tour">
       <div style={s.tourShade} />
-      <div style={s.tourCard}>
+      <div className="studio-tour-card" style={s.tourCard}>
         <span style={s.tourProgress}>{step === 0 ? 'WELCOME' : `${String(step).padStart(2, '0')} / ${String(TOUR_STEPS.length - 1).padStart(2, '0')}`}</span>
         <h2 style={s.tourTitle}>{item.title}</h2>
         <p style={s.tourBody}>{item.body}</p>

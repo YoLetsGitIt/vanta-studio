@@ -116,6 +116,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
   const savingRef = useRef(false);
 
   // ── Client
+  const [smsOptIn, setSMSOptIn] = useState(false);
   const [clientMode, setClientMode] = useState('search');
   const [clientSearch, setClientSearch] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
@@ -211,6 +212,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
   }, [clientSearch, pastClients]);
 
   function pickClient(c) {
+    setSMSOptIn(false);
     const parts = c.name.trim().split(/\s+/);
     setFirstName(parts[0] || '');
     setLastName(parts.slice(1).join(' '));
@@ -223,6 +225,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
   }
 
   function clearSelectedClient() {
+    setSMSOptIn(false);
     setSelectedClient(null);
     setFirstName(''); setLastName(''); setClientEmail(''); setClientPhone(''); setClientDob('');
     setClientSearch('');
@@ -365,6 +368,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
       if (size.trim()) { body.size = size.trim(); body.size_unit = sizeUnit; }
       if (clientEmail.trim()) body.requester_email = clientEmail.trim();
       if (clientPhone.trim()) body.requester_phone = clientPhone.trim();
+      body.sms_reminder_opt_in = smsOptIn && !!clientPhone.trim();
       if (clientDob.trim()) body.dob = clientDob.trim();
       if (stationId) body.station_id = stationId;
       if (fp > 0) body.estimated_quote = fp;
@@ -447,7 +451,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
         aria-hidden="true"
         style={{ ...bd.backdrop, opacity: open ? 1 : 0, pointerEvents: open ? 'auto' : 'none' }}
       />
-      <div ref={panelRef} role="dialog" aria-modal="true" aria-hidden={!open} aria-labelledby="new-appointment-title" style={{ ...bd.panel, transform: open ? 'translateX(0)' : 'translateX(100%)', visibility: open ? 'visible' : 'hidden' }}>
+      <div className="studio-appointment-panel" ref={panelRef} role="dialog" aria-modal="true" aria-hidden={!open} aria-labelledby="new-appointment-title" style={{ ...bd.panel, transform: open ? 'translateX(0)' : 'translateX(100%)', visibility: open ? 'visible' : 'hidden' }}>
 
         <div style={bd.header}>
           <span id="new-appointment-title" style={bd.title}>{t('nap_title')}</span>
@@ -595,7 +599,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
                 )
               ) : (
                 <>
-                  <div style={bd.fieldRow}>
+                  <div className="studio-form-row" style={bd.fieldRow}>
                     <div style={bd.field}>
                       <label htmlFor="new-appointment-first-name" style={bd.label}>{t('nap_first_name')}</label>
                       <input
@@ -625,7 +629,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
                       onChange={e => setClientDob(e.target.value)}
                     />
                   </div>
-                  <div style={bd.fieldRow}>
+                  <div className="studio-form-row" style={bd.fieldRow}>
                     <div style={bd.field}>
                       <label htmlFor="new-appointment-email" style={bd.label}>{t('sched_email')}</label>
                       <input
@@ -644,7 +648,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
                         type="tel"
                         aria-invalid={phoneInvalid}
                         id="new-appointment-phone" value={clientPhone}
-                        onChange={e => setClientPhone(e.target.value)}
+                        onChange={e => { setClientPhone(e.target.value); setSMSOptIn(false); }}
                         placeholder="+1 555 0100"
                       />
                     </div>
@@ -652,6 +656,12 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
                 </>
               )}
             </div>
+
+            <label style={{ display: 'flex', gap: 10, padding: '0 24px 20px', color: 'var(--text-secondary)', fontSize: 13, lineHeight: 1.6 }}>
+              <input type="checkbox" checked={smsOptIn} disabled={!clientPhone.trim() || saving}
+                onChange={e => setSMSOptIn(e.target.checked)} style={{ accentColor: 'var(--accent)' }} />
+              I have the client’s permission to send one SMS reminder for this appointment. Included at no extra charge.
+            </label>
 
             {/* ── BOOKING DETAILS ── */}
             <div style={bd.section}>

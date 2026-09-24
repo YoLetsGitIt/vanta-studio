@@ -11,6 +11,7 @@ import { useLanguage } from '@/lib/i18n';
 import { showError } from '@/lib/feedback';
 import { getBookingSourceLabel } from '@/lib/bookingType';
 import Button, { IconButton } from '@/components/ui/Button';
+import BookingSMS from '@/components/BookingSMS';
 
 const PAYMENT_LABELS = { cash: 'Cash', card: 'Card / POS', bank_transfer: 'Bank Transfer' };
 const CONSENT_STYLE  = {
@@ -319,7 +320,7 @@ export default function BookingDetailPanel({
   // keep the detail sections hidden rather than rendering them from partial data.
   if (loading) {
     return (
-      <aside aria-label={`${clientName} booking details`} style={p.panel}>
+      <aside className="studio-booking-detail" aria-label={`${clientName} booking details`} style={p.panel}>
         <div style={p.header}>
           <span style={p.title}>{clientName}</span>
           <IconButton onClick={onClose} aria-label="Close booking details">✕</IconButton>
@@ -332,7 +333,7 @@ export default function BookingDetailPanel({
   }
 
   return (
-    <aside aria-label={`${clientName} booking details`} style={p.panel}>
+    <aside className="studio-booking-detail" aria-label={`${clientName} booking details`} style={p.panel}>
       {/* Header */}
       <div style={p.header}>
         <span style={p.title}>{clientName}</span>
@@ -561,6 +562,8 @@ export default function BookingDetailPanel({
             <span style={{ fontSize: '0.82rem', color: 'var(--text-ghost)' }}>{t('clients_no_phone')}</span>
           )}
         </div>
+
+        {booking?.id && <BookingSMS key={booking.id} bookingId={booking.id} />}
 
         {/* Consent — inline badge (client info section) */}
         {email && (

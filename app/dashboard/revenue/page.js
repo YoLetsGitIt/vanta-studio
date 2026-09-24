@@ -70,11 +70,11 @@ export default function RevenuePage() {
   const c = stats?.customers;
 
   return (
-    <div style={st.page}>
+    <div className="studio-feature-page studio-revenue-page" style={st.page}>
       {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <div style={st.header}>
+      <div className="studio-feature-header" style={st.header}>
         <h1 style={st.title}>{t('nav_analytics')}</h1>
-        <div style={st.controls}>
+        <div className="studio-report-controls" style={st.controls}>
           <div style={st.quickPicker}>
             {QUICK_OPTIONS.map(opt => (
               <button key={opt.label} aria-pressed={activeQuick === opt.label} aria-label={opt.days === null ? 'Year to date' : `Last ${opt.days / 7} weeks`} onClick={() => applyQuick(opt)}
@@ -84,7 +84,7 @@ export default function RevenuePage() {
             ))}
           </div>
           <div style={st.dateSep} />
-          <div style={st.dateRange}>
+          <div className="studio-date-range" style={st.dateRange}>
             <input type="date" aria-label="Start date" value={startDate} max={endDate} onChange={onStartChange} style={st.dateInput} />
             <span style={st.dateArrow}>→</span>
             <input type="date" aria-label="End date" value={endDate} min={startDate} max={today} onChange={onEndChange} style={st.dateInput} />
@@ -93,14 +93,14 @@ export default function RevenuePage() {
       </div>
 
       {/* ── Body ───────────────────────────────────────────────────────────── */}
-      <div style={st.body}>
+      <div className="studio-feature-body" style={st.body}>
         {loading && <p role="status" style={st.msg}>{t('loading')}</p>}
         {error   && <p role="alert" style={{ ...st.msg, color: 'var(--status-rejected)' }}>{error}</p>}
 
         {!loading && !error && stats && (
           <>
             <Section title={t('revenue_appt_metrics')}>
-              <div style={st.kpiGrid}>
+              <div className="studio-kpi-grid" style={st.kpiGrid}>
                 <KpiCard label={t('revenue_total_appts')}    value={a?.total ?? 0} />
                 <KpiCard label={t('status_completed')}             value={a?.completed ?? 0} color="#4cc98a" />
                 <KpiCard label={t('revenue_upcoming')}  value={a?.confirmed ?? 0} color="#6fa3e8" />
@@ -116,7 +116,7 @@ export default function RevenuePage() {
             </Section>
 
             <Section title={t('revenue_customer_insights')}>
-              <div style={st.kpiGrid}>
+              <div className="studio-kpi-grid" style={st.kpiGrid}>
                 <KpiCard label={t('revenue_new_clients')}       value={c?.new_clients ?? 0}       color="#4cc98a" />
                 <KpiCard label={t('revenue_returning_clients')} value={c?.returning_clients ?? 0} color="#6fa3e8" />
               </div>
