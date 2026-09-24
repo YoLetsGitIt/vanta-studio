@@ -1,10 +1,20 @@
 .page { background: var(--bg-base); }
 .header { padding: 2rem 2rem 1.5rem; display: flex; justify-content: space-between; align-items: center; gap: 1.5rem; border-bottom: 1px solid var(--border-faint); }
 .title { margin: 0 0 .4rem; font-size: 1.65rem; font-weight: 600; letter-spacing: -.04em; line-height: 1.2; color: var(--text); }
-.date { margin: 0; font-size: .8rem; color: var(--text-faint); }
-.moneyStat { position: relative; padding: 1.3rem; border: 1px solid var(--border); border-radius: 14px; background: var(--bg-card); display: flex; flex-direction: column; gap: .65rem; min-width: 0; }
-.moneyFeatured { background: var(--accent-tint); border-color: var(--accent-active-border); }
-.moneyValue { font-size: clamp(1.25rem, 2vw, 1.65rem); font-weight: 500; letter-spacing: -.045em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.date { margin: 0; font-size: .95rem; color: var(--text-dim); }
+.moneyStat { position: relative; padding: 1.1rem 1.25rem; border: 1px solid var(--border); border-radius: 14px; background: var(--bg-card); display: flex; flex-direction: column; gap: .4rem; min-width: 0; }
+.moneyStat::before { content: ''; position: absolute; left: 0; top: 14px; bottom: 14px; width: 4px; border-radius: 0 4px 4px 0; background: var(--text-ghost); }
+.moneyLabel { color: var(--text-dim); font-size: .85rem; font-weight: 600; }
+.moneyValue { font-size: clamp(1.4rem, 2.2vw, 1.8rem); font-weight: 700; letter-spacing: -.03em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; color: var(--text); }
+.tone_success { background: var(--color-success-surface); border-color: var(--color-success-border); }
+.tone_success::before { background: var(--color-success); }
+.tone_success .moneyValue { color: var(--color-success); }
+.tone_info { background: var(--color-info-surface); border-color: var(--color-info-border); }
+.tone_info::before { background: var(--color-info); }
+.tone_info .moneyValue { color: var(--color-info); }
+.tone_warning { background: var(--color-warning-surface); border-color: var(--color-warning-border); }
+.tone_warning::before { background: var(--color-warning); }
+.tone_warning .moneyValue { color: var(--color-warning); }
 .card { min-width: 0; box-shadow: 0 5px 20px rgb(0 0 0 / 4%); }
 .appointment { transition: background 150ms ease; min-height: 64px; cursor: pointer; }
 .appointment:hover { background: var(--accent-tint) !important; }

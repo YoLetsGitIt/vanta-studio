@@ -12,18 +12,17 @@ export default function DashboardQuickActions({ artists = [] }) {
   const [dialog, setDialog] = useState(null);
 
   const actions = [
-    { icon: '⌕', label: 'Find a client', detail: 'Open a client quick view', action: () => setDialog('client') },
-    { icon: '$', label: 'Record reimbursement', detail: 'Add an approved artist expense', action: () => setDialog('reimbursement') },
+    { icon: '⌕', label: 'Find a client', tone: 'info', action: () => setDialog('client') },
+    { icon: '$', label: 'Record reimbursement', tone: 'success', action: () => setDialog('reimbursement') },
   ];
 
   return (
     <>
-      <div style={styles.grid} className="studio-home-four-col">
+      <div style={styles.grid}>
         {actions.map(action => (
           <button key={action.label} type="button" style={styles.action} onClick={action.action}>
-            <span style={styles.icon}>{action.icon}</span>
-            <span style={styles.copy}><span>{action.label}</span><small style={styles.detail}>{action.detail}</small></span>
-            <span style={styles.arrow}>→</span>
+            <span style={styles.icon(action.tone)} aria-hidden="true">{action.icon}</span>
+            <span>{action.label}</span>
           </button>
         ))}
       </div>
@@ -182,10 +181,9 @@ function ReimbursementDialog({ artists, onClose }) {
 }
 
 const styles = {
-  grid: { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '0.65rem' },
-  action: { minHeight: 70, padding: '0.8rem 0.9rem', border: '1px solid var(--border-faint)', borderRadius: 10, background: 'var(--bg-card)', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: '0.65rem', textAlign: 'left', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer' },
-  icon: { width: 27, height: 27, flexShrink: 0, display: 'grid', placeItems: 'center', borderRadius: 7, background: 'var(--accent-tint)', color: 'var(--accent)', fontSize: '0.88rem' },
-  copy: { display: 'flex', flexDirection: 'column', gap: 3 }, detail: { color: 'var(--text-ghost)', fontSize: '0.66rem', fontWeight: 400 }, arrow: { marginLeft: 'auto', color: 'var(--text-ghost)' },
+  grid: { display: 'flex', flexWrap: 'wrap', gap: '0.6rem' },
+  action: { padding: '0.5rem 0.9rem 0.5rem 0.55rem', border: '1px solid var(--border-strong)', borderRadius: 999, background: 'var(--bg-card)', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: '0.55rem', fontSize: '0.88rem', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' },
+  icon: tone => ({ width: 28, height: 28, flexShrink: 0, display: 'grid', placeItems: 'center', borderRadius: '50%', background: `var(--color-${tone}-surface)`, border: `1px solid var(--color-${tone}-border)`, color: `var(--color-${tone})`, fontSize: '0.95rem', fontWeight: 700 }),
 
   searchWrap: { position: 'relative', display: 'flex', alignItems: 'center' },
   searchIcon: { position: 'absolute', left: '0.8rem', color: 'var(--text-ghost)', fontSize: '1rem', pointerEvents: 'none' },

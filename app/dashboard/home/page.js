@@ -380,6 +380,7 @@ export default function HomePage() {
     <div style={s.page} className={styles.page}>
       <header className={styles.header}>
         <div><h1 className={styles.title}>Today</h1><p className={styles.date}>{dateLabel}</p></div>
+        {!loading && !loadError && !isEmptyDashboard && <DashboardQuickActions artists={artists} />}
       </header>
 
       <div style={s.body} className="studio-home-body">
@@ -410,33 +411,17 @@ export default function HomePage() {
         )}
 
 
-        {/* ── DAILY MONEY ───────────────────────────────────────── */}
-        {!loading && !loadError && !isEmptyDashboard && (
-          <div style={s.section}>
-            <div style={s.sectionHeadingRow}>
-              <span style={s.sectionLabel}>TODAY’S FINANCES</span>
-              <button type="button" style={s.textLink} onClick={() => router.push('/dashboard/financial')}>Review finances →</button>
-            </div>
-            <div style={s.moneyGrid} className="studio-home-four-col">
-              <MoneyStat label="Collected today" value={todayRevenue?.gross_sales} accent />
-              <MoneyStat label="Deposits received" value={todayRevenue?.deposits_collected} />
-              <MoneyStat label="Outstanding" value={todayRevenue?.remaining_balances} />
-              <MoneyStat label="Completed sessions" value={todayRevenue?.completed_sessions} money={false} />
-            </div>
-          </div>
-        )}
-
         {/* ── NEEDS ATTENTION ───────────────────────────────────── */}
         {!loading && !loadError && hasPending && (
           <div style={s.section} id="dashboard-attention">
             <button type="button" style={s.sectionToggle} onClick={() => setAttentionOpen(v => !v)} aria-expanded={attentionOpen}>
-              <span style={s.sectionLabel}>NEEDS ATTENTION</span>
+              <span style={s.sectionLabel}>Needs your attention</span>
               <span style={s.attentionHeaderMeta}><b style={s.attentionCount}>{attentionCount}</b>{attentionOpen ? 'Hide' : 'Show'} <span style={{ transform: attentionOpen ? 'rotate(180deg)' : 'none', display: 'inline-block' }}>⌄</span></span>
             </button>
             {attentionOpen && (
             <div style={s.attentionCard}>
               {pendingCount > 0 && (
-                <AttentionGroup title="Pending bookings" icon="calendar" count={pendingCount} subtitle="Awaiting your approval" open={!!openAttentionGroups.pending} onToggle={() => toggleAttentionGroup('pending')}>
+                <AttentionGroup title="Pending bookings" tone="warning" icon="calendar" count={pendingCount} subtitle="Awaiting your approval" open={!!openAttentionGroups.pending} onToggle={() => toggleAttentionGroup('pending')}>
                   {pendingBookings.map(booking => (
                     <AttentionItem key={booking.id} title={booking.requester_name ?? 'Client'} subtitle={bookingSubtitle(booking)} onClick={() => openBookingReview(booking)}>
                       <button style={s.inlinePrimary} disabled={attentionAction === `send-${booking.id}`} onClick={() => openPendingSendLink(booking)}>
@@ -449,7 +434,7 @@ export default function HomePage() {
               )}
 
               {unconfirmedCount > 0 && (
-                <AttentionGroup title="Booking confirmations" icon="check" count={unconfirmedCount} subtitle="Bookings awaiting studio confirmation" open={!!openAttentionGroups.confirmation} onToggle={() => toggleAttentionGroup('confirmation')}>
+                <AttentionGroup title="Booking confirmations" tone="info" icon="check" count={unconfirmedCount} subtitle="Bookings awaiting studio confirmation" open={!!openAttentionGroups.confirmation} onToggle={() => toggleAttentionGroup('confirmation')}>
                   {unconfirmedBookings.map(booking => (
                     <AttentionItem key={booking.id} title={booking.requester_name ?? 'Client'} subtitle={bookingSubtitle(booking)}>
                       <button style={s.inlinePrimary} onClick={() => openBookingReview(booking)}>Review & confirm</button>
@@ -459,7 +444,7 @@ export default function HomePage() {
               )}
 
               {awaitingPaymentCount > 0 && (
-                <AttentionGroup title="Unpaid deposits" icon="card" count={awaitingPaymentCount} subtitle="Deposit not yet received" open={!!openAttentionGroups.payment} onToggle={() => toggleAttentionGroup('payment')}>
+                <AttentionGroup title="Unpaid deposits" tone="danger" icon="card" count={awaitingPaymentCount} subtitle="Deposit not yet received" open={!!openAttentionGroups.payment} onToggle={() => toggleAttentionGroup('payment')}>
                   {unpaidDepositBookings.map(booking => (
                     <AttentionItem key={booking.id} title={booking.requester_name ?? 'Client'} subtitle={bookingSubtitle(booking)} onClick={() => openBookingReview(booking)}>
                       <button
@@ -476,7 +461,7 @@ export default function HomePage() {
               )}
 
               {overdueBookings.length > 0 && (
-                <AttentionGroup title="Incomplete past sessions" icon="clock" count={overdueBookings.length} subtitle="Past sessions still need an outcome and payment" open={!!openAttentionGroups.overdue} onToggle={() => toggleAttentionGroup('overdue')}>
+                <AttentionGroup title="Incomplete past sessions" tone="warning" icon="clock" count={overdueBookings.length} subtitle="Past sessions still need an outcome and payment" open={!!openAttentionGroups.overdue} onToggle={() => toggleAttentionGroup('overdue')}>
                   {overdueBookings.map(booking => (
                     <AttentionItem key={booking.id} title={booking.requester_name ?? 'Client'} subtitle={bookingSubtitle(booking)} onClick={() => openBookingReview(booking)}>
                       <button style={s.inlinePrimary} disabled={attentionAction === `outcome-${booking.id}`} onClick={() => openCompleteBooking(booking)}>
@@ -488,7 +473,7 @@ export default function HomePage() {
               )}
 
               {consentNeededEntries.length > 0 && (
-                <AttentionGroup title="Clients missing consent forms" icon="document" count={consentNeededEntries.length} subtitle="Upcoming clients without current consent" open={!!openAttentionGroups.consent} onToggle={() => toggleAttentionGroup('consent')}>
+                <AttentionGroup title="Clients missing consent forms" tone="info" icon="document" count={consentNeededEntries.length} subtitle="Upcoming clients without current consent" open={!!openAttentionGroups.consent} onToggle={() => toggleAttentionGroup('consent')}>
                   {consentNeededEntries.map(entry => {
                     const status = getConsentStatus(entry.requesterEmail);
                     const isSending = sendingLink === entry.requesterEmail;
@@ -512,7 +497,7 @@ export default function HomePage() {
               )}
 
               {pendingArtists.length > 0 && (
-                <AttentionGroup title="Pending artist requests" icon="user" count={pendingArtists.length} subtitle="Artists waiting to join your studio" open={!!openAttentionGroups.artists} onToggle={() => toggleAttentionGroup('artists')}>
+                <AttentionGroup title="Pending artist requests" tone="info" icon="user" count={pendingArtists.length} subtitle="Artists waiting to join your studio" open={!!openAttentionGroups.artists} onToggle={() => toggleAttentionGroup('artists')}>
                   {pendingArtists.map(artist => (
                     <AttentionItem key={artist.id} title={artist.name ?? 'Artist'} subtitle={[artist.email, artist.instagram].filter(Boolean).join(' · ') || 'Studio association request'}>
                       <button style={s.inlinePrimary} disabled={attentionAction === artist.id} onClick={() => runAttentionAction(artist.id, () => approveStudioArtist(artist.id), () => setPendingArtists(items => items.filter(item => item.id !== artist.id)))}>Approve</button>
@@ -526,7 +511,7 @@ export default function HomePage() {
               )}
 
               {pendingReimbursements.length > 0 && (
-                <AttentionGroup title="Pending reimbursements" icon="receipt" count={pendingReimbursements.length} subtitle="Expense claims waiting for review" open={!!openAttentionGroups.reimbursements} onToggle={() => toggleAttentionGroup('reimbursements')}>
+                <AttentionGroup title="Pending reimbursements" tone="warning" icon="receipt" count={pendingReimbursements.length} subtitle="Expense claims waiting for review" open={!!openAttentionGroups.reimbursements} onToggle={() => toggleAttentionGroup('reimbursements')}>
                   {pendingReimbursements.map(item => (
                     <AttentionItem key={item.id} title={`${item.artist_name ?? 'Artist'} · $${Number(item.amount ?? 0).toFixed(2)}`} subtitle={item.description || 'Reimbursement request'}>
                       <button style={s.inlinePrimary} disabled={attentionAction === item.id} onClick={() => runAttentionAction(item.id, () => reviewReimbursement(item.id, 'approve'), () => setPendingReimbursements(items => items.filter(entry => entry.id !== item.id)))}>Mark paid</button>
@@ -545,11 +530,27 @@ export default function HomePage() {
           </div>
         )}
 
+        {/* ── DAILY MONEY ───────────────────────────────────────── */}
+        {!loading && !loadError && !isEmptyDashboard && (
+          <div style={s.section}>
+            <div style={s.sectionHeadingRow}>
+              <span style={s.sectionLabel}>Today’s money</span>
+              <button type="button" style={s.textLink} onClick={() => router.push('/dashboard/financial')}>Review finances →</button>
+            </div>
+            <div style={s.moneyGrid} className="studio-home-four-col">
+              <MoneyStat label="Collected today" value={todayRevenue?.gross_sales} tone="success" />
+              <MoneyStat label="Deposits received" value={todayRevenue?.deposits_collected} tone="info" />
+              <MoneyStat label="Still to collect" value={todayRevenue?.remaining_balances} tone="warning" />
+              <MoneyStat label="Sessions done" value={todayRevenue?.completed_sessions} money={false} tone="neutral" />
+            </div>
+          </div>
+        )}
+
         {/* ── TODAY AT THE STUDIO ───────────────────────────────── */}
         {!loading && !loadError && !isEmptyDashboard && (
           <div style={s.section}>
             <div style={s.sectionHeadingRow}>
-              <span style={s.sectionLabel}>TODAY AT THE STUDIO</span>
+              <span style={s.sectionLabel}>In the studio today</span>
 
             </div>
             <div style={s.twoCol} className="studio-home-two-col">
@@ -584,18 +585,10 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* ── QUICK ACTIONS ─────────────────────────────────────── */}
-        {!loading && !loadError && !isEmptyDashboard && (
-          <div style={s.section}>
-            <span style={s.sectionLabel}>QUICK ACTIONS</span>
-            <DashboardQuickActions artists={artists} />
-          </div>
-        )}
-
         {/* ── THIS WEEK ─────────────────────────────────────────── */}
         {!loading && !loadError && !isEmptyDashboard && artists.length > 0 && (
           <div style={s.section}>
-            <span style={s.sectionLabel}>BOOKINGS BY ARTIST · THIS WEEK</span>
+            <span style={s.sectionLabel}>Bookings this week</span>
             <div style={s.card} className={styles.card}>
               <div style={s.utilList}>
                 {weekUtilization.map(({ artist, count }) => (
@@ -709,13 +702,13 @@ function GuideStep({ number, title, body }) {
   return <div style={s.guideStep}><span style={s.guideStepNumber}>{number}</span><div><strong style={s.guideStepTitle}>{title}</strong><p style={s.guideStepBody}>{body}</p></div></div>;
 }
 
-function MoneyStat({ label, value, accent = false, money = true }) {
+function MoneyStat({ label, value, tone = 'neutral', money = true }) {
   const display = value == null ? '—' : money
     ? `$${Number(value ?? 0).toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
     : Number(value ?? 0).toLocaleString('en-AU');
   return (
-    <div className={`${styles.moneyStat} ${accent ? styles.moneyFeatured : ''}`}>
-      <span style={s.moneyLabel}>{label}</span>
+    <div className={`${styles.moneyStat} ${styles[`tone_${tone}`]}`}>
+      <span className={styles.moneyLabel}>{label}</span>
       <strong className={styles.moneyValue}>{display}</strong>
     </div>
   );
@@ -729,13 +722,13 @@ function bookingSubtitle(booking) {
   return [date, time, artist].filter(Boolean).join(' · ');
 }
 
-function AttentionGroup({ title, icon, count, subtitle, open, onToggle, children }) {
+function AttentionGroup({ title, tone = 'info', icon, count, subtitle, open, onToggle, children }) {
   return (
     <div style={s.attentionGroup}>
       <button type="button" style={s.attentionRow} onClick={onToggle} aria-expanded={open}>
-        <AttentionIcon name={icon} />
+        <AttentionIcon name={icon} tone={tone} />
         <div style={s.attentionBody}>
-          <span style={s.attentionGroupTitleRow}><span style={s.attentionTitle}>{title}</span><strong style={s.groupCount}>{count}</strong></span>
+          <span style={s.attentionGroupTitleRow}><span style={s.attentionTitle}>{title}</span><strong style={s.groupCount(tone)}>{count}</strong></span>
           <span style={s.attentionSub}>{subtitle}</span>
         </div>
         <span style={{ ...s.attentionChevron, transform: open ? 'rotate(180deg)' : 'none' }}>⌄</span>
@@ -772,7 +765,7 @@ function AttentionItem({ title, subtitle, badge, children, onClick }) {
 }
 
 
-function AttentionIcon({ name }) {
+function AttentionIcon({ name, tone = 'info' }) {
   const paths = {
     calendar: <><rect x="3" y="4.5" width="14" height="12" rx="2"/><path d="M6 2.5v4M14 2.5v4M3 8.5h14"/></>,
     check: <><circle cx="10" cy="10" r="7"/><path d="m6.8 10 2.1 2.1 4.4-4.5"/></>,
@@ -782,7 +775,7 @@ function AttentionIcon({ name }) {
     user: <><circle cx="10" cy="7" r="3"/><path d="M4.5 17c.5-3.1 2.3-4.7 5.5-4.7s5 1.6 5.5 4.7"/></>,
     receipt: <><path d="M5 2.5 7 4l2-1.5L11 4l2-1.5L15 4v13l-2-1.5-2 1.5-2-1.5L7 17l-2-1.5z"/><path d="M8 8h4M8 11h4"/></>,
   };
-  return <span style={s.attentionIcon}><svg viewBox="0 0 20 20" aria-hidden="true" style={s.attentionIconSvg}>{paths[name] ?? paths.document}</svg></span>;
+  return <span style={s.attentionIcon(tone)}><svg viewBox="0 0 20 20" aria-hidden="true" style={s.attentionIconSvg}>{paths[name] ?? paths.document}</svg></span>;
 }
 
 const s = {
@@ -860,36 +853,32 @@ const s = {
   mobilePreviewCaption: { maxWidth: 250, margin: 0, textAlign: 'center', fontSize: '0.69rem', lineHeight: 1.45, color: 'var(--text-ghost)' },
 
   // Section wrapper
-  section: { display: 'flex', flexDirection: 'column', gap: '0.65rem' },
-  sectionLabel: {
-    fontSize: '0.68rem', fontWeight: 700,
-    letterSpacing: '0.08em', textTransform: 'uppercase',
-    color: 'var(--text-ghost)',
-  },
+  section: { display: 'flex', flexDirection: 'column', gap: '0.8rem' },
+  sectionLabel: { fontSize: '1.05rem', fontWeight: 700, letterSpacing: '-0.01em', color: 'var(--text)' },
   sectionToggle: { width: '100%', padding: 0, border: 0, background: 'none', display: 'flex', alignItems: 'center', justifyContent: 'space-between', textAlign: 'left' },
   sectionHeadingRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' },
-  textLink: { padding: 0, border: 0, background: 'none', color: 'var(--accent)', fontSize: '0.72rem', fontWeight: 600 },
+  textLink: { padding: 0, border: 0, background: 'none', color: 'var(--color-info)', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer' },
 
   // Needs attention card
   attentionCard: {
     background: 'var(--bg-card)',
-    border: '1px solid var(--border-faint)',
-    borderRadius: 12,
+    border: '1px solid var(--color-warning-border)',
+    borderRadius: 14,
     overflow: 'hidden',
   },
-  attentionHeaderMeta: { display: 'inline-flex', alignItems: 'center', gap: '0.45rem', color: 'var(--text-faint)', fontSize: '0.7rem', fontWeight: 600 },
-  attentionCount: { minWidth: 21, height: 21, padding: '0 0.35rem', display: 'grid', placeItems: 'center', borderRadius: 99, background: 'var(--accent-tint)', border: '1px solid var(--accent-tint-border)', color: 'var(--accent)', fontSize: '0.66rem' },
+  attentionHeaderMeta: { display: 'inline-flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 600 },
+  attentionCount: { minWidth: 24, height: 24, padding: '0 0.4rem', display: 'grid', placeItems: 'center', borderRadius: 99, background: 'var(--color-warning-surface)', border: '1px solid var(--color-warning-border)', color: 'var(--color-warning)', fontSize: '0.75rem' },
   attentionGroup: { borderBottom: '1px solid var(--border-faint)' },
   attentionGroupTitleRow: { display: 'flex', alignItems: 'center', gap: '0.5rem' },
-  groupCount: { minWidth: 25, height: 21, padding: '0 0.4rem', display: 'grid', placeItems: 'center', borderRadius: 99, background: 'var(--accent)', color: 'var(--accent-contrast)', fontSize: '0.68rem', lineHeight: 1 },
+  groupCount: tone => ({ minWidth: 26, height: 22, padding: '0 0.45rem', display: 'grid', placeItems: 'center', borderRadius: 99, background: `var(--color-${tone}-surface)`, border: `1px solid var(--color-${tone}-border)`, color: `var(--color-${tone})`, fontSize: '0.75rem', lineHeight: 1 }),
   attentionItems: { padding: '0 0.3rem 0.65rem 1.1rem', display: 'flex', flexDirection: 'column' },
   attentionItem: { minHeight: 54, padding: '0.7rem 1rem 0.7rem 1.4rem', borderTop: '1px solid var(--border-faint)', display: 'flex', alignItems: 'center', gap: '0.75rem' },
   attentionItemClickable: { cursor: 'pointer', borderRadius: 7, transition: 'background 0.15s ease' },
   attentionItemTitleRow: { display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' },
   attentionActions: { display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.4rem', flexWrap: 'wrap' },
-  inlinePrimary: { padding: '0.38rem 0.65rem', border: 0, borderRadius: 6, background: 'var(--accent)', color: 'var(--accent-contrast)', fontSize: '0.69rem', fontWeight: 700, whiteSpace: 'nowrap' },
+  inlinePrimary: { padding: '0.45rem 0.8rem', border: 0, borderRadius: 8, background: 'var(--accent)', color: 'var(--accent-contrast)', fontSize: '0.8rem', fontWeight: 700, whiteSpace: 'nowrap', cursor: 'pointer' },
   inlineSecondary: { padding: '0.35rem 0.6rem', border: '1px solid var(--border)', borderRadius: 6, background: 'var(--bg-chip)', color: 'var(--text-muted)', fontSize: '0.69rem', fontWeight: 600, whiteSpace: 'nowrap' },
-  inlineDanger: { padding: '0.35rem 0.6rem', border: '1px solid rgba(232,111,111,0.3)', borderRadius: 6, background: 'rgba(232,111,111,0.1)', color: '#e86f6f', fontSize: '0.69rem', fontWeight: 600, whiteSpace: 'nowrap' },
+  inlineDanger: { padding: '0.43rem 0.75rem', border: '1px solid var(--color-danger-border)', borderRadius: 8, background: 'var(--color-danger-surface)', color: 'var(--color-danger)', fontSize: '0.8rem', fontWeight: 600, whiteSpace: 'nowrap', cursor: 'pointer' },
   inlineSelect: { maxWidth: 130, padding: '0.35rem 0.45rem', border: '1px solid var(--border)', borderRadius: 6, background: 'var(--bg-input)', color: 'var(--text)', fontSize: '0.69rem' },
   emptyAttentionRow: { minHeight: 42, padding: '0.55rem 1.1rem', borderBottom: '1px solid var(--border-faint)', display: 'flex', alignItems: 'center', gap: '0.75rem', opacity: 0.58 },
   emptyAttentionTitle: { flex: 1, color: 'var(--text-muted)', fontSize: '0.76rem', fontWeight: 600 },
@@ -906,18 +895,18 @@ const s = {
     width: 8, height: 8, borderRadius: '50%',
     background: color, flexShrink: 0,
   }),
-  attentionIcon: { width: 28, height: 28, flexShrink: 0, display: 'grid', placeItems: 'center', borderRadius: 7, background: 'var(--bg-chip)', border: '1px solid var(--border-faint)', color: 'var(--text-faint)' },
-  attentionIconSvg: { width: 16, height: 16, fill: 'none', stroke: 'currentColor', strokeWidth: 1.5, strokeLinecap: 'round', strokeLinejoin: 'round' },
+  attentionIcon: tone => ({ width: 36, height: 36, flexShrink: 0, display: 'grid', placeItems: 'center', borderRadius: 10, background: `var(--color-${tone}-surface)`, border: `1px solid var(--color-${tone}-border)`, color: `var(--color-${tone})` }),
+  attentionIconSvg: { width: 19, height: 19, fill: 'none', stroke: 'currentColor', strokeWidth: 1.5, strokeLinecap: 'round', strokeLinejoin: 'round' },
   attentionBody: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.15rem' },
-  attentionTitle: { fontSize: '0.85rem', fontWeight: 600, color: 'var(--text)' },
-  attentionSub: { fontSize: '0.72rem', color: 'var(--text-ghost)' },
-  attentionChevron: { fontSize: '0.85rem', color: 'var(--text-ghost)', flexShrink: 0 },
+  attentionTitle: { fontSize: '0.95rem', fontWeight: 600, color: 'var(--text)' },
+  attentionSub: { fontSize: '0.82rem', color: 'var(--text-muted)' },
+  attentionChevron: { fontSize: '1rem', color: 'var(--text-muted)', flexShrink: 0 },
   sentTodayBadge: {
     fontSize: '0.65rem', fontWeight: 600,
     padding: '0.1rem 0.45rem', borderRadius: 5,
-    background: 'rgba(76,201,138,0.1)',
-    color: '#4cc98a',
-    border: '1px solid rgba(76,201,138,0.2)',
+    background: 'var(--color-success-surface)',
+    color: 'var(--color-success)',
+    border: '1px solid var(--color-success-border)',
     flexShrink: 0,
   },
   sendBtn: {
@@ -933,16 +922,14 @@ const s = {
   // Generic card
   card: {
     background: 'var(--bg-card)',
-    border: '1px solid var(--border-faint)',
-    borderRadius: 12,
-    padding: '1rem 1.1rem',
+    border: '1px solid var(--border)',
+    borderRadius: 14,
+    padding: '1.1rem 1.25rem',
     display: 'flex', flexDirection: 'column', gap: '0.75rem',
   },
-  cardLabel: {
-    fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)',
-  },
+  cardLabel: { fontSize: '0.95rem', fontWeight: 700, color: 'var(--text)' },
   todayBookingRow: { width: '100%', padding: '0.55rem 0', border: 0, borderBottom: '1px solid var(--border-faint)', background: 'none', display: 'flex', alignItems: 'center', gap: '0.75rem', textAlign: 'left' },
-  todayTime: { width: 64, flexShrink: 0, color: 'var(--accent)', fontSize: '0.74rem', fontWeight: 700 },
+  todayTime: { width: 74, flexShrink: 0, textAlign: 'center', padding: '0.25rem 0', borderRadius: 8, background: 'var(--color-info-surface)', border: '1px solid var(--color-info-border)', color: 'var(--color-info)', fontSize: '0.8rem', fontWeight: 700 },
   todayBookingCopy: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.12rem' },
 
 
@@ -966,21 +953,22 @@ const s = {
   // Team two-column
   twoCol: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem' },
   artistRow: { display: 'flex', alignItems: 'center', gap: '0.6rem' },
-  avatarSm: { width: 26, height: 26, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, fontSize: '0.65rem', fontWeight: 700 },
-  artistRowName: { fontSize: '0.82rem', color: 'var(--text)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  avatarSm: { width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, fontSize: '0.75rem', fontWeight: 700 },
+  avatarFallback: { display: 'grid', placeItems: 'center', background: 'var(--color-info-surface)', border: '1px solid var(--color-info-border)', color: 'var(--color-info)' },
+  artistRowName: { fontSize: '0.92rem', color: 'var(--text)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   countBadge: {
-    fontSize: '0.68rem', fontWeight: 700,
-    background: 'var(--bg-chip)', border: '1px solid var(--border)',
-    borderRadius: 5, padding: '0.1rem 0.4rem',
-    color: 'var(--text-secondary)', flexShrink: 0,
+    fontSize: '0.75rem', fontWeight: 700,
+    background: 'var(--color-info-surface)', border: '1px solid var(--color-info-border)',
+    borderRadius: 99, padding: '0.15rem 0.6rem',
+    color: 'var(--color-info)', flexShrink: 0,
   },
-  empty: { fontSize: '0.8rem', color: 'var(--text-faint)' },
+  empty: { fontSize: '0.9rem', color: 'var(--text-muted)' },
 
   // Week utilization
   utilList: { display: 'flex', flexDirection: 'column', gap: '0.6rem' },
   utilRow: { display: 'flex', alignItems: 'center', gap: '0.75rem' },
-  utilName: { fontSize: '0.82rem', color: 'var(--text)', minWidth: 90, flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  utilBarBg: { flex: 1, height: 6, background: 'var(--bg-chip)', borderRadius: 3, overflow: 'hidden' },
-  utilBarFill: { height: '100%', background: 'var(--accent)', borderRadius: 3, transition: 'width 0.3s ease' },
-  utilCount: { fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', minWidth: 22, textAlign: 'right', flexShrink: 0 },
+  utilName: { fontSize: '0.92rem', color: 'var(--text)', minWidth: 90, flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  utilBarBg: { flex: 1, height: 8, background: 'var(--bg-chip)', borderRadius: 4, overflow: 'hidden' },
+  utilBarFill: { height: '100%', background: 'var(--color-info)', borderRadius: 4, transition: 'width 0.3s ease' },
+  utilCount: { fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', minWidth: 22, textAlign: 'right', flexShrink: 0 },
 };
