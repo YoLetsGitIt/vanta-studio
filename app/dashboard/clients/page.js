@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { getStudioClients, getStudioClient, getClientConsents, getNotes, addNote, deleteNote, ensureStudioClient, patchStudioClient, generateConsentLink, listConsentTemplates, getClientConsentSubmissions, getBatchClientConsentSubmissions } from '@/lib/api';
+import { getStudioClients, getStudioClient, getClientConsents, getNotes, addNote, deleteNote, ensureStudioClient, patchStudioClient, generateConsentLink, listConsentTemplates, getClientConsentSubmissions, getBatchClientConsentSubmissions, setClientMarketingConsent } from '@/lib/api';
 
 const TATTOO_STYLES = [
   'Traditional', 'Neo Traditional', 'Blackwork', 'Fine Line', 'Realism',
@@ -30,6 +30,7 @@ function ClientsInner() {
   const [consents, setConsents] = useState({});
   const [consentVersion, setConsentVersion] = useState('1');
   const [consentTemplates, setConsentTemplates] = useState([]);
+  const [marketingOverrides, setMarketingOverrides] = useState({});
   const [submissionsByEmail, setSubmissionsByEmail] = useState({});
 
   useEffect(() => {
@@ -61,12 +62,21 @@ function ClientsInner() {
         lastBooking: contact.last_booking ?? null,
         imported: contact.source === 'import' || contact.source === 'imported',
         contactId: contact.id,
+        marketingKnown: contact.email_marketing_opt_in !== undefined,
+        marketingOptIn: contact.email_marketing_opt_in === true,
+        unsubscribed: contact.email_unsubscribed === true,
       })).sort((a, b) => {
       if (!a.lastBooking) return 1;
       if (!b.lastBooking) return -1;
       return new Date(b.lastBooking) - new Date(a.lastBooking);
     });
   }, [contacts]);
+
+  const marketingFor = useCallback(client => {
+    if (!client || !client.marketingKnown) return null;
+    const override = marketingOverrides[client.id];
+    return { optIn: override ?? client.marketingOptIn, unsubscribed: client.unsubscribed };
+  }, [marketingOverrides]);
 
   const filtered = useMemo(() => {
     if (!search.trim()) return clients;
@@ -235,6 +245,7 @@ function ClientsInner() {
                   <span style={s.sessionCount}>{client.bookingCount} {t('clients_sessions')}</span>
                   {client.imported && <span style={{ ...s.badge, ...s.badgeGrey }}>{t('clients_imported')}</span>}
                   <ConsentBadge status={consentStatus} />
+                  <MarketingBadge marketing={marketingFor(client)} />
                 </div>
               </div>
             );
@@ -271,6 +282,9 @@ function ClientsInner() {
         {!detailLoading && selectedClient && (
           <ClientDetail
             client={selectedClient}
+            marketing={marketingFor(clients.find(c => c.id === selected))}
+            onMarketingChange={optIn => setMarketingOverrides(current => ({ ...current, [selected]: optIn }))}
+            clientKey={selected}
             onClose={() => setSelected(null)}
             consentTemplates={consentTemplates}
             onSendConsentLink={handleSendConsentLink}
@@ -316,7 +330,46 @@ function ConsentBadge({ status }) {
   return <span style={{ ...s.badge, ...s.badgeRed }}>{t('clients_no_consent')}</span>;
 }
 
-function ClientDetail({ client, onClose, consentTemplates = [], onSendConsentLink }) {
+function MarketingBadge({ marketing }) {
+  if (!marketing) return null;
+  if (marketing.unsubscribed) return <span style={{ ...s.badge, ...s.badgeGrey }}>Unsubscribed</span>;
+  if (marketing.optIn) return <span style={{ ...s.badge, ...s.badgeGreen }}>Marketing</span>;
+  return null;
+}
+
+function MarketingConsent({ client, clientKey, marketing, onChange }) {
+  const [saving, setSaving] = useState(false);
+  const [checked, setChecked] = useState(marketing?.optIn ?? false);
+  useEffect(() => { setChecked(marketing?.optIn ?? false); }, [marketing?.optIn, clientKey]);
+  if (!marketing || !client.email) return null;
+  async function toggle(next) {
+    setChecked(next);
+    setSaving(true);
+    try {
+      await setClientMarketingConsent(clientKey, next);
+      onChange(next);
+    } catch (err) {
+      setChecked(!next);
+      showError(err);
+    } finally { setSaving(false); }
+  }
+  return (
+    <div style={s.consentSection}>
+      <span style={s.sectionLabel}>Marketing emails</span>
+      {marketing.unsubscribed ? (
+        <p style={{ ...s.msg, margin: '0.5rem 0 0' }}>This client unsubscribed from your marketing emails. Only they can opt back in.</p>
+      ) : (
+        <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6rem', marginTop: '0.5rem', fontSize: '0.85rem', color: 'var(--text)' }}>
+          <input type="checkbox" checked={checked} disabled={saving} onChange={e => toggle(e.target.checked)} style={{ accentColor: 'var(--accent)', marginTop: 3 }} />
+          <span>This client has agreed to receive marketing emails from us.
+            <span style={{ display: 'block', color: 'var(--text-muted)', fontSize: '0.75rem' }}>Only tick this if they told you or ticked a box. Every email includes an unsubscribe link.</span></span>
+        </label>
+      )}
+    </div>
+  );
+}
+
+function ClientDetail({ client, marketing, onMarketingChange, clientKey, onClose, consentTemplates = [], onSendConsentLink }) {
   const { t } = useLanguage();
   const [linkGeneratingId, setLinkGeneratingId] = useState(null);
   const [linkSentId,       setLinkSentId]       = useState(null);
@@ -453,6 +506,8 @@ function ClientDetail({ client, onClose, consentTemplates = [], onSendConsentLin
         {client.dob && <Field label={t('clients_dob')}>{formatDob(client.dob)}</Field>}
         <Field label={t('clients_total_sessions')}>{client.bookings.length}</Field>
         <Field label={t('status_completed')}>{client.bookings.filter(b => b.outcome === 'completed').length}</Field>
+
+        <MarketingConsent client={client} clientKey={clientKey} marketing={marketing} onChange={onMarketingChange} />
 
         {consentTemplates.length > 0 && (
           <div style={s.consentSection}>

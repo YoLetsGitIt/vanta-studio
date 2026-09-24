@@ -21,10 +21,11 @@ const NAV = [
   { href: '/dashboard/appointments', tKey: 'nav_bookings',  icon: CalendarIcon },
   { href: '/dashboard/analytics',    tKey: 'nav_analytics', icon: ChartIcon },
   { href: '/dashboard/financial',    tKey: 'revenue_financial', icon: RevenueIcon },
+  { href: '/dashboard/marketing',    tKey: 'nav_marketing', icon: MegaphoneIcon },
 ];
 
 const MOBILE_NAV = [NAV[0], NAV[1], NAV[4], NAV[3]];
-const MORE_NAV = [NAV[2], NAV[5], NAV[6], { href: '/dashboard/settings', tKey: 'settings', icon: GearIcon }];
+const MORE_NAV = [NAV[2], NAV[5], NAV[6], NAV[7], { href: '/dashboard/settings', tKey: 'settings', icon: GearIcon }];
 
 const TOUR_STEPS = [
   {
@@ -33,7 +34,7 @@ const TOUR_STEPS = [
     action: 'Start tutorial',
   },
   ...NAV.map(({ href, tKey }, index) => ({
-    title: ['Your daily overview', 'Studio schedule', 'Your artists', 'Client records', 'Bookings', 'Analytics', 'Financials'][index],
+    title: ['Your daily overview', 'Studio schedule', 'Your artists', 'Client records', 'Bookings', 'Analytics', 'Financials', 'Marketing'][index],
     body: [
       'See what needs attention today, who is working, and how the week is filling up.',
       'See every artist, station, and appointment in one calendar—without double-booking a chair.',
@@ -42,6 +43,7 @@ const TOUR_STEPS = [
       'Review incoming requests, confirm appointments, and keep deposits and follow-ups on track.',
       'Understand appointment performance, returning clients, and studio growth at a glance.',
       'Track revenue, payments, and how earnings are split across your studio.',
+      'Email clients who have agreed to hear from you: fill cancelled slots, send offers, and run campaigns.',
     ][index],
     target: 'nav', targetIndex: index, href, tKey,
   })),
@@ -503,6 +505,15 @@ function GearIcon({ size = 16 }) {
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
       <path d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" />
       <path d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+    </svg>
+  );
+}
+
+function MegaphoneIcon({ size = 16 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
+      <path d="M2.5 6.5v3l7 3.5V3l-7 3.5Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
+      <path d="M12 6.2c.9.4 1.5 1 1.5 1.8s-.6 1.4-1.5 1.8M4.5 9.7l.8 3.3h1.6l-.6-2.7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
