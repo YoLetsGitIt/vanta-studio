@@ -299,18 +299,13 @@ function FinancialContent({ s, weeklyChart, startDate, endDate, isLight }) {
     <>
       <Section title={`Revenue summary · ${startDate} – ${endDate}`}>
         <div className="studio-kpi-grid" style={st.kpiGrid}>
-          <KpiCard label={t('revenue_gross_sales')}           value={fmt(s?.gross_sales)}       accent />
-          <KpiCard label={t('revenue_net_sales')}             value={fmt(s?.net_sales)}          />
-          <KpiCard label={t('revenue_deposits')}    value={fmt(s?.deposits_collected)} />
-          <KpiCard label={t('revenue_remaining_balances')}    value={fmt(s?.remaining_balances)} />
-          <KpiCard label={t('revenue_completed_sessions')}    value={s?.completed_sessions ?? 0} />
-          <KpiCard label={t('revenue_refunds')}               value="—" dim />
-          <KpiCard label={t('revenue_discounts')}       value="—" dim />
-          <KpiCard label={t('revenue_taxes')}       value="—" dim />
-          <KpiCard label={t('revenue_gift_card_sales')}       value="—" dim />
-          <KpiCard label={t('revenue_gift_card_redemptions')} value="—" dim />
-          <KpiCard label={t('revenue_tips')}                  value="—" dim />
+          <KpiCard label={t('revenue_gross_sales')}           value={fmt(s?.gross_sales)}        tone="success" />
+          <KpiCard label={t('revenue_net_sales')}             value={fmt(s?.net_sales)}          tone="success" />
+          <KpiCard label={t('revenue_deposits')}              value={fmt(s?.deposits_collected)} tone="info" />
+          <KpiCard label={t('revenue_remaining_balances')}    value={fmt(s?.remaining_balances)} tone="warning" />
+          <KpiCard label={t('revenue_completed_sessions')}    value={s?.completed_sessions ?? 0} tone="neutral" />
         </div>
+        <p style={st.comingSoon}>Refunds, discounts, taxes, gift cards and tips will appear here once they’re available.</p>
       </Section>
 
       <Section title={t('revenue_weekly_gross')}>
@@ -326,13 +321,13 @@ function FinancialContent({ s, weeklyChart, startDate, endDate, isLight }) {
                   contentStyle={{ background: tooltipBg, border: `1px solid ${tooltipBorder}`, borderRadius: 8, fontSize: 12, color: tooltipColor }}
                   labelStyle={{ color: tickColor }}
                 />
-                <Bar dataKey="gross"    fill="var(--accent)" fillOpacity={0.72} radius={[3,3,0,0]} name="Gross sales" />
-                <Bar dataKey="deposits" fill="rgba(111,163,232,0.4)"  radius={[3,3,0,0]} name="Deposits" />
+                <Bar dataKey="gross"    fill="var(--color-success)" radius={[4,4,0,0]} name="Gross sales" />
+                <Bar dataKey="deposits" fill="var(--color-info)"    radius={[4,4,0,0]} name="Deposits" />
               </BarChart>
             </ResponsiveContainer>
             <div style={st.legend}>
-              <LegendDot color="var(--accent)" label="Gross sales" />
-              <LegendDot color="rgba(111,163,232,0.8)" label="Deposits" />
+              <LegendDot color="var(--color-success)" label="Gross sales" />
+              <LegendDot color="var(--color-info)" label="Deposits" />
             </div>
           </div>
         ) : (
@@ -425,14 +420,16 @@ function Section({ title, children }) {
   );
 }
 
-function KpiCard({ label, value, accent, dim, color }) {
+function KpiCard({ label, value, tone = 'neutral' }) {
+  const toned = tone !== 'neutral';
   return (
-    <div style={st.kpiCard}>
-      <span style={{ ...st.kpiVal, color: accent ? 'var(--accent)' : dim ? 'var(--text-ghost)' : (color ?? 'var(--text)') }}>
-        {value}
-      </span>
+    <div style={{
+      ...st.kpiCard,
+      ...(toned ? { background: `var(--color-${tone}-surface)`, borderColor: `var(--color-${tone}-border)` } : {}),
+      borderLeft: `4px solid ${toned ? `var(--color-${tone})` : 'var(--text-ghost)'}`,
+    }}>
       <span style={st.kpiLabel}>{label}</span>
-      {dim && <span style={st.dimBadge}>coming soon</span>}
+      <span style={{ ...st.kpiVal, color: toned ? `var(--color-${tone})` : 'var(--text)' }}>{value}</span>
     </div>
   );
 }
@@ -441,7 +438,7 @@ function LegendDot({ color, label }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
       <span style={{ width: 8, height: 8, borderRadius: 2, background: color, flexShrink: 0 }} />
-      <span style={{ fontSize: '0.72rem', color: 'var(--text-faint)' }}>{label}</span>
+      <span style={{ fontSize: '0.85rem', color: 'var(--text-dim)' }}>{label}</span>
     </div>
   );
 }
@@ -449,9 +446,9 @@ function LegendDot({ color, label }) {
 // ── Reimbursements section ────────────────────────────────────────────────────
 
 const REIMB_STATUS_STYLE = {
-  pending:  { color: '#f59e3a', bg: 'rgba(245,158,58,0.12)',  label: 'Pending'  },
-  approved: { color: '#4cc98a', bg: 'rgba(76,201,138,0.12)',  label: 'Paid out' },
-  rejected: { color: '#e86f6f', bg: 'rgba(232,111,111,0.12)', label: 'Rejected' },
+  pending:  { color: 'var(--color-warning)', bg: 'var(--color-warning-surface)', label: 'Pending'  },
+  approved: { color: 'var(--color-success)', bg: 'var(--color-success-surface)', label: 'Paid out' },
+  rejected: { color: 'var(--color-danger)',  bg: 'var(--color-danger-surface)',  label: 'Rejected' },
 };
 
 function ReimbursementsSection({ reimbursements, reviewingId, onReview }) {
@@ -948,27 +945,27 @@ const st = {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
     flexShrink: 0, gap: '1rem', flexWrap: 'wrap',
   },
-  title:   { fontSize: '1.2rem', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.01em' },
+  title:   { fontSize: '1.5rem', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em' },
   controls: { display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' },
   quickPicker: { display: 'flex', gap: '0.35rem', flexWrap: 'wrap' },
   dateSep: { width: 1, height: 18, background: 'var(--border)' },
   dateRange: { display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' },
   dateInput: {
     background: 'var(--bg-chip)', border: '1px solid var(--border)',
-    borderRadius: 8, color: 'var(--text-dim)', fontSize: '0.78rem',
-    padding: '0.3rem 0.5rem', outline: 'none', colorScheme: 'auto',
+    borderRadius: 8, color: 'var(--text)', fontSize: '0.875rem',
+    padding: '0.4rem 0.6rem', outline: 'none', colorScheme: 'auto',
   },
   dateArrow: { fontSize: '0.75rem', color: 'var(--text-ghost)' },
   weekBtn: {
-    padding: '0.3rem 0.65rem', borderRadius: 20,
-    border: '1px solid var(--border)', background: 'transparent',
-    color: 'var(--text-muted)', fontSize: '0.78rem', fontWeight: 500, cursor: 'pointer',
+    padding: '0.4rem 0.8rem', borderRadius: 20,
+    border: '1px solid var(--border-strong)', background: 'transparent',
+    color: 'var(--text-dim)', fontSize: '0.85rem', fontWeight: 500, cursor: 'pointer',
   },
-  weekBtnActive: { background: 'var(--accent-tint)', border: '1px solid var(--accent-tint-border)', color: 'var(--accent)' },
+  weekBtnActive: { background: 'var(--accent)', border: '1px solid var(--accent)', color: 'var(--accent-contrast)', fontWeight: 700 },
   exportBtn: {
-    padding: '0.3rem 0.75rem', borderRadius: 20,
-    border: '1px solid var(--border)', background: 'transparent',
-    color: 'var(--text-muted)', fontSize: '0.78rem', fontWeight: 500, cursor: 'pointer',
+    padding: '0.4rem 0.9rem', borderRadius: 20,
+    border: '1px solid var(--border-strong)', background: 'transparent',
+    color: 'var(--text-dim)', fontSize: '0.85rem', fontWeight: 500, cursor: 'pointer',
     whiteSpace: 'nowrap',
   },
 
@@ -981,14 +978,14 @@ const st = {
     display: 'flex', alignItems: 'center', gap: '0.4rem',
     padding: '0.65rem 0.85rem', background: 'none', border: 'none',
     borderBottom: '2px solid transparent', marginBottom: '-1px',
-    fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-muted)',
+    fontSize: '0.95rem', fontWeight: 500, color: 'var(--text-dim)',
     cursor: 'pointer', transition: 'color 0.12s',
   },
   tabActive: { color: 'var(--text)', borderBottomColor: 'var(--accent)' },
   lockBtn: {
-    marginLeft: 'auto', padding: '0.3rem 0.7rem', borderRadius: 6,
-    border: '1px solid var(--border-faint)', background: 'transparent',
-    color: 'var(--text-secondary)', fontSize: '0.72rem', fontWeight: 500, cursor: 'pointer',
+    marginLeft: 'auto', padding: '0.4rem 0.85rem', borderRadius: 8,
+    border: '1px solid var(--border-strong)', background: 'transparent',
+    color: 'var(--text-dim)', fontSize: '0.85rem', fontWeight: 500, cursor: 'pointer',
   },
 
   body: {
@@ -997,14 +994,15 @@ const st = {
   },
   msg: { fontSize: '0.875rem', color: 'var(--text-faint)' },
   section: { display: 'flex', flexDirection: 'column', gap: '1rem' },
-  sectionTitle: { fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.01em' },
-  kpiGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(148px, 1fr))', gap: '0.75rem' },
+  sectionTitle: { fontSize: '1.05rem', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.01em' },
+  kpiGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: '0.75rem' },
+  comingSoon: { margin: '0.25rem 0 0', fontSize: '0.85rem', color: 'var(--text-muted)' },
   kpiCard: {
-    background: 'var(--bg-card)', border: '1px solid var(--border-faint)',
-    borderRadius: 10, padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.3rem',
+    background: 'var(--bg-card)', border: '1px solid var(--border)',
+    borderRadius: 12, padding: '1.1rem 1.2rem', display: 'flex', flexDirection: 'column', gap: '0.4rem',
   },
-  kpiVal:   { fontSize: '1.3rem', fontWeight: 700, letterSpacing: '-0.02em' },
-  kpiLabel: { fontSize: '0.72rem', color: 'var(--text-faint)', fontWeight: 500 },
+  kpiVal:   { fontSize: '1.7rem', fontWeight: 700, letterSpacing: '-0.03em' },
+  kpiLabel: { fontSize: '0.875rem', color: 'var(--text-dim)', fontWeight: 600 },
   dimBadge: { fontSize: '0.62rem', color: 'var(--text-ghost)', fontWeight: 500, letterSpacing: '0.02em' },
   chartWrap: {
     background: 'var(--bg-card)', border: '1px solid var(--border-faint)',

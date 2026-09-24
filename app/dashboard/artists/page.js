@@ -406,12 +406,12 @@ function ArtistRow({ artist, onClick, onApprove, onReject, onRemove, actionLoadi
               </span>
             )}
             {!artist.acceptingBookings && (
-              <span style={{ fontSize: '0.68rem', fontWeight: 600, color: 'var(--text-ghost)', background: 'var(--bg-chip)', border: '1px solid var(--border)', borderRadius: 20, padding: '0.12rem 0.5rem', whiteSpace: 'nowrap' }}>
+              <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', background: 'var(--bg-chip)', border: '1px solid var(--border-strong)', borderRadius: 20, padding: '0.15rem 0.6rem', whiteSpace: 'nowrap' }}>
                 Paused
               </span>
             )}
             {artist.endDate && (
-              <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#f59e3a', background: 'rgba(245,158,58,0.1)', border: '1px solid rgba(245,158,58,0.25)', borderRadius: 20, padding: '0.12rem 0.5rem', whiteSpace: 'nowrap' }}>
+              <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--color-warning)', background: 'var(--color-warning-surface)', border: '1px solid var(--color-warning-border)', borderRadius: 20, padding: '0.15rem 0.6rem', whiteSpace: 'nowrap' }}>
                 Last day {new Date(artist.endDate + 'T00:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}
               </span>
             )}
@@ -965,27 +965,27 @@ const s = {
   },
   headerLeft: { display: 'flex', flexDirection: 'column', gap: '0.25rem' },
   title: {
-    fontSize: '1.2rem',
+    fontSize: '1.5rem',
     fontWeight: 700,
     color: 'var(--text)',
-    letterSpacing: '-0.01em',
+    letterSpacing: '-0.02em',
     display: 'flex',
     alignItems: 'center',
     gap: '0.5rem',
     margin: 0,
   },
-  subtitle: { fontSize: '0.8rem', color: 'var(--text-faint)', margin: 0 },
+  subtitle: { fontSize: '0.95rem', color: 'var(--text-dim)', margin: 0 },
   pendingBtn: {
     display: 'flex',
     alignItems: 'center',
     gap: '0.5rem',
-    padding: '0.45rem 1rem',
+    padding: '0.55rem 1.1rem',
     borderRadius: 20,
-    border: '1px solid rgba(245,158,58,0.3)',
-    background: 'rgba(245,158,58,0.08)',
-    color: '#f59e3a',
-    fontSize: '0.8rem',
-    fontWeight: 600,
+    border: '1px solid var(--color-warning-border)',
+    background: 'var(--color-warning-surface)',
+    color: 'var(--color-warning)',
+    fontSize: '0.9rem',
+    fontWeight: 700,
     cursor: 'pointer',
     whiteSpace: 'nowrap',
   },
@@ -995,12 +995,12 @@ const s = {
     color: 'var(--text-muted)',
   },
   pendingCount: {
-    fontSize: '0.7rem',
+    fontSize: '0.78rem',
     fontWeight: 700,
-    color: '#0a0a0a',
-    background: '#f59e3a',
+    color: 'var(--color-warning-surface)',
+    background: 'var(--color-warning)',
     borderRadius: 20,
-    padding: '0.1rem 0.45rem',
+    padding: '0.1rem 0.55rem',
   },
   body: {
     flex: 1,
@@ -1015,9 +1015,9 @@ const s = {
   // List row
   card: {
     background: 'var(--bg-card)',
-    border: '1px solid var(--border-faint)',
-    borderRadius: 10,
-    padding: '0.85rem 1.1rem',
+    border: '1px solid var(--border)',
+    borderRadius: 12,
+    padding: '1rem 1.2rem',
     display: 'flex',
     flexDirection: 'column',
     gap: '0.6rem',
@@ -1029,16 +1029,17 @@ const s = {
     gap: '0.85rem',
   },
   avatar: {
-    width: 40,
-    height: 40,
+    width: 46,
+    height: 46,
     borderRadius: '50%',
     objectFit: 'cover',
     flexShrink: 0,
   },
   avatarFallback: {
-    background: 'var(--accent-tint)',
-    color: 'var(--accent)',
-    fontSize: '0.85rem',
+    background: 'var(--color-info-surface)',
+    border: '1px solid var(--color-info-border)',
+    color: 'var(--color-info)',
+    fontSize: '1rem',
     fontWeight: 700,
     display: 'flex',
     alignItems: 'center',
@@ -1046,23 +1047,23 @@ const s = {
   },
   cardInfo: { flex: 1, display: 'flex', flexDirection: 'column', gap: '0.2rem', minWidth: 0 },
   nameRow: { display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' },
-  name: { fontSize: '0.9rem', fontWeight: 700, color: 'var(--text)' },
+  name: { fontSize: '1.05rem', fontWeight: 700, color: 'var(--text)' },
   metaRow: { display: 'flex', alignItems: 'center', gap: '0.35rem' },
-  email: { fontSize: '0.75rem', color: 'var(--text-faint)' },
+  email: { fontSize: '0.875rem', color: 'var(--text-muted)' },
   dot: { fontSize: '0.65rem', color: 'var(--text-ghost)' },
-  instagram: { fontSize: '0.75rem', color: 'var(--text-muted)' },
+  instagram: { fontSize: '0.875rem', color: 'var(--text-muted)' },
   chevron: {
-    fontSize: '1.1rem',
-    color: 'var(--text-ghost)',
+    fontSize: '1.5rem',
+    color: 'var(--text-muted)',
     flexShrink: 0,
     lineHeight: 1,
   },
   actions: { display: 'flex', gap: '0.4rem', flexShrink: 0 },
   actionBtn: {
-    padding: '0.38rem 0.85rem',
-    borderRadius: 7,
-    fontSize: '0.78rem',
-    fontWeight: 600,
+    padding: '0.5rem 1rem',
+    borderRadius: 8,
+    fontSize: '0.875rem',
+    fontWeight: 700,
     cursor: 'pointer',
     border: '1px solid',
     whiteSpace: 'nowrap',
@@ -1070,20 +1071,19 @@ const s = {
 
   // Shared badges
   statusBadge: {
-    fontSize: '0.68rem',
-    fontWeight: 600,
-    padding: '0.12rem 0.45rem',
+    fontSize: '0.78rem',
+    fontWeight: 700,
+    padding: '0.15rem 0.6rem',
     borderRadius: 20,
-    letterSpacing: '0.02em',
   },
   guestBadge: {
-    fontSize: '0.68rem',
-    fontWeight: 600,
-    color: 'var(--text-muted)',
-    background: 'var(--bg-chip)',
-    border: '1px solid var(--border)',
+    fontSize: '0.78rem',
+    fontWeight: 700,
+    color: 'var(--color-info)',
+    background: 'var(--color-info-surface)',
+    border: '1px solid var(--color-info-border)',
     borderRadius: 20,
-    padding: '0.12rem 0.45rem',
+    padding: '0.15rem 0.6rem',
   },
   rejectionNote: {
     fontSize: '0.78rem',

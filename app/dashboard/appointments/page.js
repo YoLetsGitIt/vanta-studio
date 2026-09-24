@@ -17,11 +17,11 @@ import { bookingActions } from '@/lib/bookingActions';
 import StatePanel from '@/components/ui/StatePanel';
 
 const STATUS_FILTERS = [
-  { value: 'pending',                              tKey: 'status_pending' },
-  { value: 'awaiting_payment',                     tKey: 'status_awaiting_payment' },
-  { value: 'requires_confirmation',                tKey: 'status_needs_confirmation' },
-  { value: 'confirmed',                            tKey: 'status_confirmed' },
-  { value: 'completed,cancelled,deposit_expired',  tKey: 'status_completed' },
+  { value: 'pending',                              tKey: 'status_pending',            tone: 'warning' },
+  { value: 'awaiting_payment',                     tKey: 'status_awaiting_payment',   tone: 'danger' },
+  { value: 'requires_confirmation',                tKey: 'status_needs_confirmation', tone: 'info' },
+  { value: 'confirmed',                            tKey: 'status_confirmed',          tone: 'success' },
+  { value: 'completed,cancelled,deposit_expired',  tKey: 'status_completed',          tone: 'neutral' },
 ];
 
 const COMPLETED_TAB = 'completed,cancelled,deposit_expired';
@@ -417,7 +417,7 @@ function AppointmentsInner() {
                 onMouseDown={e => e.preventDefault()}
                 onClick={() => selectFilter(f.value)}
                 aria-pressed={activeFilter === f.value}
-                style={{ ...s.filterBtn, ...(activeFilter === f.value ? s.filterActive : {}) }}
+                style={{ ...s.filterBtn, ...(activeFilter === f.value ? s.filterActive(f.tone) : {}) }}
               >
                 {f.label ?? t(f.tKey)}
               </button>
@@ -644,7 +644,8 @@ function BookingRow({ booking: b, selected, onSelect, labelOverride }) {
       style={{
         ...s.row,
         background: selected ? 'var(--bg-row-active)' : undefined,
-        borderColor: selected ? 'var(--border-strong)' : 'var(--border-faint)',
+        borderColor: selected ? 'var(--border-strong)' : 'var(--border)',
+        borderLeft: `4px solid ${sc.text}`,
       }}
     >
       {/* Date block */}
@@ -707,14 +708,14 @@ const s = {
     display: 'flex', flexDirection: 'column', gap: '1rem', flexShrink: 0,
   },
   title: {
-    fontSize: '1.2rem', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.01em',
+    fontSize: '1.5rem', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em',
   },
   searchInput: {
     width: '100%', boxSizing: 'border-box',
-    padding: '0.5rem 0.85rem', borderRadius: 8,
-    border: '1px solid var(--border-faint)',
+    padding: '0.65rem 1rem', borderRadius: 10,
+    border: '1px solid var(--border)',
     background: 'var(--bg-input)', color: 'var(--text)',
-    fontSize: '0.875rem', outline: 'none',
+    fontSize: '0.95rem', outline: 'none',
   },
   filterRow: {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem',
@@ -723,21 +724,21 @@ const s = {
     display: 'flex', gap: '0.4rem', flexWrap: 'wrap',
   },
   sortBtn: {
-    padding: '0.3rem 0.75rem', borderRadius: 20,
-    border: '1px solid var(--border)',
-    background: 'transparent', color: 'var(--text-muted)',
-    fontSize: '0.78rem', fontWeight: 500, cursor: 'pointer',
+    padding: '0.45rem 0.9rem', borderRadius: 20,
+    border: '1px solid var(--border-strong)',
+    background: 'transparent', color: 'var(--text-dim)',
+    fontSize: '0.85rem', fontWeight: 500, cursor: 'pointer',
     whiteSpace: 'nowrap', flexShrink: 0,
   },
   filterBtn: {
-    padding: '0.3rem 0.85rem', borderRadius: 20,
-    border: '1px solid var(--border)',
-    background: 'transparent', color: 'var(--text-muted)',
-    fontSize: '0.78rem', fontWeight: 500, cursor: 'pointer',
+    padding: '0.45rem 1rem', borderRadius: 20,
+    border: '1px solid var(--border-strong)',
+    background: 'transparent', color: 'var(--text-dim)',
+    fontSize: '0.875rem', fontWeight: 500, cursor: 'pointer', whiteSpace: 'nowrap',
   },
-  filterActive: {
-    background: 'var(--accent-tint)', border: '1px solid var(--accent-tint-border)', color: 'var(--accent)',
-  },
+  filterActive: tone => tone === 'neutral'
+    ? { background: 'var(--accent)', border: '1px solid var(--accent)', color: 'var(--accent-contrast)', fontWeight: 700 }
+    : { background: `var(--color-${tone}-surface)`, border: `1px solid var(--color-${tone}-border)`, color: `var(--color-${tone})`, fontWeight: 700 },
   subFilterRow: {
     display: 'flex', gap: '0.35rem', flexWrap: 'wrap',
     padding: '0.6rem 2rem',
@@ -745,13 +746,13 @@ const s = {
     flexShrink: 0,
   },
   subFilterBtn: {
-    padding: '0.2rem 0.7rem', borderRadius: 20,
-    border: '1px solid var(--border-faint)',
-    background: 'transparent', color: 'var(--text-ghost)',
-    fontSize: '0.73rem', fontWeight: 500, cursor: 'pointer',
+    padding: '0.35rem 0.85rem', borderRadius: 20,
+    border: '1px solid var(--border)',
+    background: 'transparent', color: 'var(--text-muted)',
+    fontSize: '0.82rem', fontWeight: 500, cursor: 'pointer',
   },
   subFilterActive: {
-    background: 'var(--bg-chip)', border: '1px solid var(--border)', color: 'var(--text-muted)',
+    background: 'var(--bg-chip)', border: '1px solid var(--border-strong)', color: 'var(--text)', fontWeight: 700,
   },
   body: {
     flex: 1, overflowY: 'auto', padding: '1rem 2rem',
@@ -769,52 +770,52 @@ const s = {
   },
   row: {
     display: 'flex', alignItems: 'center',
-    padding: '0.85rem 1rem', borderRadius: 10,
-    border: '1px solid var(--border-faint)',
+    padding: '1rem 1.1rem', borderRadius: 12,
+    border: '1px solid var(--border)', background: 'var(--bg-card)',
     cursor: 'pointer', transition: 'background 0.12s, border-color 0.12s', gap: '0.85rem',
   },
   dateBlock: {
     display: 'flex', flexDirection: 'column', alignItems: 'center',
-    flexShrink: 0, width: 44,
-    borderRight: '1px solid var(--border-faint)', paddingRight: '0.85rem',
+    flexShrink: 0, width: 54,
+    borderRight: '1px solid var(--border)', paddingRight: '0.85rem',
   },
   dateMonth: {
-    fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.08em',
-    color: 'var(--text-ghost)', lineHeight: 1,
+    fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.06em',
+    color: 'var(--color-info)', lineHeight: 1,
   },
   dateDay: {
-    fontSize: '1.45rem', fontWeight: 700, color: 'var(--text)', lineHeight: 1.1,
+    fontSize: '1.7rem', fontWeight: 700, color: 'var(--text)', lineHeight: 1.1,
   },
   dateTime: {
-    fontSize: '0.62rem', color: 'var(--text-ghost)', marginTop: '0.1rem', whiteSpace: 'nowrap',
+    fontSize: '0.74rem', color: 'var(--text-muted)', marginTop: '0.15rem', whiteSpace: 'nowrap',
   },
   rowMain: {
     display: 'flex', flexDirection: 'column', gap: '0.18rem', flex: 1, minWidth: 0,
   },
   clientName: {
-    fontSize: '0.9rem', fontWeight: 600, color: 'var(--text)',
+    fontSize: '1.02rem', fontWeight: 700, color: 'var(--text)',
   },
   rowMeta: {
-    fontSize: '0.76rem', color: 'var(--text-secondary)',
+    fontSize: '0.875rem', color: 'var(--text-dim)',
   },
   sourceTag: {
-    fontSize: '0.62rem', fontWeight: 600, letterSpacing: '0.04em',
-    padding: '0.1rem 0.4rem', borderRadius: 4, border: '1px solid transparent',
+    fontSize: '0.74rem', fontWeight: 600, letterSpacing: '0.02em',
+    padding: '0.12rem 0.5rem', borderRadius: 6, border: '1px solid transparent',
   },
   followUpTag: {
-    fontSize: '0.62rem', fontWeight: 600, letterSpacing: '0.04em',
-    padding: '0.1rem 0.4rem', borderRadius: 4,
-    background: 'rgba(111,163,232,0.12)', color: '#6fa3e8',
+    fontSize: '0.74rem', fontWeight: 600, letterSpacing: '0.02em',
+    padding: '0.12rem 0.5rem', borderRadius: 6,
+    background: 'var(--color-info-surface)', color: 'var(--color-info)',
   },
   rowRight: {
     display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.3rem', flexShrink: 0,
   },
   statusBadge: {
-    fontSize: '0.72rem', fontWeight: 600, padding: '0.2rem 0.55rem',
-    borderRadius: 20, letterSpacing: '0.02em', whiteSpace: 'nowrap',
+    fontSize: '0.8rem', fontWeight: 700, padding: '0.25rem 0.7rem',
+    borderRadius: 20, whiteSpace: 'nowrap',
   },
   priceText: {
-    fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-muted)',
+    fontSize: '0.95rem', fontWeight: 700, color: 'var(--text)',
   },
   toast: {
     position: 'absolute', bottom: '1.5rem', left: '50%',

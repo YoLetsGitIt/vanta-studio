@@ -102,13 +102,13 @@ export default function RevenuePage() {
             <Section title={t('revenue_appt_metrics')}>
               <div className="studio-kpi-grid" style={st.kpiGrid}>
                 <KpiCard label={t('revenue_total_appts')}    value={a?.total ?? 0} />
-                <KpiCard label={t('status_completed')}             value={a?.completed ?? 0} color="#4cc98a" />
-                <KpiCard label={t('revenue_upcoming')}  value={a?.confirmed ?? 0} color="#6fa3e8" />
-                <KpiCard label={t('status_pending')}               value={a?.pending ?? 0}   color="#f59e3a" />
-                <KpiCard label={t('status_cancelled')}             value={a?.cancelled ?? 0} color="#a0a0a0" />
-                <KpiCard label="No-shows"              value={a?.no_shows ?? 0}  color="#e86f6f" />
-                <KpiCard label={t('revenue_avg_value')} value={fmt(a?.avg_value)} accent />
-                <KpiCard label={t('revenue_appt_revenue')}   value={fmt(a?.revenue)} />
+                <KpiCard label={t('status_completed')}       value={a?.completed ?? 0} tone="success" />
+                <KpiCard label={t('revenue_upcoming')}       value={a?.confirmed ?? 0} tone="info" />
+                <KpiCard label={t('status_pending')}         value={a?.pending ?? 0}   tone="warning" />
+                <KpiCard label={t('status_cancelled')}       value={a?.cancelled ?? 0} />
+                <KpiCard label="No-shows"                     value={a?.no_shows ?? 0}  tone="danger" />
+                <KpiCard label={t('revenue_avg_value')}      value={fmt(a?.avg_value)} tone="info" />
+                <KpiCard label={t('revenue_appt_revenue')}   value={fmt(a?.revenue)}   tone="success" />
               </div>
               {a?.by_source?.length > 0 && (
                 <SourceBreakdown data={a.by_source} />
@@ -117,8 +117,8 @@ export default function RevenuePage() {
 
             <Section title={t('revenue_customer_insights')}>
               <div className="studio-kpi-grid" style={st.kpiGrid}>
-                <KpiCard label={t('revenue_new_clients')}       value={c?.new_clients ?? 0}       color="#4cc98a" />
-                <KpiCard label={t('revenue_returning_clients')} value={c?.returning_clients ?? 0} color="#6fa3e8" />
+                <KpiCard label={t('revenue_new_clients')}       value={c?.new_clients ?? 0}       tone="success" />
+                <KpiCard label={t('revenue_returning_clients')} value={c?.returning_clients ?? 0} tone="info" />
               </div>
               {c?.top_clients?.length > 0 && (
                 <>
@@ -212,14 +212,16 @@ function Section({ title, children }) {
   );
 }
 
-function KpiCard({ label, value, accent, dim, color }) {
+function KpiCard({ label, value, tone = 'neutral' }) {
+  const toned = tone !== 'neutral';
   return (
-    <div style={st.kpiCard}>
-      <span style={{ ...st.kpiVal, color: accent ? 'var(--accent)' : dim ? 'var(--text-ghost)' : (color ?? 'var(--text)') }}>
-        {value}
-      </span>
+    <div style={{
+      ...st.kpiCard,
+      ...(toned ? { background: `var(--color-${tone}-surface)`, borderColor: `var(--color-${tone}-border)` } : {}),
+      borderLeft: `4px solid ${toned ? `var(--color-${tone})` : 'var(--text-ghost)'}`,
+    }}>
       <span style={st.kpiLabel}>{label}</span>
-      {dim && <span style={st.dimBadge}>coming soon</span>}
+      <span style={{ ...st.kpiVal, color: toned ? `var(--color-${tone})` : 'var(--text)' }}>{value}</span>
     </div>
   );
 }
@@ -233,23 +235,23 @@ const st = {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
     flexShrink: 0, gap: '1rem', flexWrap: 'wrap',
   },
-  title:   { fontSize: '1.2rem', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.01em' },
+  title:   { fontSize: '1.5rem', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em' },
   controls: { display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' },
   quickPicker: { display: 'flex', gap: '0.35rem', flexWrap: 'wrap' },
   dateSep: { width: 1, height: 18, background: 'var(--border)' },
   dateRange: { display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' },
   dateInput: {
     background: 'var(--bg-chip)', border: '1px solid var(--border)',
-    borderRadius: 8, color: 'var(--text-dim)', fontSize: '0.78rem',
-    padding: '0.3rem 0.5rem', outline: 'none', colorScheme: 'auto',
+    borderRadius: 8, color: 'var(--text)', fontSize: '0.875rem',
+    padding: '0.4rem 0.6rem', outline: 'none', colorScheme: 'auto',
   },
   dateArrow: { fontSize: '0.75rem', color: 'var(--text-ghost)' },
   weekBtn: {
-    padding: '0.3rem 0.65rem', borderRadius: 20,
-    border: '1px solid var(--border)', background: 'transparent',
-    color: 'var(--text-muted)', fontSize: '0.78rem', fontWeight: 500, cursor: 'pointer',
+    padding: '0.4rem 0.8rem', borderRadius: 20,
+    border: '1px solid var(--border-strong)', background: 'transparent',
+    color: 'var(--text-dim)', fontSize: '0.85rem', fontWeight: 500, cursor: 'pointer',
   },
-  weekBtnActive: { background: 'var(--accent-tint)', border: '1px solid var(--accent-tint-border)', color: 'var(--accent)' },
+  weekBtnActive: { background: 'var(--accent)', border: '1px solid var(--accent)', color: 'var(--accent-contrast)', fontWeight: 700 },
 
   body: {
     flex: 1, overflowY: 'auto', padding: '1.5rem 2rem',
@@ -257,15 +259,15 @@ const st = {
   },
   msg: { fontSize: '0.875rem', color: 'var(--text-faint)' },
   section: { display: 'flex', flexDirection: 'column', gap: '1rem' },
-  sectionTitle: { fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.01em' },
-  sectionSub: { fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 500, marginTop: '0.25rem' },
-  kpiGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(148px, 1fr))', gap: '0.75rem' },
+  sectionTitle: { fontSize: '1.05rem', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.01em' },
+  sectionSub: { fontSize: '0.95rem', color: 'var(--text)', fontWeight: 700, marginTop: '0.5rem' },
+  kpiGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: '0.75rem' },
   kpiCard: {
-    background: 'var(--bg-card)', border: '1px solid var(--border-faint)',
-    borderRadius: 10, padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.3rem',
+    background: 'var(--bg-card)', border: '1px solid var(--border)',
+    borderRadius: 12, padding: '1.1rem 1.2rem', display: 'flex', flexDirection: 'column', gap: '0.4rem',
   },
-  kpiVal:   { fontSize: '1.3rem', fontWeight: 700, letterSpacing: '-0.02em' },
-  kpiLabel: { fontSize: '0.72rem', color: 'var(--text-faint)', fontWeight: 500 },
+  kpiVal:   { fontSize: '1.7rem', fontWeight: 700, letterSpacing: '-0.03em' },
+  kpiLabel: { fontSize: '0.875rem', color: 'var(--text-dim)', fontWeight: 600 },
   dimBadge: { fontSize: '0.62rem', color: 'var(--text-ghost)', fontWeight: 500, letterSpacing: '0.02em' },
   tableScroll: { overflowX: 'auto' },
   table: {
@@ -274,11 +276,10 @@ const st = {
   },
   th: {
     padding: '0.6rem 1rem', textAlign: 'left',
-    fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)',
-    letterSpacing: '0.02em', textTransform: 'uppercase',
+    fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-muted)',
     borderBottom: '1px solid var(--border-faint)',
   },
   tr: { borderBottom: '1px solid var(--border-faint)' },
-  td: { padding: '0.75rem 1rem', fontSize: '0.875rem', color: 'var(--text-muted)', fontWeight: 500, verticalAlign: 'top' },
-  emailSub: { display: 'block', fontSize: '0.72rem', color: 'var(--text-ghost)', marginTop: '0.15rem' },
+  td: { padding: '0.85rem 1rem', fontSize: '0.95rem', color: 'var(--text-dim)', fontWeight: 500, verticalAlign: 'top' },
+  emailSub: { display: 'block', fontSize: '0.82rem', color: 'var(--text-muted)', marginTop: '0.15rem' },
 };
