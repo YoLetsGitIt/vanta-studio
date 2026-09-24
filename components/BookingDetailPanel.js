@@ -12,13 +12,9 @@ import { showError } from '@/lib/feedback';
 import { getBookingSourceLabel } from '@/lib/bookingType';
 import Button, { IconButton } from '@/components/ui/Button';
 import BookingSMS from '@/components/BookingSMS';
+import { Pill, Section, Fact, detailStyles } from '@/components/ui/DetailParts';
 
 const PAYMENT_LABELS = { cash: 'Cash', card: 'Card / POS', bank_transfer: 'Bank Transfer' };
-const CONSENT_STYLE  = {
-  current:  { bg: 'var(--color-success-surface)', text: 'var(--color-success)' },
-  outdated: { bg: 'var(--color-warning-surface)', text: 'var(--color-warning)' },
-  none:     { bg: 'var(--color-danger-surface)', text: 'var(--color-danger)' },
-};
 
 function fmtDate(iso) {
   if (!iso) return null;
@@ -222,7 +218,6 @@ export default function BookingDetailPanel({
 
   const consentStatus = !consent ? 'none'
     : consent.consent_version === consentVersion ? 'current' : 'outdated';
-  const cs = CONSENT_STYLE[consentStatus];
   const consentLabel = { current: t('clients_consented'), outdated: t('clients_outdated'), none: t('clients_no_consent') }[consentStatus];
 
   // Match this booking's client against the contact book for their saved profile.
@@ -332,68 +327,79 @@ export default function BookingDetailPanel({
     );
   }
 
+  const heroTime = chosenTime ?? proposedTime ?? null;
+  const heroCaption = chosenTime ? 'Appointment' : proposedTime ? 'Proposed time' : 'Time to be arranged';
+  const heroMeta = [durationLabel, hasArtist(artistId) ? artistName : t('bdp_artist_unspecified'), stationName].filter(Boolean).join(' · ');
+  const showMoney = status === 'confirmed' || quote != null || depositRequired || depositPaid;
+  const depositTone = depositConfirmedAt ? 'success' : depositPaid ? 'warning' : 'danger';
+  const hasTimeline = createdAt || (status === 'awaiting_payment' && (updatedAt || selectionTokenExpiresAt)) || (holdExpiresAt && canConfirm);
+
   return (
     <aside className="studio-booking-detail" aria-label={`${clientName} booking details`} style={p.panel}>
-      {/* Header */}
       <div style={p.header}>
-        <span style={p.title}>{clientName}</span>
+        <div style={p.headerText}>
+          <span style={p.title}>{clientName}</span>
+          <div style={p.headerPills}>
+            {status && <Pill colors={sc}>{statusLabel(displayStatus)}</Pill>}
+            {source && <Pill>{getBookingSourceLabel(source)}</Pill>}
+            {clientAge != null && clientAge < 18 && <Pill tone="warning">{t('bdp_minor')}</Pill>}
+          </div>
+        </div>
         <IconButton onClick={onClose} aria-label="Close booking details">✕</IconButton>
       </div>
 
       <div style={p.body}>
-        {/* ── Outcome card ── */}
+        {/* ── When / who summary ── */}
+        <div style={{ ...p.hero, background: sc.bg, borderColor: sc.border }}>
+          <span style={{ ...p.heroCaption, color: sc.text }}>{heroCaption}</span>
+          <span style={p.heroTime}>{heroTime ? fmtDate(heroTime) : '—'}</span>
+          {heroMeta && <span style={p.heroMeta}>{heroMeta}</span>}
+          {cancelReason && <span style={p.heroNote}>{t('bdp_cancelled_reason')}: {cancelReason}</span>}
+        </div>
+
+        {/* ── Outcome (completed / no-show) ── */}
         {isCompleted && (
           <div style={{
-            background: showCompleted ? 'rgba(76,201,138,0.07)' : 'rgba(232,111,111,0.06)',
-            border: `1px solid ${showCompleted ? 'rgba(76,201,138,0.2)' : 'rgba(232,111,111,0.15)'}`,
-            borderRadius: 10, padding: '0.85rem 1rem',
-            display: 'flex', flexDirection: 'column', gap: '0.5rem',
+            background: showCompleted ? 'var(--color-success-surface)' : 'var(--color-danger-surface)',
+            border: `1px solid ${showCompleted ? 'var(--color-success-border)' : 'var(--color-danger-border)'}`,
+            borderRadius: 12, padding: '1rem 1.1rem',
+            display: 'flex', flexDirection: 'column', gap: '0.6rem',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <span style={{ fontSize: '0.85rem', fontWeight: 700, color: showCompleted ? '#4cc98a' : '#e86f6f' }}>
+              <span style={{ fontSize: '1rem', fontWeight: 700, color: showCompleted ? 'var(--color-success)' : 'var(--color-danger)' }}>
                 {showCompleted ? t('bdp_completed') : t('bdp_no_show_label')}
               </span>
               {outcomeAt && (
-                <span style={{ fontSize: '0.72rem', color: 'var(--text-ghost)', marginLeft: 'auto' }}>
+                <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginLeft: 'auto' }}>
                   {new Date(outcomeAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}
                 </span>
               )}
             </div>
-            {showCompleted && finalPrice != null && (
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: '0.78rem', color: 'var(--text-ghost)' }}>{t('bdp_final_price')}</span>
-                <span style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text)' }}>${finalPrice}</span>
-              </div>
-            )}
-            {showCompleted && paymentMethod && (
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: '0.78rem', color: 'var(--text-ghost)' }}>{t('bdp_payment')}</span>
-                <span style={{ fontSize: '0.82rem', color: 'var(--text-dim)' }}>{PAYMENT_LABELS[paymentMethod] ?? paymentMethod}</span>
-              </div>
-            )}
+            {showCompleted && finalPrice != null && <Fact label={t('bdp_final_price')} strong>${finalPrice}</Fact>}
+            {showCompleted && paymentMethod && <Fact label={t('bdp_payment')}>{PAYMENT_LABELS[paymentMethod] ?? paymentMethod}</Fact>}
             {showCompleted && paymentSplits !== null && (() => {
               const artistSplits = paymentSplits.filter(s => s.recorded_by === 'artist');
               const studioSplits = paymentSplits.filter(s => s.recorded_by === 'studio');
               const artistTotal  = artistSplits.reduce((n, s) => n + (s.amount ?? 0), 0);
               const studioTotal  = studioSplits.reduce((n, s) => n + (s.amount ?? 0), 0);
               return (
-                <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '0.6rem', marginTop: '0.1rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                  <span style={{ fontSize: '0.72rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-ghost)', marginBottom: '0.1rem' }}>{t('bdp_payment_recordings')}</span>
+                <div style={p.outcomeSub}>
+                  <span style={p.subLabel}>{t('bdp_payment_recordings')}</span>
                   {[
                     { label: t('bdp_artist'), splits: artistSplits, total: artistTotal },
                     { label: t('nav_studios'), splits: studioSplits, total: studioTotal },
                   ].map(({ label, splits, total }) => (
-                    <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: '0.78rem', color: 'var(--text-ghost)' }}>{label}</span>
+                    <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
+                      <span style={p.factLabel}>{label}</span>
                       {splits.length > 0 ? (
-                        <span style={{ fontSize: '0.8rem', color: '#4cc98a', fontWeight: 600 }}>
+                        <span style={{ fontSize: '0.875rem', color: 'var(--color-success)', fontWeight: 700, textAlign: 'right' }}>
                           ✓ ${total.toFixed(2)}
                           {splits.length > 1
                             ? ` (${splits.map(s => PAYMENT_LABELS[s.method] ?? s.method).join(', ')})`
                             : ` · ${PAYMENT_LABELS[splits[0].method] ?? splits[0].method}`}
                         </span>
                       ) : (
-                        <span style={{ fontSize: '0.78rem', color: '#e86f6f' }}>{t('bdp_not_recorded')}</span>
+                        <span style={{ fontSize: '0.875rem', color: 'var(--color-danger)', fontWeight: 600 }}>{t('bdp_not_recorded')}</span>
                       )}
                     </div>
                   ))}
@@ -401,338 +407,248 @@ export default function BookingDetailPanel({
               );
             })()}
             {showCompleted && aftercareInstructions && (
-              <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '0.65rem', marginTop: '0.15rem' }}>
-                <span style={{ fontSize: '0.72rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-ghost)', display: 'block', marginBottom: '0.4rem' }}>{t('bdp_aftercare')}</span>
-                <p style={{ fontSize: '0.8rem', color: 'var(--text-dim)', lineHeight: 1.6, whiteSpace: 'pre-wrap', margin: 0 }}>{aftercareInstructions}</p>
+              <div style={p.outcomeSub}>
+                <span style={p.subLabel}>{t('bdp_aftercare')}</span>
+                <p style={{ fontSize: '0.9rem', color: 'var(--text-dim)', lineHeight: 1.6, whiteSpace: 'pre-wrap', margin: 0 }}>{aftercareInstructions}</p>
               </div>
             )}
           </div>
         )}
 
-        {/* ── Booking info ── */}
-        {status && (
-          <Row label={t('bdp_status')}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: '0.72rem', fontWeight: 600, padding: '0.2rem 0.55rem', borderRadius: 20,
-                background: sc.bg, color: sc.text, border: `1px solid ${sc.border}` }}>
-                {statusLabel(displayStatus)}
-              </span>
-              {source && (
-                <span style={{ fontSize: '0.68rem', fontWeight: 600, padding: '0.15rem 0.45rem', borderRadius: 4,
-                  background: 'var(--bg-chip)', color: 'var(--text-ghost)', border: '1px solid var(--border-faint)' }}>
-                  {getBookingSourceLabel(source)}
-                </span>
-              )}
-            </div>
-          </Row>
-        )}
-        <Row label={t('bdp_artist')} value={hasArtist(artistId) ? artistName : t('bdp_artist_unspecified')} />
-        {sessionType && <Row label={t('bdp_session')} value={cap(sessionType.replace(/_/g, ' '))} />}
-        {placement   && <Row label={t('bdp_placement')} value={placement} />}
-        {size        && <Row label={t('bdp_size')} value={size} />}
-        {color       && <Row label={t('bdp_style')} value={color} />}
-        {design      && <Row label={t('bdp_design')} value={design} />}
-        {notes       && <Row label={t('bdp_notes')} value={notes} />}
-
-        {refImages.length > 0 && (
-          <div>
-            <span style={p.label}>{t('bdp_ref_photos')}</span>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginTop: '0.45rem' }}>
-              {refImages.map(img => (
-                <a key={img.id} href={img.signed_url} target="_blank" rel="noopener noreferrer"
-                  style={{ display: 'block', borderRadius: 6, overflow: 'hidden',
-                    width: 72, height: 72, flexShrink: 0,
-                    border: '1px solid var(--border-faint)' }}>
-                  <img src={img.signed_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                </a>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {(status === 'confirmed' || quote != null) && (
-          <Row label={t('bdp_quoted')} value={quote != null ? `$${Number(quote).toLocaleString()}` : '—'} />
-        )}
-        {durationLabel && <Row label={t('bdp_duration')} value={durationLabel} />}
-
-        {/* Deposit */}
-        {(status === 'confirmed' || depositRequired || depositPaid) && (
-          <div style={p.depositBox}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={p.label}>{t('bdp_deposit')}</span>
-              {!depositRequired && !depositPaid ? (
-                <span style={{ fontSize: '0.68rem', fontWeight: 700, padding: '0.1rem 0.4rem', borderRadius: 4,
-                  background: 'var(--bg-chip)', color: 'var(--text-ghost)', border: '1px solid var(--border-faint)' }}>
-                  Not required
-                </span>
-              ) : (
-                <span style={{
-                  fontSize: '0.68rem', fontWeight: 700, padding: '0.1rem 0.4rem', borderRadius: 4,
-                  background: depositConfirmedAt ? 'rgba(76,201,138,0.12)' : depositPaid ? 'rgba(250,204,21,0.12)' : 'rgba(232,111,111,0.1)',
-                  color: depositConfirmedAt ? '#4cc98a' : depositPaid ? '#facc15' : '#e86f6f',
-                }}>
-                  {depositConfirmedAt ? t('bdp_deposit_confirmed') : depositPaid ? t('bdp_deposit_unconfirmed') : t('bdp_deposit_unpaid')}
-                </span>
-              )}
-            </div>
-            {depositAmount != null && (() => {
-              const feeCents = Math.round(depositAmount * 0.03 * 100) + 50;
-              const total = depositAmount + feeCents / 100;
-              return (
-                <div style={{ marginTop: '0.2rem' }}>
-                  <span style={{ fontSize: '0.85rem', color: 'var(--text-dim)' }}>
-                    ${depositAmount.toFixed(2)}
-                    <span style={{ color: 'var(--text-ghost)', fontSize: '0.78rem' }}> + ${(feeCents / 100).toFixed(2)} fee</span>
-                  </span>
-                  <span style={{ fontSize: '0.78rem', color: 'var(--text-ghost)', marginLeft: '0.4rem' }}>
-                    = ${total.toFixed(2)} charged to client
-                  </span>
+        {/* ── Tattoo ── */}
+        {(sessionType || placement || size || color || design || notes || refImages.length > 0) && (
+          <Section title="Tattoo">
+            {sessionType && <Fact label={t('bdp_session')}>{cap(sessionType.replace(/_/g, ' '))}</Fact>}
+            {placement   && <Fact label={t('bdp_placement')}>{placement}</Fact>}
+            {size        && <Fact label={t('bdp_size')}>{size}</Fact>}
+            {color       && <Fact label={t('bdp_style')}>{color}</Fact>}
+            {design      && <Fact label={t('bdp_design')} block>{design}</Fact>}
+            {notes       && <Fact label={t('bdp_notes')} block>{notes}</Fact>}
+            {refImages.length > 0 && (
+              <div>
+                <span style={p.factLabel}>{t('bdp_ref_photos')}</span>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.5rem' }}>
+                  {refImages.map(img => (
+                    <a key={img.id} href={img.signed_url} target="_blank" rel="noopener noreferrer" style={p.thumb}>
+                      <img src={img.signed_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                    </a>
+                  ))}
                 </div>
-              );
-            })()}
-            {depositPaidAt && (
-              <span style={{ fontSize: '0.72rem', color: 'var(--text-ghost)' }}>
-                Paid {new Date(depositPaidAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
-              </span>
+              </div>
             )}
-          </div>
+          </Section>
         )}
 
-        {createdAt && <Row label={t('bdp_requested_at')} value={fmtDate(createdAt)} />}
-        {status === 'awaiting_payment' && updatedAt && <Row label={t('bdp_link_sent')} value={fmtDate(updatedAt)} />}
-        {status === 'awaiting_payment' && selectionTokenExpiresAt && <Row label={t('bdp_link_expires')} value={fmtDate(selectionTokenExpiresAt)} />}
-        {proposedTime && <Row label={t('bdp_proposed')} value={fmtDate(proposedTime)} />}
-        {chosenTime   && <Row label={t('bdp_appointment')} value={fmtDate(chosenTime)} />}
-        {stationName  && <Row label={t('bdp_station')} value={stationName} />}
-        {cancelReason && <Row label={t('bdp_cancelled_reason')} value={cancelReason} />}
-        {holdExpiresAt && canConfirm && (
-          <div style={{ background: 'rgba(111,163,232,0.07)', border: '1px solid rgba(111,163,232,0.2)', borderRadius: 8, padding: '0.55rem 0.75rem' }}>
-            <span style={{ fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#6fa3e8', display: 'block', marginBottom: '0.15rem' }}>{t('bdp_client_hold')}</span>
-            <span style={{ fontSize: '0.82rem', color: 'var(--text-dim)' }}>{fmtDate(holdExpiresAt)}</span>
-          </div>
+        {/* ── Payment ── */}
+        {showMoney && (
+          <Section title="Payment">
+            <Fact label={t('bdp_quoted')} strong>{quote != null ? `$${Number(quote).toLocaleString()}` : '—'}</Fact>
+            {(status === 'confirmed' || depositRequired || depositPaid) && (
+              <div style={p.depositBox}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
+                  <span style={p.factLabel}>{t('bdp_deposit')}</span>
+                  {!depositRequired && !depositPaid ? (
+                    <Pill>Not required</Pill>
+                  ) : (
+                    <Pill tone={depositTone}>
+                      {depositConfirmedAt ? t('bdp_deposit_confirmed') : depositPaid ? t('bdp_deposit_unconfirmed') : t('bdp_deposit_unpaid')}
+                    </Pill>
+                  )}
+                </div>
+                {depositAmount != null && (() => {
+                  const feeCents = Math.round(depositAmount * 0.03 * 100) + 50;
+                  const total = depositAmount + feeCents / 100;
+                  return (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                      <span style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text)' }}>${depositAmount.toFixed(2)}</span>
+                      <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                        + ${(feeCents / 100).toFixed(2)} fee = ${total.toFixed(2)} charged to client
+                      </span>
+                    </div>
+                  );
+                })()}
+                {depositPaidAt && (
+                  <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                    Paid {new Date(depositPaidAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  </span>
+                )}
+              </div>
+            )}
+          </Section>
         )}
 
-        {/* ── Client info ── */}
-        <div style={p.divider} />
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={p.sectionLabel}>{t('bdp_client_info')}</span>
-          {(email || (clientName && clientName !== '—')) && (
+        {/* ── Client ── */}
+        <Section
+          title={t('bdp_client_info')}
+          aside={(email || (clientName && clientName !== '—')) && (
             <button
               onClick={() => {
                 const key = email || clientName;
                 onClose?.();
                 router.push(`/dashboard/clients?client=${encodeURIComponent(key)}`);
               }}
-              style={{ background: 'none', border: 'none', padding: 0, color: 'var(--accent)', fontSize: '0.72rem', fontWeight: 600, cursor: 'pointer' }}
+              style={p.textLink}
             >
               {t('bdp_view_client')}
             </button>
           )}
-        </div>
+        >
+          {dob && <Fact label="Date of birth">{fmtDob(dob)}{clientAge != null && ` · ${clientAge} yrs`}</Fact>}
+          <Fact label="Email">{email || <span style={{ color: 'var(--text-muted)' }}>{t('clients_no_email')}</span>}</Fact>
+          <Fact label="Phone">
+            {phone ? (
+              <button
+                onClick={() => { const a = document.createElement('a'); a.href = `sms:${phone}`; a.click(); }}
+                style={p.phoneBtn}
+              >
+                {phone} <span aria-hidden="true">↗</span>
+              </button>
+            ) : <span style={{ color: 'var(--text-muted)' }}>{t('clients_no_phone')}</span>}
+          </Fact>
 
-        {/* Name + DOB */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <span style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text)' }}>{clientName}</span>
-            {clientAge != null && clientAge < 18 && (
-              <span style={{ fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.04em', padding: '0.05rem 0.35rem', borderRadius: 4, background: 'rgba(245,158,58,0.15)', color: '#f59e3a' }}>{t('bdp_minor')}</span>
-            )}
-          </div>
-          {dob && (
-            <span style={{ fontSize: '0.78rem', color: 'var(--text-ghost)' }}>
-              {fmtDob(dob)}{clientAge != null && ` · ${clientAge} yrs`}
+          {email && (
+            <Fact label={t('bdp_consent')}>
+              {consentLoading || submissionsLoading ? (
+                <Pill>{t('loading')}</Pill>
+              ) : (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                  <Pill tone={consentStatus === 'current' ? 'success' : consentStatus === 'outdated' ? 'warning' : 'danger'}>{consentLabel}</Pill>
+                  {(consentStatus === 'none' || consentStatus === 'outdated') && (
+                    <button
+                      onClick={() => handleSendConsentLink('__inline__')}
+                      disabled={linkGeneratingId === '__inline__'}
+                      style={{ ...p.smallAction, ...(linkSentId === '__inline__' ? p.smallActionDone : {}) }}
+                    >
+                      {linkSentId === '__inline__' ? 'Sent ✓' : linkGeneratingId === '__inline__' ? '…' : 'Send link'}
+                    </button>
+                  )}
+                </span>
+              )}
+            </Fact>
+          )}
+          {consent && !consentLoading && (
+            <span style={p.hint}>
+              Signed v{consent.consent_version} on {new Date(consent.agreed_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
             </span>
           )}
-        </div>
 
-        {/* Contact rows */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-          <span style={{ fontSize: '0.82rem', color: email ? 'var(--text-secondary)' : 'var(--text-ghost)' }}>
-            {email || t('clients_no_email')}
-          </span>
-          {phone ? (
-            <button
-              onClick={() => { const a = document.createElement('a'); a.href = `sms:${phone}`; a.click(); }}
-              style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem', width: 'fit-content' }}
-            >
-              <span style={{ fontSize: '0.82rem', color: 'var(--accent)', fontWeight: 500 }}>{phone}</span>
-              <span style={{ fontSize: '0.68rem', color: 'var(--text-ghost)' }}>↗</span>
-            </button>
-          ) : (
-            <span style={{ fontSize: '0.82rem', color: 'var(--text-ghost)' }}>{t('clients_no_phone')}</span>
-          )}
-        </div>
+          {booking?.id && <BookingSMS key={booking.id} bookingId={booking.id} />}
 
-        {booking?.id && <BookingSMS key={booking.id} bookingId={booking.id} />}
-
-        {/* Consent — inline badge (client info section) */}
-        {email && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-            <span style={p.label}>{t('bdp_consent')}</span>
-            {consentLoading || submissionsLoading ? (
-              <span style={{ fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.04em', padding: '0.1rem 0.4rem', borderRadius: 4, background: 'var(--bg-chip)', color: 'var(--text-ghost)', opacity: 0.5 }}>{t('loading')}</span>
-            ) : (
-              <>
-                <span style={{ fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.04em', padding: '0.1rem 0.4rem', borderRadius: 4, background: cs.bg, color: cs.text }}>{consentLabel}</span>
-                {consent && (
-                  <span style={{ fontSize: '0.72rem', color: 'var(--text-ghost)' }}>
-                    v{consent.consent_version} · {new Date(consent.agreed_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
-                  </span>
-                )}
-                {(consentStatus === 'none' || consentStatus === 'outdated') && (
-                  <button
-                    onClick={() => handleSendConsentLink('__inline__')}
-                    disabled={linkGeneratingId === '__inline__'}
-                    style={{
-                      background: 'none',
-                      border: `1px solid ${linkSentId === '__inline__' ? '#4cc98a' : 'var(--accent)'}`,
-                      borderRadius: 6, padding: '0.1rem 0.5rem',
-                      color: linkSentId === '__inline__' ? '#4cc98a' : 'var(--accent)',
-                      fontSize: '0.7rem', fontWeight: 600,
-                      cursor: 'pointer', fontFamily: 'inherit',
-                    }}
-                  >
-                    {linkSentId === '__inline__' ? 'Sent ✓' : linkGeneratingId === '__inline__' ? '…' : 'Send link →'}
-                  </button>
-                )}
-              </>
-            )}
-          </div>
-        )}
-
-        {/* Profile — allergies flagged for safety */}
-        {(allergies || designPreferences.length > 0 || painTolerance) && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-            {allergies && (
-              <div style={{ background: 'rgba(232,111,111,0.08)', border: '1px solid rgba(232,111,111,0.2)', borderRadius: 6, padding: '0.45rem 0.6rem' }}>
-                <span style={{ fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#e86f6f' }}>{t('bdp_allergies')}</span>
-                <p style={{ margin: '0.15rem 0 0', fontSize: '0.8rem', color: 'var(--text-dim)', lineHeight: 1.4 }}>{allergies}</p>
-              </div>
-            )}
-            {designPreferences.length > 0 && (
-              <div>
-                <span style={p.label}>{t('clients_design_prefs')}</span>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem', marginTop: '0.3rem' }}>
-                  {designPreferences.map(s => (
-                    <span key={s} style={{ fontSize: '0.7rem', fontWeight: 500, padding: '0.15rem 0.5rem', borderRadius: 20, background: 'var(--bg-chip)', color: 'var(--text-muted)', border: '1px solid var(--border-faint)' }}>{s}</span>
-                  ))}
-                </div>
-              </div>
-            )}
-            {painTolerance && <Row label={t('clients_pain')} value={cap(painTolerance)} />}
-          </div>
-        )}
-
-        {clientHistory.length > 0 && (
-          <div>
-            <span style={{ ...p.label, display: 'block', marginBottom: '0.5rem' }}>
-              {t('bdp_other_bookings')} ({clientHistory.length})
-            </span>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
-              {clientHistory.map(bk => {
-                const bsc = statusColors(bk.status);
-                const ds = bk.chosen_time || bk.proposed_time_primary;
-                const date = ds ? new Date(ds).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
-                const parts = [
-                  bk.session_type ? cap(bk.session_type.replace(/_/g, ' ')) : null,
-                  bk.body_location || null,
-                ].filter(Boolean);
-                return (
-                  <div key={bk.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem', minWidth: 0 }}>
-                      <span style={{ fontSize: '0.8rem', color: 'var(--text)', fontWeight: 500 }}>{parts.join(' · ') || '—'}</span>
-                      <span style={{ fontSize: '0.72rem', color: 'var(--text-ghost)' }}>{date}</span>
-                    </div>
-                    <span style={{ fontSize: '0.7rem', fontWeight: 600, color: bsc.text, flexShrink: 0 }}>
-                      {statusLabel(bk.status)}
-                    </span>
-                  </div>
-                );
-              })}
+          {allergies && (
+            <div style={p.allergy}>
+              <span style={p.allergyLabel}>{t('bdp_allergies')}</span>
+              <p style={{ margin: '0.2rem 0 0', fontSize: '0.95rem', color: 'var(--text)', lineHeight: 1.45 }}>{allergies}</p>
             </div>
-          </div>
+          )}
+          {designPreferences.length > 0 && (
+            <div>
+              <span style={p.factLabel}>{t('clients_design_prefs')}</span>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginTop: '0.4rem' }}>
+                {designPreferences.map(st => <Pill key={st} tone="info">{st}</Pill>)}
+              </div>
+            </div>
+          )}
+          {painTolerance && <Fact label={t('clients_pain')}>{cap(painTolerance)}</Fact>}
+        </Section>
+
+        {/* ── Timeline ── */}
+        {hasTimeline && (
+          <Section title="Timeline">
+            {createdAt && <Fact label={t('bdp_requested_at')}>{fmtDate(createdAt)}</Fact>}
+            {status === 'awaiting_payment' && updatedAt && <Fact label={t('bdp_link_sent')}>{fmtDate(updatedAt)}</Fact>}
+            {status === 'awaiting_payment' && selectionTokenExpiresAt && <Fact label={t('bdp_link_expires')}>{fmtDate(selectionTokenExpiresAt)}</Fact>}
+            {holdExpiresAt && canConfirm && (
+              <div style={p.holdBox}>
+                <span style={p.holdLabel}>{t('bdp_client_hold')}</span>
+                <span style={{ fontSize: '0.95rem', color: 'var(--text)' }}>{fmtDate(holdExpiresAt)}</span>
+              </div>
+            )}
+          </Section>
         )}
 
-        {/* ── Consent submissions (collapsible) ── */}
-        {submissionsLoading && (
-          <div>
-            <div style={p.divider} />
-            <span style={{ fontSize: '0.72rem', color: 'var(--text-ghost)' }}>{t('loading')}</span>
-          </div>
+        {/* ── Other bookings ── */}
+        {clientHistory.length > 0 && (
+          <Section title={`${t('bdp_other_bookings')} (${clientHistory.length})`}>
+            {clientHistory.map(bk => {
+              const bsc = statusColors(bk.status);
+              const ds = bk.chosen_time || bk.proposed_time_primary;
+              const date = ds ? new Date(ds).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+              const parts = [
+                bk.session_type ? cap(bk.session_type.replace(/_/g, ' ')) : null,
+                bk.body_location || null,
+              ].filter(Boolean);
+              return (
+                <div key={bk.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem', minWidth: 0 }}>
+                    <span style={{ fontSize: '0.95rem', color: 'var(--text)', fontWeight: 600 }}>{parts.join(' · ') || '—'}</span>
+                    <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{date}</span>
+                  </div>
+                  <Pill colors={bsc}>{statusLabel(bk.status)}</Pill>
+                </div>
+              );
+            })}
+          </Section>
         )}
+
+        {/* ── Consent forms (collapsible) ── */}
         {!submissionsLoading && consentSubmissions.length > 0 && (
-          <div>
-            <div style={p.divider} />
+          <section style={p.section}>
             <button
-              style={{ ...p.sectionLabel, background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', gap: '0.35rem', width: '100%' }}
+              style={p.collapseHead}
               aria-expanded={submissionsExpanded}
               onClick={() => setSubmissionsExpanded(x => !x)}
             >
-              <span>{t('bdp_consent_forms')} ({consentSubmissions.length})</span>
-              <span style={{ marginLeft: 'auto', fontSize: '0.7rem', color: 'var(--text-ghost)' }}>{submissionsExpanded ? '▲' : '▼'}</span>
+              <h3 style={p.sectionTitle}>{t('bdp_consent_forms')} ({consentSubmissions.length})</h3>
+              <span aria-hidden="true" style={{ color: 'var(--text-muted)' }}>{submissionsExpanded ? '▲' : '▼'}</span>
             </button>
             {submissionsExpanded && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', marginTop: '0.65rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
                 {consentSubmissions.map(sub => (
-                  <div key={sub.id} style={{ background: 'var(--bg-chip)', border: '1px solid var(--border-faint)', borderRadius: 8, padding: '0.75rem 0.85rem', display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-dim)' }}>{sub.template_name}</span>
-                      {sub.is_minor && (
-                        <span style={{ fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', padding: '0.1rem 0.4rem', borderRadius: 4, background: 'rgba(245,158,58,0.12)', color: '#f59e3a' }}>{t('bdp_minor')}</span>
-                      )}
+                  <div key={sub.id} style={p.subCard}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text)' }}>{sub.template_name}</span>
+                      {sub.is_minor && <Pill tone="warning">{t('bdp_minor')}</Pill>}
                     </div>
-                    {sub.signer_name && (
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span style={{ fontSize: '0.72rem', color: 'var(--text-ghost)' }}>{t('bdp_signed_by')}</span>
-                        <span style={{ fontSize: '0.78rem', color: 'var(--text-dim)' }}>{sub.signer_name}</span>
-                      </div>
-                    )}
+                    {sub.signer_name && <Fact label={t('bdp_signed_by')}>{sub.signer_name}</Fact>}
                     {sub.answers && Object.entries(sub.answers).length > 0 && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                         {Object.entries(sub.answers).map(([k, v]) => v && v !== true && v !== 'true' && k !== '__agreed__' && (
-                          <div key={k} style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-                            <span style={{ color: 'var(--text-ghost)' }}>{k}: </span>{v}
+                          <div key={k} style={{ fontSize: '0.875rem', color: 'var(--text-dim)', lineHeight: 1.5 }}>
+                            <span style={{ color: 'var(--text-muted)' }}>{k}: </span>{v}
                           </div>
                         ))}
                       </div>
                     )}
                     {sub.client_signature_url && (
                       <div>
-                        <p style={{ fontSize: '0.68rem', color: 'var(--text-ghost)', margin: '0 0 0.25rem' }}>{t('bdp_client_signature')}</p>
-                        <img src={sub.client_signature_url} alt="Client signature"
-                          style={{ maxWidth: '100%', height: 60, objectFit: 'contain', borderRadius: 4, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border-faint)', display: 'block' }} />
+                        <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '0 0 0.3rem' }}>{t('bdp_client_signature')}</p>
+                        <img src={sub.client_signature_url} alt="Client signature" style={p.signature} />
                       </div>
                     )}
                     {sub.guardian_name && (
-                      <div style={{ borderTop: '1px solid var(--border-faint)', paddingTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                        <span style={{ fontSize: '0.68rem', fontWeight: 600, color: 'var(--text-ghost)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('bdp_guardian')}</span>
-                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                          <span style={{ fontSize: '0.72rem', color: 'var(--text-ghost)' }}>{sub.guardian_relationship ?? 'Guardian'}</span>
-                          <span style={{ fontSize: '0.78rem', color: 'var(--text-dim)' }}>{sub.guardian_name}</span>
-                        </div>
-                        {sub.guardian_email && <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{sub.guardian_email}</span>}
-                        {sub.guardian_phone && <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{sub.guardian_phone}</span>}
-                        {sub.guardian_signature_url && (
-                          <img src={sub.guardian_signature_url} alt="Guardian signature"
-                            style={{ maxWidth: '100%', height: 60, objectFit: 'contain', borderRadius: 4, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border-faint)', display: 'block', marginTop: '0.25rem' }} />
-                        )}
+                      <div style={{ borderTop: '1px solid var(--border)', paddingTop: '0.6rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                        <span style={p.subLabel}>{t('bdp_guardian')}</span>
+                        <Fact label={sub.guardian_relationship ?? 'Guardian'}>{sub.guardian_name}</Fact>
+                        {sub.guardian_email && <span style={p.hint}>{sub.guardian_email}</span>}
+                        {sub.guardian_phone && <span style={p.hint}>{sub.guardian_phone}</span>}
+                        {sub.guardian_signature_url && <img src={sub.guardian_signature_url} alt="Guardian signature" style={p.signature} />}
                       </div>
                     )}
-                    <span style={{ fontSize: '0.68rem', color: 'var(--text-ghost)' }}>
+                    <span style={p.hint}>
                       {new Date(sub.submitted_at).toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' })}
                     </span>
                   </div>
                 ))}
               </div>
             )}
-          </div>
+          </section>
         )}
 
         {/* ── Station picker ── */}
         {stationStep && (
           <div style={p.stationPicker}>
             <p style={p.stationLabel}>{t('bdp_assign_station')}</p>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
               {availableStations.map(st => (
                 <button key={st.id} onClick={() => { setStationStep(false); onAccept(st.id); }}
                   disabled={actionLoading} style={p.stationBtn}>
@@ -740,68 +656,46 @@ export default function BookingDetailPanel({
                 </button>
               ))}
             </div>
-            <button onClick={() => setStationStep(false)}
-              style={{ background: 'none', border: 'none', padding: 0, fontSize: '0.78rem',
-                color: 'var(--text-muted)', cursor: 'pointer', fontFamily: 'inherit' }}>
+            <button onClick={() => setStationStep(false)} style={p.textLink}>
               {t('cancel')}
             </button>
           </div>
         )}
-        {stationError && <p style={{ fontSize: '0.78rem', color: '#e86f6f' }}>{stationError}</p>}
-      </div>
+        {stationError && <p style={{ fontSize: '0.9rem', color: 'var(--color-danger)', margin: 0 }}>{stationError}</p>}
 
-      {/* ── Studio notes ── */}
-      {bookingId && (
-        <div style={{ padding: '0.75rem 1rem 0' }}>
-          <div style={p.divider} />
-          <span style={p.sectionLabel}>{t('bdp_studio_notes')}</span>
-          <textarea
-            aria-label={t('clients_add_note')}
-            value={noteInput}
-            onChange={e => setNoteInput(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleAddNote(); }}
-            placeholder={t('bdp_note_placeholder')}
-            rows={2}
-            style={{
-              width: '100%', marginTop: '0.4rem', resize: 'vertical',
-              background: 'var(--bg-chip)', border: '1px solid var(--border-faint)',
-              borderRadius: 6, padding: '0.5rem 0.6rem',
-              fontSize: '0.8rem', color: 'var(--text)', lineHeight: 1.5,
-              fontFamily: 'inherit', boxSizing: 'border-box',
-            }}
-          />
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.35rem' }}>
-            <button
-              onClick={handleAddNote}
-              disabled={noteAdding || !noteInput.trim()}
-              style={{
-                fontSize: '0.75rem', fontWeight: 600, padding: '0.25rem 0.75rem',
-                borderRadius: 5, border: '1px solid var(--border-faint)',
-                background: 'var(--bg-chip)', color: 'var(--text-dim)', cursor: 'pointer',
-                opacity: (!noteInput.trim() || noteAdding) ? 0.45 : 1,
-              }}
-            >
-              {noteAdding ? t('saving') : t('clients_add_note_btn')}
-            </button>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.5rem' }}>
+        {/* ── Studio notes ── */}
+        {bookingId && (
+          <Section title={t('bdp_studio_notes')}>
+            <textarea
+              aria-label={t('clients_add_note')}
+              value={noteInput}
+              onChange={e => setNoteInput(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleAddNote(); }}
+              placeholder={t('bdp_note_placeholder')}
+              rows={3}
+              style={p.noteInput}
+            />
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <Button size="sm" variant="secondary" onClick={handleAddNote} disabled={noteAdding || !noteInput.trim()}>
+                {noteAdding ? t('saving') : t('clients_add_note_btn')}
+              </Button>
+            </div>
             {studioNotes !== null && studioNotes.map(n => (
-              <div key={n.id} style={{ background: 'var(--bg-chip)', border: '1px solid var(--border-faint)', borderRadius: 6, padding: '0.5rem 0.6rem' }}>
-                <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text)', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{n.content}</p>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.3rem' }}>
-                  <span style={{ fontSize: '0.68rem', color: 'var(--text-ghost)' }}>
+              <div key={n.id} style={p.subCard}>
+                <p style={{ margin: 0, fontSize: '0.95rem', color: 'var(--text)', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{n.content}</p>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={p.hint}>
                     {new Date(n.created_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
                   </span>
-                  <button onClick={() => handleDeleteNote(n.id)} style={{ fontSize: '0.68rem', color: '#e86f6f', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                  <button onClick={() => handleDeleteNote(n.id)} style={{ ...p.textLink, color: 'var(--color-danger)' }}>
                     {t('delete')}
                   </button>
                 </div>
               </div>
             ))}
-          </div>
-        </div>
-      )}
-
+          </Section>
+        )}
+      </div>
 
       {/* ── Actions ── */}
       {!stationStep && (canAcceptReject || canComplete || isFutureConfirmed || canSendLink || canConfirm || canReschedule) && (
@@ -814,7 +708,6 @@ export default function BookingDetailPanel({
           {canReject && onReject && (
             <Btn onClick={onReject} disabled={actionLoading} variant="danger">{t('reject')}</Btn>
           )}
-          {/* requires_confirmation: confirm or reassign */}
           {canConfirm && onConfirm && (
             <Btn onClick={onConfirm} disabled={actionLoading} variant="success">{t('bdp_confirm')}</Btn>
           )}
@@ -842,17 +735,6 @@ export default function BookingDetailPanel({
   );
 }
 
-function Row({ label, value, children }) {
-  const content = children ?? value;
-  if (!content && content !== 0) return null;
-  return (
-    <div style={p.row}>
-      <span style={p.label}>{label}</span>
-      <span style={p.value}>{content}</span>
-    </div>
-  );
-}
-
 function Btn({ onClick, disabled, variant, children }) {
   const c = variant === 'success' ? { bg: 'var(--color-success-surface)', border: 'var(--color-success-border)', text: 'var(--color-success)' }
     : variant === 'primary'  ? { bg: 'var(--color-info-surface)', border: 'var(--color-info-border)', text: 'var(--color-info)' }
@@ -869,96 +751,58 @@ function Btn({ onClick, disabled, variant, children }) {
 }
 
 const p = {
+  ...detailStyles,
   panel: {
-    position: 'absolute', top: 0, right: 0, bottom: 0, width: 'min(320px, 100%)',
+    position: 'absolute', top: 0, right: 0, bottom: 0, width: 'min(420px, 100%)',
     background: 'var(--bg-panel)', borderLeft: '1px solid var(--border)',
     display: 'flex', flexDirection: 'column', zIndex: 10,
   },
   header: {
-    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '0.75rem',
     padding: '1.25rem 1.25rem 1rem',
-    borderBottom: '1px solid var(--border-faint)', flexShrink: 0,
+    borderBottom: '1px solid var(--border)', flexShrink: 0,
   },
-  title: {
-    fontSize: '0.95rem', fontWeight: 700, color: 'var(--text)',
-  },
-  closeBtn: {
-    background: 'none', border: 'none', color: 'var(--text-faint)',
-    fontSize: '0.9rem', cursor: 'pointer', padding: '0.25rem', flexShrink: 0,
-  },
+  headerText: { display: 'flex', flexDirection: 'column', gap: '0.55rem', minWidth: 0 },
+  headerPills: { display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' },
+  title: { fontSize: '1.25rem', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.01em', overflowWrap: 'anywhere' },
   body: {
-    flex: 1, overflowY: 'auto', padding: '1rem 1.25rem',
-    display: 'flex', flexDirection: 'column', gap: '0.75rem',
+    flex: 1, overflowY: 'auto', padding: '1.1rem 1.25rem 1.5rem',
+    display: 'flex', flexDirection: 'column', gap: '1rem',
   },
-  row: {
-    display: 'flex', flexDirection: 'column', gap: '0.15rem',
+  hero: {
+    border: '1px solid', borderRadius: 14, padding: '1rem 1.1rem',
+    display: 'flex', flexDirection: 'column', gap: '0.25rem',
   },
-  label: {
-    fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-ghost)',
-    textTransform: 'uppercase', letterSpacing: '0.06em',
-  },
-  sectionLabel: {
-    fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-ghost)',
-    textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.1rem',
-  },
-  value: {
-    fontSize: '0.85rem', color: 'var(--text-dim)', lineHeight: 1.5,
-  },
+  heroCaption: { fontSize: '0.85rem', fontWeight: 700 },
+  heroTime: { fontSize: '1.3rem', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.01em' },
+  heroMeta: { fontSize: '0.95rem', color: 'var(--text-dim)' },
+  heroNote: { marginTop: '0.4rem', fontSize: '0.9rem', color: 'var(--color-danger)', fontWeight: 600 },
+  collapseHead: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', width: '100%', background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' },
+  outcomeSub: { borderTop: '1px solid var(--border)', paddingTop: '0.7rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' },
+  thumb: { display: 'block', borderRadius: 8, overflow: 'hidden', width: 84, height: 84, flexShrink: 0, border: '1px solid var(--border)' },
   depositBox: {
-    background: 'var(--bg-chip)', border: '1px solid var(--border-faint)',
-    borderRadius: 8, padding: '0.65rem 0.75rem',
-    display: 'flex', flexDirection: 'column', gap: '0.2rem',
+    background: 'var(--bg-input)', border: '1px solid var(--border)',
+    borderRadius: 10, padding: '0.8rem 0.9rem',
+    display: 'flex', flexDirection: 'column', gap: '0.4rem',
   },
-  divider: {
-    borderTop: '1px solid var(--border-faint)', margin: '0.25rem 0',
-  },
+  phoneBtn: { background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--color-info)', fontSize: '0.95rem', fontWeight: 600, fontFamily: 'inherit' },
+  allergy: { background: 'var(--color-danger-surface)', border: '1px solid var(--color-danger-border)', borderRadius: 10, padding: '0.7rem 0.85rem' },
+  allergyLabel: { fontSize: '0.85rem', fontWeight: 700, color: 'var(--color-danger)' },
+  holdBox: { background: 'var(--color-info-surface)', border: '1px solid var(--color-info-border)', borderRadius: 10, padding: '0.7rem 0.85rem', display: 'flex', flexDirection: 'column', gap: '0.2rem' },
+  holdLabel: { fontSize: '0.85rem', fontWeight: 700, color: 'var(--color-info)' },
+  signature: { maxWidth: '100%', height: 64, objectFit: 'contain', borderRadius: 6, background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', display: 'block' },
   actions: {
-    display: 'flex', gap: '0.5rem', flexWrap: 'wrap',
-    padding: '1rem 1.25rem', borderTop: '1px solid var(--border-faint)', flexShrink: 0,
+    display: 'flex', gap: '0.6rem', flexWrap: 'wrap',
+    padding: '1rem 1.25rem', borderTop: '1px solid var(--border)', flexShrink: 0, background: 'var(--bg-panel)',
   },
-  linkBtn: {
-    background: 'none',
-    border: '1px solid var(--accent)',
-    borderRadius: 6,
-    padding: '0.1rem 0.55rem',
-    display: 'inline-flex', alignItems: 'center',
-    color: 'var(--accent)', fontSize: '0.72rem', fontWeight: 600,
-    cursor: 'pointer', fontFamily: 'inherit', letterSpacing: '0.01em',
-  },
-  contactRowStatic: {
-    display: 'flex', alignItems: 'center', gap: '0.5rem',
-    padding: '0.5rem 0.75rem',
-    background: 'var(--bg-input)', border: '1px solid var(--border)',
-    borderRadius: 8,
-  },
-  contactValueStatic: {
-    fontSize: '0.82rem', color: 'var(--text-secondary)', fontWeight: 500,
-    flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-  },
-  contactRow: {
-    display: 'flex', alignItems: 'center', gap: '0.5rem',
-    background: 'var(--bg-input)', border: '1px solid var(--border)',
-    borderRadius: 8, padding: '0.5rem 0.75rem',
-    cursor: 'pointer', width: '100%', textAlign: 'left',
-  },
-  contactRowMissing: {
-    display: 'flex', alignItems: 'center', gap: '0.5rem',
-    padding: '0.5rem 0.75rem',
-    fontSize: '0.78rem', color: 'var(--text-ghost)',
-  },
-  contactIcon: { fontSize: '0.85rem', color: 'var(--text-ghost)', flexShrink: 0, width: 16, textAlign: 'center' },
-  contactValue: { fontSize: '0.82rem', color: 'var(--accent)', fontWeight: 500, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  contactArrow: { fontSize: '0.7rem', color: 'var(--text-ghost)', flexShrink: 0 },
   stationPicker: {
-    background: 'var(--bg-chip)', border: '1px solid var(--border)',
-    borderRadius: 8, padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.6rem',
+    background: 'var(--color-info-surface)', border: '1px solid var(--color-info-border)',
+    borderRadius: 12, padding: '0.9rem', display: 'flex', flexDirection: 'column', gap: '0.7rem',
   },
-  stationLabel: {
-    fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-muted)',
-  },
+  stationLabel: { fontSize: '0.95rem', fontWeight: 700, color: 'var(--text)', margin: 0 },
   stationBtn: {
-    padding: '0.4rem 0.75rem', borderRadius: 6,
-    border: '1px solid var(--border-strong)', background: 'var(--bg-input)',
-    color: 'var(--text)', fontSize: '0.8rem', fontWeight: 500, cursor: 'pointer',
+    padding: '0.55rem 0.95rem', borderRadius: 8,
+    border: '1px solid var(--border-strong)', background: 'var(--bg-card)',
+    color: 'var(--text)', fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer',
   },
 };

@@ -13,6 +13,8 @@ import { statusColors, capitalise } from '@/lib/status';
 import { formatDob } from '@/lib/format';
 import { useLanguage } from '@/lib/i18n';
 import { showError } from '@/lib/feedback';
+import Button from '@/components/ui/Button';
+import { Pill, Section, Fact, detailStyles } from '@/components/ui/DetailParts';
 
 const CLIENTS_PER_PAGE = 25;
 
@@ -353,19 +355,15 @@ function MarketingConsent({ client, clientKey, marketing, onChange }) {
       showError(err);
     } finally { setSaving(false); }
   }
+  if (marketing.unsubscribed) {
+    return <p style={{ ...detailStyles.hint, margin: 0 }}>This client unsubscribed from your marketing emails. Only they can opt back in.</p>;
+  }
   return (
-    <div style={s.consentSection}>
-      <span style={s.sectionLabel}>Marketing emails</span>
-      {marketing.unsubscribed ? (
-        <p style={{ ...s.msg, margin: '0.5rem 0 0' }}>This client unsubscribed from your marketing emails. Only they can opt back in.</p>
-      ) : (
-        <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6rem', marginTop: '0.5rem', fontSize: '0.85rem', color: 'var(--text)' }}>
-          <input type="checkbox" checked={checked} disabled={saving} onChange={e => toggle(e.target.checked)} style={{ accentColor: 'var(--accent)', marginTop: 3 }} />
-          <span>This client has agreed to receive marketing emails from us.
-            <span style={{ display: 'block', color: 'var(--text-muted)', fontSize: '0.75rem' }}>Only tick this if they told you or ticked a box. Every email includes an unsubscribe link.</span></span>
-        </label>
-      )}
-    </div>
+    <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.65rem', fontSize: '0.95rem', color: 'var(--text)', cursor: 'pointer' }}>
+      <input type="checkbox" checked={checked} disabled={saving} onChange={e => toggle(e.target.checked)} style={{ accentColor: 'var(--accent)', marginTop: 4, width: 16, height: 16 }} />
+      <span>This client has agreed to receive marketing emails from us.
+        <span style={{ display: 'block', ...detailStyles.hint }}>Only tick this if they told you or ticked a box. Every email includes an unsubscribe link.</span></span>
+    </label>
   );
 }
 
@@ -479,287 +477,223 @@ function ClientDetail({ client, marketing, onMarketingChange, clientKey, onClose
     }
   }
 
+  const firstTemplate = consentTemplates[0] ?? null;
+  const firstSub = firstTemplate ? submissions.find(x => x.template_id === firstTemplate.id) : null;
+  const consentState = !firstTemplate ? null
+    : !firstSub ? 'none'
+    : new Date(firstSub.submitted_at) < new Date(firstTemplate.updated_at) ? 'outdated' : 'current';
+  const consentTone = { current: 'success', outdated: 'warning', none: 'danger' }[consentState];
+  const consentLabelText = { current: 'Consented', outdated: 'Consent outdated', none: 'Not consented' }[consentState];
+  const completedCount = client.bookings.filter(b => b.outcome === 'completed').length;
+  const lastVisit = sorted[0]?.created_at ?? null;
+
   return (
     <aside id="client-detail" className="studio-client-detail" aria-label={`${client.name} details`} style={s.panel}>
       <div style={s.panelHeader}>
-        <span style={s.panelTitle}>{client.name}</span>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', minWidth: 0 }}>
+          <span style={s.panelTitle}>{client.name}</span>
+          <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+            {consentState && <Pill tone={consentTone}>{consentLabelText}</Pill>}
+            {marketing?.optIn && !marketing.unsubscribed && <Pill tone="info">Marketing emails</Pill>}
+            {marketing?.unsubscribed && <Pill>Unsubscribed</Pill>}
+          </div>
+        </div>
         <button type="button" aria-label="Close client details" onClick={onClose} style={s.closeBtn}>✕</button>
       </div>
       <div style={s.panelBody}>
-        {client.email ? (
-          <div style={s.contactRowStatic}>
-            <span style={s.contactIcon}>✉</span>
-            <span style={s.contactValueStatic}>{client.email}</span>
-          </div>
-        ) : (
-          <div style={s.contactRowMissing}><span style={s.contactIcon}>✉</span><span>{t('clients_no_email')}</span></div>
-        )}
-        {client.phone ? (
-          <button onClick={() => { const a = document.createElement('a'); a.href = `sms:${client.phone}`; a.click(); }} style={s.contactRow}>
-            <span style={s.contactIcon}>✆</span>
-            <span style={s.contactValue}>{client.phone}</span>
-            <span style={s.contactArrow}>↗</span>
-          </button>
-        ) : (
-          <div style={s.contactRowMissing}><span style={s.contactIcon}>✆</span><span>{t('clients_no_phone')}</span></div>
-        )}
-        {client.dob && <Field label={t('clients_dob')}>{formatDob(client.dob)}</Field>}
-        <Field label={t('clients_total_sessions')}>{client.bookings.length}</Field>
-        <Field label={t('status_completed')}>{client.bookings.filter(b => b.outcome === 'completed').length}</Field>
+        <div style={s.statRow}>
+          <div style={{ ...s.stat, ...s.statBlue }}><span style={s.statValue}>{client.bookings.length}</span><span style={s.statLabel}>{t('clients_total_sessions')}</span></div>
+          <div style={{ ...s.stat, ...s.statGreen }}><span style={s.statValue}>{completedCount}</span><span style={s.statLabel}>{t('status_completed')}</span></div>
+          <div style={s.stat}><span style={{ ...s.statValue, fontSize: '1rem' }}>{lastVisit ? new Date(lastVisit).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }) : '—'}</span><span style={s.statLabel}>Last booking</span></div>
+        </div>
 
-        <MarketingConsent client={client} clientKey={clientKey} marketing={marketing} onChange={onMarketingChange} />
+        <Section title="Contact">
+          <Fact label="Email">{client.email || <span style={{ color: 'var(--text-muted)' }}>{t('clients_no_email')}</span>}</Fact>
+          <Fact label="Phone">
+            {client.phone ? (
+              <button onClick={() => { const a = document.createElement('a'); a.href = `sms:${client.phone}`; a.click(); }} style={s.phoneBtn}>
+                {client.phone} <span aria-hidden="true">↗</span>
+              </button>
+            ) : <span style={{ color: 'var(--text-muted)' }}>{t('clients_no_phone')}</span>}
+          </Fact>
+          {client.dob && <Fact label={t('clients_dob')}>{formatDob(client.dob)}</Fact>}
+        </Section>
 
-        {consentTemplates.length > 0 && (
-          <div style={s.consentSection}>
-            <span style={s.sectionLabel}>{t('clients_consent_form')}</span>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
-              {/* Multi-template: change .slice(0, 1) to consentTemplates when multiple forms are re-enabled */}
-              {consentTemplates.slice(0, 1).map(ct => {
-                const sub = submissions.find(s => s.template_id === ct.id);
-                const outdated = !!sub && new Date(sub.submitted_at) < new Date(ct.updated_at);
-                const status = !sub ? 'none' : outdated ? 'outdated' : 'current';
-                const sentId = linkSentId === ct.id;
-                const loadingId = linkGeneratingId === ct.id;
-                const badgeStyle = status === 'current'
-                  ? { bg: 'rgba(76,201,138,0.12)', color: '#4cc98a', border: 'rgba(76,201,138,0.25)' }
-                  : status === 'outdated'
-                  ? { bg: 'rgba(245,158,58,0.12)', color: '#f59e3a', border: 'rgba(245,158,58,0.25)' }
-                  : { bg: 'rgba(232,111,111,0.1)', color: '#e86f6f', border: 'rgba(232,111,111,0.2)' };
-                const badgeLabel = status === 'current' ? 'CONSENTED' : status === 'outdated' ? 'OUTDATED' : 'NOT CONSENTED';
-                return (
-                  <div key={ct.id} style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    gap: '0.6rem', padding: '0.55rem 0.7rem',
-                    background: 'var(--bg-chip)', borderRadius: 8,
-                    border: '1px solid var(--border-faint)',
-                  }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem', minWidth: 0 }}>
-                      <span style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ct.name}</span>
-                      {sub && (
-                        <span style={{ fontSize: '0.68rem', color: 'var(--text-ghost)' }}>
-                          {new Date(sub.submitted_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
-                        </span>
-                      )}
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexShrink: 0 }}>
-                      <span style={{
-                        fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.04em',
-                        padding: '0.15rem 0.45rem', borderRadius: 20,
-                        background: badgeStyle.bg, color: badgeStyle.color,
-                        border: `1px solid ${badgeStyle.border}`,
-                      }}>
-                        {badgeLabel}
-                      </span>
-                      {client.email && status !== 'current' && (
-                        <button
-                          onClick={() => handleSendLink(ct.id)}
-                          disabled={loadingId}
-                          style={{
-                            background: 'none',
-                            border: `1px solid ${sentId ? '#4cc98a' : 'var(--accent)'}`,
-                            borderRadius: 6, padding: '0.15rem 0.5rem',
-                            color: sentId ? '#4cc98a' : 'var(--accent)',
-                            fontSize: '0.7rem', fontWeight: 600,
-                            cursor: 'pointer', fontFamily: 'inherit',
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          {sentId ? 'Sent ✓' : loadingId ? '…' : 'Send link →'}
+        {(consentTemplates.length > 0 || (marketing && client.email)) && (
+          <Section title="Consent">
+            {consentTemplates.slice(0, 1).map(ct => {
+              const sentId = linkSentId === ct.id;
+              const loadingId = linkGeneratingId === ct.id;
+              return (
+                <div key={ct.id} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <Fact label={ct.name}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                      <Pill tone={consentTone}>{consentLabelText}</Pill>
+                      {client.email && consentState !== 'current' && (
+                        <button onClick={() => handleSendLink(ct.id)} disabled={loadingId}
+                          style={{ ...detailStyles.smallAction, ...(sentId ? detailStyles.smallActionDone : {}) }}>
+                          {sentId ? 'Sent ✓' : loadingId ? '…' : 'Send link'}
                         </button>
                       )}
-                    </div>
-                  </div>
+                    </span>
+                  </Fact>
+                  {firstSub && <span style={detailStyles.hint}>Signed {new Date(firstSub.submitted_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}</span>}
+                </div>
+              );
+            })}
+            <MarketingConsent client={client} clientKey={clientKey} marketing={marketing} onChange={onMarketingChange} />
+          </Section>
+        )}
+
+        <Section title={t('clients_profile')}>
+          <div>
+            <span style={s.fieldLabel}>{t('clients_design_prefs')}</span>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+              {TATTOO_STYLES.map(style => {
+                const active = styles.includes(style);
+                return (
+                  <button
+                    key={style}
+                    aria-pressed={active}
+                    onMouseDown={e => e.preventDefault()}
+                    onClick={() => setStyles(prev => active ? prev.filter(x => x !== style) : [...prev, style])}
+                    style={{
+                      fontSize: '0.85rem', fontWeight: 600, padding: '0.3rem 0.75rem',
+                      borderRadius: 20, border: `1px solid ${active ? 'var(--color-info-border)' : 'var(--border-strong)'}`,
+                      background: active ? 'var(--color-info-surface)' : 'transparent',
+                      color: active ? 'var(--color-info)' : 'var(--text-dim)',
+                      cursor: 'pointer',
+                    }}
+                  >{style}</button>
                 );
               })}
             </div>
           </div>
-        )}
 
-        {/* Profile fields */}
-        <div style={{ borderTop: '1px solid var(--border-faint)', paddingTop: '1rem', marginTop: '0.25rem' }}>
-          <span style={s.sectionLabel}>{t('clients_profile')}</span>
-          <div style={{ marginTop: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-
-            {/* Design preferences — multiselect pills */}
-            <div>
-              <span style={s.fieldLabel}>{t('clients_design_prefs')}</span>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginTop: '0.35rem' }}>
-                {TATTOO_STYLES.map(style => {
-                  const active = styles.includes(style);
-                  return (
-                    <button
-                      key={style}
-                      aria-pressed={active}
-                      onMouseDown={e => e.preventDefault()}
-                      onClick={() => setStyles(prev => active ? prev.filter(s => s !== style) : [...prev, style])}
-                      style={{
-                        fontSize: '0.72rem', fontWeight: 600, padding: '0.25rem 0.6rem',
-                        borderRadius: 20, border: `1px solid ${active ? 'var(--accent-active-border)' : 'var(--border-faint)'}`,
-                        background: active ? 'var(--accent-active-tint)' : 'transparent',
-                        color: active ? 'var(--accent)' : 'var(--text-ghost)',
-                        cursor: 'pointer', transition: 'all 0.1s',
-                      }}
-                    >{style}</button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Allergies */}
-            <div>
-              <span style={s.fieldLabel}>{t('clients_allergies')}</span>
-              <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.35rem' }}>
-                {['No', 'Yes'].map(opt => {
-                  const active = opt === 'Yes' ? hasAllergies : !hasAllergies;
-                  return (
-                    <button
-                      key={opt}
-                      aria-pressed={active}
-                      aria-label={`${t('clients_allergies')}: ${opt === 'No' ? t('no') : t('yes')}`}
-                      onMouseDown={e => e.preventDefault()}
-                      onClick={() => setHasAllergies(opt === 'Yes')}
-                      style={{
-                        fontSize: '0.75rem', fontWeight: 600, padding: '0.28rem 0.85rem',
-                        borderRadius: 6, border: `1px solid ${active ? 'var(--accent-active-border)' : 'var(--border-faint)'}`,
-                        background: active ? 'var(--accent-active-tint)' : 'transparent',
-                        color: active ? 'var(--accent)' : 'var(--text-ghost)',
-                        cursor: 'pointer',
-                      }}
-                    >{opt === 'No' ? t('no') : t('yes')}</button>
-                  );
-                })}
-              </div>
-              {hasAllergies && (
-                <textarea
-                  aria-label="Allergy details"
-                  rows={2}
-                  placeholder="e.g. latex allergy, sensitive skin, keloid-prone…"
-                  value={allergyDetails}
-                  onChange={e => setAllergyDetails(e.target.value)}
-                  style={{ ...s.profileInput, marginTop: '0.4rem' }}
-                />
-              )}
-            </div>
-
-            {/* Pain tolerance 0-10 */}
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '0.35rem' }}>
-                <span style={s.fieldLabel}>{t('clients_pain')}</span>
-                {pain !== '' && (
-                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--accent)' }}>{pain}/10</span>
-                )}
-              </div>
-              <input
-                type="range"
-                aria-label={t('clients_pain')}
-                aria-valuetext={pain === '' ? 'Not recorded; adjust to set a value out of 10' : `${pain} out of 10`}
-                min={0}
-                max={10}
-                step={1}
-                value={pain === '' ? 5 : Number(pain)}
-                onChange={e => setPain(e.target.value)}
-                style={{ width: '100%', accentColor: 'var(--accent)', cursor: 'pointer' }}
-              />
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.2rem' }}>
-                <span style={{ fontSize: '0.65rem', color: 'var(--text-ghost)' }}>0 — very sensitive</span>
-                <span style={{ fontSize: '0.65rem', color: 'var(--text-ghost)' }}>10 — very high</span>
-              </div>
-              {pain === '' && (
-                <button
-                  onMouseDown={e => e.preventDefault()}
-                  onClick={() => setPain('5')}
-                  style={{ marginTop: '0.4rem', fontSize: '0.72rem', color: 'var(--text-ghost)', background: 'none', border: '1px dashed var(--border-faint)', borderRadius: 5, padding: '0.2rem 0.55rem', cursor: 'pointer' }}
-                >{t('clients_set_pain')}</button>
-              )}
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-              <button onClick={handleSaveProfile} disabled={profSaving} style={s.consentBtn}>
-                {t(profSaving ? 'saving' : profSaved ? 'saved' : 'clients_save_profile')}
-              </button>
-              {profErr && <span style={{ fontSize: '0.72rem', color: '#e86f6f' }}>{profErr}</span>}
-            </div>
-          </div>
-        </div>
-
-        {/* Notes */}
-        <div style={{ borderTop: '1px solid var(--border-faint)', paddingTop: '1rem', marginTop: '0.25rem' }}>
-          <span style={s.sectionLabel}>{t('clients_notes')}</span>
-          <div style={{ marginTop: '0.6rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-            <textarea
-              aria-label={t('clients_add_note')}
-              rows={2}
-              placeholder={t('clients_add_note')}
-              value={noteInput}
-              onChange={e => setNoteInput(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleAddNote(); }}
-              style={{ width: '100%', boxSizing: 'border-box', resize: 'vertical', background: 'var(--bg-input)', border: '1px solid var(--border-faint)', borderRadius: 6, padding: '0.45rem 0.6rem', fontSize: '0.8rem', color: 'var(--text)', fontFamily: 'inherit', lineHeight: 1.5 }}
-            />
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              {noteErr && <span style={{ fontSize: '0.72rem', color: '#e86f6f' }}>{noteErr}</span>}
-              <span style={{ fontSize: '0.68rem', color: 'var(--text-ghost)', marginLeft: 'auto', marginRight: '0.5rem' }}>{t('clients_cmd_to_save')}</span>
-              <button
-                onClick={handleAddNote}
-                disabled={noteAdding || !noteInput.trim()}
-                style={{ fontSize: '0.75rem', fontWeight: 600, padding: '0.25rem 0.75rem', borderRadius: 5, border: '1px solid var(--border-faint)', background: 'var(--bg-chip)', color: 'var(--text-dim)', cursor: 'pointer', opacity: (!noteInput.trim() || noteAdding) ? 0.45 : 1 }}
-              >
-                {t(noteAdding ? 'saving' : 'clients_add_note_btn')}
-              </button>
-            </div>
-            {notes === null && <p style={{ fontSize: '0.78rem', color: 'var(--text-ghost)' }}>{t('loading')}</p>}
-            {notes !== null && notes.length === 0 && <p style={{ fontSize: '0.78rem', color: 'var(--text-ghost)' }}>{t('clients_no_notes')}</p>}
-            {notes !== null && notes.map(n => (
-              <div key={n.id} style={{ background: 'var(--bg-chip)', border: '1px solid var(--border-faint)', borderRadius: 6, padding: '0.5rem 0.65rem', position: 'relative' }}>
-                <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text)', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{n.content}</p>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.35rem' }}>
-                  <span style={{ fontSize: '0.68rem', color: 'var(--text-ghost)' }}>
-                    {new Date(n.created_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
-                  </span>
+          <div>
+            <span style={s.fieldLabel}>{t('clients_allergies')}</span>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              {['No', 'Yes'].map(opt => {
+                const active = opt === 'Yes' ? hasAllergies : !hasAllergies;
+                const danger = opt === 'Yes' && active;
+                return (
                   <button
-                    onClick={() => handleDeleteNote(n.id)}
-                    style={{ fontSize: '0.68rem', color: '#e86f6f', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
-                  >
-                    {t('delete')}
-                  </button>
-                </div>
-              </div>
-            ))}
+                    key={opt}
+                    aria-pressed={active}
+                    aria-label={`${t('clients_allergies')}: ${opt === 'No' ? t('no') : t('yes')}`}
+                    onMouseDown={e => e.preventDefault()}
+                    onClick={() => setHasAllergies(opt === 'Yes')}
+                    style={{
+                      fontSize: '0.9rem', fontWeight: 600, padding: '0.4rem 1.1rem',
+                      borderRadius: 8, border: `1px solid ${danger ? 'var(--color-danger-border)' : active ? 'var(--accent)' : 'var(--border-strong)'}`,
+                      background: danger ? 'var(--color-danger-surface)' : active ? 'var(--accent)' : 'transparent',
+                      color: danger ? 'var(--color-danger)' : active ? 'var(--accent-contrast)' : 'var(--text-dim)',
+                      cursor: 'pointer',
+                    }}
+                  >{opt === 'No' ? t('no') : t('yes')}</button>
+                );
+              })}
+            </div>
+            {hasAllergies && (
+              <textarea
+                aria-label="Allergy details"
+                rows={2}
+                placeholder="e.g. latex allergy, sensitive skin, keloid-prone…"
+                value={allergyDetails}
+                onChange={e => setAllergyDetails(e.target.value)}
+                style={{ ...s.profileInput, marginTop: '0.5rem' }}
+              />
+            )}
           </div>
-        </div>
 
-        <div style={{ borderTop: '1px solid var(--border-faint)', paddingTop: '1rem', marginTop: '0.25rem' }}>
-          <span style={s.sectionLabel}>{t('clients_booking_history')}</span>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', marginTop: '0.75rem' }}>
-            {sorted.map(b => (
-              <div key={b.id} style={s.historyRow}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
-                  <span style={{ fontSize: '0.82rem', color: 'var(--text)', fontWeight: 600 }}>
-                    {[b.session_type ? capitalise(b.session_type.replace(/_/g, ' ')) : null, b.artist_name || null].filter(Boolean).join(' · ') || '—'}
-                  </span>
-                  <span style={{ fontSize: '0.73rem', color: 'var(--text-faint)' }}>
-                    {new Date(b.created_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
-                  </span>
-                </div>
-                <span style={{ fontSize: '0.72rem', fontWeight: 600, color: statusColors(b.status).text }}>
-                  {capitalise(b.outcome ?? b.status)}
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '0.35rem' }}>
+              <span style={{ ...s.fieldLabel, marginBottom: 0 }}>{t('clients_pain')}</span>
+              {pain !== '' && <span style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text)' }}>{pain}/10</span>}
+            </div>
+            <input
+              type="range"
+              aria-label={t('clients_pain')}
+              aria-valuetext={pain === '' ? 'Not recorded; adjust to set a value out of 10' : `${pain} out of 10`}
+              min={0}
+              max={10}
+              step={1}
+              value={pain === '' ? 5 : Number(pain)}
+              onChange={e => setPain(e.target.value)}
+              style={{ width: '100%', accentColor: 'var(--accent)', cursor: 'pointer' }}
+            />
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.2rem' }}>
+              <span style={detailStyles.hint}>0 — very sensitive</span>
+              <span style={detailStyles.hint}>10 — very high</span>
+            </div>
+            {pain === '' && (
+              <button
+                onMouseDown={e => e.preventDefault()}
+                onClick={() => setPain('5')}
+                style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: 'var(--text-dim)', background: 'none', border: '1px dashed var(--border-strong)', borderRadius: 8, padding: '0.3rem 0.75rem', cursor: 'pointer' }}
+              >{t('clients_set_pain')}</button>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <Button onClick={handleSaveProfile} loading={profSaving} loadingLabel={t('saving')}>
+              {t(profSaved ? 'saved' : 'clients_save_profile')}
+            </Button>
+            {profErr && <span style={{ fontSize: '0.875rem', color: 'var(--color-danger)' }}>{profErr}</span>}
+          </div>
+        </Section>
+
+        <Section title={t('clients_notes')}>
+          <textarea
+            aria-label={t('clients_add_note')}
+            rows={3}
+            placeholder={t('clients_add_note')}
+            value={noteInput}
+            onChange={e => setNoteInput(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleAddNote(); }}
+            style={detailStyles.noteInput}
+          />
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
+            <span style={detailStyles.hint}>{noteErr ? <span style={{ color: 'var(--color-danger)' }}>{noteErr}</span> : t('clients_cmd_to_save')}</span>
+            <Button size="sm" variant="secondary" onClick={handleAddNote} disabled={noteAdding || !noteInput.trim()}>
+              {t(noteAdding ? 'saving' : 'clients_add_note_btn')}
+            </Button>
+          </div>
+          {notes === null && <p style={{ ...detailStyles.hint, margin: 0 }}>{t('loading')}</p>}
+          {notes !== null && notes.length === 0 && <p style={{ ...detailStyles.hint, margin: 0 }}>{t('clients_no_notes')}</p>}
+          {notes !== null && notes.map(n => (
+            <div key={n.id} style={detailStyles.subCard}>
+              <p style={{ margin: 0, fontSize: '0.95rem', color: 'var(--text)', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{n.content}</p>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={detailStyles.hint}>
+                  {new Date(n.created_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
+                </span>
+                <button onClick={() => handleDeleteNote(n.id)} style={{ ...detailStyles.textLink, color: 'var(--color-danger)' }}>
+                  {t('delete')}
+                </button>
+              </div>
+            </div>
+          ))}
+        </Section>
+
+        <Section title={`${t('clients_booking_history')}${sorted.length ? ` (${sorted.length})` : ''}`}>
+          {sorted.length === 0 && <p style={{ ...detailStyles.hint, margin: 0 }}>No bookings yet.</p>}
+          {sorted.map(b => (
+            <div key={b.id} style={s.historyRow}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem', minWidth: 0 }}>
+                <span style={{ fontSize: '0.95rem', color: 'var(--text)', fontWeight: 600 }}>
+                  {[b.session_type ? capitalise(b.session_type.replace(/_/g, ' ')) : null, b.artist_name || null].filter(Boolean).join(' · ') || '—'}
+                </span>
+                <span style={detailStyles.hint}>
+                  {new Date(b.created_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
                 </span>
               </div>
-            ))}
-          </div>
-        </div>
+              <Pill colors={statusColors(b.outcome === 'no_show' ? 'cancelled' : b.status)}>{capitalise((b.outcome ?? b.status).replace(/_/g, ' '))}</Pill>
+            </div>
+          ))}
+        </Section>
       </div>
     </aside>
-  );
-}
-
-function Field({ label, children }) {
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
-      <span style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-ghost)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-        {label}
-      </span>
-      <span style={{ fontSize: '0.85rem', color: 'var(--text-dim)' }}>{children}</span>
-    </div>
   );
 }
 
@@ -946,7 +880,7 @@ const s = {
     color: 'var(--text-muted)',
   },
   panel: {
-    position: 'absolute', top: 0, right: 0, bottom: 0, width: 320,
+    position: 'absolute', top: 0, right: 0, bottom: 0, width: 'min(420px, 100%)',
     background: 'var(--bg-panel)',
     borderLeft: '1px solid var(--border)',
     display: 'flex',
@@ -955,32 +889,43 @@ const s = {
   },
   panelHeader: {
     display: 'flex',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
+    gap: '0.75rem',
     padding: '1.25rem 1.25rem 1rem',
-    borderBottom: '1px solid var(--border-faint)',
+    borderBottom: '1px solid var(--border)',
     flexShrink: 0,
   },
   panelTitle: {
-    fontSize: '0.95rem',
+    fontSize: '1.25rem',
     fontWeight: 700,
     color: 'var(--text)',
+    letterSpacing: '-0.01em',
+    overflowWrap: 'anywhere',
   },
   closeBtn: {
     background: 'none',
     border: 'none',
-    color: 'var(--text-faint)',
-    fontSize: '0.9rem',
+    color: 'var(--text-muted)',
+    fontSize: '1.05rem',
     cursor: 'pointer',
+    padding: '0.25rem',
   },
   panelBody: {
     flex: 1,
     overflowY: 'auto',
-    padding: '1rem 1.25rem',
+    padding: '1.1rem 1.25rem 1.5rem',
     display: 'flex',
     flexDirection: 'column',
-    gap: '0.85rem',
+    gap: '1rem',
   },
+  statRow: { display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '0.6rem' },
+  stat: { display: 'flex', flexDirection: 'column', gap: '0.2rem', padding: '0.8rem 0.9rem', borderRadius: 12, border: '1px solid var(--border)', background: 'var(--bg-card)' },
+  statBlue: { background: 'var(--color-info-surface)', borderColor: 'var(--color-info-border)' },
+  statGreen: { background: 'var(--color-success-surface)', borderColor: 'var(--color-success-border)' },
+  statValue: { fontSize: '1.5rem', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em', lineHeight: 1.1 },
+  statLabel: { fontSize: '0.8rem', color: 'var(--text-dim)', fontWeight: 600 },
+  phoneBtn: { background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--color-info)', fontSize: '0.95rem', fontWeight: 600, fontFamily: 'inherit' },
   consentSection: {
     borderTop: '1px solid var(--border-faint)',
     paddingTop: '0.85rem',
@@ -1028,22 +973,20 @@ const s = {
   contactArrow: { fontSize: '0.7rem', color: 'var(--text-ghost)', flexShrink: 0 },
   fieldLabel: {
     display: 'block',
-    fontSize: '0.68rem',
+    fontSize: '0.875rem',
     fontWeight: 600,
-    color: 'var(--text-ghost)',
-    textTransform: 'uppercase',
-    letterSpacing: '0.06em',
-    marginBottom: '0.3rem',
+    color: 'var(--text-dim)',
+    marginBottom: '0.4rem',
   },
   profileInput: {
     width: '100%',
     boxSizing: 'border-box',
     resize: 'vertical',
     background: 'var(--bg-input)',
-    border: '1px solid var(--border-faint)',
-    borderRadius: 6,
-    padding: '0.4rem 0.6rem',
-    fontSize: '0.8rem',
+    border: '1px solid var(--border)',
+    borderRadius: 10,
+    padding: '0.6rem 0.8rem',
+    fontSize: '0.95rem',
     color: 'var(--text)',
     fontFamily: 'inherit',
     lineHeight: 1.5,
