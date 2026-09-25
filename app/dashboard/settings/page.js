@@ -786,6 +786,12 @@ export default function SettingsPage() {
         </section>
 
         <section style={s.card}>
+          <h2 style={s.sectionTitle}>Studio logo</h2>
+          <p style={s.sectionDesc}>Shown at the top of your booking and consent forms.</p>
+          <StudioLogoUpload logoUrl={logoUrl} studioName={name} onChange={setLogoUrl} />
+        </section>
+
+        <section style={s.card}>
           <h2 style={s.sectionTitle}>{t('hours')}</h2>
           <div style={s.hoursGrid}>
             {hours.map((day, i) => (
@@ -1294,12 +1300,6 @@ export default function SettingsPage() {
           <button onClick={handleAddStation} style={s.saveBtn} disabled={stationLoading}>
             {t('add_station')}
           </button>
-        </section>
-
-        <section style={s.card}>
-          <h2 style={s.sectionTitle}>Studio logo</h2>
-          <p style={s.sectionDesc}>Shown at the top of your booking and consent forms.</p>
-          <StudioLogoUpload logoUrl={logoUrl} studioName={name} onChange={setLogoUrl} />
         </section>
 
         <section style={s.card}>
