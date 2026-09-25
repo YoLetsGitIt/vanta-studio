@@ -148,6 +148,10 @@ function ConsentForm() {
           return;
         }
       }
+      if (!ts.answers?.__agreed__) {
+        setSubmitErr(`Please confirm you have read and agreed to "${t.name}".`);
+        return;
+      }
       if (t.requires_signature && !ts.sigBlob) {
         setSubmitErr(`Signature required for "${t.name}".`);
         return;
@@ -298,6 +302,19 @@ function ConsentForm() {
                   />
                 ))}
               </div>
+
+              {/* Always-required agreement checkbox */}
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', cursor: 'pointer', marginTop: '1rem' }}>
+                <input
+                  type="checkbox"
+                  checked={!!ts.answers?.__agreed__}
+                  onChange={e => setAnswer(t.id, '__agreed__', e.target.checked ? 'true' : '')}
+                  style={{ accentColor: '#f5ecd9', flexShrink: 0, width: 16, height: 16, minWidth: 'auto' }}
+                />
+                <span style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.7)', lineHeight: 1.5 }}>
+                  I have read and agreed to the above <span style={{ color: '#e86f6f' }}>*</span>
+                </span>
+              </label>
 
               {t.requires_signature && (
                 <div style={{ marginTop: '1.25rem' }}>
