@@ -433,7 +433,10 @@ function AuthGate({ studioName }) {
             <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.55rem', fontSize: '0.8rem', color: 'rgba(255,255,255,0.7)', cursor: 'pointer' }}>
               <input type="checkbox" checked={mkt} onChange={e => setMkt(e.target.checked)} style={{ marginTop: 3, width: 16, height: 16, minWidth: 'auto', accentColor: '#f5ecd9' }} />
               <span>
-                Send me offers and updates from {studioName} by email and text. Msg &amp; data rates may apply. Reply STOP to opt out.
+                Send me offers and updates from {studioName} by email &amp; text.
+                <span style={{ display: 'block', fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>
+                  Msg &amp; data rates may apply. Reply STOP to opt out.
+                </span>
               </span>
             </label>
           </>
