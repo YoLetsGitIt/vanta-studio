@@ -24,7 +24,7 @@ import { getTheme, setTheme } from '@/lib/theme';
 import { useLanguage, LANGUAGES } from '@/lib/i18n';
 import { requestConfirmation, showError } from '@/lib/feedback';
 
-const QRCodeSVG = dynamic(() => import('qrcode.react').then(m => m.QRCodeSVG), { ssr: false });
+import DownloadableQR from '@/components/DownloadableQR';
 
 const DAY_KEYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 
@@ -225,6 +225,7 @@ export default function SettingsPage() {
   const [copied, setCopied] = useState(false);
   const [embedCopied, setEmbedCopied] = useState(false);
   const [walkInUrl, setWalkInUrl] = useState('');
+  const consentUrl = walkInUrl.replace('/studio-booking?s=', '/consent?s=');
   const [studioId, setStudioId] = useState('');
   const [theme, setThemeState] = useState('dark');
   const [tab, setTab] = useState('studio');
@@ -1083,6 +1084,17 @@ export default function SettingsPage() {
             */}
           </div>
 
+          {walkInUrl && (
+            <div className="studio-wrap-row" style={{ ...s.walkInCard, margin: '1rem 0' }}>
+              <div style={s.walkInLeft}>
+                <strong style={{ fontSize: '0.85rem', color: 'var(--text)' }}>Client consent QR code</strong>
+                <span style={s.sectionDesc}>Print or display this in your studio. Scanning it opens your consent form; clients create an account or sign in, then fill in and sign it.</span>
+                <span style={s.walkInUrl}>{consentUrl}</span>
+              </div>
+              <DownloadableQR value={consentUrl} filename="consent-qr" displaySize={112} />
+            </div>
+          )}
+
           {consentTemplates.length === 0 && (
             <p style={{ fontSize: '0.8rem', color: 'var(--text-ghost)', fontStyle: 'italic' }}>No forms yet. Click "+ New form" to create one.</p>
           )}
@@ -1289,11 +1301,7 @@ export default function SettingsPage() {
               <span style={s.walkInUrl}>{walkInUrl}</span>
               <button onClick={copyLink} style={s.copyBtn}>{copied ? t('copied') : t('copy_link')}</button>
             </div>
-            {walkInUrl && (
-              <div style={s.qrWrap}>
-                <QRCodeSVG value={walkInUrl} size={80} bgColor="#d5d0c7" fgColor="#080808" marginSize={2} />
-              </div>
-            )}
+            <DownloadableQR value={walkInUrl} filename="booking-qr" />
           </div>
         </section>
 
