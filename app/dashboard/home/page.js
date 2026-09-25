@@ -220,7 +220,9 @@ export default function HomePage() {
   }
 
   function toggleAttentionGroup(key) {
-    setOpenAttentionGroups(current => ({ ...current, [key]: !current[key] }));
+    // Landscape phones show one group's list beside the group names, so keep one open at a time.
+    const single = window.matchMedia('(max-width: 1100px) and (max-height: 550px) and (orientation: landscape) and (any-pointer: coarse)').matches;
+    setOpenAttentionGroups(current => single ? { [key]: !current[key] } : { ...current, [key]: !current[key] });
   }
 
   async function runAttentionAction(key, action, onDone) {
@@ -735,7 +737,7 @@ function AttentionGroup({ title, tone = 'info', icon, count, subtitle, open, onT
         </div>
         <span style={{ ...s.attentionChevron, transform: open ? 'rotate(180deg)' : 'none' }}>⌄</span>
       </button>
-      {open && <div style={s.attentionItems}>{children}</div>}
+      {open && <div style={s.attentionItems} className="studio-attention-items">{children}</div>}
     </div>
   );
 }

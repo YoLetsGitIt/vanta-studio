@@ -257,8 +257,21 @@
   .studio-attention-row { min-height: 44px !important; padding: 4px 10px !important; }
   .studio-attention-row > div > span:last-child { display: none; }
   .studio-attention-row > :first-child { width: 30px !important; height: 30px !important; }
-  /* With a group open, stack them all full width so the open list and dividers line up. */
-  .studio-attention-card:has([aria-expanded="true"]) { grid-template-columns: minmax(0, 1fr) !important; }
+  /* With a group open: group names down the left, that group's list scrolling on the right,
+     so opening a group never pushes the rest of the dashboard off screen. */
+  .studio-attention-card:has([aria-expanded="true"]) {
+    position: relative; grid-template-columns: minmax(200px, 38%) 1fr !important; min-height: 200px;
+    grid-auto-rows: min-content; align-content: start;
+  }
+  .studio-attention-card:has([aria-expanded="true"]) .studio-attention-group { display: contents; }
+  .studio-attention-card:has([aria-expanded="true"]) .studio-attention-row { grid-column: 1; border-bottom: 1px solid var(--border-faint) !important; }
+  .studio-attention-row[aria-expanded="true"] { background: var(--nav-active-bg) !important; }
+  .studio-attention-items {
+    position: absolute; top: 0; bottom: 0; left: max(200px, 38%); right: 0; overflow-y: auto; overscroll-behavior: contain;
+    border-left: 1px solid var(--border-faint); padding: 0 8px !important;
+  }
+  .studio-attention-item { min-height: 48px !important; padding: 6px 10px !important; flex-shrink: 0; flex-wrap: wrap; row-gap: 4px; }
+  .studio-attention-item > :first-child { flex: 1 1 180px; min-width: 0; }
   /* "In the studio today" and "Bookings this week": tighter cards and rows. */
   .studio-home-two-col > div { padding: 10px 12px !important; gap: 2px !important; }
   .studio-home-two-col button { min-height: 48px !important; padding-block: 4px !important; gap: 10px !important; }
