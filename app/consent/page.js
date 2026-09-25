@@ -367,8 +367,7 @@ function AuthGate({ studioName }) {
   const [dob, setDob]       = useState('');
   const [phone, setPhone]   = useState('');
   const [agreed, setAgreed]   = useState(false);
-  const [mktEmail, setMktEmail] = useState(false);
-  const [mktSms, setMktSms]   = useState(false);
+  const [mkt, setMkt]       = useState(false);
   const [busy, setBusy]       = useState(false);
   const [err, setErr]         = useState('');
   const [notice, setNotice]   = useState('');
@@ -386,7 +385,7 @@ function AuthGate({ studioName }) {
         // Covers a returning client whose app profile was never created.
         await createProfile(data.session, '');
       } else {
-        const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { full_name: name.trim(), name: name.trim(), dob, phone: phone.trim(), marketing_email: mktEmail, marketing_sms: mktSms } } });
+        const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { full_name: name.trim(), name: name.trim(), dob, phone: phone.trim(), marketing_email: mkt, marketing_sms: mkt } } });
         if (error) throw error;
         if (data.session) await createProfile(data.session, name.trim());
         else setNotice('Check your email to confirm your account, then scan the QR code again.');
@@ -432,12 +431,10 @@ function AuthGate({ studioName }) {
         {mode === 'signup' && (
           <>
             <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.55rem', fontSize: '0.8rem', color: 'rgba(255,255,255,0.7)', cursor: 'pointer' }}>
-              <input type="checkbox" checked={mktEmail} onChange={e => setMktEmail(e.target.checked)} style={{ marginTop: 3, width: 16, height: 16, minWidth: 'auto', accentColor: '#f5ecd9' }} />
-              <span>{studioName} may email me news and offers. I can unsubscribe any time.</span>
-            </label>
-            <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.55rem', fontSize: '0.8rem', color: 'rgba(255,255,255,0.7)', cursor: 'pointer' }}>
-              <input type="checkbox" checked={mktSms} onChange={e => setMktSms(e.target.checked)} style={{ marginTop: 3, width: 16, height: 16, minWidth: 'auto', accentColor: '#f5ecd9' }} />
-              <span>{studioName} may text me about my appointments, news and offers. Reply STOP to opt out.</span>
+              <input type="checkbox" checked={mkt} onChange={e => setMkt(e.target.checked)} style={{ marginTop: 3, width: 16, height: 16, minWidth: 'auto', accentColor: '#f5ecd9' }} />
+              <span>
+                Keep me in the loop! Send me appointment updates, flash drops, last-minute openings and exclusive offers from {studioName} by email and text. Unsubscribe any time.
+              </span>
             </label>
           </>
         )}
