@@ -71,13 +71,36 @@ function ConsentForm() {
     return () => sub.subscription.unsubscribe();
   }, []);
 
-  // Pre-fill from what they entered at account creation.
+  // Derive name / phone / DOB from the signed-in account: the Vanta profile first,
+  // then whatever was entered at sign-up. `known` stays null until that's resolved.
+  const [known, setKnown] = useState(null);
   useEffect(() => {
-    const m = session?.user?.user_metadata;
-    if (!m) return;
-    setSignerName(v => v || m.full_name || m.name || '');
-    setDob(v => v || m.dob || '');
-    setPhone(v => v || m.phone || '');
+    if (!session) { setKnown(null); return; }
+    let cancelled = false;
+    (async () => {
+      const m = session.user?.user_metadata ?? {};
+      let profile = null;
+      try {
+        let res = await fetch(`${BACKEND}/auth/users/me`, { headers: { Authorization: `Bearer ${session.access_token}` } });
+        if (res.status === 404) {
+          await createProfile(session, m.full_name || m.name || '');
+          res = await fetch(`${BACKEND}/auth/users/me`, { headers: { Authorization: `Bearer ${session.access_token}` } });
+        }
+        if (res.ok) profile = await res.json();
+      } catch {}
+      const profName = profile?.name && profile.name !== 'User' ? profile.name : '';
+      const k = {
+        name:  profName || m.full_name || m.name || '',
+        phone: profile?.phone || m.phone || '',
+        dob:   m.dob || '',
+      };
+      if (cancelled) return;
+      setSignerName(v => v || k.name);
+      setPhone(v => v || k.phone);
+      setDob(v => v || k.dob);
+      setKnown(k);
+    })();
+    return () => { cancelled = true; };
   }, [session]);
 
   useEffect(() => {
@@ -188,7 +211,7 @@ function ConsentForm() {
     );
   }
 
-  if (!info || session === undefined) {
+  if (!info || session === undefined || (session && !known)) {
     return <div style={s.card}><div style={s.spinner} /></div>;
   }
 
@@ -211,10 +234,9 @@ function ConsentForm() {
   const templates = info.templates ?? [];
 
   // Name / DOB / phone come from the account; only ask for whatever it's missing.
-  const meta = session.user?.user_metadata ?? {};
-  const missingName  = !(meta.full_name || meta.name);
-  const missingDob   = !meta.dob;
-  const missingPhone = !meta.phone;
+  const missingName  = !known.name;
+  const missingDob   = !known.dob;
+  const missingPhone = !known.phone;
   const needsDetails = missingName || missingDob || missingPhone;
 
   return (
@@ -225,7 +247,7 @@ function ConsentForm() {
         {needsDetails && (
           <div style={s.templateBox}>
             <p style={s.templateTitle}>Your details</p>
-            <p style={{ ...s.hint, margin: '0.25rem 0 0.85rem' }}>Signed in as {session.user?.email}. We need a few details to finish your profile.</p>
+            <p style={{ ...s.hint, margin: '0.25rem 0 0.85rem' }}>Signed in as {session.user?.email}. We need a few more details for your client record.</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
               {missingName && (
                 <div>
