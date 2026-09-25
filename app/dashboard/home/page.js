@@ -592,7 +592,7 @@ export default function HomePage() {
           <div style={s.section}>
             <span style={s.sectionLabel}>Bookings this week</span>
             <div style={s.card} className={styles.card}>
-              <div style={s.utilList}>
+              <div style={s.utilList} className="studio-home-util-list">
                 {weekUtilization.map(({ artist, count }) => (
                   <div key={artist.id} style={s.utilRow}>
                     <span style={s.utilName}>{artist.name}</span>
