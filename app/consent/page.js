@@ -33,11 +33,11 @@ async function createProfile(session, name) {
   } catch {}
 }
 
-async function submitStudioConsent(studioId, accessToken, signerName, dob, phone, submissions) {
+async function submitStudioConsent(studioId, accessToken, signerName, dob, phone, marketing, submissions) {
   const res = await fetch(`${BACKEND}/studios/${studioId}/consent`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
-    body: JSON.stringify({ signer_name: signerName, dob, phone, submissions }),
+    body: JSON.stringify({ signer_name: signerName, dob, phone, marketing_email: !!marketing.email, marketing_sms: !!marketing.sms, submissions }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error ?? 'Failed to submit consent');
@@ -189,7 +189,7 @@ function ConsentForm() {
         });
       }
 
-      await submitStudioConsent(studioId, session.access_token, signerName.trim(), dob, phone.trim(), submissions);
+      await submitStudioConsent(studioId, session.access_token, signerName.trim(), dob, phone.trim(), { email: session.user?.user_metadata?.marketing_email, sms: session.user?.user_metadata?.marketing_sms }, submissions);
       // Remember their details on the account so they aren't asked again.
       getSupabase().auth.updateUser({ data: { full_name: signerName.trim(), name: signerName.trim(), dob, phone: phone.trim() } }).catch(() => {});
       setDone(true);
@@ -367,6 +367,8 @@ function AuthGate({ studioName }) {
   const [dob, setDob]       = useState('');
   const [phone, setPhone]   = useState('');
   const [agreed, setAgreed]   = useState(false);
+  const [mktEmail, setMktEmail] = useState(false);
+  const [mktSms, setMktSms]   = useState(false);
   const [busy, setBusy]       = useState(false);
   const [err, setErr]         = useState('');
   const [notice, setNotice]   = useState('');
@@ -384,7 +386,7 @@ function AuthGate({ studioName }) {
         // Covers a returning client whose app profile was never created.
         await createProfile(data.session, '');
       } else {
-        const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { full_name: name.trim(), name: name.trim(), dob, phone: phone.trim() } } });
+        const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { full_name: name.trim(), name: name.trim(), dob, phone: phone.trim(), marketing_email: mktEmail, marketing_sms: mktSms } } });
         if (error) throw error;
         if (data.session) await createProfile(data.session, name.trim());
         else setNotice('Check your email to confirm your account, then scan the QR code again.');
@@ -426,6 +428,18 @@ function AuthGate({ studioName }) {
               <a href="https://www.vanta.tattoo/privacy" target="_blank" rel="noopener noreferrer" style={{ color: '#f5ecd9' }}>Privacy Policy</a>
             </span>
           </label>
+        )}
+        {mode === 'signup' && (
+          <>
+            <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.55rem', fontSize: '0.8rem', color: 'rgba(255,255,255,0.7)', cursor: 'pointer' }}>
+              <input type="checkbox" checked={mktEmail} onChange={e => setMktEmail(e.target.checked)} style={{ marginTop: 3, width: 16, height: 16, minWidth: 'auto', accentColor: '#f5ecd9' }} />
+              <span>{studioName} may email me news and offers. I can unsubscribe any time.</span>
+            </label>
+            <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.55rem', fontSize: '0.8rem', color: 'rgba(255,255,255,0.7)', cursor: 'pointer' }}>
+              <input type="checkbox" checked={mktSms} onChange={e => setMktSms(e.target.checked)} style={{ marginTop: 3, width: 16, height: 16, minWidth: 'auto', accentColor: '#f5ecd9' }} />
+              <span>{studioName} may text me about my appointments, news and offers. Reply STOP to opt out.</span>
+            </label>
+          </>
         )}
         {err && <p style={s.error}>{err}</p>}
         {notice && <p style={s.hint}>{notice}</p>}
