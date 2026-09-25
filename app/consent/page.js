@@ -82,7 +82,7 @@ function ConsentForm() {
 
   useEffect(() => {
     if (!studioId) { setLoadErr('This consent link is missing its studio.'); return; }
-    Promise.all([getStudioPublic(studioId), getStudioConsentTemplates(studioId)])
+    Promise.all([getStudioPublic(studioId), getStudioConsentTemplates(studioId, true)])
       .then(([studio, tpl]) => setInfo({ studio_id: studioId, studio_name: studio.name, templates: tpl.templates ?? [] }))
       .catch(() => setLoadErr('This consent link is invalid.'));
   }, [studioId]);
