@@ -21,11 +21,23 @@ async function signatureUploadSign(studioId, files) {
   return data.uploads;
 }
 
-async function submitStudioConsent(studioId, accessToken, signerName, submissions) {
+// Same profile-creation call the vanta-website /bookings sign-up makes, so a QR
+// sign-up gets a real Vanta app account. Idempotent on the backend.
+async function createProfile(session, name) {
+  try {
+    await fetch(`${BACKEND}/auth/users/me`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+      body: JSON.stringify({ name: name || 'User', accountType: 'user', termsAcceptedVersion: '1.0' }),
+    });
+  } catch {}
+}
+
+async function submitStudioConsent(studioId, accessToken, signerName, dob, phone, submissions) {
   const res = await fetch(`${BACKEND}/studios/${studioId}/consent`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
-    body: JSON.stringify({ signer_name: signerName, submissions }),
+    body: JSON.stringify({ signer_name: signerName, dob, phone, submissions }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error ?? 'Failed to submit consent');
@@ -39,6 +51,7 @@ function ConsentForm() {
   const [session, setSession]     = useState(undefined); // undefined = still checking
   const [dob, setDob]             = useState('');
   const [signerName, setSignerName] = useState('');
+  const [phone, setPhone]         = useState('');
   const [info, setInfo]           = useState(null);
   const [loadErr, setLoadErr]     = useState('');
   const [templateState, setTemplateState] = useState({});
@@ -57,6 +70,15 @@ function ConsentForm() {
     const { data: sub } = supabase.auth.onAuthStateChange((_e, next) => setSession(next ?? null));
     return () => sub.subscription.unsubscribe();
   }, []);
+
+  // Pre-fill from what they entered at account creation.
+  useEffect(() => {
+    const m = session?.user?.user_metadata;
+    if (!m) return;
+    setSignerName(v => v || m.name || '');
+    setDob(v => v || m.dob || '');
+    setPhone(v => v || m.phone || '');
+  }, [session]);
 
   useEffect(() => {
     if (!studioId) { setLoadErr('This consent link is missing its studio.'); return; }
@@ -91,7 +113,9 @@ function ConsentForm() {
   async function handleSubmit(e) {
     e.preventDefault();
     const templates = info?.templates ?? [];
+    if (!signerName.trim()) { setSubmitErr('Please enter your full name.'); return; }
     if (!dob) { setSubmitErr('Please enter your date of birth.'); return; }
+    if (phone.replace(/\D/g, '').length < 7) { setSubmitErr('Please enter a valid phone number.'); return; }
 
     for (const t of templates) {
       const ts = templateState[t.id] ?? {};
@@ -142,7 +166,7 @@ function ConsentForm() {
         });
       }
 
-      await submitStudioConsent(studioId, session.access_token, signerName.trim() || (session.user?.user_metadata?.name ?? ''), submissions);
+      await submitStudioConsent(studioId, session.access_token, signerName.trim(), dob, phone.trim(), submissions);
       setDone(true);
     } catch (e) {
       setSubmitErr(e.message);
@@ -200,6 +224,10 @@ function ConsentForm() {
             <p style={{ ...s.label, marginBottom: '0.3rem' }}>Date of birth <span style={{ color: '#e86f6f' }}>*</span></p>
             <input style={s.input} type="date" required value={dob} max={new Date().toISOString().slice(0, 10)} onChange={e => setDob(e.target.value)} />
           </div>
+        </div>
+        <div>
+          <p style={{ ...s.label, marginBottom: '0.3rem' }}>Phone number <span style={{ color: '#e86f6f' }}>*</span></p>
+          <input style={s.input} type="tel" required autoComplete="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="Your phone number" />
         </div>
         <p style={s.hint}>Signed in as {session.user?.email}</p>
 
@@ -295,22 +323,31 @@ function AuthGate({ studioName }) {
   const [mode, setMode]       = useState('signup');
   const [email, setEmail]     = useState('');
   const [password, setPassword] = useState('');
+  const [name, setName]     = useState('');
+  const [dob, setDob]       = useState('');
+  const [phone, setPhone]   = useState('');
+  const [agreed, setAgreed]   = useState(false);
   const [busy, setBusy]       = useState(false);
   const [err, setErr]         = useState('');
   const [notice, setNotice]   = useState('');
 
   async function submit(e) {
     e.preventDefault();
-    setBusy(true); setErr(''); setNotice('');
+    setErr(''); setNotice('');
+    if (mode === 'signup' && !agreed) { setErr('You must agree to the Terms of Use and Privacy Policy.'); return; }
+    setBusy(true);
     const supabase = getSupabase();
     try {
       if (mode === 'signin') {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
+        // Covers a returning client whose app profile was never created.
+        await createProfile(data.session, '');
       } else {
-        const { data, error } = await supabase.auth.signUp({ email, password });
+        const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { full_name: name.trim(), name: name.trim(), dob, phone: phone.trim() } } });
         if (error) throw error;
-        if (!data.session) setNotice('Check your email to confirm your account, then scan the QR code again.');
+        if (data.session) await createProfile(data.session, name.trim());
+        else setNotice('Check your email to confirm your account, then scan the QR code again.');
       }
     } catch (e2) {
       setErr(e2.message ?? 'Something went wrong. Please try again.');
@@ -327,8 +364,29 @@ function AuthGate({ studioName }) {
         {studioName} needs you to {mode === 'signup' ? 'create a Vanta account' : 'sign in'} before completing their consent form.
       </p>
       <form onSubmit={submit} style={s.form}>
+        {mode === 'signup' && (
+          <>
+            <input style={s.input} type="text" required autoComplete="name" value={name} onChange={e => setName(e.target.value)} placeholder="Full name" />
+            <div>
+              <p style={{ ...s.label, marginBottom: '0.3rem' }}>Date of birth</p>
+              <input style={s.input} type="date" required value={dob} max={new Date().toISOString().slice(0, 10)} onChange={e => setDob(e.target.value)} />
+            </div>
+            <input style={s.input} type="tel" required autoComplete="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="Phone number" />
+          </>
+        )}
         <input style={s.input} type="email" required autoComplete="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="Email" />
         <input style={s.input} type="password" required minLength={6} autoComplete={mode === 'signup' ? 'new-password' : 'current-password'} value={password} onChange={e => setPassword(e.target.value)} placeholder="Password" />
+        {mode === 'signup' && (
+          <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.55rem', fontSize: '0.8rem', color: 'rgba(255,255,255,0.7)', cursor: 'pointer' }}>
+            <input type="checkbox" checked={agreed} onChange={e => setAgreed(e.target.checked)} style={{ marginTop: 3, width: 16, height: 16, minWidth: 'auto', accentColor: '#f5ecd9' }} />
+            <span>
+              I agree to the{' '}
+              <a href="https://www.vanta.tattoo/terms" target="_blank" rel="noopener noreferrer" style={{ color: '#f5ecd9' }}>Terms of Use</a>
+              {' '}and{' '}
+              <a href="https://www.vanta.tattoo/privacy" target="_blank" rel="noopener noreferrer" style={{ color: '#f5ecd9' }}>Privacy Policy</a>
+            </span>
+          </label>
+        )}
         {err && <p style={s.error}>{err}</p>}
         {notice && <p style={s.hint}>{notice}</p>}
         <button type="submit" disabled={busy} style={{ ...s.btn, opacity: busy ? 0.6 : 1 }}>
