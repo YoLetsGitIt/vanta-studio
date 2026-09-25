@@ -645,6 +645,7 @@ function WalkInInner() {
                     {t.requires_signature && (
                       <div>
                         <label style={s.label}>{isMinor ? 'Client signature' : 'Signature'} <span style={{ color: 'var(--color-danger)' }}>*</span></label>
+                        <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '0 0 0.4rem', lineHeight: 1.5 }}>By signing, I agree that my electronic signature is legally binding and I consent to sign this form electronically.</p>
                         <SignaturePad onCapture={blob => setTemplateSigBlob(t.id, blob)} />
                       </div>
                     )}

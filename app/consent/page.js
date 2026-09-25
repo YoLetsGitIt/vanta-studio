@@ -321,6 +321,7 @@ function ConsentForm() {
                   <p style={{ ...s.label, marginBottom: '0.4rem' }}>
                     {isMinor && t.requires_minor_guardian ? 'Client signature' : 'Signature'} <span style={{ color: '#e86f6f' }}>*</span>
                   </p>
+                  <p style={{ ...s.hint, margin: '0 0 0.5rem' }}>By signing, I agree that my electronic signature is legally binding and I consent to sign this form electronically.</p>
                   <SignaturePad onCapture={blob => setSigBlob(t.id, blob)} />
                 </div>
               )}
