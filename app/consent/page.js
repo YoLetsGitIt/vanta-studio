@@ -75,7 +75,7 @@ function ConsentForm() {
   useEffect(() => {
     const m = session?.user?.user_metadata;
     if (!m) return;
-    setSignerName(v => v || m.name || '');
+    setSignerName(v => v || m.full_name || m.name || '');
     setDob(v => v || m.dob || '');
     setPhone(v => v || m.phone || '');
   }, [session]);
@@ -167,6 +167,8 @@ function ConsentForm() {
       }
 
       await submitStudioConsent(studioId, session.access_token, signerName.trim(), dob, phone.trim(), submissions);
+      // Remember their details on the account so they aren't asked again.
+      getSupabase().auth.updateUser({ data: { full_name: signerName.trim(), name: signerName.trim(), dob, phone: phone.trim() } }).catch(() => {});
       setDone(true);
     } catch (e) {
       setSubmitErr(e.message);
@@ -208,28 +210,44 @@ function ConsentForm() {
 
   const templates = info.templates ?? [];
 
+  // Name / DOB / phone come from the account; only ask for whatever it's missing.
+  const meta = session.user?.user_metadata ?? {};
+  const missingName  = !(meta.full_name || meta.name);
+  const missingDob   = !meta.dob;
+  const missingPhone = !meta.phone;
+  const needsDetails = missingName || missingDob || missingPhone;
+
   return (
-    <div style={s.card}>
-      <p style={s.studioTag}>{info.studio_name}</p>
-      <h2 style={s.heading}>Consent form</h2>
-      <p style={s.muted}>Please read and complete the form below.</p>
+    <div style={{ width: '100%' }}>
+      <p style={{ ...s.studioTag, marginBottom: '0.75rem' }}>{info.studio_name}</p>
 
       <form onSubmit={handleSubmit} style={s.form}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-          <div>
-            <p style={{ ...s.label, marginBottom: '0.3rem' }}>Full name <span style={{ color: '#e86f6f' }}>*</span></p>
-            <input style={s.input} type="text" required value={signerName} onChange={e => setSignerName(e.target.value)} placeholder="Your name" />
+        {needsDetails && (
+          <div style={s.templateBox}>
+            <p style={s.templateTitle}>Your details</p>
+            <p style={{ ...s.hint, margin: '0.25rem 0 0.85rem' }}>Signed in as {session.user?.email}. We need a few details to finish your profile.</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+              {missingName && (
+                <div>
+                  <p style={{ ...s.label, marginBottom: '0.3rem' }}>Full name <span style={{ color: '#e86f6f' }}>*</span></p>
+                  <input style={s.input} type="text" required autoComplete="name" value={signerName} onChange={e => setSignerName(e.target.value)} placeholder="Your name" />
+                </div>
+              )}
+              {missingDob && (
+                <div>
+                  <p style={{ ...s.label, marginBottom: '0.3rem' }}>Date of birth <span style={{ color: '#e86f6f' }}>*</span></p>
+                  <input style={s.input} type="date" required value={dob} max={new Date().toISOString().slice(0, 10)} onChange={e => setDob(e.target.value)} />
+                </div>
+              )}
+              {missingPhone && (
+                <div>
+                  <p style={{ ...s.label, marginBottom: '0.3rem' }}>Phone number <span style={{ color: '#e86f6f' }}>*</span></p>
+                  <input style={s.input} type="tel" required autoComplete="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="Your phone number" />
+                </div>
+              )}
+            </div>
           </div>
-          <div>
-            <p style={{ ...s.label, marginBottom: '0.3rem' }}>Date of birth <span style={{ color: '#e86f6f' }}>*</span></p>
-            <input style={s.input} type="date" required value={dob} max={new Date().toISOString().slice(0, 10)} onChange={e => setDob(e.target.value)} />
-          </div>
-        </div>
-        <div>
-          <p style={{ ...s.label, marginBottom: '0.3rem' }}>Phone number <span style={{ color: '#e86f6f' }}>*</span></p>
-          <input style={s.input} type="tel" required autoComplete="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="Your phone number" />
-        </div>
-        <p style={s.hint}>Signed in as {session.user?.email}</p>
+        )}
 
         {templates.length === 0 && (
           <p style={s.muted}>
