@@ -18,7 +18,19 @@ const HOUR_PX   = 64;
 const DAY_START = 8;
 const DAY_END   = 20;
 const HOURS     = Array.from({ length: DAY_END - DAY_START }, (_, i) => DAY_START + i);
-const GRID_H    = (DAY_END - DAY_START) * HOUR_PX;
+
+// Short landscape phones get a tighter hour so more of the working day fits on screen.
+function useHourPx() {
+  const [px, setPx] = useState(HOUR_PX);
+  useEffect(() => {
+    const mq = window.matchMedia('(max-height: 550px) and (orientation: landscape) and (any-pointer: coarse)');
+    const update = () => setPx(mq.matches ? 48 : HOUR_PX);
+    update();
+    mq.addEventListener('change', update);
+    return () => mq.removeEventListener('change', update);
+  }, []);
+  return px;
+}
 
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
@@ -650,13 +662,14 @@ function MonthView({ monthStart, onDayClick }) {
 
 // ── Day view ──────────────────────────────────────────────────────────────────
 
-function DayView({ date }) {
+function DayView({ date, showAll, setShowAll }) {
   const { t } = useLanguage();
+  const hourPx = useHourPx();
+  const gridH  = (DAY_END - DAY_START) * hourPx;
   const [artists,        setArtists]        = useState([]);
   const [entries,        setEntries]        = useState([]);
   const [loading,        setLoading]        = useState(true);
   const [error,          setError]          = useState('');
-  const [showAll,        setShowAll]        = useState(false);
   const [showNewBooking, setShowNewBooking] = useState(false);
   const [refreshKey,     setRefreshKey]     = useState(0);
   const actions = useBookingActions(() => {
@@ -749,10 +762,10 @@ function DayView({ date }) {
       ) : (
       <div className="studio-calendar-scroll" style={s.calWrap}>
       <div style={{ ...s.grid, gridTemplateColumns: `52px repeat(${cols.length}, minmax(160px, 1fr))` }}>
-        <div style={s.cornerCell} />
+        <div className="studio-calendar-column-heading" style={s.cornerCell} />
 
         {cols.map(artist => (
-          <div key={artist.id} style={s.artistHeader}>
+          <div key={artist.id} className="studio-calendar-column-heading" style={s.artistHeader}>
             {artist.profileImage
               ? <img src={artist.profileImage} alt={artist.name} style={s.artistAvatar} />
               : <div style={{ ...s.artistAvatar, ...s.artistAvatarFallback }}>{initials(artist.name)}</div>
@@ -761,9 +774,9 @@ function DayView({ date }) {
           </div>
         ))}
 
-        <div style={{ ...s.gutterCol, height: GRID_H }}>
+        <div style={{ ...s.gutterCol, height: gridH }}>
           {HOURS.map(h => (
-            <div key={h} style={{ ...s.hourLabel, top: (h - DAY_START) * HOUR_PX }}>
+            <div key={h} style={{ ...s.hourLabel, top: (h - DAY_START) * hourPx }}>
               {h === 12 ? '12pm' : h < 12 ? `${h}am` : `${h-12}pm`}
             </div>
           ))}
@@ -772,14 +785,14 @@ function DayView({ date }) {
         {cols.map(artist => {
           const bookings = byArtist[artist.artistId] ?? [];
           return (
-            <div key={artist.id} style={{ ...s.dayCol, height: GRID_H }}>
-              {HOURS.map(h => <div key={h} style={{ ...s.gridLine, top: (h - DAY_START) * HOUR_PX }} />)}
+            <div key={artist.id} style={{ ...s.dayCol, height: gridH }}>
+              {HOURS.map(h => <div key={h} style={{ ...s.gridLine, top: (h - DAY_START) * hourPx }} />)}
               {bookings.map(b => {
                 const startMin = minutesFromMidnight(b.chosenTime);
                 const durMin   = b.durationMins ?? 60;
-                const top      = (startMin - DAY_START * 60) * (HOUR_PX / 60);
-                const height   = Math.max(durMin * (HOUR_PX / 60), 24);
-                if (top < 0 || top > GRID_H) return null;
+                const top      = (startMin - DAY_START * 60) * (hourPx / 60);
+                const height   = Math.max(durMin * (hourPx / 60), 24);
+                if (top < 0 || top > gridH) return null;
                 const isSelected = actions.selectedEntry?.bookingId === b.bookingId;
                 const ss = srcStyle(b.source);
                 const unconfirmed = b.status === 'requires_confirmation' || b.status === 'awaiting_payment';
@@ -1057,6 +1070,8 @@ function StationMonthView({ monthStart, onDayClick }) {
 
 function StationView({ date }) {
   const { t } = useLanguage();
+  const hourPx = useHourPx();
+  const gridH  = (DAY_END - DAY_START) * hourPx;
   const dateStr = toISO(date);
   const [entries,     setEntries]     = useState([]);
   const [allStations, setAllStations] = useState([]);
@@ -1111,17 +1126,17 @@ function StationView({ date }) {
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
       <div className="studio-calendar-scroll" style={s.calWrap}>
       <div style={{ ...s.grid, gridTemplateColumns: `52px repeat(${cols.length}, minmax(160px, 1fr))` }}>
-        <div style={s.cornerCell} />
+        <div className="studio-calendar-column-heading" style={s.cornerCell} />
 
         {cols.map(col => (
-          <div key={col.id} style={s.artistHeader}>
+          <div key={col.id} className="studio-calendar-column-heading" style={s.artistHeader}>
             <span style={s.artistName}>{col.name}</span>
           </div>
         ))}
 
-        <div style={{ ...s.gutterCol, height: GRID_H }}>
+        <div style={{ ...s.gutterCol, height: gridH }}>
           {HOURS.map(h => (
-            <div key={h} style={{ ...s.hourLabel, top: (h - DAY_START) * HOUR_PX }}>
+            <div key={h} style={{ ...s.hourLabel, top: (h - DAY_START) * hourPx }}>
               {h === 12 ? '12pm' : h < 12 ? `${h}am` : `${h-12}pm`}
             </div>
           ))}
@@ -1130,14 +1145,14 @@ function StationView({ date }) {
         {cols.map(col => {
           const bookings = col.id === '__unassigned__' ? unassigned : (byStation[col.id] ?? []);
           return (
-            <div key={col.id} style={{ ...s.dayCol, height: GRID_H }}>
-              {HOURS.map(h => <div key={h} style={{ ...s.gridLine, top: (h - DAY_START) * HOUR_PX }} />)}
+            <div key={col.id} style={{ ...s.dayCol, height: gridH }}>
+              {HOURS.map(h => <div key={h} style={{ ...s.gridLine, top: (h - DAY_START) * hourPx }} />)}
               {bookings.map(b => {
                 const startMin = minutesFromMidnight(b.chosenTime);
                 const durMin   = b.durationMins ?? 60;
-                const top      = (startMin - DAY_START * 60) * (HOUR_PX / 60);
-                const height   = Math.max(durMin * (HOUR_PX / 60), 24);
-                if (top < 0 || top > GRID_H) return null;
+                const top      = (startMin - DAY_START * 60) * (hourPx / 60);
+                const height   = Math.max(durMin * (hourPx / 60), 24);
+                if (top < 0 || top > gridH) return null;
                 const isSelected = actions.selectedEntry?.bookingId === b.bookingId;
                 const ss = srcStyle(b.source);
                 const unconfirmed = b.status === 'requires_confirmation' || b.status === 'awaiting_payment';
@@ -1186,6 +1201,7 @@ export default function SchedulePage() {
   const { t, lang } = useLanguage();
   const locale = LANG_LOCALE[lang] ?? 'en-AU';
   const [view,      setView]      = useState('month');  // 'month' | 'day'
+  const [showAll, setShowAll] = useState(false);
   const [lens,      setLens]      = useState('artist'); // 'artist' | 'station'
   const [monthStart, setMonthStart] = useState(() => getMonthStart(new Date()));
   const [dayDate,    setDayDate]    = useState(() => new Date());
@@ -1207,6 +1223,24 @@ export default function SchedulePage() {
 
   return (
     <div className="studio-feature-page studio-schedule-page" style={s.page}>
+      <div className="studio-calendar-toolbar" role="toolbar" aria-label="Calendar controls">
+        <button type="button" aria-label="Open studio navigation" onClick={() => window.dispatchEvent(new Event('vanta:open-navigation'))}>☰</button>
+        <select aria-label="Calendar view" value={`${view}:${lens}${view === 'day' && lens === 'artist' && showAll ? ':all' : ''}`} onChange={event => {
+          const [nextView, nextLens, all] = event.target.value.split(':');
+          setView(nextView); setLens(nextLens); setShowAll(all === 'all');
+        }}>
+          <option value="day:artist">{t('sched_day')} · {t('bdp_artist')}</option>
+          <option value="day:artist:all">{t('sched_day')} · {t('sched_all_artists')}</option>
+          <option value="day:station">{t('sched_day')} · {t('bdp_station')}</option>
+          <option value="month:artist">{t('sched_month')} · {t('bdp_artist')}</option>
+          <option value="month:station">{t('sched_month')} · {t('bdp_station')}</option>
+        </select>
+        <button type="button" aria-label={view === 'day' ? 'Previous day' : 'Previous month'} onClick={() => view === 'day' ? setDayDate(d => addDays(d, -1)) : setMonthStart(d => getMonthStart(new Date(d.getFullYear(), d.getMonth() - 1, 1)))}>←</button>
+        <span className="studio-calendar-toolbar-date" aria-live="polite">{view === 'month' ? monthLabel : dayDate.toLocaleDateString(locale, { weekday: 'short', day: 'numeric', month: 'short' })}</span>
+        <button type="button" aria-label={view === 'day' ? 'Next day' : 'Next month'} onClick={() => view === 'day' ? setDayDate(d => addDays(d, 1)) : setMonthStart(d => getMonthStart(new Date(d.getFullYear(), d.getMonth() + 1, 1)))}>→</button>
+        <button type="button" onClick={() => { setDayDate(new Date()); setMonthStart(getMonthStart(new Date())); }}>{t('today')}</button>
+        <button type="button" className="studio-calendar-add" aria-label={t('new_appointment')} title={t('new_appointment')} onClick={() => window.dispatchEvent(new CustomEvent('vanta:open-new-appointment', { detail: { bookingType: 'walkin' } }))}>＋</button>
+      </div>
       <div className="studio-feature-header" style={s.header}>
         <div className="studio-schedule-toggles" style={s.headerLeft}>
           <h1 style={s.title}>{t('nav_schedule')}</h1>
@@ -1245,7 +1279,7 @@ export default function SchedulePage() {
 
       {view === 'month' && lens === 'artist'  && <MonthView        monthStart={monthStart} onDayClick={goToDayView} />}
       {view === 'month' && lens === 'station' && <StationMonthView monthStart={monthStart} onDayClick={day => { goToDayView(day); setLens('station'); }} />}
-      {view === 'day'   && lens === 'artist'  && <DayView          date={dayDate} />}
+      {view === 'day'   && lens === 'artist'  && <DayView          date={dayDate} showAll={showAll} setShowAll={setShowAll} />}
       {view === 'day'   && lens === 'station' && <StationView      date={dayDate} />}
     </div>
   );

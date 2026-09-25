@@ -18,9 +18,9 @@ export default function DashboardQuickActions({ artists = [] }) {
 
   return (
     <>
-      <div style={styles.grid}>
+      <div style={styles.grid} className="studio-home-quick-actions">
         {actions.map(action => (
-          <button key={action.label} type="button" style={styles.action} onClick={action.action}>
+          <button key={action.label} type="button" style={styles.action} aria-label={action.label} title={action.label} onClick={action.action}>
             <span style={styles.icon(action.tone)} aria-hidden="true">{action.icon}</span>
             <span>{action.label}</span>
           </button>

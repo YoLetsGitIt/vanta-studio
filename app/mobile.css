@@ -142,3 +142,128 @@
   .studio-booking-detail > div:first-child,
   .studio-client-detail > div:first-child { padding-block: 4px !important; }
 }
+
+/* Use landscape width to reduce stacked controls without shrinking tap targets. */
+@media (max-width: 1100px) and (max-height: 550px) and (orientation: landscape) and (any-pointer: coarse) {
+  .studio-appointments-page > .studio-feature-header {
+    display: grid !important; grid-template-columns: auto minmax(0, 1fr); align-items: center;
+  }
+  .studio-booking-filter-row { grid-column: 1 / -1; flex-wrap: nowrap; }
+  .studio-booking-filter-row .studio-scroll-tabs { flex: 1; width: auto; padding-bottom: 0; }
+  .studio-clients-page > .studio-feature-header { flex-direction: row !important; align-items: center !important; }
+  .studio-clients-page > .studio-feature-header > div:last-child { flex: 1; max-width: none !important; }
+  .studio-home-four-col { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+}
+
+@media (min-width: 740px) and (max-width: 1100px) and (max-height: 550px) and (orientation: landscape) and (any-pointer: coarse) {
+  /* One navigation row recovers the height previously used by the bottom bar. */
+  .studio-dashboard-shell {
+    display: grid !important;
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-areas: 'header navigation' 'content content';
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .studio-mobile-header { grid-area: header; padding-right: 8px; gap: 12px; }
+  .studio-mobile-header > a > span:last-child { display: none; }
+  .studio-mobile-nav {
+    grid-area: navigation; align-items: center;
+    border-top: 0; border-bottom: 1px solid var(--border);
+    padding: max(4px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) 4px 0;
+  }
+  .studio-mobile-nav > a, .studio-mobile-nav > button { gap: 5px; font-size: 11px; flex-wrap: wrap; }
+  .studio-mobile-nav > a > span { overflow-wrap: anywhere; }
+  .studio-dashboard-body { grid-area: content; }
+  .studio-booking-row { grid-template-columns: 44px minmax(0, 1fr) auto; }
+  .studio-booking-status { grid-column: 3; flex-direction: column !important; align-items: flex-end !important; }
+  .studio-client-row { grid-template-columns: 36px minmax(0, 1fr) auto; }
+  .studio-client-stats { grid-column: 3; flex-direction: column !important; align-items: flex-end !important; }
+}
+
+.studio-calendar-toolbar { display: none; }
+@media (max-width: 1100px) and (max-height: 550px) and (orientation: landscape) and (any-pointer: coarse) {
+  /* The schedule gets one 48px control row, rather than stacked app/view bars. */
+  .studio-dashboard-shell:has(.studio-schedule-page) {
+    display: flex !important;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .studio-dashboard-shell:has(.studio-schedule-page) > .studio-mobile-header,
+  .studio-dashboard-shell:has(.studio-schedule-page) > .studio-mobile-nav,
+  .studio-schedule-page > .studio-feature-header,
+  .studio-schedule-page .studio-schedule-filter { display: none !important; }
+  .studio-calendar-toolbar {
+    display: flex; align-items: center; gap: 4px; flex-shrink: 0;
+    padding: 2px 8px; border-bottom: 1px solid var(--border); background: var(--bg-sidebar);
+  }
+  .studio-calendar-toolbar button, .studio-calendar-toolbar select {
+    height: 44px; min-width: 44px; flex-shrink: 0; border: 1px solid var(--border);
+    border-radius: 7px; background: var(--bg-input); color: var(--text); padding: 0 8px;
+  }
+  .studio-calendar-toolbar select { width: 140px; font-size: 16px !important; }
+  .studio-calendar-toolbar-date { flex: 1; min-width: 0; text-align: center; font-size: 13px; font-weight: 600; }
+  .studio-calendar-toolbar .studio-calendar-add { background: var(--accent); color: var(--accent-contrast); font-size: 24px; }
+  .studio-schedule-page .studio-calendar-column-heading { height: 28px !important; padding-inline: 8px !important; }
+  .studio-calendar-column-heading img, .studio-calendar-column-heading > div { width: 20px !important; height: 20px !important; }
+}
+
+.studio-home-landscape-control { display: none; }
+@media (max-width: 1100px) and (max-height: 550px) and (orientation: landscape) and (any-pointer: coarse) {
+  .studio-dashboard-shell:has(.studio-home-page) {
+    display: flex !important;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .studio-dashboard-shell:has(.studio-home-page) > .studio-mobile-header,
+  .studio-dashboard-shell:has(.studio-home-page) > .studio-mobile-nav { display: none !important; }
+  .studio-home-header { padding: 2px 8px !important; gap: 8px !important; flex-shrink: 0; }
+  .studio-home-header > div:first-of-type { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 8px; }
+  .studio-home-header h1 { font-size: 16px; margin: 0; }
+  .studio-home-header p { font-size: 12px; }
+  .studio-home-landscape-control {
+    display: block; height: 44px; min-width: 44px; flex-shrink: 0;
+    border: 1px solid var(--border); border-radius: 7px; background: var(--bg-input); color: var(--text);
+  }
+  .studio-home-add { background: var(--accent); color: var(--accent-contrast); font-size: 24px; }
+  .studio-home-quick-actions { gap: 4px !important; flex-wrap: nowrap !important; }
+  .studio-home-quick-actions button { height: 44px; padding: 0 8px !important; border-radius: 7px !important; gap: 5px !important; }
+  .studio-home-quick-actions button > span:first-child { width: 24px !important; height: 24px !important; }
+  .studio-home-quick-actions button > span:last-child { font-size: 12px; }
+  .studio-home-body { padding: 8px 12px 16px !important; gap: 12px !important; }
+  .studio-attention-card { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+  .studio-attention-group:has([aria-expanded="true"]) { grid-column: 1 / -1; }
+  .studio-attention-row { padding: 8px 10px !important; gap: 8px !important; min-height: 60px; }
+  .studio-attention-row > div > span:first-child { flex-wrap: wrap; gap: 5px !important; }
+  .studio-attention-row > div > span:first-child > span { font-size: 13px !important; }
+  .studio-attention-row > div > span:last-child { font-size: 12px !important; }
+}
+@media (max-width: 739px) and (max-height: 550px) and (orientation: landscape) and (any-pointer: coarse) {
+  .studio-home-quick-actions button > span:last-child { display: none; }
+  .studio-home-header > div:first-of-type { flex-direction: column; gap: 0; }
+}
+
+/* ── Second pass: denser landscape dashboard, tighter portrait schedule/dashboard ── */
+@media (max-width: 1100px) and (max-height: 550px) and (orientation: landscape) and (any-pointer: coarse) {
+  .studio-home-body {
+    padding: 10px max(16px, env(safe-area-inset-right)) 16px max(16px, env(safe-area-inset-left)) !important;
+    gap: 14px !important;
+  }
+  .studio-home-body > div { gap: 8px !important; }
+  .studio-home-two-col { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 8px !important; }
+}
+@media (min-width: 600px) and (max-width: 1100px) and (max-height: 550px) and (orientation: landscape) and (any-pointer: coarse) {
+  .studio-home-four-col { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; gap: 8px !important; }
+}
+@media (max-width: 760px) and (orientation: portrait) {
+  /* Quick actions share one row instead of stacking full-width pills. */
+  .studio-home-quick-actions { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px !important; width: 100%; }
+  .studio-home-quick-actions > button {
+    min-width: 0; justify-content: flex-start; gap: 8px !important;
+    padding-right: 10px !important; font-size: 13px !important; line-height: 1.2; white-space: normal !important; text-align: left;
+  }
+  .studio-home-four-col { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 8px !important; }
+  /* The bottom navigation already names the page, so give the calendar the space. */
+  .studio-schedule-page > .studio-feature-header { padding: 10px 16px !important; gap: 8px !important; }
+  .studio-schedule-toggles h1 { display: none; }
+  .studio-schedule-filter { padding: 6px 16px !important; }
+}

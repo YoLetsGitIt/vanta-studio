@@ -135,6 +135,13 @@ function DashboardShell({ children }) {
   const [appointmentType, setAppointmentType] = useState('walkin');
   const [tourStep, setTourStep] = useState(null);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [fullNavigation, setFullNavigation] = useState(false);
+
+  useEffect(() => {
+    const openNavigation = () => { setFullNavigation(true); setMoreOpen(true); };
+    window.addEventListener('vanta:open-navigation', openNavigation);
+    return () => window.removeEventListener('vanta:open-navigation', openNavigation);
+  }, []);
 
   useEffect(() => { setMoreOpen(false); }, [pathname]);
   useEffect(() => {
@@ -321,7 +328,7 @@ function DashboardShell({ children }) {
             <Icon size={20} /><span>{t(tKey)}</span>
           </Link>
         ))}
-        <button type="button" aria-haspopup="dialog" aria-expanded={moreOpen} className={MORE_NAV.some(item => pathname.startsWith(item.href)) || pathname.startsWith('/dashboard/import') ? 'is-active' : ''} onClick={() => setMoreOpen(true)}>
+        <button type="button" aria-haspopup="dialog" aria-expanded={moreOpen} className={MORE_NAV.some(item => pathname.startsWith(item.href)) || pathname.startsWith('/dashboard/import') ? 'is-active' : ''} onClick={() => { setFullNavigation(false); setMoreOpen(true); }}>
           <span aria-hidden="true" className="studio-more-icon">•••</span><span>{t('nav_more')}</span>
         </button>
       </nav>
@@ -329,7 +336,7 @@ function DashboardShell({ children }) {
         <Dialog title={t('nav_more')} onClose={() => setMoreOpen(false)} footer={<button type="button" className="studio-button studio-button--secondary" onClick={() => setMoreOpen(false)}>{t('close')}</button>}>
           <p className="studio-mobile-studio-name">{displayName}</p>
           <nav className="studio-mobile-menu" aria-label="More studio navigation">
-            {MORE_NAV.map(({ href, tKey, icon: Icon }) => (
+            {(fullNavigation ? [...NAV, MORE_NAV.find(item => item.href === '/dashboard/settings')] : MORE_NAV).map(({ href, tKey, icon: Icon }) => (
               <Link key={href} href={href} onClick={() => setMoreOpen(false)} aria-current={pathname.startsWith(href) ? 'page' : undefined}><Icon size={20} />{t(tKey)}</Link>
             ))}
           </nav>

@@ -377,10 +377,12 @@ export default function HomePage() {
   const dateLabel = new Date().toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long' });
 
   return (
-    <div style={s.page} className={styles.page}>
-      <header className={styles.header}>
+    <div style={s.page} className={`${styles.page} studio-home-page`}>
+      <header className={`${styles.header} studio-home-header`}>
+        <button className="studio-home-landscape-control" type="button" aria-label="Open studio navigation" onClick={() => window.dispatchEvent(new Event('vanta:open-navigation'))}>☰</button>
         <div><h1 className={styles.title}>Today</h1><p className={styles.date}>{dateLabel}</p></div>
         {!loading && !loadError && !isEmptyDashboard && <DashboardQuickActions artists={artists} />}
+        <button className="studio-home-landscape-control studio-home-add" type="button" aria-label="New Appointment" onClick={() => window.dispatchEvent(new Event('vanta:open-new-appointment'))}>+</button>
       </header>
 
       <div style={s.body} className="studio-home-body">
@@ -419,7 +421,7 @@ export default function HomePage() {
               <span style={s.attentionHeaderMeta}><b style={s.attentionCount}>{attentionCount}</b>{attentionOpen ? 'Hide' : 'Show'} <span style={{ transform: attentionOpen ? 'rotate(180deg)' : 'none', display: 'inline-block' }}>⌄</span></span>
             </button>
             {attentionOpen && (
-            <div style={s.attentionCard}>
+            <div style={s.attentionCard} className="studio-attention-card">
               {pendingCount > 0 && (
                 <AttentionGroup title="Pending bookings" tone="warning" icon="calendar" count={pendingCount} subtitle="Awaiting your approval" open={!!openAttentionGroups.pending} onToggle={() => toggleAttentionGroup('pending')}>
                   {pendingBookings.map(booking => (
@@ -724,8 +726,8 @@ function bookingSubtitle(booking) {
 
 function AttentionGroup({ title, tone = 'info', icon, count, subtitle, open, onToggle, children }) {
   return (
-    <div style={s.attentionGroup}>
-      <button type="button" style={s.attentionRow} onClick={onToggle} aria-expanded={open}>
+    <div style={s.attentionGroup} className="studio-attention-group">
+      <button type="button" style={s.attentionRow} className="studio-attention-row" onClick={onToggle} aria-expanded={open}>
         <AttentionIcon name={icon} tone={tone} />
         <div style={s.attentionBody}>
           <span style={s.attentionGroupTitleRow}><span style={s.attentionTitle}>{title}</span><strong style={s.groupCount(tone)}>{count}</strong></span>

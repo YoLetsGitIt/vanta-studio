@@ -27,6 +27,7 @@ async function setup(context) {
     let json = { hours: [], stations: [], templates: [], fields: {}, connected: false, notes: [], submissions: [], consents: {}, payouts: [], reimbursements: [] };
     if (path === '/studio/me') json = { status: 'approved', studio_id: 'test-studio', studio: { name: 'Northside Tattoo Studio', timezone: 'Australia/Melbourne', subscription_status: 'active', payment_recording_requirement: 'studio_only' } };
     else if (path === '/studio/me/artists') json = { artists: url.searchParams.get('status') === 'approved' ? artists : [] };
+    else if (path === '/studio/me/dashboard-attention') json = { bookings: [{ ...booking, id: 'pending-1', status: 'pending' }, { ...booking, id: 'confirmation-1', status: 'requires_confirmation' }], pending_artists: [], pending_reimbursements: [] };
     else if (path === '/studio/me/schedule') json = { entries };
     else if (path === '/studio/me/clients') json = { clients: [client] };
     else if (path === '/studio/me/clients/client-1') json = { client, bookings: [booking] };
@@ -38,6 +39,14 @@ async function setup(context) {
     else if (path === '/studio/me/revenue') json = { summary: { gross_sales: 12345, completed_sessions: 12 }, weekly: [{ week_start: date, gross_sales: 12345, session_count: 12 }], by_artist: [{ artist_id: 'artist-0', artist_name: artists[0].name, session_count: 12, gross_sales: 12345 }] };
     await route.fulfill({ json });
   });
+}
+
+async function closeAppointment(page) {
+  await page.getByRole('button', { name: 'Close new appointment' }).click();
+  await page.waitForFunction(() => document.querySelector('.studio-appointment-panel')?.getAttribute('aria-hidden') === 'true' || document.querySelector('dialog[open][role="alertdialog"]'));
+  const discard = page.getByRole('button', { name: 'Discard appointment', exact: true });
+  if (await discard.isVisible()) await discard.click();
+  await page.getByRole('dialog', { name: 'New Appointment', exact: true }).waitFor({ state: 'hidden' });
 }
 
 const layoutErrors = [];
@@ -69,7 +78,7 @@ async function contained(page, label) {
     for (const { width, height } of [
       { width: 320, height: 844 }, { width: 390, height: 844 },
       { width: 568, height: 320 }, { width: 667, height: 375 },
-      { width: 844, height: 390 }, { width: 932, height: 430 },
+      { width: 740, height: 360 }, { width: 844, height: 390 }, { width: 932, height: 430 },
       { width: 760, height: 844 }, { width: 1280, height: 844 },
     ]) {
       const mobile = width <= 760 || (width <= 1100 && height <= 550 && width > height);
@@ -78,8 +87,25 @@ async function contained(page, label) {
         await page.goto(`${base}/dashboard/${route}.html`, { waitUntil: 'networkidle' });
         await page.locator('.studio-dashboard-main').waitFor();
         await contained(page, `${route} at ${width}`);
-        assert.equal(await page.locator('.studio-mobile-nav').isVisible(), mobile);
+        assert.equal(await page.locator('.studio-mobile-nav').isVisible(), mobile && !(['home', 'schedule'].includes(route) && width > height));
         assert.equal(await page.locator('.studio-dashboard-sidebar').isVisible(), !mobile);
+        if (route === 'home' && mobile && width > height) {
+          await page.getByRole('button', { name: /Pending bookings/ }).waitFor();
+          await page.getByRole('button', { name: /Pending bookings/ }).click();
+          assert.equal(await page.getByRole('button', { name: /Pending bookings/ }).getAttribute('aria-expanded'), 'true');
+          await contained(page, `expanded attention at ${width}`);
+          await page.getByRole('button', { name: /Pending bookings/ }).click();
+          const header = await page.locator('.studio-home-header').boundingBox();
+          assert.ok(header.height <= 56, `Dashboard header too tall: ${header.height}`);
+          const moneyColumns = await page.locator('.studio-home-four-col').evaluate(el => getComputedStyle(el).gridTemplateColumns.split(' ').length);
+          assert.equal(moneyColumns, width >= 600 ? 4 : 2, `Money cards at ${width}px`);
+          await page.getByRole('button', { name: 'Open studio navigation' }).click();
+          await page.getByRole('dialog', { name: 'More', exact: true }).waitFor();
+          await page.keyboard.press('Escape');
+          await page.getByRole('button', { name: 'New Appointment', exact: true }).click();
+          await closeAppointment(page);
+          await page.screenshot({ path: `/private/tmp/studio-landscape-home-${width}.png` });
+        }
         if (route === 'settings') {
           for (const tab of ['studio', 'bookings', 'payments', 'account']) {
             await page.locator(`[data-tour-settings-tab="${tab}"]`).click();
@@ -87,18 +113,49 @@ async function contained(page, label) {
           }
         }
         if (route === 'schedule') {
-          assert.equal(await page.getByRole('button', { name: 'Day', exact: true }).getAttribute('aria-pressed'), mobile ? 'true' : 'false');
+          const focusedCalendar = mobile && width > height;
+          const toolbar = page.getByRole('toolbar', { name: 'Calendar controls' });
+          if (focusedCalendar) {
+            assert.equal(await toolbar.getByLabel('Calendar view').inputValue(), 'day:artist');
+            await toolbar.getByRole('button', { name: 'Open studio navigation' }).click();
+            const navigation = page.getByRole('dialog', { name: 'More', exact: true });
+            for (const name of ['Dashboard', 'Schedule', 'Bookings', 'Clients', 'Settings']) await navigation.getByRole('link', { name, exact: true }).waitFor();
+            await page.keyboard.press('Escape');
+            await toolbar.getByRole('button', { name: 'New Appointment', exact: true }).click();
+            await page.getByRole('dialog', { name: 'New Appointment', exact: true }).waitFor();
+            await closeAppointment(page);
+            const currentDate = await page.locator('.studio-calendar-toolbar-date').innerText();
+            await toolbar.getByRole('button', { name: 'Previous day', exact: true }).click();
+            assert.notEqual(await page.locator('.studio-calendar-toolbar-date').innerText(), currentDate);
+            await toolbar.getByRole('button', { name: 'Today', exact: true }).click();
+            assert.equal(await page.locator('.studio-calendar-toolbar-date').innerText(), currentDate);
+            await toolbar.getByLabel('Calendar view').selectOption('day:artist:all');
+            await toolbar.getByLabel('Calendar view').selectOption('day:station');
+            await page.locator('.studio-calendar-column-heading').filter({ hasText: 'Station 1' }).waitFor();
+            await toolbar.getByLabel('Calendar view').selectOption('day:artist');
+          } else assert.equal(await page.getByRole('button', { name: 'Day', exact: true }).getAttribute('aria-pressed'), mobile ? 'true' : 'false');
           if (mobile) {
             const calendar = page.locator('.studio-calendar-scroll');
             await calendar.waitFor();
             const bounds = await calendar.boundingBox();
             assert.ok(bounds.height >= 64, `Day calendar has usable height at ${width}x${height}: ${bounds.height}`);
-            const bottomNav = await page.locator('.studio-mobile-nav').boundingBox();
-            assert.ok(bounds.y + bounds.height <= bottomNav.y + 1, 'Calendar stays above navigation');
+            const main = await page.locator('.studio-dashboard-main').boundingBox();
+            assert.ok(bounds.y >= main.y - 1 && bounds.y + bounds.height <= main.y + main.height + 1, 'Calendar stays inside content viewport');
+            if (focusedCalendar) {
+              const heading = await page.locator('.studio-calendar-column-heading').first().boundingBox();
+              assert.ok(bounds.height - heading.height >= height * 0.75, `Time grid occupies at least 75% of landscape height: ${bounds.height - heading.height}/${height}`);
+            } else {
+              const nav = await page.locator('.studio-mobile-nav').boundingBox();
+              assert.ok(bounds.y + bounds.height <= nav.y + 1, 'Calendar stays above bottom navigation');
+            }
           }
           if (height < width && mobile) await page.screenshot({ path: `/private/tmp/studio-landscape-schedule-${width}.png` });
-          await page.getByRole('button', { name: 'Month', exact: true }).click();
+          if (focusedCalendar) await toolbar.getByLabel('Calendar view').selectOption('month:artist');
+          else await page.getByRole('button', { name: 'Month', exact: true }).click();
           await contained(page, `month at ${width}`);
+        }
+        if (height < width && mobile && ['appointments', 'clients', 'home'].includes(route)) {
+          await page.screenshot({ path: `/private/tmp/studio-landscape-${route}-${width}.png` });
         }
         if (route === 'appointments') {
           await page.locator('.studio-booking-row').first().click();
@@ -152,7 +209,7 @@ async function contained(page, label) {
       const submitBounds = await submit.boundingBox();
       assert.ok(submitBounds.y >= 0 && submitBounds.y + submitBounds.height <= size.height + 1, 'Submit stays reachable in short viewports');
     }
-    await page.getByRole('button', { name: 'Close new appointment' }).click();
+    await closeAppointment(page);
     assert.deepEqual(errors, [], 'Browser runtime errors');
     assert.deepEqual(layoutErrors, [], 'Layout containment errors');
     console.log('Mobile navigation, detail panels and appointment form checks passed.');
