@@ -337,6 +337,7 @@ function WalkInInner() {
   return (
     <div style={s.card}>
       <div style={s.studioHeader}>
+        {studio.logo_url && <img src={studio.logo_url} alt={`${studio.name} logo`} style={{ maxHeight: 64, maxWidth: 220, objectFit: 'contain', alignSelf: 'flex-start', marginBottom: '0.5rem' }} />}
         <span style={s.studioLabel}>Studio booking</span>
         <h1 style={s.studioName}>{studio.name}</h1>
       </div>

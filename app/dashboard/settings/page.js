@@ -2,6 +2,7 @@
 
 import Dialog from '@/components/ui/Dialog';
 import { WidgetPreview, ConsentFormPreview } from '@/components/forms/FormPreviews';
+import StudioLogoUpload from '@/components/StudioLogoUpload';
 import SmartSchedulingSettings from '@/components/SmartSchedulingSettings';
 import SMSSettings from '@/components/SMSSettings';
 
@@ -209,6 +210,7 @@ export default function SettingsPage() {
   const [email, setEmail] = useState('');
   const [aftercareInstructions, setAftercareInstructions] = useState('');
   const [widgetBgColor, setWidgetBgColor] = useState('#111111');
+  const [logoUrl, setLogoUrl] = useState('');
   const [widgetAccentColor, setWidgetAccentColor] = useState('#d5d0c7');
   const [schedulingMode, setSchedulingMode] = useState('all');
   const [timezone, setTimezone] = useState('Australia/Sydney');
@@ -320,6 +322,7 @@ export default function SettingsPage() {
         setStations(stationsData.stations ?? []);
         setConsentTemplates(templateData.templates ?? []);
         setWidgetConsentTemplateId(account.studio?.widget_consent_template_id ?? '');
+        setLogoUrl(account.studio?.logo_url ?? '');
         setStripeStatus(stripeData ?? { connected: false, charges_enabled: false });
         setFormFields(formConfigData?.fields ?? {});
         setSubscriptionStatus(account.studio?.subscription_status ?? '');
@@ -1294,6 +1297,12 @@ export default function SettingsPage() {
         </section>
 
         <section style={s.card}>
+          <h2 style={s.sectionTitle}>Studio logo</h2>
+          <p style={s.sectionDesc}>Shown at the top of your booking and consent forms.</p>
+          <StudioLogoUpload logoUrl={logoUrl} studioName={name} onChange={setLogoUrl} />
+        </section>
+
+        <section style={s.card}>
           <h2 style={s.sectionTitle}>{t('booking_link')}</h2>
           <p style={s.sectionDesc}>Share this link or QR code so clients can submit booking requests.</p>
           <div className="studio-wrap-row" style={s.walkInCard}>
@@ -1446,7 +1455,7 @@ export default function SettingsPage() {
               </div>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <WidgetPreview bg={widgetBgColor} accent={widgetAccentColor} studioName={name || 'Your Studio'} fields={formFields} consentTemplate={widgetConsentTemplateId ? consentTemplates.find(t => t.id === widgetConsentTemplateId) : null} />
+              <WidgetPreview bg={widgetBgColor} accent={widgetAccentColor} logoUrl={logoUrl} studioName={name || 'Your Studio'} fields={formFields} consentTemplate={widgetConsentTemplateId ? consentTemplates.find(t => t.id === widgetConsentTemplateId) : null} />
             </div>
           </div>
         </section>

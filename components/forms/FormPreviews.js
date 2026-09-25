@@ -24,7 +24,7 @@ function hexToRgbaStr(hex, alpha) {
   return `rgba(${r},${g},${b},${alpha})`;
 }
 
-export function WidgetPreview({ bg, accent, studioName, fields, consentTemplate }) {
+export function WidgetPreview({ bg, accent, studioName, logoUrl, fields, consentTemplate }) {
   const light = isLightColor(accent);
   const inp = { height: 38, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8 };
   const lbl = { fontSize: '0.65rem', fontWeight: 600, color: 'rgba(255,255,255,0.4)', marginBottom: 4, display: 'block' };
@@ -38,6 +38,7 @@ export function WidgetPreview({ bg, accent, studioName, fields, consentTemplate 
 
         {/* Header */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4, paddingBottom: '1rem', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+          {logoUrl && <img src={logoUrl} alt="" style={{ maxHeight: 44, maxWidth: 160, objectFit: 'contain', alignSelf: 'flex-start', marginBottom: 6 }} />}
           <span style={{ fontSize: '0.62rem', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)' }}>Studio booking</span>
           <span style={{ fontSize: '1.2rem', fontWeight: 700, color: '#fff', letterSpacing: '-0.02em' }}>{studioName}</span>
         </div>

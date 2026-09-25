@@ -106,7 +106,7 @@ function ConsentForm() {
   useEffect(() => {
     if (!studioId) { setLoadErr('This consent link is missing its studio.'); return; }
     Promise.all([getStudioPublic(studioId), getStudioConsentTemplates(studioId, true)])
-      .then(([studio, tpl]) => setInfo({ studio_id: studioId, studio_name: studio.name, templates: tpl.templates ?? [] }))
+      .then(([studio, tpl]) => setInfo({ studio_id: studioId, studio_name: studio.name, logo_url: studio.logo_url ?? '', templates: tpl.templates ?? [] }))
       .catch(() => setLoadErr('This consent link is invalid.'));
   }, [studioId]);
 
@@ -220,7 +220,7 @@ function ConsentForm() {
   }
 
   if (!session) {
-    return <AuthGate studioName={info.studio_name} />;
+    return <AuthGate studioName={info.studio_name} logoUrl={info.logo_url} />;
   }
 
   if (done) {
@@ -245,6 +245,7 @@ function ConsentForm() {
 
   return (
     <div style={{ width: '100%', maxWidth: 540 }}>
+      {info.logo_url && <img src={info.logo_url} alt={`${info.studio_name} logo`} style={{ maxHeight: 56, maxWidth: 200, objectFit: 'contain', display: 'block', marginBottom: '0.6rem' }} />}
       <p style={{ ...s.studioTag, marginBottom: '0.75rem' }}>{info.studio_name}</p>
 
       <form onSubmit={handleSubmit} style={s.form}>
@@ -377,7 +378,7 @@ function ConsentForm() {
   );
 }
 
-function AuthGate({ studioName }) {
+function AuthGate({ studioName, logoUrl }) {
   const [mode, setMode]       = useState('signup');
   const [email, setEmail]     = useState('');
   const [password, setPassword] = useState('');
@@ -417,6 +418,7 @@ function AuthGate({ studioName }) {
 
   return (
     <div style={s.card}>
+      {logoUrl && <img src={logoUrl} alt={`${studioName} logo`} style={{ maxHeight: 56, maxWidth: 200, objectFit: 'contain', alignSelf: 'flex-start' }} />}
       <p style={s.studioTag}>{studioName}</p>
       <h2 style={s.heading}>{mode === 'signup' ? 'Create an account' : 'Sign in'}</h2>
       <p style={s.muted}>
