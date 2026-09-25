@@ -240,7 +240,7 @@ function ConsentForm() {
   const needsDetails = missingName || missingDob || missingPhone;
 
   return (
-    <div style={{ width: '100%' }}>
+    <div style={{ width: '100%', maxWidth: 540 }}>
       <p style={{ ...s.studioTag, marginBottom: '0.75rem' }}>{info.studio_name}</p>
 
       <form onSubmit={handleSubmit} style={s.form}>
