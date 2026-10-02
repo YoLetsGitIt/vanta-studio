@@ -2,12 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import Button from '@/components/ui/Button';
-import Field, { Input, Textarea } from '@/components/ui/Field';
+import Field, { Input, Textarea, Select } from '@/components/ui/Field';
 import {
   saveMarketingSettings, getMarketingDomain, addMarketingDomain, verifyMarketingDomain, removeMarketingDomain,
 } from '@/lib/api';
 import { requestConfirmation, showError, showFeedback } from '@/lib/feedback';
 import styles from './marketing.module.css';
+import MailboxConnections from './MailboxConnections';
 
 function statusBadge(status) {
   if (status === 'verified') return <span className={`${styles.pill} ${styles.pillOn}`}>Verified</span>;
@@ -15,24 +16,26 @@ function statusBadge(status) {
   return <span className={`${styles.pill} ${styles.pillBusy}`}>Waiting for DNS</span>;
 }
 
-export default function SenderSettings({ settings, available, onSaved }) {
+export default function SenderSettings({ settings, available, domainAvailable = available, onSaved, onReload }) {
   const [form, setForm] = useState(settings);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [domainInput, setDomainInput] = useState('');
   const [domain, setDomain] = useState(null);
   const [busy, setBusy] = useState('');
+  const [connections, setConnections] = useState([]);
+  const mailbox = ['gmail', 'outlook'].includes(form.sender_provider);
   const dirty = JSON.stringify(form) !== JSON.stringify(settings);
   const set = patch => setForm(prev => ({ ...prev, ...patch }));
 
   useEffect(() => { setForm(settings); }, [settings]);
 
   useEffect(() => {
-    if (!settings.domain || !available) return;
+    if (!settings.domain || !domainAvailable) return;
     let active = true;
-    getMarketingDomain().then(d => { if (active) setDomain(d); }).catch(() => {});
+    getMarketingDomain().then(d => { if (active) { setDomain(d); if (d.status !== settings.domain_status) onReload?.(); } }).catch(() => {});
     return () => { active = false; };
-  }, [settings.domain, available]);
+  }, [settings.domain, domainAvailable]);
 
   async function save() {
     setSaving(true); setError('');
@@ -71,19 +74,26 @@ export default function SenderSettings({ settings, available, onSaved }) {
   const verified = settings.domain_status === 'verified';
   return (
     <>
+      <MailboxConnections onChanged={onReload} onConnections={setConnections} />
       <section className={styles.card} aria-labelledby="sender-id">
         <div>
           <h2 className={styles.cardTitle} id="sender-id">Who emails come from</h2>
-          <p className={styles.desc}>Verify your studio domain below to send from your own email address. Replies go to the reply-to address.</p>
+          <p className={styles.desc}>Choose a connected mailbox or send through your studio’s verified domain. Save your sending method before sending.</p>
         </div>
+        <Field label="Sending method"><Select value={form.sender_provider || 'resend'} onChange={e => set({ sender_provider: e.target.value })}>
+          <option value="resend">Studio domain or Vanta sender</option>
+          {connections.map(c => <option key={c.provider} value={c.provider}>{c.provider === 'gmail' ? 'Gmail' : 'Outlook'} · {c.email}</option>)}
+          {mailbox && !connections.some(c => c.provider === form.sender_provider) && <option value={form.sender_provider}>{form.sender_provider === 'gmail' ? 'Gmail' : 'Outlook'} · reconnect required</option>}
+        </Select></Field>
+        {mailbox && <p className={styles.hint}>Emails send from {connections.find(c => c.provider === form.sender_provider)?.email || 'the connected account once reconnected'}.</p>}
         <div className={styles.row}>
           <Field label="Sender name" hint="Defaults to your studio name."><Input value={form.from_name} maxLength={100} onChange={e => set({ from_name: e.target.value })} /></Field>
-          <Field label="Reply-to email" required hint="Where client replies land."><Input type="email" value={form.reply_to} onChange={e => set({ reply_to: e.target.value })} /></Field>
+          <Field label="Reply-to email" required={!mailbox} hint={mailbox ? "Optional. Replies go to your connected account when left blank." : "Where client replies land."}><Input type="email" value={form.reply_to} onChange={e => set({ reply_to: e.target.value })} /></Field>
         </div>
         <Field label="Postal address for the email footer" hint="Shown at the bottom of every email. Recommended.">
           <Textarea rows={2} value={form.footer_address} maxLength={300} onChange={e => set({ footer_address: e.target.value })} />
         </Field>
-        {verified && (
+        {verified && !mailbox && (
           <Field label="Email address prefix" hint={`Emails send from ${form.from_local || 'hello'}@${settings.domain}.`}>
             <Input value={form.from_local} placeholder="hello" maxLength={40} onChange={e => set({ from_local: e.target.value })} />
           </Field>
@@ -95,14 +105,14 @@ export default function SenderSettings({ settings, available, onSaved }) {
       <details className={styles.details} open>
         <summary><span>Send from your studio email {settings.domain && statusBadge(settings.domain_status)}</span></summary>
         <div className={styles.detailsBody}>
-        <p className={styles.desc}>With a verified domain, emails send from {form.from_local || 'hello'}@{settings.domain || 'yourstudio.com'}. Add the DNS records at your domain provider to verify ownership. Without verification, emails use your studio name via Vanta, with replies sent to you. Personal Gmail and Outlook addresses can be used for replies; sending directly from those accounts would require a mailbox connection.</p>
+        <p className={styles.desc}>With a verified domain, emails send from {form.from_local || 'hello'}@{settings.domain || 'yourstudio.com'}. Add the DNS records at your domain provider to verify ownership. Without verification, emails use your studio name via Vanta, with replies sent to you. To send directly from Gmail or Outlook, connect your account above and choose it as your sending method.</p>
         {!settings.domain ? (
           <div className={styles.row}>
             <Field label="Your domain" hint="For example yourstudio.com">
-              <Input value={domainInput} placeholder="yourstudio.com" onChange={e => setDomainInput(e.target.value)} disabled={!available} />
+              <Input value={domainInput} placeholder="yourstudio.com" onChange={e => setDomainInput(e.target.value)} disabled={!domainAvailable} />
             </Field>
             <div style={{ alignSelf: 'end' }}>
-              <Button onClick={addDomain} loading={busy === 'add'} disabled={!available || !domainInput.trim()}>Add domain</Button>
+              <Button onClick={addDomain} loading={busy === 'add'} disabled={!domainAvailable || !domainInput.trim()}>Add domain</Button>
             </div>
           </div>
         ) : <>
@@ -127,7 +137,7 @@ export default function SenderSettings({ settings, available, onSaved }) {
             <Button variant="ghost" onClick={remove} loading={busy === 'remove'}>Remove domain</Button>
           </div>
         </>}
-        {!available && <p className={styles.hint}>Sending isn’t switched on yet.</p>}
+        {!domainAvailable && <p className={styles.hint}>Domain sending is not available yet.</p>}
         </div>
       </details>
     </>

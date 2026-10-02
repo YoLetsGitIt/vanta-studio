@@ -137,6 +137,7 @@ export default function Campaigns({ available, ready, onSent, onNeedSetup }) {
 
       <section className={styles.card} aria-labelledby="campaign-history">
         <h2 className={styles.cardTitle} id="campaign-history">Past campaigns</h2>
+        {campaigns?.some(c => c.unknown > 0) && <p className={styles.hint}>Some send outcomes are unknown. Check your connected mailbox’s Sent folder before resending those messages.</p>}
         {campaigns === null ? <p className={styles.muted} role="status">Loading…</p>
           : campaigns.length === 0 ? <p className={styles.muted}>No campaigns yet.</p> : (
             <ul className={styles.list}>
@@ -147,8 +148,9 @@ export default function Campaigns({ available, ready, onSent, onNeedSetup }) {
                       {new Date(c.created_at).toLocaleDateString('en-AU', { dateStyle: 'medium' })} · {c.recipient_count} recipients · {c.delivered} delivered · {c.opened} opened · {c.clicked} clicked
                     </span></span>
                   <span>
+                    {c.unknown > 0 && <span className={`${styles.pill} ${styles.pillBad}`} style={{ marginRight: 6 }}>{c.unknown} need review</span>}
                     {c.failed > 0 && <span className={`${styles.pill} ${styles.pillBad}`} style={{ marginRight: 6 }}>{c.failed} failed</span>}
-                    <span className={`${styles.pill} ${c.status === 'sent' ? styles.pillOn : styles.pillBusy}`}>{c.status === 'sent' ? 'Sent' : `Sending · ${c.queued} left`}</span>
+                    <span className={`${styles.pill} ${c.status === 'sent' ? styles.pillOn : styles.pillBusy}`}>{c.status === 'sent' ? 'Sent' : c.status === 'needs_review' ? 'Check Sent mail' : c.status === 'finished_with_errors' ? 'Finished with errors' : `Sending · ${c.queued} left`}</span>
                   </span>
                 </li>
               ))}

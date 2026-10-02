@@ -33,7 +33,7 @@ export default function MarketingPage() {
     try { setData(await getMarketing()); setError(''); }
     catch (err) { setError(err.message); }
   }, []);
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { load(); if (new URLSearchParams(window.location.search).has('mailbox')) setTab('sender'); }, [load]);
 
   if (error && !data) {
     return <main className={styles.page}><StatePanel tone="error" title="Couldn’t load marketing" description={error} action={<Button onClick={load}>Try again</Button>} /></main>;
@@ -43,7 +43,7 @@ export default function MarketingPage() {
   }
 
   const { stats, settings, available, ready } = data;
-  const patchSettings = next => setData(prev => ({ ...prev, settings: next, ready: Boolean(next.reply_to || (next.domain && next.domain_status === 'verified')) }));
+  const patchSettings = () => load();
   const goSender = () => { setTab('sender'); window.scrollTo({ top: 0, behavior: 'smooth' }); };
 
   const hasClients = stats.consented_clients > 0;
@@ -93,7 +93,7 @@ export default function MarketingPage() {
       <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
         {tab === 'templates' && <Templates />}
         {tab === 'campaigns' && <Campaigns available={available} ready={ready} onSent={load} onNeedSetup={goSender} />}
-        {tab === 'sender' && <SenderSettings settings={settings} available={available} onSaved={patchSettings} />}
+        {tab === 'sender' && <SenderSettings settings={settings} available={available} domainAvailable={data.domain_available ?? available} onSaved={patchSettings} onReload={load} />}
       </div>
     </main>
   );
