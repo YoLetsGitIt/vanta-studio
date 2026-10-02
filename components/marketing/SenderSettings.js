@@ -25,6 +25,8 @@ export default function SenderSettings({ settings, available, onSaved }) {
   const dirty = JSON.stringify(form) !== JSON.stringify(settings);
   const set = patch => setForm(prev => ({ ...prev, ...patch }));
 
+  useEffect(() => { setForm(settings); }, [settings]);
+
   useEffect(() => {
     if (!settings.domain || !available) return;
     let active = true;
@@ -72,7 +74,7 @@ export default function SenderSettings({ settings, available, onSaved }) {
       <section className={styles.card} aria-labelledby="sender-id">
         <div>
           <h2 className={styles.cardTitle} id="sender-id">Who emails come from</h2>
-          <p className={styles.desc}>Emails show your studio name, and replies go to the address below.</p>
+          <p className={styles.desc}>Verify your studio domain below to send from your own email address. Replies go to the reply-to address.</p>
         </div>
         <div className={styles.row}>
           <Field label="Sender name" hint="Defaults to your studio name."><Input value={form.from_name} maxLength={100} onChange={e => set({ from_name: e.target.value })} /></Field>
@@ -82,7 +84,7 @@ export default function SenderSettings({ settings, available, onSaved }) {
           <Textarea rows={2} value={form.footer_address} maxLength={300} onChange={e => set({ footer_address: e.target.value })} />
         </Field>
         {verified && (
-          <Field label="Sending address" hint={`Emails send from ${form.from_local || 'hello'}@${settings.domain}.`}>
+          <Field label="Email address prefix" hint={`Emails send from ${form.from_local || 'hello'}@${settings.domain}.`}>
             <Input value={form.from_local} placeholder="hello" maxLength={40} onChange={e => set({ from_local: e.target.value })} />
           </Field>
         )}
@@ -90,10 +92,10 @@ export default function SenderSettings({ settings, available, onSaved }) {
         <div className={styles.actions}><Button onClick={save} loading={saving} loadingLabel="Saving…" disabled={!dirty}>Save</Button></div>
       </section>
 
-      <details className={styles.details} open={Boolean(settings.domain)}>
-        <summary><span>Advanced: send from your own domain {settings.domain && statusBadge(settings.domain_status)}</span></summary>
+      <details className={styles.details} open>
+        <summary><span>Send from your studio email {settings.domain && statusBadge(settings.domain_status)}</span></summary>
         <div className={styles.detailsBody}>
-        <p className={styles.desc}>Right now emails are sent as “{form.from_name || 'Your studio'} via Vanta”. To send from an address like hello@yourstudio.com instead, add the records below at your domain provider (where you bought the domain).</p>
+        <p className={styles.desc}>With a verified domain, emails send from {form.from_local || 'hello'}@{settings.domain || 'yourstudio.com'}. Add the DNS records at your domain provider to verify ownership. Without verification, emails use your studio name via Vanta, with replies sent to you. Personal Gmail and Outlook addresses can be used for replies; sending directly from those accounts would require a mailbox connection.</p>
         {!settings.domain ? (
           <div className={styles.row}>
             <Field label="Your domain" hint="For example yourstudio.com">

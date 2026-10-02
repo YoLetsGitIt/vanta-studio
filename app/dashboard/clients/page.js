@@ -15,6 +15,7 @@ import { useLanguage } from '@/lib/i18n';
 import { showError } from '@/lib/feedback';
 import Button from '@/components/ui/Button';
 import MarketingConsent from '@/components/MarketingConsent';
+import ClientTemplateSend from '@/components/marketing/ClientTemplateSend';
 import { Pill, Section, Fact, SkeletonBar, DetailSkeleton, detailStyles } from '@/components/ui/DetailParts';
 
 const CLIENTS_PER_PAGE = 25;
@@ -528,6 +529,10 @@ function ClientDetail({ client, marketing, onMarketingChange, clientKey, onClose
             <MarketingConsent email={client.email} clientKey={clientKey} marketing={marketing} onChange={onMarketingChange} />
           </Section>
         )}
+
+        <Section title="Send an email">
+          <ClientTemplateSend key={clientKey} clientKey={clientKey} email={client.email} marketing={marketing} />
+        </Section>
 
         <Section title={t('clients_profile')}>
           <div>
