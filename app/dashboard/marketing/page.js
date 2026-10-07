@@ -65,14 +65,16 @@ export default function MarketingPage() {
       <header className={styles.pageHead}>
         <div>
           <h1 className={styles.title}>Marketing</h1>
-          <p className={styles.subtitle}>Email clients who have agreed to hear from you. Only clients you’ve ticked are ever emailed.</p>
+          <p className={styles.subtitle}>Email clients who’ve agreed to hear from you. Nobody else is ever contacted.</p>
         </div>
-        <dl className={styles.stats} aria-label="Summary">
-          <div className={styles.stat}><dd>{stats.consented_clients}</dd><dt>Can be emailed</dt></div>
-          <div className={styles.stat}><dd>{stats.sent_this_month}</dd><dt>Sent this month</dt></div>
-          {stats.unsubscribed > 0 && <div className={styles.stat}><dd>{stats.unsubscribed}</dd><dt>Unsubscribed</dt></div>}
-          {stats.failed_this_month > 0 && <div className={`${styles.stat} ${styles.statBad}`}><dd>{stats.failed_this_month}</dd><dt>Failed this month</dt></div>}
-        </dl>
+        <ul className={styles.stats} aria-label="Summary">
+          <li><strong>{stats.consented_clients}</strong> can be emailed</li>
+          <li><strong>{stats.sent_this_month}</strong> sent this month</li>
+          {stats.unsubscribed > 0 && <li><strong>{stats.unsubscribed}</strong> unsubscribed</li>}
+          {stats.failed_this_month > 0 && (
+            <li><button type="button" className={styles.statBad} onClick={() => setTab('history')}><strong>{stats.failed_this_month}</strong> failed this month</button></li>
+          )}
+        </ul>
       </header>
 
       {!available && (
