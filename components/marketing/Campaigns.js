@@ -4,47 +4,48 @@ import { useEffect, useState } from 'react';
 import Button from '@/components/ui/Button';
 import Field, { Input, Select } from '@/components/ui/Field';
 import AudiencePicker from './AudiencePicker';
-import { listMarketingTemplates, listMarketingRecipients, listMarketingCampaigns, createMarketingCampaign } from '@/lib/api';
+import EmailPreview from './EmailPreview';
+import TestSendButton from './TestSendButton';
+import { listMarketingTemplates, listMarketingRecipients, createMarketingCampaign } from '@/lib/api';
 import { requestConfirmation, showError, showFeedback } from '@/lib/feedback';
-import PreviewDialog from './PreviewDialog';
 import styles from './marketing.module.css';
 
 function StepHead({ n, children }) {
-  return <div className={styles.stepHead}><span className={styles.stepNum} aria-hidden="true">{n}</span><h3 className={styles.cardTitle}>{children}</h3></div>;
+  return <div className={styles.stepHead}><span className={styles.stepNum} aria-hidden="true">{n}</span><h2 className={styles.cardTitle}>{children}</h2></div>;
 }
 
-export default function Campaigns({ available, ready, onSent, onNeedSetup }) {
+const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+
+/** Compose a campaign: pick clients on the left, see the email they will get on the right. */
+export default function Campaigns({ available, ready, preset, onSent, onNeedSetup, onEditTemplates }) {
   const [name, setName] = useState('');
-  const [templates, setTemplates] = useState([]);
-  const [templateId, setTemplateId] = useState('');
+  const [templates, setTemplates] = useState(null);
+  const [templateId, setTemplateId] = useState(preset?.templateId || '');
   const [clients, setClients] = useState(null);
   const [clientsError, setClientsError] = useState('');
-  const [selected, setSelected] = useState(() => new Set());
-  const template = templates.find(t => t.id === templateId);
-  const subject = template?.subject || '';
-  const body = template?.body || '';
+  const [selected, setSelected] = useState(() => new Set(preset?.clientIds || []));
   const [sending, setSending] = useState(false);
-  const [preview, setPreview] = useState(false);
-  const [campaigns, setCampaigns] = useState(null);
+  const template = templates?.find(t => t.id === templateId);
 
-  useEffect(() => { refresh(); loadClients(); listMarketingTemplates().then(data => setTemplates(data.templates)).catch(showError); }, []);
-  async function refresh() {
-    try { setCampaigns((await listMarketingCampaigns()).campaigns); } catch (err) { showError(err); }
-  }
+  useEffect(() => { loadClients(); listMarketingTemplates().then(data => setTemplates(data.templates)).catch(showError); }, []);
   // Filtering happens in the picker, so one fetch of everyone who can be emailed is enough.
   async function loadClients() {
     setClientsError('');
     try {
       const list = (await listMarketingRecipients('all')).clients;
       setClients(list);
-      setSelected(prev => new Set(list.filter(c => prev.has(c.id)).map(c => c.id)));
+      // A preset can name clients who have since unsubscribed or withdrawn consent.
+      const kept = new Set(list.filter(c => selected.has(c.id)).map(c => c.id));
+      const dropped = selected.size - kept.size;
+      if (dropped > 0) showFeedback(`${plural(dropped, 'client')} can no longer be emailed and ${dropped === 1 ? 'was' : 'were'} left out.`, 'info');
+      setSelected(kept);
     } catch (err) { setClientsError(err.message); }
   }
 
   async function send() {
     const ok = await requestConfirmation({
       title: 'Send campaign',
-      message: `Send “${subject}” to ${selected.size} client${selected.size === 1 ? '' : 's'}? This can’t be undone once emails start going out.`,
+      message: `Send “${template.subject}” to ${plural(selected.size, 'client')}? This can’t be undone once emails start going out.`,
       confirmLabel: 'Send',
     });
     if (!ok) return;
@@ -54,65 +55,59 @@ export default function Campaigns({ available, ready, onSent, onNeedSetup }) {
       showFeedback('Campaign queued. Emails go out over the next few minutes.', 'success');
       setName('');
       setSelected(new Set());
-      await refresh();
       onSent?.();
     } catch (err) { showError(err); }
     finally { setSending(false); }
   }
 
   const canSend = available && ready && template && selected.size > 0;
+  const firstClient = clients?.find(c => selected.has(c.id));
+  const blocker = !available ? 'Sending isn’t switched on yet.'
+    : !ready ? null
+      : selected.size === 0 ? 'Tick at least one client.'
+        : !template ? 'Choose a template.' : null;
 
   return (
-    <>
-      <section className={styles.card} aria-label="New campaign">
+    <div className={styles.compose}>
+      <section className={styles.card} aria-label="Choose clients">
         <StepHead n="1">Who should get it?</StepHead>
         <p className={styles.hint}>Tick the clients to email. Filters only narrow the list, so your ticks stay put while you change them. Only clients with marketing consent are listed, and unsubscribed clients are left out.</p>
         <AudiencePicker clients={clients} error={clientsError} onRetry={loadClients} selected={selected} onChange={setSelected} />
+      </section>
 
-        <StepHead n="2">Choose a saved template</StepHead>
-        <Field label="Email template"><Select value={templateId} onChange={e => setTemplateId(e.target.value)}>
-          <option value="">Choose a template</option>{templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-        </Select></Field>
-        {templates.length === 0 && <p className={styles.hint}>Create a template in the Templates tab first.</p>}
-        {template && <p className={styles.desc}><strong>Subject:</strong> {subject}</p>}
-        <Field label="Campaign name" hint="Optional. Defaults to the template name."><Input value={name} maxLength={200} onChange={e => setName(e.target.value)} /></Field>
+      <aside className={`${styles.card} ${styles.aside}`} aria-label="Email and send">
+        <StepHead n="2">What are you sending?</StepHead>
+        {templates?.length === 0 ? (
+          <p className={styles.empty}>You have no templates yet. <button type="button" className={styles.chip} onClick={onEditTemplates}>Write one</button></p>
+        ) : (
+          <Field label="Template">
+            <Select value={templateId} disabled={!templates} onChange={e => setTemplateId(e.target.value)}>
+              <option value="">{templates ? 'Choose a template' : 'Loading…'}</option>
+              {templates?.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </Select>
+          </Field>
+        )}
+        {template && <>
+          <EmailPreview subject={template.subject} body={template.body} clientName={firstClient?.name} />
+          <p className={styles.hint}>
+            {firstClient ? `Shown as ${firstClient.name} will see it.` : 'Shown with a sample name. Tick a client to see theirs.'}{' '}
+            <button type="button" className={styles.link} onClick={onEditTemplates}>Edit templates</button>
+          </p>
+          <Field label="Campaign name" hint="Only you see this. Defaults to the template name.">
+            <Input value={name} maxLength={200} placeholder={template.name} onChange={e => setName(e.target.value)} />
+          </Field>
+        </>}
 
         <StepHead n="3">Send it</StepHead>
-        {!available && <p className={styles.hint}>Sending isn’t switched on yet.</p>}
-        {available && ready && selected.size === 0 && <p className={styles.hint}>Tick at least one client in step 1.</p>}
-        {available && ready && selected.size > 0 && !template && <p className={styles.hint}>Choose a template in step 2.</p>}
         {available && !ready && (
-          <p className={styles.hint}>Add a reply-to email first. <button type="button" className={styles.chip} onClick={onNeedSetup}>Set it up</button></p>
+          <p className={styles.hint}>Set up your sending email first. <button type="button" className={styles.chip} onClick={onNeedSetup}>Set it up</button></p>
         )}
-        <div className={styles.actions}>
-          <Button onClick={send} loading={sending} loadingLabel="Sending…" disabled={!canSend}>{selected.size > 0 ? `Send to ${selected.size} client${selected.size === 1 ? '' : 's'}` : 'Send campaign'}</Button>
-          <Button variant="secondary" onClick={() => setPreview(true)} disabled={!body.trim()}>Preview</Button>
-        </div>
-      </section>
-
-      <section className={styles.card} aria-labelledby="campaign-history">
-        <h2 className={styles.cardTitle} id="campaign-history">Past campaigns</h2>
-        {campaigns?.some(c => c.unknown > 0) && <p className={styles.hint}>Some send outcomes are unknown. Check your connected mailbox’s Sent folder before resending those messages.</p>}
-        {campaigns === null ? <p className={styles.muted} role="status">Loading…</p>
-          : campaigns.length === 0 ? <p className={styles.muted}>No campaigns yet.</p> : (
-            <ul className={styles.list}>
-              {campaigns.map(c => (
-                <li key={c.id} className={styles.listRow}>
-                  <span>{c.name}
-                    <span className={styles.rowSub}>
-                      {new Date(c.created_at).toLocaleDateString('en-AU', { dateStyle: 'medium' })} · {c.recipient_count} recipients · {c.delivered} delivered · {c.opened} opened · {c.clicked} clicked
-                    </span></span>
-                  <span>
-                    {c.unknown > 0 && <span className={`${styles.pill} ${styles.pillBad}`} style={{ marginRight: 6 }}>{c.unknown} need review</span>}
-                    {c.failed > 0 && <span className={`${styles.pill} ${styles.pillBad}`} style={{ marginRight: 6 }}>{c.failed} failed</span>}
-                    <span className={`${styles.pill} ${c.status === 'sent' ? styles.pillOn : styles.pillBusy}`}>{c.status === 'sent' ? 'Sent' : c.status === 'needs_review' ? 'Check Sent mail' : c.status === 'finished_with_errors' ? 'Finished with errors' : `Sending · ${c.queued} left`}</span>
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-      </section>
-      {preview && <PreviewDialog subject={subject} body={body} onClose={() => setPreview(false)} />}
-    </>
+        {blocker && <p className={styles.hint}>{blocker}</p>}
+        <Button fullWidth onClick={send} loading={sending} loadingLabel="Sending…" disabled={!canSend}>
+          {selected.size > 0 ? `Send to ${plural(selected.size, 'client')}` : 'Send campaign'}
+        </Button>
+        <TestSendButton fullWidth available={available} ready={ready} disabled={!template} message={{ template_id: templateId }} />
+      </aside>
+    </div>
   );
 }

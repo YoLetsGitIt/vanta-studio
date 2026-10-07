@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import Button from '@/components/ui/Button';
 import Field, { Input, Select } from '@/components/ui/Field';
+import { listMarketingAudiences, saveMarketingAudience, deleteMarketingAudience } from '@/lib/api';
+import { requestConfirmation, showError, showFeedback } from '@/lib/feedback';
 import styles from './marketing.module.css';
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -60,6 +62,14 @@ function history(c) {
   return parts.join(' · ');
 }
 
+// Saved audiences come back from the server, so only known filter keys with string values are applied.
+function savedFilters(raw) {
+  const out = { ...NO_FILTERS };
+  Object.keys(NO_FILTERS).forEach(k => { if (k !== 'search' && typeof raw?.[k] === 'string') out[k] = raw[k]; });
+  delete out.search;
+  return out;
+}
+
 function DaysField({ label, value, onChange }) {
   return (
     <Field label={label} error={parseDays(value) ? undefined : 'Enter a number of days from 1 to 3650.'}>
@@ -74,6 +84,24 @@ export default function AudiencePicker({ clients, error, onRetry, selected, onCh
   const [view, setView] = useState('all');
   const [limit, setLimit] = useState(PAGE);
   const set = patch => setFilters(prev => ({ ...prev, ...patch }));
+  const [saved, setSaved] = useState([]);
+  const [naming, setNaming] = useState(null);
+  // Saved audiences are a convenience; the picker works without them.
+  useEffect(() => { listMarketingAudiences().then(data => setSaved(data.audiences)).catch(() => {}); }, []);
+
+  async function saveAudience() {
+    const { search, ...rest } = filters;
+    try {
+      const audience = await saveMarketingAudience(naming, rest);
+      setSaved(prev => [...prev, audience]);
+      setNaming(null);
+      showFeedback(`Saved “${audience.name}”.`, 'success');
+    } catch (err) { showError(err); }
+  }
+  async function removeAudience(audience) {
+    if (!await requestConfirmation({ title: 'Delete saved audience', message: `Delete “${audience.name}”? This only removes the saved filters, not any clients.`, confirmLabel: 'Delete', danger: true })) return;
+    try { await deleteMarketingAudience(audience.id); setSaved(prev => prev.filter(a => a.id !== audience.id)); } catch (err) { showError(err); }
+  }
   useEffect(() => { setLimit(PAGE); }, [filters, view]);
 
   const filtered = useMemo(() => {
@@ -95,6 +123,7 @@ export default function AudiencePicker({ clients, error, onRetry, selected, onCh
   }
 
   const filtersOn = Object.keys(NO_FILTERS).some(k => !k.endsWith('Days') && filters[k] !== NO_FILTERS[k]);
+  const filtersOnly = Object.keys(NO_FILTERS).some(k => k !== 'search' && !k.endsWith('Days') && filters[k] !== NO_FILTERS[k]);
   const presetOn = patch => Object.entries({ ...NO_FILTERS, search: filters.search, ...patch }).every(([k, v]) => k.endsWith('Days') && !(k in patch) ? true : filters[k] === v);
   const shownSelected = shown.filter(c => selected.has(c.id)).length;
   const hiddenSelected = selected.size - filtered.filter(c => selected.has(c.id)).length;
@@ -116,6 +145,21 @@ export default function AudiencePicker({ clients, error, onRetry, selected, onCh
           );
         })}
       </div>
+
+      {saved.length > 0 && (
+        <div className={styles.chips} role="group" aria-label="Saved audiences">
+          <span className={styles.hint}>Saved</span>
+          {saved.map(a => {
+            const on = presetOn(savedFilters(a.filters));
+            return (
+              <span key={a.id} className={`${styles.savedChip} ${on ? styles.chipOn : ''}`}>
+                <button type="button" aria-pressed={on} onClick={() => setFilters({ ...savedFilters(a.filters), search: filters.search })}>{a.name}</button>
+                <button type="button" aria-label={`Delete saved audience ${a.name}`} onClick={() => removeAudience(a)}>×</button>
+              </span>
+            );
+          })}
+        </div>
+      )}
 
       <div className={styles.row}>
         <Field label="Tattoos done here">
@@ -197,8 +241,16 @@ export default function AudiencePicker({ clients, error, onRetry, selected, onCh
           {selected.size} of {clients.length} selected{hiddenSelected > 0 ? ` · ${hiddenSelected} hidden by filters` : ''}
         </p>
         {filtersOn && <Button size="sm" variant="ghost" onClick={() => setFilters(NO_FILTERS)}>Clear filters</Button>}
+        {filtersOnly && naming === null && <Button size="sm" variant="ghost" onClick={() => setNaming('')}>Save these filters</Button>}
         {selected.size > 0 && <Button size="sm" variant="ghost" onClick={() => onChange(new Set())}>Clear selection</Button>}
       </div>
+      {naming !== null && (
+        <form className={styles.saveRow} onSubmit={e => { e.preventDefault(); if (naming.trim()) saveAudience(); }}>
+          <Field label="Name these filters"><Input autoFocus value={naming} maxLength={80} placeholder="For example, Lapsed regulars" onChange={e => setNaming(e.target.value)} /></Field>
+          <Button size="sm" type="submit" disabled={!naming.trim()}>Save</Button>
+          <Button size="sm" variant="ghost" onClick={() => setNaming(null)}>Cancel</Button>
+        </form>
+      )}
     </>
   );
 }

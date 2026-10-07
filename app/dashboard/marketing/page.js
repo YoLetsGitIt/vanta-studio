@@ -6,11 +6,12 @@ import StatePanel from '@/components/ui/StatePanel';
 import Button from '@/components/ui/Button';
 import Templates from '@/components/marketing/Templates';
 import Campaigns from '@/components/marketing/Campaigns';
+import History from '@/components/marketing/History';
 import SenderSettings from '@/components/marketing/SenderSettings';
 import { getMarketing } from '@/lib/api';
 import styles from '@/components/marketing/marketing.module.css';
 
-const TABS = [['templates', 'Templates'], ['campaigns', 'Send emails'], ['sender', 'Sender']];
+const TABS = [['campaigns', 'Send emails'], ['history', 'Sent'], ['templates', 'Templates'], ['sender', 'Sender']];
 
 
 function Step({ done, n, title, hint, action }) {
@@ -27,7 +28,9 @@ function Step({ done, n, title, hint, action }) {
 export default function MarketingPage() {
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
-  const [tab, setTab] = useState('templates');
+  const [tab, setTab] = useState('campaigns');
+  // Carries a template or a set of clients into the compose screen; a new object remounts it with those chosen.
+  const [preset, setPreset] = useState({ key: 0 });
 
   const load = useCallback(async () => {
     try { setData(await getMarketing()); setError(''); }
@@ -46,15 +49,30 @@ export default function MarketingPage() {
   const patchSettings = () => load();
   const goSender = () => { setTab('sender'); window.scrollTo({ top: 0, behavior: 'smooth' }); };
 
+  const compose = next => { setPreset(prev => ({ ...next, key: prev.key + 1 })); setTab('campaigns'); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+
   const hasClients = stats.consented_clients > 0;
   const inUse = stats.sent_this_month > 0;
-  const setupDone = ready && hasClients && inUse;
+  const steps = [
+    { done: ready, title: 'Set up your sending email', hint: 'So client replies reach you.', action: <Button size="sm" onClick={goSender}>Add it</Button> },
+    { done: hasClients, title: 'Choose who can be emailed', hint: 'Tick “agreed to marketing emails” on a client.', action: <Link href="/dashboard/clients" className="studio-button studio-button--secondary studio-button--sm">Go to clients</Link> },
+    { done: inUse, title: 'Save a template and send an email', action: <Button size="sm" variant="secondary" onClick={() => setTab('templates')}>Write a template</Button> },
+  ];
+  const left = steps.filter(step => !step.done);
 
   return (
     <main className={styles.page}>
-      <header>
-        <h1 className={styles.title}>Marketing</h1>
-        <p className={styles.subtitle}>Email clients who have agreed to hear from you. Only clients you’ve ticked are ever emailed.</p>
+      <header className={styles.pageHead}>
+        <div>
+          <h1 className={styles.title}>Marketing</h1>
+          <p className={styles.subtitle}>Email clients who have agreed to hear from you. Only clients you’ve ticked are ever emailed.</p>
+        </div>
+        <dl className={styles.stats} aria-label="Summary">
+          <div className={styles.stat}><dd>{stats.consented_clients}</dd><dt>Can be emailed</dt></div>
+          <div className={styles.stat}><dd>{stats.sent_this_month}</dd><dt>Sent this month</dt></div>
+          {stats.unsubscribed > 0 && <div className={styles.stat}><dd>{stats.unsubscribed}</dd><dt>Unsubscribed</dt></div>}
+          {stats.failed_this_month > 0 && <div className={`${styles.stat} ${styles.statBad}`}><dd>{stats.failed_this_month}</dd><dt>Failed this month</dt></div>}
+        </dl>
       </header>
 
       {!available && (
@@ -63,26 +81,20 @@ export default function MarketingPage() {
         </div>
       )}
 
-      {!setupDone && (
+      {left.length === 1 && (
+        <div className={`${styles.setup} ${styles.setupSlim}`} role="status">
+          <span className={styles.stepText}><strong>One step left:</strong> {left[0].title.charAt(0).toLowerCase() + left[0].title.slice(1)}.</span>
+          {left[0].action}
+        </div>
+      )}
+      {left.length > 1 && (
         <section className={styles.setup} aria-labelledby="setup-title">
           <h2 className={styles.setupTitle} id="setup-title">Get started in 3 steps</h2>
           <ol className={styles.steps}>
-            <Step n="1" done={ready} title="Set up your sending email" hint="So client replies reach you."
-              action={<Button size="sm" onClick={goSender}>Add it</Button>} />
-            <Step n="2" done={hasClients} title="Choose who can be emailed" hint="Tick “agreed to marketing emails” on a client."
-              action={<Link href="/dashboard/clients" className="studio-button studio-button--secondary studio-button--sm">Go to clients</Link>} />
-            <Step n="3" done={inUse} title="Save a template and send an email"
-              action={<Button size="sm" variant="secondary" onClick={() => setTab('campaigns')}>Send a campaign</Button>} />
+            {steps.map((step, i) => <Step key={step.title} n={i + 1} {...step} />)}
           </ol>
         </section>
       )}
-
-      <div className={styles.summary} aria-label="Summary">
-        <span className={styles.summaryItem}><span className={`${styles.dot} ${styles.dotBlue}`} />{stats.consented_clients} can be emailed</span>
-        <span className={styles.summaryItem}><span className={`${styles.dot} ${styles.dotGreen}`} />{stats.sent_this_month} sent this month</span>
-        {stats.unsubscribed > 0 && <span className={styles.summaryItem}><span className={styles.dot} />{stats.unsubscribed} unsubscribed</span>}
-        {stats.failed_this_month > 0 && <span className={styles.summaryItem}><span className={`${styles.dot} ${styles.dotRed}`} />{stats.failed_this_month} failed</span>}
-      </div>
 
       <div role="tablist" aria-label="Marketing sections" className={styles.tabs}>
         {TABS.map(([id, label]) => (
@@ -90,9 +102,10 @@ export default function MarketingPage() {
         ))}
       </div>
 
-      <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-        {tab === 'templates' && <Templates />}
-        {tab === 'campaigns' && <Campaigns available={available} ready={ready} onSent={load} onNeedSetup={goSender} />}
+      <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`} className={styles.panel}>
+        {tab === 'campaigns' && <Campaigns key={preset.key} preset={preset} available={available} ready={ready} onSent={() => { load(); setTab('history'); }} onNeedSetup={goSender} onEditTemplates={() => setTab('templates')} />}
+        {tab === 'history' && <History onCompose={() => setTab('campaigns')} onResend={clientIds => compose({ clientIds })} />}
+        {tab === 'templates' && <Templates available={available} ready={ready} onUse={templateId => compose({ templateId })} />}
         {tab === 'sender' && <SenderSettings settings={settings} available={available} domainAvailable={data.domain_available ?? available} onSaved={patchSettings} onReload={load} />}
       </div>
     </main>
