@@ -1,6 +1,1 @@
-{
-  "release": "studio-mailbox-senders-2026-10-05",
-  "commit": "89acc5f548dbee961c956388694d6b81ad0ff5fd",
-  "backend_commit": "013983f7d27d886e3ee600c791db9f6a25e858be",
-  "published_on": "2026-10-05"
-}
+{"release":"studio-send-emails-filters-2026-10-08","source":"31697d51"}
