@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Button from '@/components/ui/Button';
-import Field, { Input, Select } from '@/components/ui/Field';
+import Field, { Select } from '@/components/ui/Field';
 import AudiencePicker from './AudiencePicker';
 import EmailPreview from './EmailPreview';
 import TestSendButton from './TestSendButton';
@@ -10,15 +10,19 @@ import { listMarketingTemplates, listMarketingRecipients, createMarketingCampaig
 import { requestConfirmation, showError, showFeedback } from '@/lib/feedback';
 import styles from './marketing.module.css';
 
-function StepHead({ n, children }) {
-  return <div className={styles.stepHead}><span className={styles.stepNum} aria-hidden="true">{n}</span><h2 className={styles.cardTitle}>{children}</h2></div>;
+function StepHead({ n, done, children }) {
+  return (
+    <div className={styles.stepHead}>
+      <span className={`${styles.stepNum} ${done ? styles.stepNumDone : ''}`} aria-hidden="true">{done ? '✓' : n}</span>
+      <h2 className={styles.cardTitle}>{children}{done && <span className="sr-only"> (done)</span>}</h2>
+    </div>
+  );
 }
 
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
 /** Compose a campaign: pick clients on the left, see the email they will get on the right. */
 export default function Campaigns({ available, ready, preset, onSent, onNeedSetup, onEditTemplates }) {
-  const [name, setName] = useState('');
   const [templates, setTemplates] = useState(null);
   const [templateId, setTemplateId] = useState(preset?.templateId || '');
   const [clients, setClients] = useState(null);
@@ -51,9 +55,8 @@ export default function Campaigns({ available, ready, preset, onSent, onNeedSetu
     if (!ok) return;
     setSending(true);
     try {
-      await createMarketingCampaign({ name: name.trim() || template.name, template_id: templateId, segment: { kind: 'selected', client_ids: [...selected] } });
+      await createMarketingCampaign({ name: template.name, template_id: templateId, segment: { kind: 'selected', client_ids: [...selected] } });
       showFeedback('Campaign queued. Emails go out over the next few minutes.', 'success');
-      setName('');
       setSelected(new Set());
       onSent?.();
     } catch (err) { showError(err); }
@@ -70,13 +73,12 @@ export default function Campaigns({ available, ready, preset, onSent, onNeedSetu
   return (
     <div className={styles.compose}>
       <section className={styles.card} aria-label="Choose clients">
-        <StepHead n="1">Who should get it?</StepHead>
-        <p className={styles.hint}>Tick the clients to email. Filters only narrow the list, so your ticks stay put while you change them. Only clients with marketing consent are listed, and unsubscribed clients are left out.</p>
+        <StepHead n="1" done={selected.size > 0}>Choose clients</StepHead>
         <AudiencePicker clients={clients} error={clientsError} onRetry={loadClients} selected={selected} onChange={setSelected} />
       </section>
 
       <aside className={`${styles.card} ${styles.aside}`} aria-label="Email and send">
-        <StepHead n="2">What are you sending?</StepHead>
+        <StepHead n="2" done={Boolean(template)}>Choose the email</StepHead>
         {templates?.length === 0 ? (
           <p className={styles.empty}>You have no templates yet. <button type="button" className={styles.chip} onClick={onEditTemplates}>Write one</button></p>
         ) : (
@@ -93,12 +95,8 @@ export default function Campaigns({ available, ready, preset, onSent, onNeedSetu
             {firstClient ? `Shown as ${firstClient.name} will see it.` : 'Shown with a sample name. Tick a client to see theirs.'}{' '}
             <button type="button" className={styles.link} onClick={onEditTemplates}>Edit templates</button>
           </p>
-          <Field label="Campaign name" hint="Only you see this. Defaults to the template name.">
-            <Input value={name} maxLength={200} placeholder={template.name} onChange={e => setName(e.target.value)} />
-          </Field>
         </>}
 
-        <StepHead n="3">Send it</StepHead>
         {available && !ready && (
           <p className={styles.hint}>Set up your sending email first. <button type="button" className={styles.chip} onClick={onNeedSetup}>Set it up</button></p>
         )}
@@ -106,7 +104,7 @@ export default function Campaigns({ available, ready, preset, onSent, onNeedSetu
         <Button fullWidth onClick={send} loading={sending} loadingLabel="Sending…" disabled={!canSend}>
           {selected.size > 0 ? `Send to ${plural(selected.size, 'client')}` : 'Send campaign'}
         </Button>
-        <TestSendButton fullWidth available={available} ready={ready} disabled={!template} message={{ template_id: templateId }} />
+        {template && <TestSendButton fullWidth variant="ghost" available={available} ready={ready} message={{ template_id: templateId }} />}
       </aside>
     </div>
   );

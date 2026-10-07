@@ -13,14 +13,13 @@ const PAGE = 100;
 const NO_FILTERS = { search: '', tattoos: 'any', last: 'any', lastDays: '90', upcoming: 'any', upcomingDays: '30', added: 'any', addedDays: '30' };
 
 const PRESETS = [
-  ['Lapsed 90+ days', { last: 'before', lastDays: '90' }],
-  ['Tattooed in last 30 days', { last: 'within', lastDays: '30' }],
   ['Regulars', { tattoos: 'repeat' }],
+  ['Lapsed, no tattoo in 90+ days', { last: 'before', lastDays: '90' }],
+  ['Tattooed in the last 30 days', { last: 'within', lastDays: '30' }],
+  ['New this month', { added: 'within', addedDays: '30' }],
   ['No tattoo yet', { tattoos: 'none' }],
   ['Nothing booked', { upcoming: 'none' }],
-  ['New this month', { added: 'within', addedDays: '30' }],
 ];
-const VIEWS = [['all', 'All'], ['selected', 'Selected'], ['unselected', 'Not selected']];
 
 // Blank or out-of-range input is not a usable number of days.
 function parseDays(value) {
@@ -52,14 +51,23 @@ function matches(c, f, now) {
   return true;
 }
 
-const fmtDate = iso => new Date(iso).toLocaleDateString('en-AU', { dateStyle: 'medium' });
+const fmtDate = iso => new Date(iso).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
+const initials = name => name.trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase() || '?';
+
+// The one thing most worth knowing about a client, as a coloured label.
+function tag(c, now) {
+  const last = c.last_visit ? new Date(c.last_visit).getTime() : null;
+  if (last && last < now - 90 * DAY) return ['warn', 'Lapsed'];
+  if (c.completed_count >= 2) return ['good', 'Regular'];
+  if (new Date(c.created_at).getTime() >= now - 30 * DAY) return ['info', 'New'];
+  return c.completed_count === 0 ? ['plain', 'No tattoo yet'] : null;
+}
 
 function history(c) {
-  const parts = [c.completed_count > 0
-    ? `${c.completed_count} tattoo${c.completed_count === 1 ? '' : 's'}${c.last_visit ? `, last ${fmtDate(c.last_visit)}` : ''}`
-    : 'No tattoo yet'];
+  const parts = [];
+  if (c.completed_count > 0) parts.push(`${c.completed_count} tattoo${c.completed_count === 1 ? '' : 's'}${c.last_visit ? `, last ${fmtDate(c.last_visit)}` : ''}`);
   if (c.next_appointment) parts.push(`booked ${fmtDate(c.next_appointment)}`);
-  return parts.join(' · ');
+  return parts.join(' · ') || c.email;
 }
 
 // Saved audiences come back from the server, so only known filter keys with string values are applied.
@@ -78,37 +86,24 @@ function DaysField({ label, value, onChange }) {
   );
 }
 
-/** Lists every client who can be emailed, narrows the list with filters, and keeps the ticked set across filter changes. */
+/** Lists every client who can be emailed, narrows the list with one search and one group choice, and keeps the ticked set across changes. */
 export default function AudiencePicker({ clients, error, onRetry, selected, onChange }) {
   const [filters, setFilters] = useState(NO_FILTERS);
-  const [view, setView] = useState('all');
+  const [onlySelected, setOnlySelected] = useState(false);
   const [limit, setLimit] = useState(PAGE);
+  const [custom, setCustom] = useState(false);
   const set = patch => setFilters(prev => ({ ...prev, ...patch }));
   const [saved, setSaved] = useState([]);
   const [naming, setNaming] = useState(null);
   // Saved audiences are a convenience; the picker works without them.
   useEffect(() => { listMarketingAudiences().then(data => setSaved(data.audiences)).catch(() => {}); }, []);
+  useEffect(() => { setLimit(PAGE); }, [filters, onlySelected]);
+  useEffect(() => { if (selected.size === 0) setOnlySelected(false); }, [selected]);
 
-  async function saveAudience() {
-    const { search, ...rest } = filters;
-    try {
-      const audience = await saveMarketingAudience(naming, rest);
-      setSaved(prev => [...prev, audience]);
-      setNaming(null);
-      showFeedback(`Saved “${audience.name}”.`, 'success');
-    } catch (err) { showError(err); }
-  }
-  async function removeAudience(audience) {
-    if (!await requestConfirmation({ title: 'Delete saved audience', message: `Delete “${audience.name}”? This only removes the saved filters, not any clients.`, confirmLabel: 'Delete', danger: true })) return;
-    try { await deleteMarketingAudience(audience.id); setSaved(prev => prev.filter(a => a.id !== audience.id)); } catch (err) { showError(err); }
-  }
-  useEffect(() => { setLimit(PAGE); }, [filters, view]);
-
-  const filtered = useMemo(() => {
-    const now = Date.now();
-    return (clients || []).filter(c => matches(c, filters, now));
-  }, [clients, filters]);
-  const shown = view === 'all' ? filtered : filtered.filter(c => selected.has(c.id) === (view === 'selected'));
+  const now = useMemo(() => Date.now(), [clients]);
+  const filtered = useMemo(() => (clients || []).filter(c => matches(c, filters, now)), [clients, filters, now]);
+  // How many clients each group holds, so a studio can see its size before picking it.
+  const presetCounts = useMemo(() => PRESETS.map(([, patch]) => (clients || []).filter(c => matches(c, { ...NO_FILTERS, ...patch }, now)).length), [clients, now]);
 
   if (error) {
     return <p className={styles.error} role="alert">{error} <button type="button" className={styles.chip} onClick={onRetry}>Try again</button></p>;
@@ -122,134 +117,145 @@ export default function AudiencePicker({ clients, error, onRetry, selected, onCh
     );
   }
 
-  const filtersOn = Object.keys(NO_FILTERS).some(k => !k.endsWith('Days') && filters[k] !== NO_FILTERS[k]);
-  const filtersOnly = Object.keys(NO_FILTERS).some(k => k !== 'search' && !k.endsWith('Days') && filters[k] !== NO_FILTERS[k]);
-  const presetOn = patch => Object.entries({ ...NO_FILTERS, search: filters.search, ...patch }).every(([k, v]) => k.endsWith('Days') && !(k in patch) ? true : filters[k] === v);
+  const is = patch => Object.keys(NO_FILTERS).every(k => k === 'search' || (k.endsWith('Days') && !(k in patch)) || filters[k] === ({ ...NO_FILTERS, ...patch })[k]);
+  const presetIndex = PRESETS.findIndex(([, patch]) => is(patch));
+  const savedMatch = saved.find(a => is(savedFilters(a.filters)));
+  // The dropdown always names what the list is showing.
+  const group = custom ? 'custom' : is({}) ? 'all' : presetIndex >= 0 ? `p${presetIndex}` : savedMatch ? `s${savedMatch.id}` : 'custom';
+  const shown = onlySelected ? filtered.filter(c => selected.has(c.id)) : filtered;
   const shownSelected = shown.filter(c => selected.has(c.id)).length;
   const hiddenSelected = selected.size - filtered.filter(c => selected.has(c.id)).length;
 
+  function pick(value) {
+    setCustom(value === 'custom');
+    if (value === 'custom') return;
+    const patch = value === 'all' ? {} : value[0] === 'p' ? PRESETS[Number(value.slice(1))][1] : savedFilters(saved.find(a => `s${a.id}` === value)?.filters);
+    setFilters({ ...NO_FILTERS, ...patch, search: filters.search });
+  }
   function toggle(ids, on) {
     const next = new Set(selected);
     ids.forEach(id => (on ? next.add(id) : next.delete(id)));
     onChange(next);
   }
+  async function saveAudience() {
+    const { search, ...rest } = filters;
+    try {
+      const audience = await saveMarketingAudience(naming, rest);
+      setSaved(prev => [...prev, audience]);
+      setNaming(null); setCustom(false);
+      showFeedback(`Saved “${audience.name}”. Find it under Show.`, 'success');
+    } catch (err) { showError(err); }
+  }
+  async function removeAudience(audience) {
+    if (!await requestConfirmation({ title: 'Delete saved group', message: `Delete “${audience.name}”? This only removes the saved filters, not any clients.`, confirmLabel: 'Delete', danger: true })) return;
+    try { await deleteMarketingAudience(audience.id); setSaved(prev => prev.filter(a => a.id !== audience.id)); pick('all'); } catch (err) { showError(err); }
+  }
 
   return (
     <>
-      <div className={styles.chips} role="group" aria-label="Quick filters">
-        {PRESETS.map(([label, patch]) => {
-          const on = presetOn(patch);
-          return (
-            <button key={label} type="button" aria-pressed={on} className={`${styles.chip} ${on ? styles.chipOn : ''}`}
-              onClick={() => setFilters(on ? { ...NO_FILTERS, search: filters.search } : { ...NO_FILTERS, search: filters.search, ...patch })}>{label}</button>
-          );
-        })}
+      <div className={styles.findRow}>
+        <Field label="Search"><Input type="search" value={filters.search} placeholder="Name or email" onChange={e => set({ search: e.target.value })} /></Field>
+        <Field label="Show">
+          <Select value={group} onChange={e => pick(e.target.value)}>
+            <option value="all">Everyone ({clients.length})</option>
+            {PRESETS.map(([label], i) => <option key={label} value={`p${i}`}>{label} ({presetCounts[i]})</option>)}
+            {saved.length > 0 && <optgroup label="Your saved groups">{saved.map(a => <option key={a.id} value={`s${a.id}`}>{a.name}</option>)}</optgroup>}
+            <option value="custom">Custom filters…</option>
+          </Select>
+        </Field>
       </div>
+      {savedMatch && !custom && <p className={styles.hint}><button type="button" className={styles.link} onClick={() => removeAudience(savedMatch)}>Delete this saved group</button></p>}
 
-      {saved.length > 0 && (
-        <div className={styles.chips} role="group" aria-label="Saved audiences">
-          <span className={styles.hint}>Saved</span>
-          {saved.map(a => {
-            const on = presetOn(savedFilters(a.filters));
-            return (
-              <span key={a.id} className={`${styles.savedChip} ${on ? styles.chipOn : ''}`}>
-                <button type="button" aria-pressed={on} onClick={() => setFilters({ ...savedFilters(a.filters), search: filters.search })}>{a.name}</button>
-                <button type="button" aria-label={`Delete saved audience ${a.name}`} onClick={() => removeAudience(a)}>×</button>
-              </span>
-            );
-          })}
+      {custom && (
+        <div className={styles.filterPanel}>
+          <div className={styles.row}>
+            <Field label="Tattoos done here">
+              <Select value={filters.tattoos} onChange={e => set({ tattoos: e.target.value })}>
+                <option value="any">Any number</option>
+                <option value="none">None yet</option>
+                <option value="some">At least one</option>
+                <option value="repeat">Two or more</option>
+              </Select>
+            </Field>
+            <Field label="Last tattoo">
+              <Select value={filters.last} onChange={e => set({ last: e.target.value })}>
+                <option value="any">Any time</option>
+                <option value="within">Within the last…</option>
+                <option value="before">More than… ago</option>
+              </Select>
+            </Field>
+            {filters.last !== 'any' && <DaysField label={filters.last === 'within' ? 'Within the last (days)' : 'More than (days) ago'} value={filters.lastDays} onChange={v => set({ lastDays: v })} />}
+            <Field label="Upcoming appointment">
+              <Select value={filters.upcoming} onChange={e => set({ upcoming: e.target.value })}>
+                <option value="any">Doesn’t matter</option>
+                <option value="none">Nothing booked</option>
+                <option value="any_time">Has one booked</option>
+                <option value="within">Booked in the next…</option>
+              </Select>
+            </Field>
+            {filters.upcoming === 'within' && <DaysField label="In the next (days)" value={filters.upcomingDays} onChange={v => set({ upcomingDays: v })} />}
+            <Field label="Added to your clients">
+              <Select value={filters.added} onChange={e => set({ added: e.target.value })}>
+                <option value="any">Any time</option>
+                <option value="within">In the last…</option>
+              </Select>
+            </Field>
+            {filters.added === 'within' && <DaysField label="Added in the last (days)" value={filters.addedDays} onChange={v => set({ addedDays: v })} />}
+          </div>
+          {naming === null ? (
+            <div className={styles.actions}>
+              <Button size="sm" variant="secondary" disabled={is({})} onClick={() => setNaming('')}>Save as a group</Button>
+            </div>
+          ) : (
+            <form className={styles.saveRow} onSubmit={e => { e.preventDefault(); if (naming.trim()) saveAudience(); }}>
+              <Field label="Name this group"><Input autoFocus value={naming} maxLength={80} placeholder="For example, Lapsed regulars" onChange={e => setNaming(e.target.value)} /></Field>
+              <Button size="sm" type="submit" disabled={!naming.trim()}>Save</Button>
+              <Button size="sm" variant="ghost" onClick={() => setNaming(null)}>Cancel</Button>
+            </form>
+          )}
         </div>
       )}
-
-      <div className={styles.row}>
-        <Field label="Tattoos done here">
-          <Select value={filters.tattoos} onChange={e => set({ tattoos: e.target.value })}>
-            <option value="any">Any number</option>
-            <option value="none">None yet</option>
-            <option value="some">At least one</option>
-            <option value="repeat">Two or more</option>
-          </Select>
-        </Field>
-        <Field label="Last tattoo">
-          <Select value={filters.last} onChange={e => set({ last: e.target.value })}>
-            <option value="any">Any time</option>
-            <option value="within">Within the last…</option>
-            <option value="before">More than… ago</option>
-          </Select>
-        </Field>
-        {filters.last !== 'any' && <DaysField label={filters.last === 'within' ? 'Within the last (days)' : 'More than (days) ago'} value={filters.lastDays} onChange={v => set({ lastDays: v })} />}
-        <Field label="Upcoming appointment">
-          <Select value={filters.upcoming} onChange={e => set({ upcoming: e.target.value })}>
-            <option value="any">Doesn’t matter</option>
-            <option value="none">Nothing booked</option>
-            <option value="any_time">Has one booked</option>
-            <option value="within">Booked in the next…</option>
-          </Select>
-        </Field>
-        {filters.upcoming === 'within' && <DaysField label="In the next (days)" value={filters.upcomingDays} onChange={v => set({ upcomingDays: v })} />}
-        <Field label="Added to your clients">
-          <Select value={filters.added} onChange={e => set({ added: e.target.value })}>
-            <option value="any">Any time</option>
-            <option value="within">In the last…</option>
-          </Select>
-        </Field>
-        {filters.added === 'within' && <DaysField label="Added in the last (days)" value={filters.addedDays} onChange={v => set({ addedDays: v })} />}
-      </div>
-
-      <Field label="Find a client">
-        <Input type="search" value={filters.search} placeholder="Search name or email" onChange={e => set({ search: e.target.value })} />
-      </Field>
 
       <div className={styles.listBar}>
         <label className={styles.checkAll}>
           <input type="checkbox" checked={shown.length > 0 && shownSelected === shown.length} disabled={shown.length === 0}
             ref={el => { if (el) el.indeterminate = shownSelected > 0 && shownSelected < shown.length; }}
             onChange={e => toggle(shown.map(c => c.id), e.target.checked)} />
-          <span>{shownSelected === shown.length && shown.length > 0 ? 'Deselect' : 'Select'} all {shown.length} shown</span>
+          <span>Select all {shown.length}</span>
         </label>
-        <div className={styles.views} role="group" aria-label="Show">
-          {VIEWS.map(([id, label]) => (
-            <button key={id} type="button" aria-pressed={view === id} className={styles.view} onClick={() => setView(id)}>{label}</button>
-          ))}
-        </div>
+        <p className={styles.selectedNote} role="status">
+          <span className={`${styles.audience} ${selected.size > 0 ? styles.audienceOn : ''}`}>{selected.size} selected</span>
+          {hiddenSelected > 0 && !onlySelected && <span>{hiddenSelected} not in this view</span>}
+          {selected.size > 0 && <>
+            <button type="button" className={styles.link} aria-pressed={onlySelected} onClick={() => setOnlySelected(!onlySelected)}>{onlySelected ? 'Show everyone' : 'Show selected'}</button>
+            <button type="button" className={styles.link} onClick={() => onChange(new Set())}>Clear</button>
+          </>}
+        </p>
       </div>
 
       {shown.length === 0 ? (
         <p className={styles.empty}>
-          {view === 'selected' && selected.size === 0 ? 'No clients selected yet.' : 'No clients match.'}
-          {(filtersOn || view !== 'all') && <button type="button" className={styles.chip} onClick={() => { setFilters(NO_FILTERS); setView('all'); }}>Show everyone</button>}
+          No clients match. <button type="button" className={styles.chip} onClick={() => { setFilters(NO_FILTERS); setCustom(false); setOnlySelected(false); }}>Show everyone</button>
         </p>
       ) : (
         <ul className={styles.clientList} aria-label="Clients">
-          {shown.slice(0, limit).map(c => (
-            <li key={c.id}>
-              <label className={styles.clientRow}>
-                <input type="checkbox" checked={selected.has(c.id)} onChange={e => toggle([c.id], e.target.checked)} />
-                <span className={styles.clientMain}>{c.name}<span className={styles.rowSub}>{c.email}</span></span>
-                <span className={styles.clientMeta}>{history(c)}</span>
-              </label>
-            </li>
-          ))}
+          {shown.slice(0, limit).map(c => {
+            const on = selected.has(c.id), label = tag(c, now);
+            return (
+              <li key={c.id}>
+                <label className={`${styles.clientRow} ${on ? styles.clientOn : ''}`}>
+                  <input type="checkbox" checked={on} onChange={e => toggle([c.id], e.target.checked)} />
+                  <span className={`${styles.avatar} ${styles[label?.[0] || 'plain']}`} aria-hidden="true">{initials(c.name)}</span>
+                  <span className={styles.clientMain}>{c.name}<span className={styles.rowSub}>{history(c)}</span></span>
+                  {label && <span className={`${styles.tag} ${styles[label[0]]}`}>{label[1]}</span>}
+                </label>
+              </li>
+            );
+          })}
           {shown.length > limit && (
             <li className={styles.more}><Button size="sm" variant="ghost" onClick={() => setLimit(limit + PAGE)}>Show more ({shown.length - limit} left)</Button></li>
           )}
         </ul>
-      )}
-
-      <div className={styles.actions}>
-        <p className={styles.audience} role="status">
-          {selected.size} of {clients.length} selected{hiddenSelected > 0 ? ` · ${hiddenSelected} hidden by filters` : ''}
-        </p>
-        {filtersOn && <Button size="sm" variant="ghost" onClick={() => setFilters(NO_FILTERS)}>Clear filters</Button>}
-        {filtersOnly && naming === null && <Button size="sm" variant="ghost" onClick={() => setNaming('')}>Save these filters</Button>}
-        {selected.size > 0 && <Button size="sm" variant="ghost" onClick={() => onChange(new Set())}>Clear selection</Button>}
-      </div>
-      {naming !== null && (
-        <form className={styles.saveRow} onSubmit={e => { e.preventDefault(); if (naming.trim()) saveAudience(); }}>
-          <Field label="Name these filters"><Input autoFocus value={naming} maxLength={80} placeholder="For example, Lapsed regulars" onChange={e => setNaming(e.target.value)} /></Field>
-          <Button size="sm" type="submit" disabled={!naming.trim()}>Save</Button>
-          <Button size="sm" variant="ghost" onClick={() => setNaming(null)}>Cancel</Button>
-        </form>
       )}
     </>
   );
