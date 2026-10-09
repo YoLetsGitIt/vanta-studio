@@ -472,6 +472,14 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
         ) : (
           <form onSubmit={handleSubmit} style={bd.form}>
 
+            <div style={bd.section}>
+              <label style={bd.sectionLabel} htmlFor="new-appointment-type">Appointment type</label>
+              <select id="new-appointment-type" style={bd.select} value={appointmentType} onChange={e => setAppointmentType(e.target.value)}>
+                <option value="tattoo">Tattoo</option>
+                <option value="piercing">Piercing</option>
+              </select>
+            </div>
+
             {/* ── BOOKING TYPE ── */}
             <div style={bd.section}>
               <p style={bd.sectionLabel}>{t('nap_booking_type')}</p>
@@ -751,14 +759,6 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
                 </span>
               </button>
             )}
-
-            <div style={bd.field}>
-              <label style={bd.label} htmlFor="new-appointment-type">Appointment type</label>
-              <select id="new-appointment-type" style={bd.input} value={appointmentType} onChange={e => setAppointmentType(e.target.value)}>
-                <option value="tattoo">Tattoo</option>
-                <option value="piercing">Piercing</option>
-              </select>
-            </div>
 
             {/* ── DETAILS ── */}
             {essentialsComplete && (bookingType !== 'walkin' || showOptional) && <>
