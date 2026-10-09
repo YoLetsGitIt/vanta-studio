@@ -79,6 +79,8 @@ const COUNTRIES = [
   { id: 'VN', flag: '🇻🇳', name: 'Vietnam',        dial: '+84'  },
 ];
 
+const PIERCING_PLACEMENTS = ['Earlobe', 'Helix', 'Tragus', 'Conch', 'Daith', 'Rook', 'Industrial', 'Nostril', 'Septum', 'Eyebrow', 'Lip', 'Tongue', 'Navel', 'Nipple', 'Other'];
+
 const PLACEMENTS = [
   'Ankle', 'Arm', 'Back', 'Calf', 'Chest', 'Foot', 'Forearm',
   'Hand', 'Head', 'Hip', 'Knee', 'Neck', 'Ribs', 'Shoulder',
@@ -109,6 +111,8 @@ function WalkInInner() {
   const [size, setSize]             = useState('');
   const [sizeUnit, setSizeUnit]     = useState('cm');
   const [colorStyle, setColorStyle] = useState('');
+  const [appointmentType, setAppointmentType] = useState('tattoo');
+  const isPiercing = appointmentType === 'piercing';
   const [retouch, setRetouch]       = useState(false);
   const [hasAllergies, setHasAllergies] = useState(false);
   const [allergyDetails, setAllergyDetails] = useState('');
@@ -299,13 +303,13 @@ function WalkInInner() {
         phone: `${COUNTRIES.find(c => c.id === phoneCode)?.dial ?? ''} ${phoneNum}`.trim(),
         sms_reminder_opt_in: smsOptIn,
         dob,
-        skin_tone:            skinTone,
+        skin_tone:            isPiercing ? '' : skinTone,
 
-        session_type:         retouch ? 'retouch' : '',
+        session_type:         isPiercing ? 'piercing' : retouch ? 'retouch' : '',
         body_location:        placements.join(', '),
         design_details:       design,
-        size:                 size.trim() ? `${size.trim()}${sizeUnit}` : '',
-        color:                colorStyle,
+        size:                 !isPiercing && size.trim() ? `${size.trim()}${sizeUnit}` : '',
+        color:                isPiercing ? '' : colorStyle,
         notes,
         allergies:            hasAllergies ? (allergyDetails.trim() || 'Yes') : '',
         image_paths:          imagePaths,
@@ -391,7 +395,13 @@ function WalkInInner() {
           </label>
 
           {/* ── Your tattoo ── */}
-          <Section title="Your tattoo">
+          <Section title="Your appointment">
+            <Field label="Appointment type">
+              <select style={s.input} value={appointmentType} onChange={e => { setAppointmentType(e.target.value); setPlacements([]); }}>
+                <option value="tattoo">Tattoo</option>
+                <option value="piercing">Piercing</option>
+              </select>
+            </Field>
             {field('artist_id').enabled && (
               <Field label={<>Artist preference{field('artist_id').required ? null : <Optional />}</>}>
                 <select style={s.input} value={artistId} required={field('artist_id').required} onChange={e => setArtistId(e.target.value)}>
@@ -414,7 +424,7 @@ function WalkInInner() {
                   </span>
                 </label>
                 <div style={s.chipGrid}>
-                  {PLACEMENTS.map(p => {
+                  {(isPiercing ? PIERCING_PLACEMENTS : PLACEMENTS).map(p => {
                     const active = placements.includes(p);
                     return (
                       <button
@@ -440,12 +450,12 @@ function WalkInInner() {
             )}
 
             {field('design_details').enabled && (
-              <Field label={<>Design description{field('design_details').required ? null : <Optional />}</>}>
+              <Field label={<>{isPiercing ? 'Piercing details' : 'Design description'}{field('design_details').required ? null : <Optional />}</>}>
                 <textarea style={{ ...s.input, ...s.textarea }} value={design} required={field('design_details').required} onChange={e => setDesign(e.target.value)} placeholder="Describe what you'd like…" />
               </Field>
             )}
 
-            {field('skin_tone').enabled && (
+            {!isPiercing && field('skin_tone').enabled && (
               <Field label={<>Skin tone{field('skin_tone').required ? null : <Optional />}</>}>
                 <select style={s.input} value={skinTone} required={field('skin_tone').required} onChange={e => setSkinTone(e.target.value)}>
                   <option value="">Select skin tone…</option>
@@ -456,7 +466,7 @@ function WalkInInner() {
               </Field>
             )}
 
-            {field('size').enabled && (
+            {!isPiercing && field('size').enabled && (
               <Field id="booking-size" required={field('size').required} label={<>Size{!field('size').required && <Optional />}</>}>
                 <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                   <input
@@ -490,14 +500,14 @@ function WalkInInner() {
               </Field>
             )}
 
-            {field('retouch').enabled && (
+            {!isPiercing && field('retouch').enabled && (
               <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: 'var(--text-dim)', cursor: 'pointer' }}>
                 <input type="checkbox" checked={retouch} onChange={e => setRetouch(e.target.checked)} style={{ width: 16, height: 16, accentColor: '#d5d0c7', cursor: 'pointer' }} />
                 This is a touch-up / retouch
               </label>
             )}
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+            {!isPiercing && <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
               <label style={s.label}>Colour</label>
               <div style={{ display: 'flex', gap: '0.5rem' }}>
                 {['Black', 'Grey', 'Color'].map(opt => {
@@ -527,6 +537,8 @@ function WalkInInner() {
                 })}
               </div>
             </div>
+
+            }
 
             {field('notes').enabled && (
               <Field label={<>Additional notes{field('notes').required ? null : <Optional />}</>}>

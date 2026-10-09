@@ -66,6 +66,8 @@ export function WidgetPreview({ bg, accent, studioName, logoUrl, fields, consent
           <div style={fld}><span style={lbl}>Artist preference</span><div style={inp} /></div>
         )}
 
+        <div style={fld}><span style={lbl}>Appointment type *</span><div style={{ ...inp, display: 'flex', alignItems: 'center', padding: '0 10px', fontSize: '0.75rem', color: '#fff' }}>Tattoo / Piercing</div></div>
+
         {/* Placement chips */}
         {f('body_location').enabled && (
           <div style={fld}>

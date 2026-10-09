@@ -209,6 +209,7 @@ export default function SettingsPage() {
   const [addressLng, setAddressLng] = useState(null);
   const [email, setEmail] = useState('');
   const [aftercareInstructions, setAftercareInstructions] = useState('');
+  const [piercingAftercareInstructions, setPiercingAftercareInstructions] = useState('');
   const [widgetBgColor, setWidgetBgColor] = useState('#111111');
   const [logoUrl, setLogoUrl] = useState('');
   const [widgetAccentColor, setWidgetAccentColor] = useState('#d5d0c7');
@@ -304,6 +305,7 @@ export default function SettingsPage() {
         if (account.studio?.latitude != null) setAddressLat(account.studio.latitude);
         if (account.studio?.longitude != null) setAddressLng(account.studio.longitude);
         setAftercareInstructions(account.studio?.aftercare_instructions ?? '');
+        setPiercingAftercareInstructions(account.studio?.piercing_aftercare_instructions ?? '');
         setWidgetBgColor(account.studio?.widget_bg_color || '#111111');
         setWidgetAccentColor(account.studio?.widget_accent_color || '#d5d0c7');
         setTimezone(account.studio?.timezone || 'Australia/Sydney');
@@ -376,7 +378,7 @@ export default function SettingsPage() {
     try {
       const wc = parseFloat(walkinCut);
       const pc = parseFloat(personalCut);
-      await updateStudioProfile(name.trim(), address.trim(), widgetBgColor, widgetAccentColor, isNaN(wc) ? 0 : wc, isNaN(pc) ? 0 : pc, aftercareInstructions, timezone, addressLat, addressLng, paymentRecordingReq, rescheduleWindow, widgetConsentTemplateId || null, sendReminder7d, sendReminder24h, payForfeitedDeposits, schedulingMode);
+      await updateStudioProfile(name.trim(), address.trim(), widgetBgColor, widgetAccentColor, isNaN(wc) ? 0 : wc, isNaN(pc) ? 0 : pc, aftercareInstructions, timezone, addressLat, addressLng, paymentRecordingReq, rescheduleWindow, widgetConsentTemplateId || null, sendReminder7d, sendReminder24h, payForfeitedDeposits, schedulingMode, piercingAftercareInstructions);
       invalidate('studio-account');
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
@@ -1065,6 +1067,13 @@ export default function SettingsPage() {
         </section>
 
         <SMSSettings styles={s} />
+
+        <section style={{ ...s.card, gridColumn: '1 / -1' }}>
+          <h2 style={s.sectionTitle}>Piercing aftercare instructions</h2>
+          <p style={s.sectionDesc}>Your studio’s guidance is attached to completed piercing appointments. Tattoo instructions are kept separate.</p>
+          <textarea aria-label="Piercing aftercare instructions" style={{ ...s.input, minHeight: 120, resize: 'vertical', lineHeight: 1.6 }} value={piercingAftercareInstructions} onChange={e => setPiercingAftercareInstructions(e.target.value)} placeholder="Add your studio’s piercing aftercare instructions…" />
+          <button onClick={saveProfile} style={s.saveBtn} disabled={saving}>{saving ? t('saving') : saved ? t('saved') : t('save')}</button>
+        </section>
 
         {/* Aftercare instructions — temporarily hidden
         <section style={{ ...s.card, gridColumn: '1 / -1' }}>

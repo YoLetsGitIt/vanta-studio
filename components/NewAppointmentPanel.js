@@ -137,6 +137,8 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
   // ── Details
   const [size, setSize] = useState('');
   const [sizeUnit, setSizeUnit] = useState(getDefaultSizeUnit);
+  const [appointmentType, setAppointmentType] = useState('tattoo');
+  const isPiercing = appointmentType === 'piercing';
   const [retouch, setRetouch] = useState(false);
 
   // ── Pricing
@@ -291,7 +293,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
   const disabledReason = loadError || validationError || missingRequirement;
   const canSubmit = !disabledReason;
   const essentialsComplete = Boolean(clientName && artistId && bookingDate && startTime && stationId && !timeError && !dateInPast && !artistConflict);
-  const dirty = Boolean(selectedClient || firstName || lastName || clientEmail || clientPhone || clientDob || artistId || stationId || size || retouch || finalPrice || depositAmount || depositMode !== 'none' || notes || bookingType !== initialBookingType);
+  const dirty = Boolean(selectedClient || firstName || lastName || clientEmail || clientPhone || clientDob || artistId || stationId || appointmentType !== 'tattoo' || size || retouch || finalPrice || depositAmount || depositMode !== 'none' || notes || bookingType !== initialBookingType);
   dirtyRef.current = dirty;
   savingRef.current = saving;
 
@@ -306,7 +308,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
     setStartTime(slot.time);
     setDurationMins(60);
     setStationId('');
-    setSize(''); setSizeUnit('cm'); setRetouch(false);
+    setSize(''); setSizeUnit('cm'); setRetouch(false); setAppointmentType('tattoo');
     setFinalPrice(''); setDepositAmount(''); setDepositMode('none'); setShowOptional(false);
     setBookingType(initialBookingType);
     setNotes(''); setError('');
@@ -364,8 +366,9 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
         duration_minutes: durationMins,
         deposit_required: depositEnabled && da > 0,
       };
-      if (retouch) body.session_type = 'retouch';
-      if (size.trim()) { body.size = size.trim(); body.size_unit = sizeUnit; }
+      if (isPiercing) body.session_type = 'piercing';
+      else if (retouch) body.session_type = 'retouch';
+      if (!isPiercing && size.trim()) { body.size = size.trim(); body.size_unit = sizeUnit; }
       if (clientEmail.trim()) body.requester_email = clientEmail.trim();
       if (clientPhone.trim()) body.requester_phone = clientPhone.trim();
       body.sms_reminder_opt_in = smsOptIn && !!clientPhone.trim();
@@ -740,7 +743,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
               >
                 <span style={bd.optionalToggleCopy}>
                   <span style={bd.optionalToggleTitle}>Optional details</span>
-                  <span style={bd.optionalToggleDescription}>Tattoo, pricing, deposit and notes</span>
+                  <span style={bd.optionalToggleDescription}>Appointment, pricing, deposit and notes</span>
                 </span>
                 <span style={bd.optionalToggleAction}>
                   {showOptional ? 'Hide' : 'Show'}
@@ -749,10 +752,19 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
               </button>
             )}
 
+            <div style={bd.field}>
+              <label style={bd.label} htmlFor="new-appointment-type">Appointment type</label>
+              <select id="new-appointment-type" style={bd.input} value={appointmentType} onChange={e => setAppointmentType(e.target.value)}>
+                <option value="tattoo">Tattoo</option>
+                <option value="piercing">Piercing</option>
+              </select>
+            </div>
+
             {/* ── DETAILS ── */}
             {essentialsComplete && (bookingType !== 'walkin' || showOptional) && <>
             <div style={bd.section}>
               <p style={bd.sectionLabel}>{t('nap_details')}</p>
+              {!isPiercing && <>
               <label style={bd.checkRow}>
                 <input type="checkbox" checked={retouch} onChange={e => setRetouch(e.target.checked)} style={bd.checkbox} />
                 <span>{t('nap_retouch')}</span>
@@ -780,6 +792,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
                   </div>
                 </div>
               </div>
+              </>}
             </div>
 
             {/* ── PRICING ── */}
