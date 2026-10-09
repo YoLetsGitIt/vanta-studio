@@ -22,7 +22,7 @@ function StepHead({ n, done, children }) {
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
 /** Compose a campaign: pick clients on the left, see the email they will get on the right. */
-export default function Campaigns({ available, ready, preset, onSent, onNeedSetup, onEditTemplates }) {
+export default function Campaigns({ active = true, available, ready, preset, onSent, onNeedSetup, onEditTemplates }) {
   const [templates, setTemplates] = useState(null);
   const [templateId, setTemplateId] = useState(preset?.templateId || '');
   const [clients, setClients] = useState(null);
@@ -31,7 +31,14 @@ export default function Campaigns({ available, ready, preset, onSent, onNeedSetu
   const [sending, setSending] = useState(false);
   const template = templates?.find(t => t.id === templateId);
 
-  useEffect(() => { loadClients(); listMarketingTemplates().then(data => setTemplates(data.templates)).catch(showError); }, []);
+  useEffect(() => { loadClients(); }, []);
+  // Refresh saved templates when returning from the editor without losing selected clients.
+  useEffect(() => {
+    if (!active) return;
+    let current = true;
+    listMarketingTemplates().then(data => { if (current) setTemplates(data.templates); }).catch(err => { if (current) showError(err); });
+    return () => { current = false; };
+  }, [active]);
   // Filtering happens in the picker, so one fetch of everyone who can be emailed is enough.
   async function loadClients() {
     setClientsError('');

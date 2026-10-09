@@ -80,12 +80,13 @@ function Recipients({ campaign, onResend }) {
 }
 
 /** Every campaign sent, with who got it and what happened to each email. */
-export default function History({ onResend, onCompose }) {
+export default function History({ active: visible = true, onResend, onCompose }) {
   const [campaigns, setCampaigns] = useState(null);
   const [open, setOpen] = useState('');
   const [preview, setPreview] = useState(null);
 
   useEffect(() => {
+    if (!visible) return;
     let active = true, timer;
     async function load() {
       try {
@@ -98,7 +99,7 @@ export default function History({ onResend, onCompose }) {
     }
     load();
     return () => { active = false; clearTimeout(timer); };
-  }, []);
+  }, [visible]);
 
   if (campaigns === null) return <p className={styles.muted} role="status">Loading campaigns…</p>;
   if (campaigns.length === 0) {

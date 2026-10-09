@@ -37,10 +37,10 @@ export default function ClientTemplateSend({ clientKey, email, marketing }) {
    <Field label="Email template"><Select value={id} onChange={e => setId(e.target.value)} disabled={busy}>
     <option value="">Choose a template</option>{templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
    </Select></Field>
-   {templates.length === 0 && <Link href="/dashboard/marketing">Create an email template</Link>}
+   {templates.length === 0 && <Link href="/dashboard/marketing?tab=templates">Create an email template</Link>}
    {!eligible && <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{marketing?.unsubscribed ? 'This client has unsubscribed.' : 'This client needs an email address and marketing consent before sending.'}</p>}
    {!data.available && <p>Sending isn’t switched on yet.</p>}
-   {data.available && !data.ready && <Link href="/dashboard/marketing">Set up your sender in Marketing</Link>}
+   {data.available && !data.ready && <Link href="/dashboard/marketing?tab=settings">Set up your sending email</Link>}
    <div style={{ display: 'flex', gap: 8 }}>
     <Button size="sm" loading={busy} disabled={!template || !eligible || !data.available || !data.ready} onClick={send}>Send email</Button>
     <Button size="sm" variant="secondary" disabled={!template} onClick={() => setPreview(true)}>Preview</Button>
