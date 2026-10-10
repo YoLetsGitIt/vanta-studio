@@ -1,0 +1,20 @@
+{
+  "src": "/studio/demos/branding.mp4",
+  "poster": "/studio/demos/branding-poster.jpg",
+  "duration": 12,
+  "title": "Make it your studio",
+  "chapters": [
+    {
+      "at": 0,
+      "title": "Match the background to your website."
+    },
+    {
+      "at": 4.1,
+      "title": "Choose an accent. See it change live."
+    },
+    {
+      "at": 8.1,
+      "title": "Copy the embed snippet for your own website."
+    }
+  ]
+}

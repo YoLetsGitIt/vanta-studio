@@ -1,0 +1,20 @@
+{
+  "src": "/studio/demos/artists.mp4",
+  "poster": "/studio/demos/artists-poster.jpg",
+  "duration": 13,
+  "title": "Your artists, in one place",
+  "chapters": [
+    {
+      "at": 0,
+      "title": "Open an artist’s studio profile."
+    },
+    {
+      "at": 4.5,
+      "title": "See their sessions and revenue at a glance."
+    },
+    {
+      "at": 8.5,
+      "title": "Manage the timetable behind their availability."
+    }
+  ]
+}
