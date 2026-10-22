@@ -473,49 +473,6 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
         ) : (
           <form onSubmit={handleSubmit} style={bd.form}>
             <div className={styles.body}>
-              <section style={bd.section} aria-labelledby="appointment-section-title">
-                <h2 id="appointment-section-title" style={bd.sectionLabel}>{t('nap_appointment')}</h2>
-                <div className={styles.fieldRow}>
-                  <div style={bd.field}>
-                    <label style={bd.label} htmlFor="new-appointment-type">Appointment type</label>
-                    <select id="new-appointment-type" style={bd.select} value={appointmentType} onChange={e => setAppointmentType(e.target.value)}>
-                      <option value="tattoo">Tattoo</option>
-                      <option value="piercing">Piercing</option>
-                    </select>
-                  </div>
-                  <div style={bd.field}>
-                    <label htmlFor="new-appointment-artist" style={bd.label}>{t('bdp_artist')}</label>
-                    <select id="new-appointment-artist" style={bd.select} value={artistId} onChange={e => setArtistId(e.target.value)} required>
-                      <option value="">{t('nap_select_artist')}</option>
-                      {artists.map(a => (
-                        <option key={a.artistId ?? a.artist_id ?? a.id} value={a.artistId ?? a.artist_id ?? a.id}>{a.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                <div style={bd.field}>
-                  <span id="booking-type-label" style={bd.label}>{t('nap_booking_type')}</span>
-                  <div className={styles.bookingTypes} role="group" aria-labelledby="booking-type-label" aria-describedby="booking-type-description">
-                    {[
-                      ['studio', t('nap_type_studio'), 'Studio appointment'],
-                      ['walkin', 'Walk-in', 'Walk-in'],
-                      ['personal', t('nap_type_personal'), 'Personal appointment'],
-                    ].map(([value, label, accessibleLabel]) => (
-                      <button key={value} type="button" aria-label={accessibleLabel} aria-pressed={bookingType === value} onClick={() => setBookingType(value)}>
-                        <span aria-hidden="true" className={styles.choiceMark}>{bookingType === value ? '✓' : ''}</span>{label}
-                      </button>
-                    ))}
-                  </div>
-                  <p id="booking-type-description" style={bd.hint}>{
-                    bookingType === 'walkin' ? 'Client arrived without a planned booking.'
-                      : bookingType === 'studio' ? 'Planned and booked by the studio.'
-                      : 'Client brought in by the artist.'
-                  }</p>
-                </div>
-                {artists.length === 0 && <p role="alert" style={bd.inlineError}>Add or approve an artist before creating an appointment.</p>}
-                {allStations.length === 0 && <p role="alert" style={bd.inlineError}>No active station was found. Reload the studio or add a station in Settings before creating an appointment.</p>}
-              </section>
-
               {/* ── CLIENT ── */}
               <section style={bd.section} aria-labelledby="client-section-title">
                 <h2 id="client-section-title" style={bd.sectionLabel}>{t('nap_client')}</h2>
@@ -660,6 +617,49 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
                     onChange={e => setSMSOptIn(e.target.checked)} style={{ accentColor: 'var(--accent)' }} />
                   <span>I have the client’s permission to send one SMS reminder for this appointment. <span className={styles.consentHint}>Included at no extra charge.</span></span>
                 </label>
+              </section>
+
+              <section style={bd.section} aria-labelledby="appointment-section-title">
+                <h2 id="appointment-section-title" style={bd.sectionLabel}>{t('nap_appointment')}</h2>
+                <div className={styles.fieldRow}>
+                  <div style={bd.field}>
+                    <label style={bd.label} htmlFor="new-appointment-type">Appointment type</label>
+                    <select id="new-appointment-type" style={bd.select} value={appointmentType} onChange={e => setAppointmentType(e.target.value)}>
+                      <option value="tattoo">Tattoo</option>
+                      <option value="piercing">Piercing</option>
+                    </select>
+                  </div>
+                  <div style={bd.field}>
+                    <label htmlFor="new-appointment-artist" style={bd.label}>{t('bdp_artist')}</label>
+                    <select id="new-appointment-artist" style={bd.select} value={artistId} onChange={e => setArtistId(e.target.value)} required>
+                      <option value="">{t('nap_select_artist')}</option>
+                      {artists.map(a => (
+                        <option key={a.artistId ?? a.artist_id ?? a.id} value={a.artistId ?? a.artist_id ?? a.id}>{a.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div style={bd.field}>
+                  <span id="booking-type-label" style={bd.label}>{t('nap_booking_type')}</span>
+                  <div className={styles.bookingTypes} role="group" aria-labelledby="booking-type-label" aria-describedby="booking-type-description">
+                    {[
+                      ['studio', t('nap_type_studio'), 'Studio appointment'],
+                      ['walkin', 'Walk-in', 'Walk-in'],
+                      ['personal', t('nap_type_personal'), 'Personal appointment'],
+                    ].map(([value, label, accessibleLabel]) => (
+                      <button key={value} type="button" aria-label={accessibleLabel} aria-pressed={bookingType === value} onClick={() => setBookingType(value)}>
+                        <span aria-hidden="true" className={styles.choiceMark}>{bookingType === value ? '✓' : ''}</span>{label}
+                      </button>
+                    ))}
+                  </div>
+                  <p id="booking-type-description" style={bd.hint}>{
+                    bookingType === 'walkin' ? 'Client arrived without a planned booking.'
+                      : bookingType === 'studio' ? 'Planned and booked by the studio.'
+                      : 'Client brought in by the artist.'
+                  }</p>
+                </div>
+                {artists.length === 0 && <p role="alert" style={bd.inlineError}>Add or approve an artist before creating an appointment.</p>}
+                {allStations.length === 0 && <p role="alert" style={bd.inlineError}>No active station was found. Reload the studio or add a station in Settings before creating an appointment.</p>}
               </section>
 
               <section style={bd.section} aria-labelledby="schedule-section-title">
