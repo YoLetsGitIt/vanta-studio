@@ -68,6 +68,7 @@ function ClientsInner() {
         contactId: contact.id,
         marketingKnown: contact.email_marketing_opt_in !== undefined,
         marketingOptIn: contact.email_marketing_opt_in === true,
+        smsMarketingOptIn: contact.sms_marketing_opt_in === true,
         unsubscribed: contact.email_unsubscribed === true,
       })).sort((a, b) => {
       if (!a.lastBooking) return 1;
@@ -79,7 +80,7 @@ function ClientsInner() {
   const marketingFor = useCallback(client => {
     if (!client || !client.marketingKnown) return null;
     const override = marketingOverrides[client.id];
-    return { optIn: override ?? client.marketingOptIn, unsubscribed: client.unsubscribed };
+    return { optIn: override ?? client.marketingOptIn, smsOptIn: override ?? client.smsMarketingOptIn, unsubscribed: client.unsubscribed };
   }, [marketingOverrides]);
 
   const filtered = useMemo(() => {
@@ -348,7 +349,7 @@ function ConsentBadge({ status }) {
 function MarketingBadge({ marketing }) {
   if (!marketing) return null;
   if (marketing.unsubscribed) return <span style={{ ...s.badge, ...s.badgeGrey }}>Unsubscribed</span>;
-  if (marketing.optIn) return <span style={{ ...s.badge, ...s.badgeGreen }}>Marketing</span>;
+  if (marketing.optIn || marketing.smsOptIn) return <span style={{ ...s.badge, ...s.badgeGreen }}>Marketing</span>;
   return null;
 }
 
@@ -480,7 +481,7 @@ function ClientDetail({ client, marketing, onMarketingChange, clientKey, onClose
           <span style={s.panelTitle}>{client.name}</span>
           <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
             {consentState && <Pill tone={consentTone}>{consentLabelText}</Pill>}
-            {marketing?.optIn && !marketing.unsubscribed && <Pill tone="info">Marketing emails</Pill>}
+            {(marketing?.optIn || marketing?.smsOptIn) && <Pill tone="info">Marketing</Pill>}
             {marketing?.unsubscribed && <Pill>Unsubscribed</Pill>}
           </div>
         </div>
@@ -505,7 +506,7 @@ function ClientDetail({ client, marketing, onMarketingChange, clientKey, onClose
           {client.dob && <Fact label={t('clients_dob')}>{formatDob(client.dob)}</Fact>}
         </Section>
 
-        {(consentTemplates.length > 0 || (marketing && client.email)) && (
+        {(consentTemplates.length > 0 || (marketing && (client.email || client.phone))) && (
           <Section title="Consent">
             {consentTemplates.slice(0, 1).map(ct => {
               const sentId = linkSentId === ct.id;
@@ -526,7 +527,7 @@ function ClientDetail({ client, marketing, onMarketingChange, clientKey, onClose
                 </div>
               );
             })}
-            <MarketingConsent email={client.email} clientKey={clientKey} marketing={marketing} onChange={onMarketingChange} />
+            <MarketingConsent email={client.email} phone={client.phone} clientKey={clientKey} marketing={marketing} onChange={onMarketingChange} />
           </Section>
         )}
 

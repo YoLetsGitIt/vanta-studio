@@ -538,9 +538,10 @@ export default function BookingDetailPanel({
 
           <MarketingConsent
             email={email}
+            phone={phone}
             clientKey={clientProfile?.id}
             marketing={clientProfile && clientProfile.email_marketing_opt_in !== undefined
-              ? { optIn: marketingOverride ?? clientProfile.email_marketing_opt_in === true, unsubscribed: clientProfile.email_unsubscribed === true }
+              ? { optIn: marketingOverride ?? clientProfile.email_marketing_opt_in === true, smsOptIn: marketingOverride ?? clientProfile.sms_marketing_opt_in === true, unsubscribed: clientProfile.email_unsubscribed === true }
               : null}
             onChange={setMarketingOverride}
           />
