@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { getSupabase } from '@/lib/supabase';
 import { getStudioPublic, getStudioConsentTemplates } from '@/lib/api';
+import styles from './ConsentPage.module.css';
 
 // The studio's reusable consent QR code lands here (/consent?s=<studioId>). Unlike the
 // emailed single-use link on vanta.tattoo, the client must sign in or create an account
@@ -263,7 +264,7 @@ function ConsentForm() {
               {missingDob && (
                 <div>
                   <p style={{ ...s.label, marginBottom: '0.3rem' }}>Date of birth <span style={{ color: '#e86f6f' }}>*</span></p>
-                  <input style={s.input} type="date" required value={dob} max={new Date().toISOString().slice(0, 10)} onChange={e => setDob(e.target.value)} />
+                  <DateOfBirthInput value={dob} onChange={setDob} />
                 </div>
               )}
               {missingPhone && (
@@ -378,6 +379,26 @@ function ConsentForm() {
   );
 }
 
+function DateOfBirthInput({ value, onChange }) {
+  return (
+    <div className={styles.dateField}>
+      <input
+        className={styles.dateInput}
+        style={s.input}
+        type="date"
+        aria-label="Date of birth"
+        autoComplete="bday"
+        required
+        value={value}
+        data-empty={!value}
+        max={new Date().toISOString().slice(0, 10)}
+        onChange={e => onChange(e.target.value)}
+      />
+      {!value && <span className={styles.datePlaceholder} aria-hidden="true">Date of birth</span>}
+    </div>
+  );
+}
+
 function AuthGate({ studioName, logoUrl }) {
   const [mode, setMode]       = useState('signup');
   const [email, setEmail]     = useState('');
@@ -428,10 +449,7 @@ function AuthGate({ studioName, logoUrl }) {
         {mode === 'signup' && (
           <>
             <input style={s.input} type="text" required autoComplete="name" value={name} onChange={e => setName(e.target.value)} placeholder="Full name" />
-            <div>
-              <p style={{ ...s.label, marginBottom: '0.3rem' }}>Date of birth</p>
-              <input style={s.input} type="date" required value={dob} max={new Date().toISOString().slice(0, 10)} onChange={e => setDob(e.target.value)} />
-            </div>
+            <DateOfBirthInput value={dob} onChange={setDob} />
             <input style={s.input} type="tel" required autoComplete="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="Phone number" />
           </>
         )}
@@ -703,7 +721,7 @@ const s = {
     border: '1px solid rgba(255,255,255,0.12)',
     borderRadius: 8, padding: '0.65rem 0.85rem',
     fontSize: '0.9rem', color: '#fff', outline: 'none',
-    width: '100%', minWidth: 0, boxSizing: 'border-box',
+    width: '100%', minWidth: 0, minHeight: 44, boxSizing: 'border-box',
     fontFamily: 'inherit',
   },
   templateBox: {
