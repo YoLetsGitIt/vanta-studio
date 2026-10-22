@@ -25,6 +25,7 @@ import {
 import { useRouter } from 'next/navigation';
 import { initials, toISODate } from '@/lib/format';
 import BookingDetailPanel from '@/components/BookingDetailPanel';
+import CancelDepositButton from '@/components/CancelDepositButton';
 import CompleteBookingModal from '@/components/CompleteBookingModal';
 import RejectBookingModal from '@/components/RejectBookingModal';
 import SendSelectionLinkModal from '@/components/SendSelectionLinkModal';
@@ -89,6 +90,16 @@ export default function HomePage() {
   const [stripeConnected, setStripeConnected] = useState(false);
   const [loadError, setLoadError] = useState('');
   const router = useRouter();
+
+  useEffect(() => {
+    function cancelled(event) {
+      const id = event.detail.bookingId;
+      setUnpaidDepositBookings(items => items.filter(item => item.id !== id));
+      setReviewBooking(current => current?.id === id ? { ...current, deposit_required: false, deposit_amount: null, status: current.status === 'awaiting_payment' ? 'confirmed' : current.status } : current);
+    }
+    window.addEventListener('booking-deposit-cancelled', cancelled);
+    return () => window.removeEventListener('booking-deposit-cancelled', cancelled);
+  }, []);
 
   const TODAY_SENT_KEY = `consent_sent_${new Date().toISOString().slice(0, 10)}`;
   const [sentToday, setSentToday] = useState(() => {
@@ -451,6 +462,7 @@ export default function HomePage() {
                 <AttentionGroup title="Unpaid deposits" tone="danger" icon="card" count={awaitingPaymentCount} subtitle="Deposit not yet received" open={!!openAttentionGroups.payment} onToggle={() => toggleAttentionGroup('payment')}>
                   {unpaidDepositBookings.map(booking => (
                     <AttentionItem key={booking.id} title={booking.requester_name ?? 'Client'} subtitle={bookingSubtitle(booking)} onClick={() => openBookingReview(booking)}>
+                      <CancelDepositButton bookingId={booking.id} disabled={attentionAction === `deposit-${booking.id}`} />
                       <button
                         style={s.inlinePrimary}
                         disabled={attentionAction === `deposit-${booking.id}` || !booking.requester_email}

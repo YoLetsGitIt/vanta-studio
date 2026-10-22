@@ -1,5 +1,6 @@
 'use client';
 
+import CancelDepositButton from '@/components/CancelDepositButton';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { getStations, getClientConsents, getNotes, addNote, deleteNote, getBookingConsentSubmissions, getStudioClients, generateConsentLink, getStudioBookingPayment, listConsentTemplates, downloadConsentPdf } from '@/lib/api';
@@ -93,6 +94,8 @@ export default function BookingDetailPanel({
   const [submissionsExpanded, setSubmissionsExpanded] = useState(false);
 
   // ── Normalise fields from booking (priority) with entry as fallback ────────
+  const [cancelledDepositId, setCancelledDepositId] = useState(null);
+  const depositCancelled = cancelledDepositId === (booking?.id ?? entry?.bookingId);
   const b           = booking ?? entry ?? {};
   const bookingId   = booking?.id     ?? entry?.bookingId;
   const clientName  = booking?.requester_name    ?? entry?.clientName    ?? '—';
@@ -115,9 +118,10 @@ export default function BookingDetailPanel({
   const duration    = booking?.proposed_duration_minutes ?? entry?.durationMins ?? null;
   const chosenTime  = booking?.chosen_time       ?? entry?.chosenTime     ?? null;
   const proposedTime = booking?.proposed_time_primary    ?? null;
-  const status      = booking?.status            ?? entry?.status         ?? null;
-  const depositRequired   = booking?.deposit_required    ?? false;
-  const depositAmount     = booking?.deposit_amount      ?? null;
+  const rawStatus   = booking?.status ?? entry?.status ?? null;
+  const status      = depositCancelled && rawStatus === 'awaiting_payment' ? 'confirmed' : rawStatus;
+  const depositRequired   = !depositCancelled && (booking?.deposit_required ?? false);
+  const depositAmount     = depositCancelled ? null : booking?.deposit_amount ?? null;
   const depositPaidAt     = booking?.deposit_paid_at     ?? null;
   const depositConfirmedAt = booking?.deposit_confirmed_at ?? null;
   const depositPaid       = !!depositPaidAt || !!(entry?.depositPaid);
@@ -471,6 +475,9 @@ export default function BookingDetailPanel({
                     </div>
                   );
                 })()}
+                {depositRequired && !depositPaid && !depositConfirmedAt && chosenTime && ['confirmed', 'awaiting_payment', 'requires_confirmation'].includes(status) && (
+                  <CancelDepositButton bookingId={bookingId} onCancelled={() => setCancelledDepositId(bookingId)} disabled={actionLoading} />
+                )}
                 {depositPaidAt && (
                   <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
                     Paid {new Date(depositPaidAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
