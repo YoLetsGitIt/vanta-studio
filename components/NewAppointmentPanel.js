@@ -372,7 +372,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
       if (!isPiercing && size.trim()) { body.size = size.trim(); body.size_unit = sizeUnit; }
       if (clientEmail.trim()) body.requester_email = clientEmail.trim();
       if (clientPhone.trim()) body.requester_phone = clientPhone.trim();
-      body.sms_reminder_opt_in = smsOptIn && !!clientPhone.trim();
+      body.sms_reminder_opt_in = clientMode === 'manual' && smsOptIn && !!clientPhone.trim();
       if (clientDob.trim()) body.dob = clientDob.trim();
       if (stationId) body.station_id = stationId;
       if (fp > 0) body.estimated_quote = fp;
@@ -612,11 +612,11 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
                   </>
                 )}
 
-                <label className={styles.smsConsent}>
+                {clientMode === 'manual' && <label className={styles.smsConsent}>
                   <input type="checkbox" checked={smsOptIn} disabled={!clientPhone.trim() || saving}
                     onChange={e => setSMSOptIn(e.target.checked)} style={{ accentColor: 'var(--accent)' }} />
                   <span>I have the client’s permission to send one SMS reminder for this appointment. <span className={styles.consentHint}>Included at no extra charge.</span></span>
-                </label>
+                </label>}
               </section>
 
               <section style={bd.section} aria-labelledby="appointment-section-title">
