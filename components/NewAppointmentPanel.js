@@ -11,6 +11,7 @@ import { useLanguage } from '@/lib/i18n';
 import { requestConfirmation, showError, showFeedback } from '@/lib/feedback';
 import { bookingActions } from '@/lib/bookingActions';
 import Button from '@/components/ui/Button';
+import styles from './NewAppointmentPanel.module.css';
 
 const DURATION_OPTIONS = [
   { label: '30 min', value: 30 },
@@ -46,11 +47,11 @@ function getDefaultSizeUnit() {
 }
 
 const selectStyle = {
-  background: 'var(--bg-input)',
-  border: '1px solid var(--border)',
-  borderRadius: 8, padding: '0.6rem 0.85rem',
-  fontSize: '0.875rem', color: 'var(--text)', outline: 'none',
-  width: '100%', boxSizing: 'border-box', colorScheme: 'auto', cursor: 'pointer',
+  background: 'var(--appointment-input, var(--bg-input))',
+  border: '1px solid var(--border-strong)',
+  borderRadius: 9, padding: '0.65rem 0.75rem', minHeight: 44,
+  fontSize: '0.875rem', color: 'var(--text)',
+  width: '100%', boxSizing: 'border-box', colorScheme: 'inherit', cursor: 'pointer',
 };
 
 // Converts "HH:MM" (24h) ↔ {h12, minute, ampm} for display
@@ -337,7 +338,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
       if (document.querySelector('dialog:modal')) return;
       if (event.key === 'Escape') { event.preventDefault(); handleClose(); return; }
       if (event.key !== 'Tab' || !panelRef.current) return;
-      const focusable = [...panelRef.current.querySelectorAll('button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [href], [tabindex]:not([tabindex="-1"])')];
+      const focusable = [...panelRef.current.querySelectorAll('button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), summary, [href], [tabindex]:not([tabindex="-1"])')].filter(element => element.getClientRects().length > 0);
       if (!focusable.length) return;
       const first = focusable[0];
       const last = focusable[focusable.length - 1];
@@ -454,7 +455,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
         aria-hidden="true"
         style={{ ...bd.backdrop, opacity: open ? 1 : 0, pointerEvents: open ? 'auto' : 'none' }}
       />
-      <div className="studio-appointment-panel" ref={panelRef} role="dialog" aria-modal="true" aria-hidden={!open} aria-labelledby="new-appointment-title" style={{ ...bd.panel, transform: open ? 'translateX(0)' : 'translateX(100%)', visibility: open ? 'visible' : 'hidden' }}>
+      <div className={`studio-appointment-panel ${styles.panel}`} ref={panelRef} role="dialog" aria-modal="true" aria-hidden={!open} aria-labelledby="new-appointment-title" style={{ ...bd.panel, transform: open ? 'translateX(0)' : 'translateX(100%)', visibility: open ? 'visible' : 'hidden' }}>
 
         <div style={bd.header}>
           <span id="new-appointment-title" style={bd.title}>{t('nap_title')}</span>
@@ -471,428 +472,389 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
           </div>
         ) : (
           <form onSubmit={handleSubmit} style={bd.form}>
-
-            <div style={bd.section}>
-              <label style={bd.sectionLabel} htmlFor="new-appointment-type">Appointment type</label>
-              <select id="new-appointment-type" style={bd.select} value={appointmentType} onChange={e => setAppointmentType(e.target.value)}>
-                <option value="tattoo">Tattoo</option>
-                <option value="piercing">Piercing</option>
-              </select>
-            </div>
-
-            {/* ── BOOKING TYPE ── */}
-            <div style={bd.section}>
-              <p style={bd.sectionLabel}>{t('nap_booking_type')}</p>
-              <div style={bd.typeCards}>
-                <button
-                  type="button"
-                  style={{ ...bd.typeCard, ...(bookingType === 'studio' ? bd.typeCardActive : {}) }}
-                  aria-pressed={bookingType === 'studio'}
-                  onClick={() => setBookingType('studio')}
-                >
-                  <strong>Studio appointment</strong><span>Planned and booked by the studio</span>
-                </button>
-                <button
-                  type="button"
-                  style={{ ...bd.typeCard, ...(bookingType === 'walkin' ? bd.typeCardActive : {}) }}
-                  aria-pressed={bookingType === 'walkin'}
-                  onClick={() => setBookingType('walkin')}
-                >
-                  <strong>Walk-in</strong><span>Client arrived without a planned booking</span>
-                </button>
-                <button
-                  type="button"
-                  style={{ ...bd.typeCard, ...(bookingType === 'personal' ? bd.typeCardActive : {}) }}
-                  aria-pressed={bookingType === 'personal'}
-                  onClick={() => setBookingType('personal')}
-                >
-                  <strong>Personal appointment</strong><span>Client brought in by the artist</span>
-                </button>
-              </div>
-            </div>
-
-            {/* ── ARTIST ── */}
-            {artists.length > 0 && (
-              <div style={bd.section}>
-                <p style={bd.sectionLabel}>{t('bdp_artist')}</p>
-                <select aria-label={t('bdp_artist')} style={bd.select} value={artistId} onChange={e => setArtistId(e.target.value)} required>
-                  <option value="">{t('nap_select_artist')}</option>
-                  {artists.map(a => (
-                    <option key={a.artistId ?? a.artist_id ?? a.id} value={a.artistId ?? a.artist_id ?? a.id}>
-                      {a.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-            {artists.length === 0 && <p role="alert" style={bd.inlineError}>Add or approve an artist before creating an appointment.</p>}
-            {allStations.length === 0 && <p role="alert" style={bd.inlineError}>No active station was found. Reload the studio or add a station in Settings before creating an appointment.</p>}
-
-            {/* ── CLIENT ── */}
-            <div style={bd.section}>
-              <p style={bd.sectionLabel}>{t('nap_client')}</p>
-
-              <div style={bd.modeTabs}>
-                <button
-                  type="button"
-                  aria-pressed={clientMode === 'search'}
-                  style={{ ...bd.modeTab, ...(clientMode === 'search' ? bd.modeTabActive : {}) }}
-                  onClick={() => { setClientMode('search'); setFirstName(''); setLastName(''); setClientEmail(''); setClientPhone(''); }}
-                >
-                  {t('nap_search_existing')}
-                </button>
-                <button
-                  type="button"
-                  aria-pressed={clientMode === 'manual'}
-                  style={{ ...bd.modeTab, ...(clientMode === 'manual' ? bd.modeTabActive : {}) }}
-                  onClick={() => { setClientMode('manual'); setSelectedClient(null); }}
-                >
-                  {t('nap_new_client')}
-                </button>
-              </div>
-
-              {clientMode === 'search' ? (
-                selectedClient ? (
-                  <div>
-                  <div style={bd.selectedClientCard}>
-                    <div style={{ minWidth: 0 }}>
-                      <span style={bd.selectedClientName}>{selectedClient.name}</span>
-                      <span style={bd.selectedClientSub}>
-                        {[selectedClient.email, selectedClient.phone, selectedClient.dob ? formatDob(selectedClient.dob) : null].filter(Boolean).join(' · ')}
-                      </span>
-                    </div>
-                    <button type="button" style={bd.deselectBtn} onClick={clearSelectedClient} aria-label="Remove selected client">✕</button>
-                  </div>
-                  {(selectedClient.allergies || selectedClient.pain_tolerance || selectedClient.notes) && (
-                    <div role="note" style={bd.clientWarning}>
-                      <strong>Client context</strong>
-                      {selectedClient.allergies && <span>Allergies: {selectedClient.allergies}</span>}
-                      {selectedClient.pain_tolerance && <span>Pain tolerance: {selectedClient.pain_tolerance}</span>}
-                      {selectedClient.notes && <span>Notes: {selectedClient.notes}</span>}
-                    </div>
-                  )}
-                  </div>
-                ) : (
-                  <div style={{ position: 'relative' }} onBlur={event => {
-                    if (!event.currentTarget.contains(event.relatedTarget)) setShowDropdown(false);
-                  }}>
-                    <input
-                      style={bd.input}
-                      type="search"
-                      aria-label="Search existing clients"
-                      aria-expanded={showDropdown && filteredClients.length > 0}
-                      aria-controls="new-appointment-client-results"
-                      placeholder={t('clients_search')}
-                      value={clientSearch}
-                      onChange={e => { setClientSearch(e.target.value); setShowDropdown(true); }}
-                      onFocus={() => setShowDropdown(true)}
-                      autoComplete="off"
-                    />
-                    {showDropdown && filteredClients.length > 0 && (
-                      <div id="new-appointment-client-results" role="group" aria-label="Matching clients" style={bd.dropdown}>
-                        {filteredClients.map((c, i) => (
-                          <button key={c.id ?? c.email ?? `${c.name}-${i}`} type="button" style={bd.dropdownItem} onClick={() => pickClient(c)}>
-                            <span style={bd.dropdownName}>{c.name}</span>
-                            <span style={bd.dropdownSub}>{[c.email, c.phone].filter(Boolean).join(' · ')}</span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                    {clientSearch && filteredClients.length === 0 && (
-                      <div style={bd.noResults}>
-                        {t('nap_no_matches')}{' '}
-                        <button type="button" style={bd.linkBtn} onClick={() => setClientMode('manual')}>
-                          {t('nap_enter_manually')}
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )
-              ) : (
-                <>
-                  <div className="studio-form-row" style={bd.fieldRow}>
-                    <div style={bd.field}>
-                      <label htmlFor="new-appointment-first-name" style={bd.label}>{t('nap_first_name')}</label>
-                      <input
-                        style={bd.input}
-                        id="new-appointment-first-name" value={firstName}
-                        onChange={e => setFirstName(e.target.value)}
-                        placeholder={t('nap_first_name')}
-                        autoFocus
-                      />
-                    </div>
-                    <div style={bd.field}>
-                      <label htmlFor="new-appointment-last-name" style={bd.label}>{t('nap_last_name')}</label>
-                      <input
-                        style={bd.input}
-                        id="new-appointment-last-name" value={lastName}
-                        onChange={e => setLastName(e.target.value)}
-                        placeholder={t('nap_last_name')}
-                      />
-                    </div>
+            <div className={styles.body}>
+              <section style={bd.section} aria-labelledby="appointment-section-title">
+                <h2 id="appointment-section-title" style={bd.sectionLabel}>{t('nap_appointment')}</h2>
+                <div className={styles.fieldRow}>
+                  <div style={bd.field}>
+                    <label style={bd.label} htmlFor="new-appointment-type">Appointment type</label>
+                    <select id="new-appointment-type" style={bd.select} value={appointmentType} onChange={e => setAppointmentType(e.target.value)}>
+                      <option value="tattoo">Tattoo</option>
+                      <option value="piercing">Piercing</option>
+                    </select>
                   </div>
                   <div style={bd.field}>
-                    <label htmlFor="new-appointment-dob" style={bd.label}>{t('clients_dob')}</label>
-                    <input
-                      style={bd.input}
-                      type="date"
-                      id="new-appointment-dob" value={clientDob}
-                      onChange={e => setClientDob(e.target.value)}
-                    />
-                  </div>
-                  <div className="studio-form-row" style={bd.fieldRow}>
-                    <div style={bd.field}>
-                      <label htmlFor="new-appointment-email" style={bd.label}>{t('sched_email')}</label>
-                      <input
-                        style={bd.input}
-                        type="email"
-                        aria-invalid={emailInvalid}
-                        id="new-appointment-email" value={clientEmail}
-                        onChange={e => setClientEmail(e.target.value)}
-                        placeholder="email@example.com"
-                      />
-                    </div>
-                    <div style={bd.field}>
-                      <label htmlFor="new-appointment-phone" style={bd.label}>{t('sched_phone')}</label>
-                      <input
-                        style={bd.input}
-                        type="tel"
-                        aria-invalid={phoneInvalid}
-                        id="new-appointment-phone" value={clientPhone}
-                        onChange={e => { setClientPhone(e.target.value); setSMSOptIn(false); }}
-                        placeholder="+1 555 0100"
-                      />
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
-
-            <label style={{ display: 'flex', gap: 10, padding: '0 24px 20px', color: 'var(--text-secondary)', fontSize: 13, lineHeight: 1.6 }}>
-              <input type="checkbox" checked={smsOptIn} disabled={!clientPhone.trim() || saving}
-                onChange={e => setSMSOptIn(e.target.checked)} style={{ accentColor: 'var(--accent)' }} />
-              I have the client’s permission to send one SMS reminder for this appointment. Included at no extra charge.
-            </label>
-
-            {/* ── BOOKING DETAILS ── */}
-            <div style={bd.section}>
-              <p style={bd.sectionLabel}>{t('nap_booking_details')}</p>
-
-              <div style={bd.field}>
-                <label htmlFor="new-appointment-date" style={bd.label}>{t('sched_date')}</label>
-                <input
-                  style={bd.input}
-                  type="date"
-                  min={todayStr()}
-                  id="new-appointment-date" value={bookingDate}
-                  onChange={e => setBookingDate(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div style={bd.field}>
-                <span style={bd.label}>{t('nap_start_time')}</span>
-                <TimeSelect value={startTime} onChange={setStartTime} label={t('nap_start_time')} />
-              </div>
-
-              <div style={bd.field}>
-                <label htmlFor="new-appointment-duration" style={bd.label}>{t('bdp_duration')}</label>
-                <select style={bd.select} id="new-appointment-duration" value={durationMins} onChange={e => setDurationMins(Number(e.target.value))}>
-                  {DURATION_OPTIONS.map(opt => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                  ))}
-                </select>
-              </div>
-
-              {timeError ? (
-                <div style={bd.timeWarning}>
-                  <span style={bd.timeWarningIcon}>⚠</span>
-                  {timeError}
-                </div>
-              ) : dayHours && !dayHours.is_closed ? (
-                <p style={bd.hint}>{t('nap_studio_open')} {dayHours.open_time} – {dayHours.close_time}</p>
-              ) : bookingDate && !studioHours.length ? (
-                <p style={bd.hint}>{t('nap_no_hours_hint')}</p>
-              ) : null}
-              {artistConflict && <div role="alert" style={bd.timeWarning}><span style={bd.timeWarningIcon}>⚠</span>This artist already has an appointment that overlaps this time.</div>}
-              {scheduleError && <p role="status" style={bd.availabilityNotice}>{scheduleError} The server will verify it when you create the appointment.</p>}
-            </div>
-
-            {/* ── STATION — revealed after date + time + duration are set ── */}
-            {bookingDate && startTime && allStations.length > 0 && (
-              <div style={{ ...bd.section, opacity: timeError ? 0.35 : 1, pointerEvents: timeError ? 'none' : 'auto' }}>
-                <p style={bd.sectionLabel}>{t('bdp_station')}</p>
-                {stationsLoading ? (
-                  <p style={bd.hint}>{t('nap_checking')}</p>
-                ) : (
-                  <>
-                    <select aria-label={t('bdp_station')} disabled={!!timeError} style={bd.select} value={stationId} onChange={e => setStationId(e.target.value)}>
-                      <option value="">{t('nap_no_station')}</option>
-                      {(availableStations ?? allStations).map(s => (
-                        <option key={s.id} value={s.id}>{s.name}</option>
+                    <label htmlFor="new-appointment-artist" style={bd.label}>{t('bdp_artist')}</label>
+                    <select id="new-appointment-artist" style={bd.select} value={artistId} onChange={e => setArtistId(e.target.value)} required>
+                      <option value="">{t('nap_select_artist')}</option>
+                      {artists.map(a => (
+                        <option key={a.artistId ?? a.artist_id ?? a.id} value={a.artistId ?? a.artist_id ?? a.id}>{a.name}</option>
                       ))}
                     </select>
-                    {stationId && <p style={bd.hint}>The first available station was selected automatically. You can change it.</p>}
-                    {availableStations !== null && availableStations.length === 0 && (
-                      <p style={bd.inlineError}>{t('nap_no_stations_date')}</p>
-                    )}
-                    {stationAvailabilityError && <p role="alert" style={bd.inlineError}>Live station availability could not be checked. The booking will be verified when you create it.</p>}
-                  </>
-                )}
-              </div>
-            )}
-
-            {essentialsComplete && bookingType === 'walkin' && (
-              <button
-                type="button"
-                style={{ ...bd.optionalToggle, ...(showOptional ? bd.optionalToggleOpen : {}) }}
-                onClick={() => setShowOptional(value => !value)}
-                aria-expanded={showOptional}
-              >
-                <span style={bd.optionalToggleCopy}>
-                  <span style={bd.optionalToggleTitle}>Optional details</span>
-                  <span style={bd.optionalToggleDescription}>Appointment, pricing, deposit and notes</span>
-                </span>
-                <span style={bd.optionalToggleAction}>
-                  {showOptional ? 'Hide' : 'Show'}
-                  <span aria-hidden="true" style={{ ...bd.optionalChevron, transform: showOptional ? 'rotate(180deg)' : 'rotate(0deg)' }}>⌄</span>
-                </span>
-              </button>
-            )}
-
-            {/* ── DETAILS ── */}
-            {essentialsComplete && (bookingType !== 'walkin' || showOptional) && <>
-            <div style={bd.section}>
-              <p style={bd.sectionLabel}>{t('nap_details')}</p>
-              {!isPiercing && <>
-              <label style={bd.checkRow}>
-                <input type="checkbox" checked={retouch} onChange={e => setRetouch(e.target.checked)} style={bd.checkbox} />
-                <span>{t('nap_retouch')}</span>
-              </label>
-              <div style={bd.field}>
-                <label htmlFor="new-appointment-size" style={bd.label}>{t('bdp_size')}</label>
-                <div style={{ display: 'flex', gap: '0.4rem' }}>
-                  <input
-                    style={{ ...bd.input, flex: 1 }}
-                    type="number" min="0" step="0.1"
-                    id="new-appointment-size" value={size}
-                    onChange={e => setSize(e.target.value)}
-                    placeholder="e.g. 10"
-                  />
-                  <div style={bd.unitToggle}>
-                    {['cm', 'in'].map(u => (
-                      <button
-                        key={u} type="button" aria-pressed={sizeUnit === u}
-                        style={{ ...bd.unitBtn, ...(sizeUnit === u ? bd.unitBtnActive : {}) }}
-                        onClick={() => setSizeUnit(u)}
-                      >
-                        {u}
+                  </div>
+                </div>
+                <div style={bd.field}>
+                  <span id="booking-type-label" style={bd.label}>{t('nap_booking_type')}</span>
+                  <div className={styles.bookingTypes} role="group" aria-labelledby="booking-type-label" aria-describedby="booking-type-description">
+                    {[
+                      ['studio', t('nap_type_studio'), 'Studio appointment'],
+                      ['walkin', 'Walk-in', 'Walk-in'],
+                      ['personal', t('nap_type_personal'), 'Personal appointment'],
+                    ].map(([value, label, accessibleLabel]) => (
+                      <button key={value} type="button" aria-label={accessibleLabel} aria-pressed={bookingType === value} onClick={() => setBookingType(value)}>
+                        <span aria-hidden="true" className={styles.choiceMark}>{bookingType === value ? '✓' : ''}</span>{label}
                       </button>
                     ))}
                   </div>
+                  <p id="booking-type-description" style={bd.hint}>{
+                    bookingType === 'walkin' ? 'Client arrived without a planned booking.'
+                      : bookingType === 'studio' ? 'Planned and booked by the studio.'
+                      : 'Client brought in by the artist.'
+                  }</p>
                 </div>
-              </div>
-              </>}
-            </div>
+                {artists.length === 0 && <p role="alert" style={bd.inlineError}>Add or approve an artist before creating an appointment.</p>}
+                {allStations.length === 0 && <p role="alert" style={bd.inlineError}>No active station was found. Reload the studio or add a station in Settings before creating an appointment.</p>}
+              </section>
 
-            {/* ── PRICING ── */}
-            <div style={bd.section}>
-              <p style={bd.sectionLabel}>{t('nap_pricing')}</p>
-              <div style={bd.field}>
-                <div style={bd.field}>
-                  <label htmlFor="new-appointment-estimate" style={bd.label}>Estimated price</label>
-                  <div style={bd.prefixWrap}>
-                    <span style={bd.prefix}>$</span>
-                    <input
-                      style={{ ...bd.input, paddingLeft: '1.75rem' }}
-                      type="number" min="0" step="0.01"
-                      id="new-appointment-estimate" value={finalPrice}
-                      onChange={e => setFinalPrice(e.target.value)}
-                      placeholder="0.00"
-                    />
+              {/* ── CLIENT ── */}
+              <section style={bd.section} aria-labelledby="client-section-title">
+                <h2 id="client-section-title" style={bd.sectionLabel}>{t('nap_client')}</h2>
+
+                <div style={bd.modeTabs}>
+                  <button
+                    type="button"
+                    aria-pressed={clientMode === 'search'}
+                    style={{ ...bd.modeTab, ...(clientMode === 'search' ? bd.modeTabActive : {}) }}
+                    onClick={() => { setClientMode('search'); setFirstName(''); setLastName(''); setClientEmail(''); setClientPhone(''); }}
+                  >
+                    {t('nap_search_existing')}
+                  </button>
+                  <button
+                    type="button"
+                    aria-pressed={clientMode === 'manual'}
+                    style={{ ...bd.modeTab, ...(clientMode === 'manual' ? bd.modeTabActive : {}) }}
+                    onClick={() => { setClientMode('manual'); setSelectedClient(null); }}
+                  >
+                    {t('nap_new_client')}
+                  </button>
+                </div>
+
+                {clientMode === 'search' ? (
+                  selectedClient ? (
+                    <div>
+                    <div style={bd.selectedClientCard}>
+                      <div style={{ minWidth: 0 }}>
+                        <span style={bd.selectedClientName}>{selectedClient.name}</span>
+                        <span style={bd.selectedClientSub}>
+                          {[selectedClient.email, selectedClient.phone, selectedClient.dob ? formatDob(selectedClient.dob) : null].filter(Boolean).join(' · ')}
+                        </span>
+                      </div>
+                      <button type="button" style={bd.deselectBtn} onClick={clearSelectedClient} aria-label="Remove selected client">✕</button>
+                    </div>
+                    {(selectedClient.allergies || selectedClient.pain_tolerance || selectedClient.notes) && (
+                      <div role="note" style={bd.clientWarning}>
+                        <strong>Client context</strong>
+                        {selectedClient.allergies && <span>Allergies: {selectedClient.allergies}</span>}
+                        {selectedClient.pain_tolerance && <span>Pain tolerance: {selectedClient.pain_tolerance}</span>}
+                        {selectedClient.notes && <span>Notes: {selectedClient.notes}</span>}
+                      </div>
+                    )}
+                    </div>
+                  ) : (
+                    <div style={{ position: 'relative' }} onBlur={event => {
+                      if (!event.currentTarget.contains(event.relatedTarget)) setShowDropdown(false);
+                    }}>
+                      <input
+                        style={bd.input}
+                        type="search"
+                        aria-label="Search existing clients"
+                        aria-expanded={showDropdown && filteredClients.length > 0}
+                        aria-controls="new-appointment-client-results"
+                        placeholder={t('clients_search')}
+                        value={clientSearch}
+                        onChange={e => { setClientSearch(e.target.value); setShowDropdown(true); }}
+                        onFocus={() => setShowDropdown(true)}
+                        autoComplete="off"
+                      />
+                      {showDropdown && filteredClients.length > 0 && (
+                        <div id="new-appointment-client-results" role="group" aria-label="Matching clients" style={bd.dropdown}>
+                          {filteredClients.map((c, i) => (
+                            <button key={c.id ?? c.email ?? `${c.name}-${i}`} type="button" style={bd.dropdownItem} onClick={() => pickClient(c)}>
+                              <span style={bd.dropdownName}>{c.name}</span>
+                              <span style={bd.dropdownSub}>{[c.email, c.phone].filter(Boolean).join(' · ')}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      {clientSearch && filteredClients.length === 0 && (
+                        <div style={bd.noResults}>
+                          {t('nap_no_matches')}{' '}
+                          <button type="button" style={bd.linkBtn} onClick={() => setClientMode('manual')}>
+                            {t('nap_enter_manually')}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )
+                ) : (
+                  <>
+                    <div className={styles.fieldRow}>
+                      <div style={bd.field}>
+                        <label htmlFor="new-appointment-first-name" style={bd.label}>{t('nap_first_name')}</label>
+                        <input
+                          style={bd.input}
+                          id="new-appointment-first-name" value={firstName}
+                          onChange={e => setFirstName(e.target.value)}
+                          placeholder={t('nap_first_name')}
+                          autoFocus
+                        />
+                      </div>
+                      <div style={bd.field}>
+                        <label htmlFor="new-appointment-last-name" style={bd.label}>{t('nap_last_name')}</label>
+                        <input
+                          style={bd.input}
+                          id="new-appointment-last-name" value={lastName}
+                          onChange={e => setLastName(e.target.value)}
+                          placeholder={t('nap_last_name')}
+                        />
+                      </div>
+                    </div>
+                    <div style={bd.field}>
+                      <label htmlFor="new-appointment-dob" style={bd.label}>{t('clients_dob')}</label>
+                      <input
+                        style={bd.input}
+                        type="date"
+                        id="new-appointment-dob" value={clientDob}
+                        onChange={e => setClientDob(e.target.value)}
+                      />
+                    </div>
+                    <div className={styles.fieldRow}>
+                      <div style={bd.field}>
+                        <label htmlFor="new-appointment-email" style={bd.label}>{t('sched_email')}</label>
+                        <input
+                          style={bd.input}
+                          type="email"
+                          aria-invalid={emailInvalid}
+                          id="new-appointment-email" value={clientEmail}
+                          onChange={e => setClientEmail(e.target.value)}
+                          placeholder="email@example.com"
+                        />
+                      </div>
+                      <div style={bd.field}>
+                        <label htmlFor="new-appointment-phone" style={bd.label}>{t('sched_phone')}</label>
+                        <input
+                          style={bd.input}
+                          type="tel"
+                          aria-invalid={phoneInvalid}
+                          id="new-appointment-phone" value={clientPhone}
+                          onChange={e => { setClientPhone(e.target.value); setSMSOptIn(false); }}
+                          placeholder="+1 555 0100"
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                <label className={styles.smsConsent}>
+                  <input type="checkbox" checked={smsOptIn} disabled={!clientPhone.trim() || saving}
+                    onChange={e => setSMSOptIn(e.target.checked)} style={{ accentColor: 'var(--accent)' }} />
+                  <span>I have the client’s permission to send one SMS reminder for this appointment. <span className={styles.consentHint}>Included at no extra charge.</span></span>
+                </label>
+              </section>
+
+              <section style={bd.section} aria-labelledby="schedule-section-title">
+                <h2 id="schedule-section-title" style={bd.sectionLabel}>{t('nav_schedule')}</h2>
+                <div className={styles.fieldRow}>
+                  <div style={bd.field}>
+                    <label htmlFor="new-appointment-date" style={bd.label}>{t('sched_date')}</label>
+                    <input style={bd.input} type="date" min={todayStr()} id="new-appointment-date" value={bookingDate} onChange={e => setBookingDate(e.target.value)} required />
+                  </div>
+                  <div style={bd.field}>
+                    <span style={bd.label}>{t('nap_start_time')}</span>
+                    <TimeSelect value={startTime} onChange={setStartTime} label={t('nap_start_time')} />
                   </div>
                 </div>
-                <div style={bd.field}>
-                  <span style={bd.label}>Deposit</span>
-                  <div style={bd.depositModes}>
-                    {[
-                      ['none', 'No deposit'],
-                      ['later', stripeConnected ? 'Collect later' : 'Due later'],
-                      ['paid', 'Already paid'],
-                    ].map(([value, label]) => <button key={value} type="button" aria-pressed={depositMode === value} onClick={() => setDepositMode(value)} style={{ ...bd.depositMode, ...(depositMode === value ? bd.depositModeActive : {}) }}>{label}</button>)}
+                <div className={styles.fieldRow}>
+                  <div style={bd.field}>
+                    <label htmlFor="new-appointment-duration" style={bd.label}>{t('bdp_duration')}</label>
+                    <select style={bd.select} id="new-appointment-duration" value={durationMins} onChange={e => setDurationMins(Number(e.target.value))}>
+                      {DURATION_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                    </select>
+                  </div>
+                  {bookingDate && startTime && allStations.length > 0 && (
+                    <div style={bd.field}>
+                      <label htmlFor="new-appointment-station" style={bd.label}>{t('bdp_station')}</label>
+                      <select id="new-appointment-station" disabled={!!timeError || stationsLoading} style={bd.select} value={stationId} onChange={e => setStationId(e.target.value)}>
+                        <option value="">{stationsLoading ? t('nap_checking') : t('nap_no_station')}</option>
+                        {(availableStations ?? allStations).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                      </select>
+                    </div>
+                  )}
+                </div>
+                {stationId && <p style={bd.hint}>First available station selected. Change it if needed.</p>}
+                {availableStations !== null && availableStations.length === 0 && <p style={bd.inlineError}>{t('nap_no_stations_date')}</p>}
+                {stationAvailabilityError && <p role="alert" style={bd.inlineError}>Live station availability could not be checked. The booking will be verified when you create it.</p>}
+                {timeError ? (
+                  <div style={bd.timeWarning}>
+                    <span style={bd.timeWarningIcon}>⚠</span>
+                    {timeError}
+                  </div>
+                ) : dayHours && !dayHours.is_closed ? (
+                  <p style={bd.hint}>{t('nap_studio_open')} {dayHours.open_time} – {dayHours.close_time}</p>
+                ) : bookingDate && !studioHours.length ? (
+                  <p style={bd.hint}>{t('nap_no_hours_hint')}</p>
+                ) : null}
+                {artistConflict && <div role="alert" style={bd.timeWarning}><span style={bd.timeWarningIcon}>⚠</span>This artist already has an appointment that overlaps this time.</div>}
+                {scheduleError && <p role="status" style={bd.availabilityNotice}>{scheduleError} The server will verify it when you create the appointment.</p>}
+              </section>
+
+              {essentialsComplete && bookingType === 'walkin' && (
+                <button
+                  type="button"
+                  style={{ ...bd.optionalToggle, ...(showOptional ? bd.optionalToggleOpen : {}) }}
+                  onClick={() => setShowOptional(value => !value)}
+                  aria-expanded={showOptional}
+                >
+                  <span style={bd.optionalToggleCopy}>
+                    <span style={bd.optionalToggleTitle}>Optional details</span>
+                    <span style={bd.optionalToggleDescription}>Appointment, pricing, deposit and notes</span>
+                  </span>
+                  <span style={bd.optionalToggleAction}>
+                    {showOptional ? 'Hide' : 'Show'}
+                    <span aria-hidden="true" style={{ ...bd.optionalChevron, transform: showOptional ? 'rotate(180deg)' : 'rotate(0deg)' }}>⌄</span>
+                  </span>
+                </button>
+              )}
+
+              {essentialsComplete && (bookingType !== 'walkin' || showOptional) && <>
+                {/* ── PRICING ── */}
+                <section style={bd.section} aria-labelledby="payment-section-title">
+                  <h2 id="payment-section-title" style={bd.sectionLabel}>{t('bdp_payment')}</h2>
+                  <div style={bd.field}>
+                    <span id="deposit-mode-label" style={bd.label}>Deposit</span>
+                    <div style={bd.depositModes} role="group" aria-labelledby="deposit-mode-label">
+                      {[
+                        ['none', 'No deposit'],
+                        ['later', stripeConnected ? 'Collect later' : 'Due later'],
+                        ['paid', 'Already paid'],
+                      ].map(([value, label]) => <button key={value} type="button" aria-pressed={depositMode === value} onClick={() => setDepositMode(value)} style={{ ...bd.depositMode, ...(depositMode === value ? bd.depositModeActive : {}) }}>{label}</button>)}
+                    </div>
+                  </div>
+                  <div className={styles.fieldRow}>
+                    <div style={bd.field}>
+                      <label htmlFor="new-appointment-estimate" style={bd.label}>Estimated price</label>
+                      <div style={bd.prefixWrap}>
+                        <span style={bd.prefix}>$</span>
+                        <input style={{ ...bd.input, paddingLeft: '1.75rem' }} type="number" min="0" step="0.01" id="new-appointment-estimate" value={finalPrice} onChange={e => setFinalPrice(e.target.value)} placeholder="0.00" />
+                      </div>
+                    </div>
+                    {depositMode !== 'none' && (
+                      <div style={bd.field}>
+                        <label htmlFor="new-appointment-deposit" style={bd.label}>Deposit amount</label>
+                        <div style={bd.prefixWrap}>
+                          <span style={bd.prefix}>$</span>
+                          <input style={{ ...bd.input, paddingLeft: '1.75rem' }} type="number" min="0" step="0.01" id="new-appointment-deposit" value={depositAmount} aria-invalid={depositInvalid} onChange={e => setDepositAmount(e.target.value)} placeholder="0.00" />
+                        </div>
+                      </div>
+                    )}
                   </div>
                   {depositMode !== 'none' && <>
-                  <div style={bd.prefixWrap}>
-                    <span style={bd.prefix}>$</span>
-                    <input
-                      style={{ ...bd.input, paddingLeft: '1.75rem' }}
-                      type="number" min="0" step="0.01"
-                      aria-label="Deposit amount" value={depositAmount}
-                      aria-invalid={depositInvalid}
-                      onChange={e => setDepositAmount(e.target.value)}
-                      placeholder="0.00"
-                    />
-                  </div>
-                  {depositMode === 'later' && <span style={bd.hint}>{stripeConnected ? 'This will appear as an unpaid deposit to collect.' : 'Record the external payment when it is received.'}</span>}
-                  {depositMode === 'paid' && <span style={bd.hint}>The deposit will be recorded as received now.</span>}
-                  {(() => {
-                    const da = depositMode === 'later' && stripeConnected ? parseFloat(depositAmount) || 0 : 0;
-                    if (da <= 0) return null;
-                    const feeCents = Math.round(da * 0.03 * 100) + 50;
-                    const total = da + feeCents / 100;
-                    return (
-                      <span style={{ fontSize: '0.74rem', color: 'var(--text-ghost)', marginTop: '0.25rem', display: 'block' }}>
-                        {t('nap_fee_client_charged')} ${total.toFixed(2)} ({t('nap_fee_incl')} ${(feeCents / 100).toFixed(2)} {t('nap_fee_suffix')})
-                      </span>
-                    );
-                  })()}
+                    {depositMode === 'later' && <span style={bd.hint}>{stripeConnected ? 'This will appear as an unpaid deposit to collect.' : 'Record the external payment when it is received.'}</span>}
+                    {depositMode === 'paid' && <span style={bd.hint}>The deposit will be recorded as received now.</span>}
+                    {(() => {
+                      const da = depositMode === 'later' && stripeConnected ? parseFloat(depositAmount) || 0 : 0;
+                      if (da <= 0) return null;
+                      const feeCents = Math.round(da * 0.03 * 100) + 50;
+                      const total = da + feeCents / 100;
+                      return (
+                        <span style={{ fontSize: '0.74rem', color: 'var(--text-ghost)', marginTop: '0.25rem', display: 'block' }}>
+                          {t('nap_fee_client_charged')} ${total.toFixed(2)} ({t('nap_fee_incl')} ${(feeCents / 100).toFixed(2)} {t('nap_fee_suffix')})
+                        </span>
+                      );
+                    })()}
                   </>}
+                </section>
+
+                <details className={styles.additionalDetails}>
+                  <summary><span>{t('nap_additional_details')}</span><span className={styles.optionalBadge}>{t('optional')}</span></summary>
+                  <div className={styles.additionalBody}>
+                    {!isPiercing && <>
+                      <label style={bd.checkRow}>
+                        <input type="checkbox" checked={retouch} onChange={e => setRetouch(e.target.checked)} style={bd.checkbox} />
+                        <span>{t('nap_retouch')}</span>
+                      </label>
+                      <div style={bd.field}>
+                        <label htmlFor="new-appointment-size" style={bd.label}>{t('bdp_size')}</label>
+                        <div style={{ display: 'flex', gap: '0.4rem' }}>
+                          <input
+                            style={{ ...bd.input, flex: 1 }}
+                            type="number" min="0" step="0.1"
+                            id="new-appointment-size" value={size}
+                            onChange={e => setSize(e.target.value)}
+                            placeholder="e.g. 10"
+                          />
+                          <div style={bd.unitToggle}>
+                            {['cm', 'in'].map(u => (
+                              <button
+                                key={u} type="button" aria-pressed={sizeUnit === u}
+                                style={{ ...bd.unitBtn, ...(sizeUnit === u ? bd.unitBtnActive : {}) }}
+                                onClick={() => setSizeUnit(u)}
+                              >
+                                {u}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </>}
+                    <div style={bd.field}>
+                      <label style={bd.label} htmlFor="new-appointment-notes">{t('bdp_notes')}</label>
+                      <textarea
+                        id="new-appointment-notes"
+                        style={{ ...bd.input, minHeight: 72, resize: 'vertical' }}
+                        value={notes}
+                        onChange={e => setNotes(e.target.value)}
+                        placeholder={t('nap_notes_placeholder')}
+                      />
+                    </div>
+                  </div>
+                </details>
+              </>}
+
+            </div>
+            <div className={styles.footer}>
+              {essentialsComplete && (
+                <div className={styles.summary}>
+                  <div className={styles.summaryHeading}>
+                    <strong>{clientName}</strong>
+                    {quote > 0 && <strong>${quote.toFixed(2)}</strong>}
+                  </div>
+                  <span>{[
+                    isPiercing ? 'Piercing' : retouch ? 'Retouch' : 'Tattoo',
+                    artists.find(artist => (artist.artistId ?? artist.artist_id ?? artist.id) === artistId)?.name,
+                    chosenDateTime?.toLocaleString('en-AU', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }),
+                    `${durationMins} min`,
+                    (availableStations ?? allStations).find(station => station.id === stationId)?.name,
+                  ].filter(Boolean).join(' · ')}</span>
                 </div>
-              </div>
+              )}
+
+              {(validationError || error) && <p role="alert" style={bd.errorText}>{error || validationError}</p>}
+
+              <Button
+                type="submit"
+                loading={saving}
+                loadingLabel={t('sched_creating')}
+                fullWidth
+                disabled={!canSubmit}
+                title={!canSubmit ? disabledReason : undefined}
+                aria-describedby={!canSubmit ? 'new-appointment-disabled-reason' : undefined}
+              >
+                {t('nap_create')}
+              </Button>
+              {!canSubmit && <span id="new-appointment-disabled-reason" style={bd.disabledReason}>{disabledReason}</span>}
+
             </div>
-
-            {/* ── NOTES ── */}
-            <div style={{ ...bd.section, borderBottom: 'none', marginBottom: 0 }}>
-              <p style={bd.sectionLabel}>{t('bdp_notes')}</p>
-              <textarea
-                aria-label={t('bdp_notes')}
-                style={{ ...bd.input, minHeight: 72, resize: 'vertical' }}
-                value={notes}
-                onChange={e => setNotes(e.target.value)}
-                placeholder={t('nap_notes_placeholder')}
-              />
-            </div>
-            </>}
-
-            {essentialsComplete && (
-              <div style={bd.summary}>
-                <span style={bd.sectionLabel}>REVIEW</span>
-                <strong style={bd.summaryText}>{[
-                  bookingType === 'walkin' ? 'Walk-in' : bookingType === 'studio' ? 'Studio appointment' : 'Personal appointment',
-                  artists.find(artist => (artist.artistId ?? artist.artist_id ?? artist.id) === artistId)?.name,
-                  chosenDateTime?.toLocaleString('en-AU', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }),
-                  `${durationMins} min`,
-                  (availableStations ?? allStations).find(station => station.id === stationId)?.name,
-                  quote > 0 ? `$${quote.toFixed(2)}` : null,
-                ].filter(Boolean).join(' · ')}</strong>
-              </div>
-            )}
-
-            {(validationError || error) && <p role="alert" style={bd.errorText}>{error || validationError}</p>}
-
-            <Button
-              type="submit"
-              loading={saving}
-              loadingLabel={t('sched_creating')}
-              fullWidth
-              disabled={!canSubmit}
-              title={!canSubmit ? disabledReason : undefined}
-              aria-describedby={!canSubmit ? 'new-appointment-disabled-reason' : undefined}
-            >
-              {t('nap_create')}
-            </Button>
-            {!canSubmit && <span id="new-appointment-disabled-reason" style={bd.disabledReason}>{disabledReason}</span>}
-
           </form>
         )}
       </div>
@@ -908,7 +870,7 @@ const bd = {
   },
   panel: {
     position: 'fixed', top: 0, right: 0, bottom: 0, zIndex: 41,
-    width: 460, maxWidth: '100vw',
+    width: 560, maxWidth: '100vw',
     background: 'var(--bg-sidebar)',
     borderLeft: '1px solid var(--border)',
     display: 'flex', flexDirection: 'column',
@@ -920,10 +882,10 @@ const bd = {
     borderBottom: '1px solid var(--border-faint)',
     flexShrink: 0,
   },
-  title: { fontSize: '1rem', fontWeight: 700, color: 'var(--text)' },
+  title: { fontSize: '1.25rem', fontWeight: 700, color: 'var(--text)' },
   closeBtn: {
     background: 'var(--bg-chip)', border: 'none', borderRadius: 6,
-    width: 28, height: 28, color: 'var(--text-muted)',
+    width: 36, height: 36, color: 'var(--text-muted)',
     fontSize: '0.75rem', cursor: 'pointer',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
   },
@@ -934,23 +896,21 @@ const bd = {
   loadErrorText: { color: 'var(--text-muted)', fontSize: '0.82rem', lineHeight: 1.5 },
   retryBtn: { alignSelf: 'flex-start', border: 0, borderRadius: 8, padding: '0.55rem 0.8rem', background: 'var(--accent)', color: 'var(--accent-contrast)', fontWeight: 700, cursor: 'pointer' },
   form: {
-    flex: 1, overflowY: 'auto',
-    display: 'flex', flexDirection: 'column', gap: 0,
-    padding: '1.25rem 1.5rem 2rem',
+    flex: 1, minHeight: 0, overflow: 'hidden',
+    display: 'flex', flexDirection: 'column',
   },
   section: {
-    display: 'flex', flexDirection: 'column', gap: '0.65rem',
-    paddingBottom: '1.25rem',
-    marginBottom: '1.25rem',
-    borderBottom: '1px solid var(--border-faint)',
+    display: 'flex', flexDirection: 'column', gap: '1rem', minWidth: 0,
+    padding: '1.125rem', borderRadius: 14,
+    background: 'var(--bg-panel)', border: '1px solid var(--border)',
   },
   sectionLabel: {
-    margin: 0, fontSize: '0.68rem', fontWeight: 700,
-    color: 'var(--text-ghost)', letterSpacing: '0.1em', textTransform: 'uppercase',
+    margin: 0, fontSize: '1rem', fontWeight: 650,
+    color: 'var(--text)', letterSpacing: '-0.02em',
   },
   modeTabs: {
     display: 'flex',
-    background: 'var(--bg-input)',
+    background: 'var(--appointment-input, var(--bg-input))',
     border: '1px solid var(--border-faint)',
     borderRadius: 9, padding: 3, gap: 3,
   },
@@ -958,31 +918,27 @@ const bd = {
     flex: 1, background: 'none', border: 'none', borderRadius: 7,
     padding: '0.45rem 0.75rem',
     fontSize: '0.82rem', fontWeight: 500,
-    color: 'var(--text-faint)', cursor: 'pointer',
+    color: 'var(--text-secondary)', cursor: 'pointer',
   },
   modeTabActive: {
-    background: 'var(--bg-chip)',
-    color: 'var(--text)', fontWeight: 600,
+    background: 'var(--bg-modal)',
+    color: 'var(--text)', fontWeight: 600, boxShadow: '0 1px 4px rgba(0,0,0,0.15)',
   },
-  typeCards: { display: 'grid', gridTemplateColumns: '1fr', gap: '0.45rem' },
-  typeCard: { display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 3, width: '100%', padding: '0.72rem 0.8rem', borderRadius: 9, border: '1px solid var(--border)', background: 'var(--bg-input)', color: 'var(--text)', textAlign: 'left', cursor: 'pointer', fontSize: '0.8rem' },
-  typeCardActive: { borderColor: 'var(--accent)', background: 'var(--accent-tint)', color: 'var(--accent)' },
-  fieldRow: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem' },
-  field: { display: 'flex', flexDirection: 'column', gap: '0.3rem' },
-  label: { fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-muted)' },
+  field: { display: 'flex', flexDirection: 'column', gap: '0.5rem', minWidth: 0 },
+  label: { fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-dim)' },
   input: {
-    background: 'var(--bg-input)',
-    border: '1px solid var(--border)',
-    borderRadius: 8, padding: '0.6rem 0.85rem',
-    fontSize: '0.875rem', color: 'var(--text)', outline: 'none',
-    width: '100%', boxSizing: 'border-box', colorScheme: 'auto',
+    background: 'var(--appointment-input, var(--bg-input))',
+    border: '1px solid var(--border-strong)',
+    borderRadius: 9, padding: '0.65rem 0.75rem', minHeight: 44,
+    fontSize: '0.875rem', color: 'var(--text)',
+    width: '100%', boxSizing: 'border-box', colorScheme: 'inherit',
   },
   select: {
-    background: 'var(--bg-input)',
-    border: '1px solid var(--border)',
-    borderRadius: 8, padding: '0.6rem 0.85rem',
-    fontSize: '0.875rem', color: 'var(--text)', outline: 'none',
-    width: '100%', boxSizing: 'border-box', colorScheme: 'auto', cursor: 'pointer',
+    background: 'var(--appointment-input, var(--bg-input))',
+    border: '1px solid var(--border-strong)',
+    borderRadius: 9, padding: '0.65rem 0.75rem', minHeight: 44,
+    fontSize: '0.875rem', color: 'var(--text)',
+    width: '100%', boxSizing: 'border-box', colorScheme: 'inherit', cursor: 'pointer',
   },
   dropdown: {
     position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50,
@@ -1004,7 +960,7 @@ const bd = {
   },
   selectedClientCard: {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem',
-    background: 'var(--bg-input)', border: '1px solid var(--border)',
+    background: 'var(--appointment-input, var(--bg-input))', border: '1px solid var(--border)',
     borderRadius: 8, padding: '0.65rem 0.85rem',
   },
   selectedClientName: { display: 'block', fontSize: '0.875rem', color: 'var(--text)', fontWeight: 500 },
@@ -1014,13 +970,13 @@ const bd = {
     background: 'none', border: 'none', flexShrink: 0,
     color: 'var(--text-secondary)', fontSize: '0.8rem', cursor: 'pointer', padding: '0.15rem',
   },
-  hint: { margin: 0, fontSize: '0.75rem', color: 'var(--text-ghost)' },
+  hint: { margin: 0, fontSize: '0.75rem', lineHeight: 1.5, color: 'var(--text-secondary)' },
   inlineError: { margin: 0, fontSize: '0.78rem', color: '#ff8c5a' },
   availabilityNotice: { margin: 0, fontSize: '0.74rem', color: 'var(--text-ghost)', lineHeight: 1.45 },
   timeWarning: {
     display: 'flex', alignItems: 'center', gap: '0.5rem',
     background: 'rgba(255,140,90,0.1)', border: '1px solid rgba(255,140,90,0.25)',
-    borderRadius: 8, padding: '0.6rem 0.85rem',
+    borderRadius: 9, padding: '0.65rem 0.75rem', minHeight: 44,
     fontSize: '0.82rem', color: '#ff8c5a', fontWeight: 500,
   },
   timeWarningIcon: { fontSize: '0.85rem', flexShrink: 0 },
@@ -1036,7 +992,7 @@ const bd = {
   checkRow: {
     display: 'flex', alignItems: 'center', gap: '0.5rem',
     fontSize: '0.85rem', fontWeight: 500, color: 'var(--text)',
-    cursor: 'pointer', marginBottom: '0.85rem',
+    cursor: 'pointer',
   },
   checkbox: { width: 16, height: 16, accentColor: 'var(--accent)', cursor: 'pointer' },
   linkBtn: {
@@ -1045,29 +1001,27 @@ const bd = {
   },
   unitToggle: {
     display: 'flex', flexShrink: 0,
-    background: 'var(--bg-input)', border: '1px solid var(--border)',
+    background: 'var(--appointment-input, var(--bg-input))', border: '1px solid var(--border)',
     borderRadius: 8, padding: 3, gap: 2,
   },
   unitBtn: {
     background: 'none', border: 'none', borderRadius: 6,
     padding: '0.3rem 0.55rem', fontSize: '0.78rem', fontWeight: 500,
-    color: 'var(--text-faint)', cursor: 'pointer',
+    color: 'var(--text-secondary)', cursor: 'pointer',
   },
   unitBtnActive: {
     background: 'var(--bg-chip)', color: 'var(--text)', fontWeight: 600,
   },
-  optionalToggle: { width: '100%', margin: '-0.5rem 0 1.25rem', padding: '0.85rem 0.9rem', borderRadius: 10, border: '1px solid var(--border-faint)', background: 'var(--bg-card)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', textAlign: 'left' },
-  optionalToggleOpen: { background: 'var(--bg-input)', borderColor: 'var(--border)' },
+  optionalToggle: { width: '100%', margin: 0, padding: '0.85rem 0.9rem', borderRadius: 10, borderWidth: 1, borderStyle: 'solid', borderColor: 'var(--border-faint)', background: 'var(--bg-card)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', textAlign: 'left' },
+  optionalToggleOpen: { background: 'var(--appointment-input, var(--bg-input))', borderColor: 'var(--border)' },
   optionalToggleCopy: { display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 },
   optionalToggleTitle: { color: 'var(--text)', fontSize: '0.8rem', fontWeight: 650 },
   optionalToggleDescription: { color: 'var(--text-secondary)', fontSize: '0.7rem', fontWeight: 400, lineHeight: 1.35 },
   optionalToggleAction: { display: 'flex', alignItems: 'center', gap: '0.45rem', flexShrink: 0, color: 'var(--text-muted)', fontSize: '0.72rem', fontWeight: 600 },
   optionalChevron: { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: '50%', background: 'var(--bg-chip)', border: '1px solid var(--border)', color: 'var(--text-dim)', fontSize: '1rem', lineHeight: 1, transition: 'transform 0.2s ease' },
   depositModes: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 5 },
-  depositMode: { padding: '0.5rem 0.35rem', borderRadius: 7, border: '1px solid var(--border)', background: 'var(--bg-input)', color: 'var(--text-muted)', fontSize: '0.7rem', cursor: 'pointer' },
+  depositMode: { padding: '0.5rem 0.35rem', borderRadius: 7, borderWidth: 1, borderStyle: 'solid', borderColor: 'var(--border)', background: 'var(--appointment-input, var(--bg-input))', color: 'var(--text-muted)', fontSize: '0.75rem', minHeight: 44, cursor: 'pointer' },
   depositModeActive: { borderColor: 'var(--accent)', background: 'var(--accent-tint)', color: 'var(--accent)', fontWeight: 700 },
-  summary: { display: 'flex', flexDirection: 'column', gap: '0.45rem', padding: '0.85rem', borderRadius: 9, border: '1px solid var(--accent-tint-border)', background: 'var(--accent-tint)' },
-  summaryText: { color: 'var(--text)', fontSize: '0.8rem', lineHeight: 1.5 },
   errorText: { margin: '0.5rem 0 0', fontSize: '0.8rem', color: '#ff6b6b' },
   disabledReason: { marginTop: '0.45rem', textAlign: 'center', color: 'var(--text-ghost)', fontSize: '0.73rem' },
 
