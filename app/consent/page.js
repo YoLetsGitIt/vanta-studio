@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { getSupabase } from '@/lib/supabase';
 import { getStudioPublic, getStudioConsentTemplates } from '@/lib/api';
 import styles from './ConsentPage.module.css';
+import ClientAuthGate from '@/components/ClientAuthGate';
 
 // The studio's reusable consent QR code lands here (/consent?s=<studioId>). Unlike the
 // emailed single-use link on vanta.tattoo, the client must sign in or create an account
@@ -221,7 +222,7 @@ function ConsentForm() {
   }
 
   if (!session) {
-    return <AuthGate studioName={info.studio_name} logoUrl={info.logo_url} />;
+    return <ClientAuthGate collectMarketing studioId={studioId} studioName={info.studio_name} logoUrl={info.logo_url} />;
   }
 
   if (done) {
@@ -399,97 +400,6 @@ function DateOfBirthInput({ value, onChange }) {
   );
 }
 
-function AuthGate({ studioName, logoUrl }) {
-  const [mode, setMode]       = useState('signup');
-  const [email, setEmail]     = useState('');
-  const [password, setPassword] = useState('');
-  const [name, setName]     = useState('');
-  const [dob, setDob]       = useState('');
-  const [phone, setPhone]   = useState('');
-  const [agreed, setAgreed]   = useState(false);
-  const [mkt, setMkt]       = useState(false);
-  const [busy, setBusy]       = useState(false);
-  const [err, setErr]         = useState('');
-  const [notice, setNotice]   = useState('');
-
-  async function submit(e) {
-    e.preventDefault();
-    setErr(''); setNotice('');
-    if (mode === 'signup' && !agreed) { setErr('You must agree to the Terms of Use and Privacy Policy.'); return; }
-    setBusy(true);
-    const supabase = getSupabase();
-    try {
-      if (mode === 'signin') {
-        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
-        // Covers a returning client whose app profile was never created.
-        await createProfile(data.session, '');
-      } else {
-        const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { full_name: name.trim(), name: name.trim(), dob, phone: phone.trim(), marketing_email: mkt, marketing_sms: mkt } } });
-        if (error) throw error;
-        if (data.session) await createProfile(data.session, name.trim());
-        else setNotice('Check your email to confirm your account, then scan the QR code again.');
-      }
-    } catch (e2) {
-      setErr(e2.message ?? 'Something went wrong. Please try again.');
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <div style={s.card}>
-      {logoUrl && <img src={logoUrl} alt={`${studioName} logo`} style={{ maxHeight: 56, maxWidth: 200, objectFit: 'contain', alignSelf: 'flex-start' }} />}
-      <p style={s.studioTag}>{studioName}</p>
-      <h2 style={s.heading}>{mode === 'signup' ? 'Create an account' : 'Sign in'}</h2>
-      <p style={s.muted}>
-        {studioName} needs you to {mode === 'signup' ? 'create a Vanta account' : 'sign in'} before completing their consent form.
-      </p>
-      <form onSubmit={submit} style={s.form}>
-        {mode === 'signup' && (
-          <>
-            <input style={s.input} type="text" required autoComplete="name" value={name} onChange={e => setName(e.target.value)} placeholder="Full name" />
-            <DateOfBirthInput value={dob} onChange={setDob} />
-            <input style={s.input} type="tel" required autoComplete="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="Phone number" />
-          </>
-        )}
-        <input style={s.input} type="email" required autoComplete="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="Email" />
-        <input style={s.input} type="password" required minLength={6} autoComplete={mode === 'signup' ? 'new-password' : 'current-password'} value={password} onChange={e => setPassword(e.target.value)} placeholder="Password" />
-        {mode === 'signup' && (
-          <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.55rem', fontSize: '0.8rem', lineHeight: '18px', color: 'rgba(255,255,255,0.7)', cursor: 'pointer' }}>
-            <input type="checkbox" checked={agreed} onChange={e => setAgreed(e.target.checked)} style={{ flexShrink: 0, margin: '1px 0 0', width: 16, height: 16, minWidth: 'auto', accentColor: '#f5ecd9' }} />
-            <span>
-              I agree to the{' '}
-              <a href="https://www.vanta.tattoo/terms" target="_blank" rel="noopener noreferrer" style={{ color: '#f5ecd9' }}>Terms of Use</a>
-              {' '}and{' '}
-              <a href="https://www.vanta.tattoo/privacy" target="_blank" rel="noopener noreferrer" style={{ color: '#f5ecd9' }}>Privacy Policy</a>{' '}
-              <span style={{ color: '#e86f6f' }}>*</span>
-            </span>
-          </label>
-        )}
-        {mode === 'signup' && (
-          <>
-            <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.55rem', fontSize: '0.8rem', lineHeight: '18px', color: 'rgba(255,255,255,0.7)', cursor: 'pointer' }}>
-              <input type="checkbox" checked={mkt} onChange={e => setMkt(e.target.checked)} style={{ flexShrink: 0, margin: '1px 0 0', width: 16, height: 16, minWidth: 'auto', accentColor: '#f5ecd9' }} />
-              <span>
-                Send me offers and updates from {studioName} by email &amp; text.
-              </span>
-            </label>
-          </>
-        )}
-        {err && <p style={s.error}>{err}</p>}
-        {notice && <p style={s.hint}>{notice}</p>}
-        <button type="submit" disabled={busy} style={{ ...s.btn, opacity: busy ? 0.6 : 1 }}>
-          {busy ? 'Please wait…' : mode === 'signup' ? 'Create account & continue' : 'Sign in & continue'}
-        </button>
-        <button type="button" onClick={() => { setMode(mode === 'signup' ? 'signin' : 'signup'); setErr(''); setNotice(''); }}
-          style={{ background: 'none', border: 'none', color: '#f5ecd9', cursor: 'pointer', fontSize: '0.82rem', fontFamily: 'inherit' }}>
-          {mode === 'signup' ? 'Already have an account? Sign in' : 'New here? Create an account'}
-        </button>
-      </form>
-    </div>
-  );
-}
 
 const typeBadgeColor = {
   health:  { background: 'rgba(99,102,241,0.15)', color: '#818cf8' },

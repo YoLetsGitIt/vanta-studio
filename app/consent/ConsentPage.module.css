@@ -45,3 +45,73 @@
     font-size: 16px;
   }
 }
+
+.socialSection {
+  display: grid;
+  gap: 12px;
+  margin-top: 0.75rem;
+}
+
+.socialButtons {
+  display: grid;
+  gap: 12px;
+}
+
+.socialButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 48px !important;
+  padding: 10px 14px;
+  border: 1px solid #d9dce1;
+  border-radius: 8px;
+  background: #fff;
+  color: #1f1f1f;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.socialButton svg {
+  flex-shrink: 0;
+}
+
+.socialTerms {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.75rem;
+  line-height: 1.6;
+}
+
+.socialTerms a {
+  color: #f5ecd9;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.socialError {
+  margin: 0;
+  color: #ff9696;
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.authDivider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 4px;
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 0.75rem;
+}
+
+.authDivider::before,
+.authDivider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.12);
+}

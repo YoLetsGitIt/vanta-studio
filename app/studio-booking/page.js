@@ -4,6 +4,9 @@ import { useState, useEffect, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Field from '@/components/ui/Field';
 import Button from '@/components/ui/Button';
+import ClientAuthGate from '@/components/ClientAuthGate';
+import { ensureClientProfile, subscribeClientSession } from '@/lib/client-account';
+import { getSupabase } from '@/lib/supabase';
 import { getStudioPublic, createWalkIn, walkinUploadSign, signatureUploadSign, getStudioConsentTemplates, getFormConfigPublic } from '@/lib/api';
 
 function detectCountry() {
@@ -94,6 +97,40 @@ function WalkInInner() {
   const [studio, setStudio]   = useState(null);
   const [studioErr, setStudioErr] = useState('');
   const [formConfig, setFormConfig] = useState(null); // null = loading
+  const [session, setSession] = useState(undefined);
+  const [accountReady, setAccountReady] = useState(false);
+  const [accountError, setAccountError] = useState('');
+  const [accountRetry, setAccountRetry] = useState(0);
+  const accountUser = useRef(null);
+
+  useEffect(() => subscribeClientSession(setSession, () => {
+    setSession(null);
+  }), []);
+
+  useEffect(() => {
+    setAccountReady(false);
+    setAccountError('');
+    if (!session) return;
+    let cancelled = false;
+    ensureClientProfile(session).then(profile => {
+      if (cancelled) return;
+      const metadata = session.user?.user_metadata ?? {};
+      if (accountUser.current !== session.user.id) {
+        const name = (profile.name && profile.name !== 'User' ? profile.name : metadata.full_name || metadata.name || '').trim().split(/\s+/);
+        setFirstName(name.shift() || '');
+        setLastName(name.join(' '));
+        setDob(metadata.dob || '');
+        const phone = (profile.phone || metadata.phone || '').trim();
+        const country = [...COUNTRIES].sort((a, b) => b.dial.length - a.dial.length).find(country => phone.startsWith(country.dial));
+        if (country) setPhoneCode(country.id);
+        setPhoneNum(country ? phone.slice(country.dial.length).trim() : phone);
+        accountUser.current = session.user.id;
+      }
+      setEmail(session.user.email || '');
+      setAccountReady(true);
+    }).catch(error => { if (!cancelled) setAccountError(error.message); });
+    return () => { cancelled = true; };
+  }, [session, accountRetry]);
 
   // Form state
   const [firstName, setFirstName]   = useState('');
@@ -205,6 +242,12 @@ function WalkInInner() {
 
   async function handleSubmit(e) {
     e.preventDefault();
+    const { data: { session: currentSession } } = await getSupabase().auth.getSession();
+    if (!currentSession || currentSession.user.id !== session?.user.id) {
+      setSession(currentSession ?? null);
+      setSubmitError('Please sign in again before requesting your booking.');
+      return;
+    }
     if (!firstName.trim() || !lastName.trim()) { setSubmitError('Please provide your first and last name.'); return; }
     if (!email.trim()) { setSubmitError('Please provide your email address.'); return; }
     if (!phoneNum.trim()) { setSubmitError('Please provide your phone number.'); return; }
@@ -299,7 +342,7 @@ function WalkInInner() {
       await createWalkIn(studioId, {
         artist_id:            artistId,
         name:                 `${firstName} ${lastName}`.trim(),
-        email,
+        email: currentSession.user.email,
         phone: `${COUNTRIES.find(c => c.id === phoneCode)?.dial ?? ''} ${phoneNum}`.trim(),
         sms_reminder_opt_in: smsOptIn,
         dob,
@@ -327,6 +370,10 @@ function WalkInInner() {
   if (!studioId) return <p style={s.msg}>Invalid link — no studio ID.</p>;
   if (studioErr) return <p role="alert" style={{ ...s.msg, color: 'var(--color-danger)' }}>{studioErr}</p>;
   if (!studio || formConfig === null) return <p style={s.msg}>Loading…</p>;
+  if (session === undefined) return <p style={s.msg}>Checking your account…</p>;
+  if (!session) return <ClientAuthGate studioId={studioId} studioName={studio.name} logoUrl={studio.logo_url} purpose="booking" />;
+  if (accountError) return <div style={s.card}><p role="alert" style={s.error}>{accountError}</p><Button onClick={() => setAccountRetry(value => value + 1)}>Try again</Button></div>;
+  if (!accountReady) return <p style={s.msg}>Loading your details…</p>;
 
   if (done) {
     return (
@@ -362,7 +409,7 @@ function WalkInInner() {
               <input style={{ ...s.input, colorScheme: 'dark' }} type="date" value={dob} required onChange={e => setDob(e.target.value)} />
             </Field>
             <Field label="Email">
-              <input style={s.input} type="email" value={email} required onChange={e => setEmail(e.target.value)} placeholder="you@example.com" />
+              <input style={s.input} type="email" value={email} required readOnly autoComplete="email" placeholder="you@example.com" />
             </Field>
             <Field label="Phone" id="booking-phone" required>
               <div style={s.phoneRow}>
