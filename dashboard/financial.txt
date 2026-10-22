@@ -2,7 +2,7 @@
 2:I[9766,[],""]
 3:I[98924,[],""]
 4:I[17989,[],"ClientSegmentRoot"]
-5:I[19351,["5730","static/chunks/44530001-699706df5f232cb6.js","7817","static/chunks/7817-d36e9add24ee35aa.js","2619","static/chunks/2619-04bc32f026a0d946.js","867","static/chunks/867-b484e0ef88c10fae.js","9903","static/chunks/9903-135f3b2ffa9310c4.js","1954","static/chunks/app/dashboard/layout-4bcc1af1e1b7aa64.js"],"default"]
+5:I[19351,["5730","static/chunks/44530001-699706df5f232cb6.js","7817","static/chunks/7817-d36e9add24ee35aa.js","2619","static/chunks/2619-04bc32f026a0d946.js","867","static/chunks/867-b484e0ef88c10fae.js","9903","static/chunks/9903-135f3b2ffa9310c4.js","1954","static/chunks/app/dashboard/layout-c154aca8e62aed06.js"],"default"]
 7:I[81959,[],"ClientPageRoot"]
 8:I[80887,["5730","static/chunks/44530001-699706df5f232cb6.js","7817","static/chunks/7817-d36e9add24ee35aa.js","5608","static/chunks/5608-1f99614420394ed7.js","9784","static/chunks/9784-6ca961cb114b8ff5.js","867","static/chunks/867-b484e0ef88c10fae.js","9903","static/chunks/9903-135f3b2ffa9310c4.js","5353","static/chunks/app/dashboard/financial/page-b8e89de49eebb29b.js"],"default"]
 b:I[24431,[],"OutletBoundary"]
