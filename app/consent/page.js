@@ -76,6 +76,7 @@ function ConsentForm() {
   // Derive name / phone / DOB from the signed-in account: the Vanta profile first,
   // then whatever was entered at sign-up. `known` stays null until that's resolved.
   const [known, setKnown] = useState(null);
+  const accountUser = useRef(null);
   useEffect(() => {
     if (!session) { setKnown(null); return; }
     let cancelled = false;
@@ -90,16 +91,18 @@ function ConsentForm() {
         }
         if (res.ok) profile = await res.json();
       } catch {}
-      const profName = profile?.name && profile.name !== 'User' ? profile.name : '';
       const k = {
-        name:  profName || m.full_name || m.name || '',
-        phone: profile?.phone || m.phone || '',
-        dob:   m.dob || '',
+        name: [profile?.name, m.full_name, m.name].find(value => value?.trim() && value.trim() !== 'User')?.trim() || '',
+        phone: profile?.phone?.trim() || m.phone?.trim() || '',
+        dob: m.dob?.trim() || '',
       };
       if (cancelled) return;
-      setSignerName(v => v || k.name);
-      setPhone(v => v || k.phone);
-      setDob(v => v || k.dob);
+      if (accountUser.current !== session.user.id) {
+        setSignerName(k.name);
+        setPhone(k.phone);
+        setDob(k.dob);
+        accountUser.current = session.user.id;
+      }
       setKnown(k);
     })();
     return () => { cancelled = true; };
@@ -239,44 +242,34 @@ function ConsentForm() {
 
   const templates = info.templates ?? [];
 
-  // Name / DOB / phone come from the account; only ask for whatever it's missing.
-  const missingName  = !known.name;
-  const missingDob   = !known.dob;
-  const missingPhone = !known.phone;
-  const needsDetails = missingName || missingDob || missingPhone;
-
   return (
     <div style={{ width: '100%', maxWidth: 540 }}>
       {info.logo_url && <img src={info.logo_url} alt={`${info.studio_name} logo`} style={{ maxHeight: 56, maxWidth: 200, objectFit: 'contain', display: 'block', marginBottom: '0.6rem' }} />}
       <p style={{ ...s.studioTag, marginBottom: '0.75rem' }}>{info.studio_name}</p>
 
       <form onSubmit={handleSubmit} style={s.form}>
-        {needsDetails && (
-          <div style={s.templateBox}>
-            <p style={s.templateTitle}>Your details</p>
-            <p style={{ ...s.hint, margin: '0.25rem 0 0.85rem' }}>Signed in as {session.user?.email}. We need a few more details for your client record.</p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
-              {missingName && (
-                <div>
-                  <p style={{ ...s.label, marginBottom: '0.3rem' }}>Full name <span style={{ color: '#e86f6f' }}>*</span></p>
-                  <input style={s.input} type="text" required autoComplete="name" value={signerName} onChange={e => setSignerName(e.target.value)} placeholder="Your name" />
-                </div>
-              )}
-              {missingDob && (
-                <div>
-                  <p style={{ ...s.label, marginBottom: '0.3rem' }}>Date of birth <span style={{ color: '#e86f6f' }}>*</span></p>
-                  <DateOfBirthInput value={dob} onChange={setDob} />
-                </div>
-              )}
-              {missingPhone && (
-                <div>
-                  <p style={{ ...s.label, marginBottom: '0.3rem' }}>Phone number <span style={{ color: '#e86f6f' }}>*</span></p>
-                  <input style={s.input} type="tel" required autoComplete="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="Your phone number" />
-                </div>
-              )}
+        <div style={s.templateBox}>
+          <p style={s.templateTitle}>Your details</p>
+          <p style={{ ...s.hint, margin: '0.25rem 0 0.85rem' }}>Review your details and update anything that has changed.</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+            <div>
+              <label htmlFor="consent-name" style={{ ...s.label, marginBottom: '0.3rem' }}>Full name <span style={{ color: '#e86f6f' }}>*</span></label>
+              <input id="consent-name" style={s.input} type="text" required autoComplete="name" value={signerName} onChange={e => setSignerName(e.target.value)} placeholder="Your name" />
+            </div>
+            <div>
+              <p style={{ ...s.label, marginBottom: '0.3rem' }}>Date of birth <span style={{ color: '#e86f6f' }}>*</span></p>
+              <DateOfBirthInput value={dob} onChange={setDob} />
+            </div>
+            <div>
+              <label htmlFor="consent-email" style={{ ...s.label, marginBottom: '0.3rem' }}>Email</label>
+              <input id="consent-email" style={s.input} type="email" readOnly autoComplete="email" value={session.user?.email || ''} />
+            </div>
+            <div>
+              <label htmlFor="consent-phone" style={{ ...s.label, marginBottom: '0.3rem' }}>Phone number <span style={{ color: '#e86f6f' }}>*</span></label>
+              <input id="consent-phone" style={s.input} type="tel" required autoComplete="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="Your phone number" />
             </div>
           </div>
-        )}
+        </div>
 
         {templates.length === 0 && (
           <p style={s.muted}>

@@ -11,11 +11,13 @@ const errors = [], unexpected = [], results = [];
 const user = { id: '22222222-2222-4222-8222-222222222222', email: 'client@example.test', user_metadata: { full_name: 'Local Client' } };
 const session = { access_token: 'local-test-token', refresh_token: 'local-refresh-token', expires_at: 2000000000, user };
 
-async function open(browser, { width = 390, signedIn = false, newProfile = false, suffix = '' } = {}) {
+async function open(browser, { width = 390, signedIn = false, newProfile = false, metadata = user.user_metadata, profile = { name: 'Local Client' }, suffix = '' } = {}) {
+  const mockUser = { ...user, user_metadata: { ...metadata } };
+  const mockSession = { ...session, user: mockUser };
   const context = await browser.newContext({ viewport: { width, height: 900 }, isMobile: width < 1000, hasTouch: width < 1000, locale: 'en-AU' });
-  const calls = { authorizations: [], profiles: [] };
+  const calls = { authorizations: [], profiles: [], consents: [], updates: [] };
   let profileExists = !newProfile;
-  if (signedIn) await context.addInitScript(value => localStorage.setItem('sb-aznxvdnpvbcofaqxgmtu-auth-token', JSON.stringify(value)), session);
+  if (signedIn) await context.addInitScript(value => localStorage.setItem('sb-aznxvdnpvbcofaqxgmtu-auth-token', JSON.stringify(value)), mockSession);
   await context.route('**/*', async route => {
     const request = route.request(), url = new URL(request.url());
     if (url.origin === new URL(base).origin && request.method() === 'GET') return route.continue();
@@ -23,13 +25,21 @@ async function open(browser, { width = 390, signedIn = false, newProfile = false
     if (request.method() === 'OPTIONS') return route.fulfill({ status: 204, headers });
     if (url.pathname.endsWith('/public')) return route.fulfill({ json: { name: 'Vanta Studio' }, headers });
     if (url.pathname.endsWith('/consent-templates')) return route.fulfill({ json: { templates: [] }, headers });
-    if (url.pathname === '/auth/v1/user') return route.fulfill({ json: user, headers });
+    if (url.pathname === '/auth/v1/user') {
+      if (request.method() === 'PUT') calls.updates.push(request.postDataJSON());
+      return route.fulfill({ json: mockUser, headers });
+    }
+    if (url.pathname === `/studios/${studioId}/consent`) {
+      assert.equal(request.headers().authorization, 'Bearer local-test-token');
+      calls.consents.push(request.postDataJSON());
+      return route.fulfill({ json: { ok: true }, headers });
+    }
     if (url.pathname === '/auth/users/me') {
       if (request.method() === 'POST') {
         calls.profiles.push(request.postDataJSON());
         profileExists = true;
       }
-      return route.fulfill({ status: profileExists ? 200 : 404, json: profileExists ? { name: 'Local Client' } : {}, headers });
+      return route.fulfill({ status: profileExists ? 200 : 404, json: profileExists ? profile : {}, headers });
     }
     if (url.pathname === '/auth/v1/authorize') {
       calls.authorizations.push({ provider: url.searchParams.get('provider'), redirectTo: url.searchParams.get('redirect_to'), document: request.resourceType() === 'document' });
@@ -107,13 +117,47 @@ async function open(browser, { width = 390, signedIn = false, newProfile = false
       const { context, page, calls } = await open(browser, { signedIn: true, newProfile });
       assert.equal(await page.getByRole('button', { name: 'Continue with Google', exact: true }).count(), 0);
       const dob = page.getByLabel('Date of birth', { exact: true });
+      assert.equal(await page.getByPlaceholder('Your name', { exact: true }).inputValue(), 'Local Client');
       assert.equal(await dob.isVisible(), true);
       assert.equal(await page.getByPlaceholder('Your phone number', { exact: true }).isVisible(), true);
       await dob.fill('1995-06-15');
       await page.getByPlaceholder('Your phone number', { exact: true }).fill('+61412345678');
       assert.equal(calls.profiles.length, newProfile ? 1 : 0);
       if (newProfile) assert.deepEqual(calls.profiles[0], { name: 'Local Client', accountType: 'user', termsAcceptedVersion: '1.0' });
-      results.push(`${newProfile ? 'New' : 'Returning'} social account asks for missing DOB and phone`);
+      results.push(`${newProfile ? 'New' : 'Returning'} social account shows saved name and editable missing DOB and phone`);
+      await context.close();
+    }
+
+    for (const width of [320, 390, 1280]) {
+      const { context, page, calls } = await open(browser, {
+        width, signedIn: true,
+        metadata: { full_name: 'Account Name', dob: '1990-01-01', phone: '+61400123456' },
+        profile: { name: 'Local Client', phone: '+61412345678' },
+      });
+      const name = page.getByLabel('Full name', { exact: false });
+      const dob = page.getByLabel('Date of birth', { exact: true });
+      const phone = page.getByLabel('Phone number', { exact: false });
+      const email = page.getByLabel('Email', { exact: true });
+      for (const field of [name, dob, phone, email]) assert(await field.isVisible(), 'Known details remain visible');
+      assert.equal(await name.inputValue(), 'Local Client');
+      assert.equal(await dob.inputValue(), '1990-01-01');
+      assert.equal(await phone.inputValue(), '+61412345678');
+      assert.equal(await email.inputValue(), user.email);
+      assert(await email.evaluate(input => input.readOnly));
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+      await page.screenshot({ path: `${output}/prefilled-consent-${width}.png`, fullPage: true });
+      await name.fill('Reviewed Client');
+      await dob.fill('1991-02-03');
+      await phone.fill('+61498765432');
+      await page.getByRole('button', { name: 'Submit consent', exact: true }).click();
+      await page.getByRole('heading', { name: 'Consent recorded', exact: true }).waitFor();
+      await page.waitForLoadState('networkidle');
+      assert.equal(calls.consents.length, 1);
+      assert.equal(calls.consents[0].signer_name, 'Reviewed Client');
+      assert.equal(calls.consents[0].dob, '1991-02-03');
+      assert.equal(calls.consents[0].phone, '+61498765432');
+      assert.equal(calls.updates.at(-1).data.full_name, 'Reviewed Client');
+      results.push(`Complete account: all details visible, prefilled, editable and submitted correctly at ${width}px`);
       await context.close();
     }
 
