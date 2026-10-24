@@ -15,9 +15,14 @@ async function open(browser, { width = 390, signedIn = false, newProfile = false
   const mockUser = { ...user, user_metadata: { ...metadata } };
   const mockSession = { ...session, user: mockUser };
   const context = await browser.newContext({ viewport: { width, height: 900 }, isMobile: width < 1000, hasTouch: width < 1000, locale: 'en-AU' });
-  const calls = { authorizations: [], profiles: [], consents: [], updates: [] };
+  const calls = { authorizations: [], profiles: [], consents: [], updates: [], logouts: 0 };
   let profileExists = !newProfile;
-  if (signedIn) await context.addInitScript(value => localStorage.setItem('sb-aznxvdnpvbcofaqxgmtu-auth-token', JSON.stringify(value)), mockSession);
+  if (signedIn) await context.addInitScript(value => {
+    if (!sessionStorage.getItem('test-session-seeded')) {
+      localStorage.setItem('sb-aznxvdnpvbcofaqxgmtu-auth-token', JSON.stringify(value));
+      sessionStorage.setItem('test-session-seeded', 'true');
+    }
+  }, mockSession);
   await context.route('**/*', async route => {
     const request = route.request(), url = new URL(request.url());
     if (url.origin === new URL(base).origin && request.method() === 'GET') return route.continue();
@@ -25,6 +30,11 @@ async function open(browser, { width = 390, signedIn = false, newProfile = false
     if (request.method() === 'OPTIONS') return route.fulfill({ status: 204, headers });
     if (url.pathname.endsWith('/public')) return route.fulfill({ json: { name: 'Vanta Studio' }, headers });
     if (url.pathname.endsWith('/consent-templates')) return route.fulfill({ json: { templates: [] }, headers });
+    if (url.pathname === '/auth/v1/logout') {
+      calls.logouts++;
+      assert.equal(url.searchParams.get('scope'), 'local');
+      return route.fulfill({ status: 204, headers });
+    }
     if (url.pathname === '/auth/v1/user') {
       if (request.method() === 'PUT') calls.updates.push(request.postDataJSON());
       return route.fulfill({ json: mockUser, headers });
@@ -141,6 +151,12 @@ async function open(browser, { width = 390, signedIn = false, newProfile = false
       for (const field of [name, dob, phone, email]) assert(await field.isVisible(), 'Known details remain visible');
       assert.equal(await name.inputValue(), 'Local Client');
       assert.equal(await dob.inputValue(), '1990-01-01');
+      const matchingDateStyle = await dob.evaluate(input => {
+        const name = document.querySelector('input[autocomplete="name"]');
+        const own = getComputedStyle(input), other = getComputedStyle(name);
+        return input.offsetHeight === name.offsetHeight && own.font === other.font && own.border === other.border && own.padding === other.padding;
+      });
+      assert(matchingDateStyle, 'Date field matches the name field on mobile and desktop');
       assert.equal(await phone.inputValue(), '+61412345678');
       assert.equal(await email.inputValue(), user.email);
       assert(await email.evaluate(input => input.readOnly));
@@ -158,6 +174,20 @@ async function open(browser, { width = 390, signedIn = false, newProfile = false
       assert.equal(calls.consents[0].phone, '+61498765432');
       assert.equal(calls.updates.at(-1).data.full_name, 'Reviewed Client');
       results.push(`Complete account: all details visible, prefilled, editable and submitted correctly at ${width}px`);
+      await context.close();
+    }
+
+    {
+      const { context, page, calls } = await open(browser, { signedIn: true });
+      const before = page.url();
+      await page.getByRole('button', { name: 'Log out', exact: true }).click();
+      await page.getByRole('heading', { name: 'Create an account', exact: true }).waitFor();
+      assert.equal(page.url(), before);
+      assert.equal(await page.getByRole('button', { name: 'Submit consent', exact: true }).count(), 0);
+      assert.equal(await page.getByRole('button', { name: 'Log out', exact: true }).count(), 0);
+      assert.equal(calls.logouts, 1);
+      assert.equal(calls.consents.length, 0);
+      results.push('Consent logout returns to signup/login at the same studio QR link');
       await context.close();
     }
 

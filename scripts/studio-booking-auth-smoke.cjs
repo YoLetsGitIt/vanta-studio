@@ -9,14 +9,17 @@ const user = { id: '22222222-2222-4222-8222-222222222222', email: 'client@exampl
 const session = { access_token: 'local-access-token', refresh_token: 'local-refresh-token', token_type: 'bearer', expires_in: 3600, expires_at: 4102444800, user };
 const studio = { id: 'test-studio', name: 'Test Tattoo Studio', artists: [] };
 
-async function open(browser, { width = 390, signedIn = false, confirmation = false, profileFailure = false, profileMissing = false, metadata = user.user_metadata, profile = { name: 'Jamie Client', phone: '+61400123456' }, path = '/studio-booking', suffix = '' } = {}) {
+async function open(browser, { width = 390, signedIn = false, confirmation = false, profileFailure = false, profileMissing = false, logoutFailure = false, metadata = user.user_metadata, profile = { name: 'Jamie Client', phone: '+61400123456' }, path = '/studio-booking', suffix = '' } = {}) {
   const mockUser = { ...user, user_metadata: { ...metadata } };
   const mockSession = { ...session, user: mockUser };
   const context = await browser.newContext({ viewport: { width, height: 900 } });
   if (signedIn) await context.addInitScript(({ storageKey, session }) => {
-    if (!localStorage.getItem(storageKey)) localStorage.setItem(storageKey, JSON.stringify(session));
+    if (!sessionStorage.getItem('test-session-seeded')) {
+      localStorage.setItem(storageKey, JSON.stringify(session));
+      sessionStorage.setItem('test-session-seeded', 'true');
+    }
   }, { storageKey, session: mockSession });
-  const calls = { bookings: [], profiles: [], signups: [], providers: [], profileUpdates: [], profileReads: 0 };
+  const calls = { bookings: [], profiles: [], signups: [], providers: [], profileUpdates: [], profileReads: 0, logouts: 0 };
   const errors = [];
   let hasProfile = !profileMissing;
   await context.route('**/*', async route => {
@@ -28,6 +31,12 @@ async function open(browser, { width = 390, signedIn = false, confirmation = fal
     if (url.pathname.endsWith('/form-config')) return route.fulfill({ json: { fields: {} }, headers });
     if (url.pathname.endsWith('/consent-templates')) return route.fulfill({ json: { templates: [] }, headers });
     if (url.pathname === '/auth/v1/token') return route.fulfill({ json: mockSession, headers });
+    if (url.pathname === '/auth/v1/logout') {
+      calls.logouts++;
+      assert.equal(url.searchParams.get('scope'), 'local', 'Logging out only affects this browser');
+      if (logoutFailure && calls.logouts === 1) return route.fulfill({ status: 400, json: { msg: 'Could not log out' }, headers });
+      return route.fulfill({ status: 204, headers });
+    }
     if (url.pathname === '/auth/v1/signup') {
       calls.signups.push({ body: request.postDataJSON(), redirectTo: url.searchParams.get('redirect_to') });
       return route.fulfill({ json: confirmation ? mockUser : mockSession, headers });
@@ -86,6 +95,12 @@ async function signIn(page) {
       assert.equal(await page.getByRole('button', { name: 'Continue with Apple' }).count(), 1);
       assert.equal(await page.getByRole('button', { name: 'Continue with Google' }).count(), 1);
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+      const dateStyle = await page.locator('input[type="date"]').evaluate(input => {
+        const name = document.querySelector('input[autocomplete="name"]');
+        const own = getComputedStyle(input), other = getComputedStyle(name);
+        return { sameHeight: input.offsetHeight === name.offsetHeight, sameFont: own.font === other.font, sameBorder: own.border === other.border, samePadding: own.padding === other.padding };
+      });
+      assert(Object.values(dateStyle).every(Boolean), `Signup date field matches other controls at ${width}px: ${JSON.stringify(dateStyle)}`);
       await page.screenshot({ path: `${output}/signup-${width}.png`, fullPage: true });
       await signIn(page);
       assert(await page.getByText('Your details', { exact: true }).isVisible());
@@ -94,6 +109,7 @@ async function signIn(page) {
       assert.equal(await page.getByPlaceholder('you@example.com').inputValue(), user.email);
       assert(await page.getByPlaceholder('you@example.com').evaluate(input => input.readOnly));
       assert.equal(await page.locator('input[type="tel"]').inputValue(), '400123456');
+      assert.equal(await page.locator('input[type="date"]').evaluate(input => input.offsetHeight === document.querySelector('input[autocomplete="name"]').offsetHeight), true, 'Prefilled date and name fields have matching heights');
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
       await page.screenshot({ path: `${output}/booking-${width}.png`, fullPage: true });
       await page.getByRole('button', { name: 'Forearm', exact: true }).click();
@@ -108,6 +124,23 @@ async function signIn(page) {
       assert.equal(calls.bookings[0].sms_reminder_opt_in, false, 'Booking does not silently opt in to messages');
       assert.deepEqual(errors, []);
       results.push(`Anonymous gate, login, visible prefilled details and authenticated booking: ${width}px`);
+      await context.close();
+    }
+    {
+      const { context, page, calls } = await open(browser, { signedIn: true, logoutFailure: true });
+      const before = page.url();
+      await page.getByPlaceholder('Your name', { exact: true }).fill('Draft Client');
+      await page.getByRole('button', { name: 'Log out', exact: true }).click();
+      await page.getByRole('alert').filter({ hasText: 'Could not log out' }).waitFor();
+      assert.equal(await page.getByPlaceholder('Your name', { exact: true }).inputValue(), 'Draft Client');
+      await page.getByRole('button', { name: 'Log out', exact: true }).click();
+      await page.getByRole('heading', { name: 'Create an account', exact: true }).waitFor();
+      assert.equal(page.url(), before, 'Logging out retains the studio QR link');
+      assert.equal(await page.getByRole('button', { name: 'Log out', exact: true }).count(), 0);
+      assert.equal(calls.bookings.length, 0);
+      await signIn(page);
+      assert.equal(await page.getByPlaceholder('Your name', { exact: true }).inputValue(), 'Jamie Client', 'Explicit logout clears the prior client draft');
+      results.push('Logout error recovery, browser-only sign-out, studio URL retained and client draft cleared');
       await context.close();
     }
     {

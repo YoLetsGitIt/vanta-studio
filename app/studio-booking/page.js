@@ -5,6 +5,8 @@ import { useSearchParams } from 'next/navigation';
 import Field from '@/components/ui/Field';
 import Button from '@/components/ui/Button';
 import ClientAuthGate from '@/components/ClientAuthGate';
+import ClientAccountActions from '@/components/ClientAccountActions';
+import DateOfBirthInput from '@/components/ui/DateOfBirthInput';
 import { ensureClientProfile, subscribeClientSession } from '@/lib/client-account';
 import { getSupabase } from '@/lib/supabase';
 import { getStudioPublic, createWalkIn, walkinUploadSign, signatureUploadSign, getStudioConsentTemplates, getFormConfigPublic } from '@/lib/api';
@@ -397,6 +399,7 @@ function WalkInInner() {
       </div>
 
       <form onSubmit={handleSubmit} style={s.form}>
+          <ClientAccountActions email={session.user.email} />
 
           <Section title="Your details" first>
             <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: 13 }}>Review your details and update anything that has changed.</p>
@@ -404,7 +407,7 @@ function WalkInInner() {
               <input style={s.input} type="text" value={fullName} required autoComplete="name" onChange={e => setFullName(e.target.value)} placeholder="Your name" />
             </Field>
             <Field label="Date of birth">
-              <input style={{ ...s.input, colorScheme: 'dark' }} type="date" value={dob} required autoComplete="bday" max={new Date().toISOString().slice(0, 10)} onChange={e => setDob(e.target.value)} />
+              <DateOfBirthInput style={s.input} value={dob} onChange={setDob} />
             </Field>
             <Field label="Email">
               <input style={s.input} type="email" value={session.user.email || ''} required readOnly autoComplete="email" placeholder="you@example.com" />
@@ -951,6 +954,7 @@ const s = {
     borderRadius: 8,
     color: '#ffffff',
     fontSize: '0.875rem',
+    minHeight: 44,
     padding: '0.65rem 0.85rem',
     outline: 'none',
     width: '100%',

@@ -4,27 +4,8 @@ import { useState } from 'react';
 import { getSupabase } from '@/lib/supabase';
 import { ensureClientProfile } from '@/lib/client-account';
 import ConsentSocialSignIn from '@/app/consent/ConsentSocialSignIn';
-import styles from '@/app/consent/ConsentPage.module.css';
+import DateOfBirthInput from '@/components/ui/DateOfBirthInput';
 
-function DateOfBirthInput({ value, onChange }) {
-  return (
-    <div className={styles.dateField}>
-      <input
-        className={styles.dateInput}
-        style={s.input}
-        type="date"
-        aria-label="Date of birth"
-        autoComplete="bday"
-        required
-        value={value}
-        data-empty={!value}
-        max={new Date().toISOString().slice(0, 10)}
-        onChange={e => onChange(e.target.value)}
-      />
-      {!value && <span className={styles.datePlaceholder} aria-hidden="true">Date of birth</span>}
-    </div>
-  );
-}
 
 export default function ClientAuthGate({ studioId, studioName, logoUrl, purpose = 'consent', collectMarketing = false }) {
   const [mode, setMode]       = useState('signup');
@@ -77,7 +58,7 @@ export default function ClientAuthGate({ studioId, studioName, logoUrl, purpose 
         {mode === 'signup' && (
           <>
             <input style={s.input} type="text" required autoComplete="name" value={name} onChange={e => setName(e.target.value)} placeholder="Full name" />
-            <DateOfBirthInput value={dob} onChange={setDob} />
+            <DateOfBirthInput style={s.input} value={dob} onChange={setDob} />
             <input style={s.input} type="tel" required autoComplete="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="Phone number" />
           </>
         )}

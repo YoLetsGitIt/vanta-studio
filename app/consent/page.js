@@ -4,7 +4,8 @@ import { useState, useEffect, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { getSupabase } from '@/lib/supabase';
 import { getStudioPublic, getStudioConsentTemplates } from '@/lib/api';
-import styles from './ConsentPage.module.css';
+import DateOfBirthInput from '@/components/ui/DateOfBirthInput';
+import ClientAccountActions from '@/components/ClientAccountActions';
 import ClientAuthGate from '@/components/ClientAuthGate';
 
 // The studio's reusable consent QR code lands here (/consent?s=<studioId>). Unlike the
@@ -248,6 +249,7 @@ function ConsentForm() {
       <p style={{ ...s.studioTag, marginBottom: '0.75rem' }}>{info.studio_name}</p>
 
       <form onSubmit={handleSubmit} style={s.form}>
+        <ClientAccountActions email={session.user?.email} />
         <div style={s.templateBox}>
           <p style={s.templateTitle}>Your details</p>
           <p style={{ ...s.hint, margin: '0.25rem 0 0.85rem' }}>Review your details and update anything that has changed.</p>
@@ -258,7 +260,7 @@ function ConsentForm() {
             </div>
             <div>
               <p style={{ ...s.label, marginBottom: '0.3rem' }}>Date of birth <span style={{ color: '#e86f6f' }}>*</span></p>
-              <DateOfBirthInput value={dob} onChange={setDob} />
+              <DateOfBirthInput style={s.input} value={dob} onChange={setDob} />
             </div>
             <div>
               <label htmlFor="consent-email" style={{ ...s.label, marginBottom: '0.3rem' }}>Email</label>
@@ -373,25 +375,6 @@ function ConsentForm() {
   );
 }
 
-function DateOfBirthInput({ value, onChange }) {
-  return (
-    <div className={styles.dateField}>
-      <input
-        className={styles.dateInput}
-        style={s.input}
-        type="date"
-        aria-label="Date of birth"
-        autoComplete="bday"
-        required
-        value={value}
-        data-empty={!value}
-        max={new Date().toISOString().slice(0, 10)}
-        onChange={e => onChange(e.target.value)}
-      />
-      {!value && <span className={styles.datePlaceholder} aria-hidden="true">Date of birth</span>}
-    </div>
-  );
-}
 
 
 const typeBadgeColor = {
