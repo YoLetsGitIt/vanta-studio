@@ -1,0 +1,47 @@
+.view { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 24px; border-bottom: 1px solid var(--border); color: var(--text-muted); font-size: 13px; flex-shrink: 0; }
+.filter { display: flex; align-items: center; gap: 10px; font-size: 12px; font-weight: 600; }
+.filter select { color: var(--text); background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px; padding: 8px 28px 8px 10px; max-width: 240px; min-height: 36px; font: inherit; }
+.scroll { flex: 1; overflow: auto; }
+.days { display: grid; grid-template-columns: repeat(7, minmax(160px, 1fr)); min-width: 1120px; min-height: 100%; align-items: stretch; }
+.day { min-width: 0; border-right: 1px solid var(--border-faint); background: var(--bg-base); }
+.day:last-child { border-right: 0; }
+.dayHeading { position: sticky; top: 0; z-index: 1; width: 100%; display: grid; grid-template-columns: 1fr auto; gap: 6px; padding: 16px 14px; text-align: left; background: var(--bg-sidebar); color: var(--text); border: 0; border-bottom: 1px solid var(--border); cursor: pointer; }
+.dayHeading:hover { background: var(--bg-row-hover); }
+.dayName { grid-column: 1 / -1; font-size: 12px; font-weight: 600; color: var(--text-muted); }
+.date { font-size: 22px; font-weight: 700; letter-spacing: -0.04em; }
+.date > span { font-size: 12px; letter-spacing: normal; font-weight: 500; color: var(--text-muted); }
+.dayCount { align-self: center; font-size: 11px; background: var(--bg-chip); color: var(--text-muted); padding: 3px 7px; border-radius: 6px; }
+.today .dayHeading { border-bottom: 2px solid var(--accent); }
+.today .date, .today .dayName { color: var(--accent); }
+.bookings { display: flex; flex-direction: column; gap: 10px; padding: 12px 10px 24px; }
+.booking { width: 100%; min-width: 0; display: flex; flex-direction: column; gap: 7px; padding: 12px; border: 1px solid var(--border); border-left: 3px solid var(--booking-color); border-radius: 10px; background: var(--bg-card); color: var(--text); text-align: left; font-family: inherit; cursor: pointer; transition: background 150ms, border-color 150ms; }
+.booking:hover { background: var(--bg-row-hover); border-top-color: var(--border-strong); border-right-color: var(--border-strong); border-bottom-color: var(--border-strong); }
+.booking:focus-visible, .dayHeading:focus-visible, .scroll:focus-visible, .filter select:focus-visible, .retry:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+.selected { box-shadow: 0 0 0 2px var(--accent); }
+.pending { border-style: dashed; }
+.time { font-size: 12px; font-weight: 650; color: var(--text-dim); }
+.client { font-size: 14px; font-weight: 650; line-height: 1.4; overflow-wrap: anywhere; }
+.resource { display: flex; flex-direction: column; gap: 2px; font-size: 12px; line-height: 1.4; overflow-wrap: anywhere; }
+.resource > span { font-size: 10px; color: var(--text-muted); }
+.tags { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin-top: 3px; }
+.source, .status, .pendingTag { font-size: 10px; line-height: 1.4; border-radius: 4px; padding: 3px 5px; background: var(--bg-chip); color: var(--text-dim); }
+.source { border-left: 2px solid var(--booking-color); }
+.pendingTag { color: var(--color-warning); background: var(--color-warning-surface); }
+.continuation { color: var(--text-muted); font-size: 10px; line-height: 1.5; }
+.empty { margin: 14px 2px; font-size: 12px; color: var(--text-faint); }
+.message { padding: 24px; color: var(--text-muted); font-size: 14px; }
+.retry { background: var(--bg-input); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 8px 14px; cursor: pointer; }
+@media (max-width: 760px) {
+  .summary { padding: 10px 16px; flex-wrap: wrap; font-size: 12px; }
+  .filter select { max-width: 210px; min-height: 40px; font-size: 14px; }
+  .days { grid-template-columns: repeat(7, minmax(240px, 1fr)); min-width: 1680px; }
+  .dayHeading { padding: 12px 14px; }
+}
+@media (max-height: 550px) and (orientation: landscape) and (any-pointer: coarse) {
+  .summary { padding: 4px 12px; }
+  .filter select { min-height: 32px; padding-block: 4px; }
+  .dayHeading { padding: 8px 12px; grid-template-columns: auto 1fr auto; align-items: center; }
+  .dayName { grid-column: auto; }
+  .date { font-size: 16px; }
+}

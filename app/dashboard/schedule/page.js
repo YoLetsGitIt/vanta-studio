@@ -6,6 +6,8 @@ import { useState, useEffect } from 'react';
 import { getStudioArtists, getStudioSchedule, getStudioScheduleRange, getStudioBooking, createManualBooking, getStations, getStripeStatus } from '@/lib/api';
 import { BOOKING_SOURCES, getBookingStyle, TYPE_STYLE } from '@/lib/bookingType';
 import BookingDetailPanel from '@/components/BookingDetailPanel';
+import ScheduleWeekView from '@/components/ScheduleWeekView';
+import { weekRangeLabel } from '@/lib/scheduleWeek.mjs';
 import { getCached, setCached, invalidatePrefix } from '@/lib/cache';
 import CompleteBookingModal from '@/components/CompleteBookingModal';
 import RejectBookingModal from '@/components/RejectBookingModal';
@@ -660,6 +662,25 @@ function MonthView({ monthStart, onDayClick }) {
   );
 }
 
+// ── Full week schedule ────────────────────────────────────────────────────────
+
+function WeekView({ date, lens, onDayClick }) {
+  const [refreshKey, setRefreshKey] = useState(0);
+  const refresh = () => { invalidatePrefix('schedule:'); setRefreshKey(value => value + 1); };
+  const actions = useBookingActions(refresh);
+  useEffect(() => {
+    window.addEventListener('booking-created', refresh);
+    return () => window.removeEventListener('booking-created', refresh);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { actions.closeDetail(); }, [toISO(date), lens]); // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <div style={{ display: 'flex', flex: 1, minWidth: 0, minHeight: 0, overflow: 'hidden', position: 'relative' }}>
+      <ScheduleWeekView date={date} lens={lens} refreshKey={refreshKey} selectedBookingId={actions.selectedEntry?.bookingId} onOpenDetail={actions.openDetail} onDayClick={onDayClick} />
+      <BookingOverlays actions={actions} />
+    </div>
+  );
+}
+
 // ── Day view ──────────────────────────────────────────────────────────────────
 
 function DayView({ date, showAll, setShowAll }) {
@@ -1200,7 +1221,7 @@ const LANG_LOCALE = { en: 'en-AU', 'zh-Hans': 'zh-CN', ko: 'ko-KR' };
 export default function SchedulePage() {
   const { t, lang } = useLanguage();
   const locale = LANG_LOCALE[lang] ?? 'en-AU';
-  const [view,      setView]      = useState('month');  // 'month' | 'day'
+  const [view,      setView]      = useState('month');  // 'month' | 'week' | 'day'
   const [showAll, setShowAll] = useState(false);
   const [lens,      setLens]      = useState('artist'); // 'artist' | 'station'
   const [monthStart, setMonthStart] = useState(() => getMonthStart(new Date()));
@@ -1220,6 +1241,22 @@ export default function SchedulePage() {
 
   const monthLabel = monthStart.toLocaleDateString(locale, { month: 'long', year: 'numeric' });
   const dayLabel   = dayDate.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' });
+  const weekLabel = weekRangeLabel(dayDate, locale);
+  const period = view === 'month' ? 'month' : view === 'week' ? 'week' : 'day';
+  const periodLabel = view === 'month' ? monthLabel : view === 'week' ? weekLabel : dayLabel;
+  const isCurrentPeriod = view === 'month' ? isCurrentMonth : view === 'week' ? toISO(getMonday(dayDate)) === toISO(getMonday(today)) : toISO(dayDate) === toISO(today);
+
+  function changeView(nextView) {
+    if (view === 'month' && nextView !== 'month' && !isSameMonth(dayDate, monthStart)) setDayDate(monthStart);
+    if (nextView === 'month' && view !== 'month') setMonthStart(getMonthStart(dayDate));
+    setView(nextView);
+  }
+  function navigate(offset) {
+    if (view === 'month') setMonthStart(date => getMonthStart(new Date(date.getFullYear(), date.getMonth() + offset, 1)));
+    else setDayDate(date => addDays(date, offset * (view === 'week' ? 7 : 1)));
+  }
+  function goToday() { setDayDate(new Date()); setMonthStart(getMonthStart(new Date())); }
+
 
   return (
     <div className="studio-feature-page studio-schedule-page" style={s.page}>
@@ -1227,26 +1264,29 @@ export default function SchedulePage() {
         <button type="button" aria-label="Open studio navigation" onClick={() => window.dispatchEvent(new Event('vanta:open-navigation'))}>☰</button>
         <select aria-label="Calendar view" value={`${view}:${lens}${view === 'day' && lens === 'artist' && showAll ? ':all' : ''}`} onChange={event => {
           const [nextView, nextLens, all] = event.target.value.split(':');
-          setView(nextView); setLens(nextLens); setShowAll(all === 'all');
+          changeView(nextView); setLens(nextLens); setShowAll(all === 'all');
         }}>
           <option value="day:artist">{t('sched_day')} · {t('bdp_artist')}</option>
           <option value="day:artist:all">{t('sched_day')} · {t('sched_all_artists')}</option>
           <option value="day:station">{t('sched_day')} · {t('bdp_station')}</option>
+          <option value="week:artist">{t('sched_week')} · {t('bdp_artist')}</option>
+          <option value="week:station">{t('sched_week')} · {t('bdp_station')}</option>
           <option value="month:artist">{t('sched_month')} · {t('bdp_artist')}</option>
           <option value="month:station">{t('sched_month')} · {t('bdp_station')}</option>
         </select>
-        <button type="button" aria-label={view === 'day' ? 'Previous day' : 'Previous month'} onClick={() => view === 'day' ? setDayDate(d => addDays(d, -1)) : setMonthStart(d => getMonthStart(new Date(d.getFullYear(), d.getMonth() - 1, 1)))}>←</button>
-        <span className="studio-calendar-toolbar-date" aria-live="polite">{view === 'month' ? monthLabel : dayDate.toLocaleDateString(locale, { weekday: 'short', day: 'numeric', month: 'short' })}</span>
-        <button type="button" aria-label={view === 'day' ? 'Next day' : 'Next month'} onClick={() => view === 'day' ? setDayDate(d => addDays(d, 1)) : setMonthStart(d => getMonthStart(new Date(d.getFullYear(), d.getMonth() + 1, 1)))}>→</button>
-        <button type="button" onClick={() => { setDayDate(new Date()); setMonthStart(getMonthStart(new Date())); }}>{t('today')}</button>
+        <button type="button" aria-label={`Previous ${period}`} onClick={() => navigate(-1)}>←</button>
+        <span className="studio-calendar-toolbar-date" aria-live="polite">{view === 'day' ? dayDate.toLocaleDateString(locale, { weekday: 'short', day: 'numeric', month: 'short' }) : periodLabel}</span>
+        <button type="button" aria-label={`Next ${period}`} onClick={() => navigate(1)}>→</button>
+        <button type="button" onClick={goToday}>{t('today')}</button>
         <button type="button" className="studio-calendar-add" aria-label={t('new_appointment')} title={t('new_appointment')} onClick={() => window.dispatchEvent(new CustomEvent('vanta:open-new-appointment', { detail: { bookingType: 'walkin' } }))}>＋</button>
       </div>
       <div className="studio-feature-header" style={s.header}>
         <div className="studio-schedule-toggles" style={s.headerLeft}>
           <h1 style={s.title}>{t('nav_schedule')}</h1>
           <div style={s.viewToggle}>
-            <button aria-pressed={view === 'month'} onClick={() => setView('month')} style={{ ...s.toggleBtn, ...(view === 'month' ? s.toggleActive : {}) }}>{t('sched_month')}</button>
-            <button aria-pressed={view === 'day'} onClick={() => setView('day')}   style={{ ...s.toggleBtn, ...(view === 'day'   ? s.toggleActive : {}) }}>{t('sched_day')}</button>
+            <button aria-pressed={view === 'month'} onClick={() => changeView('month')} style={{ ...s.toggleBtn, ...(view === 'month' ? s.toggleActive : {}) }}>{t('sched_month')}</button>
+            <button aria-pressed={view === 'week'} onClick={() => changeView('week')} style={{ ...s.toggleBtn, ...(view === 'week' ? s.toggleActive : {}) }}>{t('sched_week')}</button>
+            <button aria-pressed={view === 'day'} onClick={() => changeView('day')}   style={{ ...s.toggleBtn, ...(view === 'day'   ? s.toggleActive : {}) }}>{t('sched_day')}</button>
           </div>
           <div style={{ ...s.viewToggle, marginLeft: '0.25rem' }}>
             <button aria-pressed={lens === 'artist'} onClick={() => setLens('artist')}  style={{ ...s.toggleBtn, ...(lens === 'artist'  ? s.toggleActive : {}) }}>{t('bdp_artist')}</button>
@@ -1255,30 +1295,16 @@ export default function SchedulePage() {
         </div>
 
         <div className="studio-schedule-date-nav" style={s.nav}>
-          {view === 'month' ? (
-            <>
-              <button aria-label="Previous month" onClick={() => setMonthStart(d => getMonthStart(new Date(d.getFullYear(), d.getMonth() - 1, 1)))} style={s.navBtn}>←</button>
-              <span className="studio-schedule-date-label" style={s.navLabel}>{monthLabel}</span>
-              <button aria-label="Next month" onClick={() => setMonthStart(d => getMonthStart(new Date(d.getFullYear(), d.getMonth() + 1, 1)))} style={s.navBtn}>→</button>
-              {!isCurrentMonth && (
-                <button onClick={() => setMonthStart(getMonthStart(today))} style={s.todayBtn}>{t('today')}</button>
-              )}
-            </>
-          ) : (
-            <>
-              <button aria-label="Previous day" onClick={() => setDayDate(d => addDays(d, -1))} style={s.navBtn}>←</button>
-              <span className="studio-schedule-date-label" style={s.navLabel}>{dayLabel}</span>
-              <button aria-label="Next day" onClick={() => setDayDate(d => addDays(d, 1))}  style={s.navBtn}>→</button>
-              {toISO(dayDate) !== toISO(today) && (
-                <button onClick={() => setDayDate(today)} style={s.todayBtn}>{t('today')}</button>
-              )}
-            </>
-          )}
+          <button aria-label={`Previous ${period}`} onClick={() => navigate(-1)} style={s.navBtn}>←</button>
+          <span className="studio-schedule-date-label" style={s.navLabel} aria-live="polite">{periodLabel}</span>
+          <button aria-label={`Next ${period}`} onClick={() => navigate(1)} style={s.navBtn}>→</button>
+          {!isCurrentPeriod && <button onClick={goToday} style={s.todayBtn}>{t('today')}</button>}
         </div>
       </div>
 
       {view === 'month' && lens === 'artist'  && <MonthView        monthStart={monthStart} onDayClick={goToDayView} />}
       {view === 'month' && lens === 'station' && <StationMonthView monthStart={monthStart} onDayClick={day => { goToDayView(day); setLens('station'); }} />}
+      {view === 'week' && <WeekView date={dayDate} lens={lens} onDayClick={goToDayView} />}
       {view === 'day'   && lens === 'artist'  && <DayView          date={dayDate} showAll={showAll} setShowAll={setShowAll} />}
       {view === 'day'   && lens === 'station' && <StationView      date={dayDate} />}
     </div>

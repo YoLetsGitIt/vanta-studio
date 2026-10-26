@@ -8,7 +8,7 @@ import {
   PieChart, Pie, Cell,
 } from 'recharts';
 import { useLanguage } from '@/lib/i18n';
-import { getBookingSourceLabel } from '@/lib/bookingType';
+import { getBookingSourceLabel, getBookingStyle } from '@/lib/bookingType';
 
 // Financial figures and Artists & Payouts moved to /dashboard/financial
 // (a separate, password-protected nav tab). This page only shows the
@@ -156,21 +156,19 @@ export default function RevenuePage() {
 
 // ── Small components ──────────────────────────────────────────────────────────
 
-const SOURCE_COLORS = { App: '#d5d0c7', Studio: '#bdb8af', 'Walk-in': '#a7a29a', Personal: '#918d86', Imported: '#77746f' };
-
 function SourceBreakdown({ data }) {
   const total = data.reduce((s, d) => s + d.count, 0);
   // Group legacy aliases by display label while keeping walk-ins distinct.
   const grouped = new Map();
   for (const d of data) {
     const name = getBookingSourceLabel(d.source);
-    grouped.set(name, (grouped.get(name) ?? 0) + d.count);
+    grouped.set(name, {
+      name,
+      value: (grouped.get(name)?.value ?? 0) + d.count,
+      color: getBookingStyle(d.source).dot,
+    });
   }
-  const chartData = Array.from(grouped, ([name, value]) => ({
-    name,
-    value,
-    color: SOURCE_COLORS[name] ?? '#918d86',
-  }));
+  const chartData = Array.from(grouped.values());
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '2rem', marginTop: '1rem', flexWrap: 'wrap' }}>
       <div style={{ width: 160, height: 160, flexShrink: 0 }}>
