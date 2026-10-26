@@ -11,7 +11,7 @@ export default function PreviewDialog({ subject, body, onClose }) {
   const { t: mt } = useLanguage();
   return (
     <Dialog title={mt("Email preview")} onClose={onClose} footer={<Button variant="secondary" onClick={onClose}>{mt("Close")}</Button>}>
-      <p className={styles.hint}>{mt("Shown with a sample client name.")}</p>
+      <p className={styles.hint}>{mt("Shown with sample client details.")}</p>
       <EmailPreview subject={subject} body={body} className={styles.mailTall} />
     </Dialog>
   );

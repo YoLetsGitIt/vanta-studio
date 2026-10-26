@@ -33,7 +33,11 @@ const STARTER_GROUPS = [
     ['Piercing check-in', 'Follow up after a piercing.'],
   ] },
 ];
-const PLACEHOLDERS = [['{{client_name}}', 'Client’s first name'], ['{{studio_name}}', 'Studio name']];
+const PERSONALISATION_GROUPS = [
+  ['Client details', [['client_name', 'Client’s first name'], ['client_full_name', 'Client’s full name'], ['client_email', 'Client email']]],
+  ['Visits and appointments', [['visit_count', 'Completed visits'], ['last_visit_date', 'Last visit date'], ['next_appointment_date', 'Next appointment date'], ['next_appointment_time', 'Next appointment time']]],
+  ['Studio details', [['studio_name', 'Studio name'], ['studio_address', 'Studio address'], ['booking_link', 'Booking link']]],
+];
 const same = (a, b) => a.name === b.name && a.subject === b.subject && a.body === b.body;
 
 /** Choose a starting point, write the message, then use the separate action panel. */
@@ -205,9 +209,13 @@ export default function Templates({ available, ready, preset, onSent, onNeedSetu
           </div>
           <div className={`${styles.editorGroup} ${styles.personaliseGroup}`}>
             <div><h3 className={styles.editorGroupTitle}>{mt("Personalisation")}</h3><p className={styles.desc}>{mt("These details are filled in for each client.")}</p></div>
-            <div className={styles.chips}>
-              {PLACEHOLDERS.map(([token, label]) => <button key={token} type="button" disabled={busy} className={styles.chip} onClick={() => insert(token)}>{mt(label)}</button>)}
+            <div className={styles.personalisationOptions}>
+              {PERSONALISATION_GROUPS.map(([group, fields]) => <div key={group}>
+                <h4 className={styles.personalisationLabel}>{mt(group)}</h4>
+                <div className={styles.chips}>{fields.map(([key, label]) => <button key={key} type="button" disabled={busy} title={`{{${key}}}`} className={styles.chip} onClick={() => insert(`{{${key}}}`)}>{mt(label)}</button>)}</div>
+              </div>)}
             </div>
+            <p className={styles.hint}>{mt('Missing visit dates show “not recorded”; missing appointment dates or times show “not booked”.')}</p>
           </div>
         </section>}
 

@@ -96,6 +96,8 @@
 .chip:hover { background: var(--accent-tint); border-color: var(--accent-tint-border); }
 
 .chipOn, .chipOn:hover { background: var(--accent); border-color: var(--accent); color: var(--accent-contrast); font-weight: 700; }
+.personalisationOptions { display: flex; flex-direction: column; gap: 1rem; }
+.personalisationLabel { margin: 0 0 0.5rem; font-size: 0.78rem; font-weight: 600; color: var(--text-dim); }
 
 /* Client picker */
 .listBar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.6rem 1rem; }

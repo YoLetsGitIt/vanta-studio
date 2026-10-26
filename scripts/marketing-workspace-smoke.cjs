@@ -110,6 +110,50 @@ async function screenshot(page, name) {
 (async () => {
   const browser = await (process.env.STUDIO_BROWSER === 'webkit' ? webkit : chromium).launch({ headless: true, ...(process.env.STUDIO_CHROMIUM_EXECUTABLE && process.env.STUDIO_BROWSER !== 'webkit' ? { executablePath: process.env.STUDIO_CHROMIUM_EXECUTABLE } : {}) });
   try {
+    for (const width of cases('personalisation') ? [390, 1440] : []) {
+      const { context, page, writes, unexpected, errors } = await setup(browser, width);
+      await page.goto(`${base}/dashboard/marketing.html`, { waitUntil: 'networkidle' });
+      await writeTemplate(page);
+      const editor = page.getByRole('region', { name: 'Template editor', exact: true });
+      const message = page.getByRole('textbox', { name: 'Message', exact: true });
+      const subject = page.getByRole('textbox', { name: 'Subject', exact: true });
+      for (const label of ['Client details', 'Visits and appointments', 'Studio details']) await editor.getByRole('heading', { name: label, exact: true }).waitFor();
+      const tokens = ['client_name', 'client_full_name', 'client_email', 'visit_count', 'last_visit_date', 'next_appointment_date', 'next_appointment_time', 'studio_name', 'studio_address', 'booking_link'];
+      for (const token of tokens) {
+        await message.fill('Hello REPLACE!');
+        await message.focus();
+        await message.evaluate(el => el.setSelectionRange(6, 13));
+        await editor.getByTitle(`{{${token}}}`, { exact: true }).click();
+        assert.equal(await message.inputValue(), `Hello {{${token}}}!`);
+        await page.waitForFunction(() => document.activeElement?.tagName === 'TEXTAREA');
+        assert.equal(await message.evaluate(el => el === document.activeElement), true);
+      }
+      await subject.fill('Hello '); await subject.focus();
+      await editor.getByTitle('{{client_full_name}}', { exact: true }).click();
+      assert.equal(await subject.inputValue(), 'Hello {{client_full_name}}');
+      await message.fill(tokens.map(token => `{{${token}}}`).join(' | '));
+      await noOverflow(page); await screenshot(page, `personalisation-${width}`);
+      await page.getByRole('complementary', { name: 'Template actions', exact: true }).getByRole('button', { name: 'Preview', exact: true }).click();
+      const dialog = page.getByRole('dialog', { name: 'Email preview', exact: true });
+      await dialog.getByText('Shown with sample client details.', { exact: true }).waitFor();
+      await dialog.locator('iframe').waitFor();
+      assert.equal(writes.filter(w => w.path.endsWith('/marketing/preview')).at(-1).body.client_id, undefined);
+      await dialog.getByRole('button', { name: 'Close', exact: true }).click();
+      await continueFlow(page);
+      const alice = page.getByRole('checkbox', { name: /Alice Local/ });
+      const bob = page.getByRole('checkbox', { name: /Bob Local/ });
+      const previewFor = id => page.waitForResponse(response => response.url().endsWith('/marketing/preview') && response.request().postDataJSON().client_id === id);
+      let preview = previewFor('client-0'); await alice.check(); await preview;
+      preview = previewFor('client-1'); await bob.check(); await alice.uncheck(); await preview;
+      const calls = writes.filter(w => w.path.endsWith('/marketing/preview'));
+      assert.equal(calls.at(-1).body.client_id, 'client-1');
+      assert.equal(calls.at(-1).body.client_name, 'Bob Local');
+      assert.equal(writes.find(w => w.path.endsWith('/marketing/templates')).body.body, tokens.map(token => `{{${token}}}`).join(' | '));
+      assert.equal(writes.filter(w => w.path.endsWith('/marketing/campaigns')).length, 0);
+      assert.deepEqual(unexpected, []); assert.deepEqual(errors, []);
+      console.log(`PASS all ten fields insert at cursor in message/subject, persist, use sample preview and switch real-client preview IDs at ${width}px`);
+      await context.close();
+    }
     for (const width of cases('navigation') ? [320, 390, 834, 1440] : []) {
       for (const theme of ['dark', 'light']) {
         const { context, page, writes, errors, reads } = await setup(browser, width, { theme });

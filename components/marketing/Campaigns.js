@@ -97,9 +97,9 @@ export default function Campaigns({ template, available, ready, preset, onSent, 
           <Button size="sm" variant="secondary" disabled={sending} onClick={onEditTemplates}>{mt("Back to template")}</Button>
         </div>
         {template && <>
-          <EmailPreview subject={template.subject} body={template.body} clientName={firstClient?.name} />
+          <EmailPreview subject={template.subject} body={template.body} clientName={firstClient?.name} clientId={firstClient?.id} />
           <p className={styles.hint}>
-            {firstClient ? mt('Shown as {name} will see it.', { name: firstClient.name }) : mt("Shown with a sample name. Tick a client to see theirs.")}{' '}
+            {firstClient ? mt('Shown as {name} will see it.', { name: firstClient.name }) : mt("Shown with sample client details. Tick a client to see theirs.")}{' '}
           </p>
         </>}
 
