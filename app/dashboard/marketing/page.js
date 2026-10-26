@@ -70,39 +70,28 @@ export default function MarketingPage() {
   const { available, ready } = data;
   const goSettings = () => selectTab('settings');
   const compose = clientIds => { setPreset(prev => ({ clientIds, key: prev.key + 1 })); selectTab('templates'); };
-  function navigateTabs(event, id) {
-    const index = SECTIONS.indexOf(id);
-    const next = { ArrowRight: (index + 1) % SECTIONS.length, ArrowLeft: (index + SECTIONS.length - 1) % SECTIONS.length, Home: 0, End: SECTIONS.length - 1 }[event.key];
-    if (next === undefined) return;
-    event.preventDefault();
-    selectTab(SECTIONS[next], false);
-    document.getElementById(`tab-${SECTIONS[next]}`)?.focus();
-  }
-
   return (
     <main data-marketing-view={tab} className={`${styles.page} ${styles.workspacePage}`}>
       <header className={`${styles.pageHead} ${styles.marketingHead}`}>
-        <h1 className={styles.title}>{mt("Marketing")}</h1>
-        <p className={styles.subtitle}>{mt("Create email templates and send them to your clients.")}</p>
+        <div className={styles.marketingIntro}>
+          <p className={styles.marketingEyebrow}>{mt('Marketing')}</p>
+          <h1 className={styles.title}>{mt(SECTION_COPY[tab][0])}</h1>
+          <p className={styles.subtitle}>{mt(tab === 'templates' ? 'Create email templates and send them to your clients.' : SECTION_COPY[tab][1])}</p>
+          {tab !== 'templates' && <Button id="tab-templates" size="sm" className={styles.returnToCreate} aria-controls="panel-templates" onClick={() => selectTab('templates')}><span aria-hidden="true">←</span>{mt('Create and send')}</Button>}
+        </div>
+        <nav aria-label={mt('Marketing sections')} className={styles.marketingUtilities}>
+          {['history', 'settings'].map(id => <button key={id} type="button" id={`tab-${id}`} aria-pressed={tab === id} aria-controls={`panel-${id}`} className={styles.marketingUtility} onClick={() => selectTab(id, false)}>
+            <SectionIcon section={id} />
+            {mt(SECTION_COPY[id][0])}
+          </button>)}
+        </nav>
       </header>
 
-      <div role="tablist" aria-label={mt('Marketing sections')} className={styles.sectionTabs}>
-        {SECTIONS.map(id => <button key={id} type="button" role="tab" id={`tab-${id}`} aria-labelledby={`tab-${id}-title`} aria-selected={tab === id} aria-controls={`panel-${id}`} aria-describedby={`tab-${id}-description`} tabIndex={tab === id ? 0 : -1} className={styles.sectionTab} onClick={() => selectTab(id, false)} onKeyDown={event => navigateTabs(event, id)}>
-          <span className={styles.sectionTabIcon}><SectionIcon section={id} /></span>
-          <span className={styles.sectionTabText}>
-            <span id={`tab-${id}-title`} className={styles.sectionTabTitle}>{mt(SECTION_COPY[id][0])}</span>
-            <span id={`tab-${id}-description`} className={styles.sectionTabDescription}>{mt(SECTION_COPY[id][1])}</span>
-          </span>
-          <span className={styles.sectionTabSelected} aria-hidden="true">✓</span>
-        </button>)}
-      </div>
-
       {SECTIONS.map(id => (
-        <section key={id} id={`panel-${id}`} role="tabpanel" aria-labelledby={`tab-${id}`} tabIndex={0} hidden={tab !== id} className={styles.panel}>
+        <section key={id} id={`panel-${id}`} aria-label={mt(SECTION_COPY[id][0])} tabIndex={-1} hidden={tab !== id} className={styles.panel}>
           {visited.includes(id) && <>
             {id === 'templates' && <Templates key={preset.key} preset={preset} available={available} ready={ready} onSent={load} onNeedSetup={goSettings} />}
             {id === 'history' && <>
-              <div><h2 className={styles.cardTitle}>{mt('Sent emails')}</h2><p className={styles.desc}>{mt(SECTION_COPY.history[1])}</p></div>
               <History active={tab === id} onCompose={() => selectTab('templates')} onResend={compose} />
             </>}
             {id === 'settings' && <MarketingSettings data={data} onReload={load} onTemplates={() => selectTab('templates')} onHistory={() => selectTab('history')} />}

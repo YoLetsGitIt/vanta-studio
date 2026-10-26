@@ -59,8 +59,12 @@ async function setup(browser, width, { ready = true, available = true, saveFailu
     if (path.endsWith('/marketing/mailboxes')) return route.fulfill({ json: { connections: [], providers: { gmail: true, outlook: true } } });
     return route.fulfill({ json: {} });
   });
+  if (process.env.VANTA_DELAY_TRANSLATIONS) await context.route('**/_next/static/chunks/339-*.js', async route => {
+    await new Promise(resolve => setTimeout(resolve, Number(process.env.VANTA_DELAY_TRANSLATIONS)));
+    return route.continue();
+  });
   const page = await context.newPage(), errors = [];
-  page.on('pageerror', err => errors.push(err.message));
+  page.on('pageerror', err => { errors.push(err.message); if (process.env.VANTA_DEBUG_ERRORS) console.error(err.stack); });
   return { context, page, writes, unexpected, errors, reads };
 }
 
@@ -69,8 +73,8 @@ const selected = async (page, section) => {
   try { await page.waitForFunction(id => document.querySelector(`[data-marketing-view="${id}"] #panel-${id}:not([hidden])`), section); }
   catch (error) { await screenshot(page, 'navigation-failure'); console.error('Navigation failure:', page.url(), await page.locator('body').innerText()); throw error; }
   assert.equal(await page.locator(`#panel-${section}`).isVisible(), true);
-  assert.equal(await page.getByRole('tablist').count(), 1);
-  assert.equal(await sectionAction(page, section).getAttribute('aria-selected'), 'true');
+  assert.equal(await page.getByRole('tablist').count(), 0);
+  if (section !== 'templates') assert.equal(await sectionAction(page, section).getAttribute('aria-pressed'), 'true');
 };
 const noOverflow = async page => assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'Page should fit the viewport');
 
@@ -111,27 +115,27 @@ async function screenshot(page, name) {
         const { context, page, writes, errors, reads } = await setup(browser, width, { theme });
         await page.goto(`${base}/dashboard/marketing.html`, { waitUntil: 'networkidle' });
         await selected(page, 'templates');
-        const first = sectionAction(page, 'templates');
-        await first.focus();
-        await page.keyboard.press('ArrowRight');
+        const utilities = page.getByRole('navigation', { name:'Marketing sections', exact:true });
+        await sectionAction(page, 'history').focus();
+        await page.keyboard.press('Tab');
+        assert.equal(await sectionAction(page, 'settings').evaluate(el => el === document.activeElement), true);
+        await page.keyboard.press('Enter');
+        await selected(page, 'settings');
+        await sectionAction(page, 'history').focus();
+        await page.keyboard.press('Enter');
         await selected(page, 'history');
-        assert.equal(await sectionAction(page, 'history').evaluate(el => el === document.activeElement), true);
         await page.getByRole('heading', {name:'Nothing sent yet', exact:true}).waitFor();
-        await page.keyboard.press('End');
-        await selected(page, 'settings');
-        await page.keyboard.press('ArrowRight');
-        await selected(page, 'templates');
-        await page.keyboard.press('ArrowLeft');
-        await selected(page, 'settings');
-        await page.keyboard.press('Home');
+        await sectionAction(page, 'templates').focus();
+        await page.keyboard.press('Enter');
         await selected(page, 'templates');
         assert.equal(new URL(page.url()).searchParams.get('tab'), 'templates');
-        const cards = await page.getByRole('tab').evaluateAll(tabs => tabs.map(el => ({width:el.getBoundingClientRect().width, height:el.getBoundingClientRect().height, background:getComputedStyle(el).backgroundColor, name:el.getAttribute('aria-labelledby'), description:el.getAttribute('aria-describedby')})));
-        assert.notEqual(cards[0].background, cards[1].background, 'Selected tab must be visibly filled');
-        assert.ok(cards.every(card => card.height >= 44 && card.width >= 44 && card.name && card.description));
-        assert.equal(await page.locator('[role=tabpanel]:not([hidden])').count(), 1);
-        assert.equal(await first.getAttribute('tabindex'), '0');
-        assert.equal(await sectionAction(page, 'history').getAttribute('tabindex'), '-1');
+        assert.equal(await utilities.getByRole('button').count(), 2);
+        assert.equal(await page.getByRole('tab').count(), 0);
+        assert.equal(await page.locator('main[data-marketing-view] > section:not([hidden])').count(), 1);
+        const titleSize = await page.getByRole('heading', {name:'Create and send', exact:true, level:1}).evaluate(el=>parseFloat(getComputedStyle(el).fontSize));
+        const utilitySize = await sectionAction(page, 'history').evaluate(el=>parseFloat(getComputedStyle(el).fontSize));
+        assert.ok(titleSize >= utilitySize * 1.75, 'Create and send must lead the visual hierarchy');
+        assert.ok((await sectionAction(page, 'history').boundingBox()).height <= 48, 'Utilities should stay compact');
         await noOverflow(page); await screenshot(page, `navigation-${width}-${theme}`);
         assert.deepEqual(writes, []); assert.deepEqual(errors, []);
         await context.close();
@@ -142,7 +146,7 @@ async function screenshot(page, name) {
       await page.goto(`${base}/dashboard/marketing.html`, { waitUntil: 'networkidle' });
       await page.getByRole('heading', { name: 'Your templates', exact: true }).waitFor();
       await selected(page, 'templates');
-      assert.equal(await page.getByRole('tab').count(), 3);
+      assert.equal(await page.getByRole('tab').count(), 0);
       assert.equal(await sectionAction(page, 'settings').isVisible(), true);
       assert.equal(await page.getByRole('heading', { name: 'Setup checklist' }).count(), 0);
       assert.equal(await page.getByRole('button', { name: 'Continue to clients', exact: true }).count(), 0);
@@ -296,11 +300,11 @@ async function screenshot(page, name) {
         assert.equal(await library.isVisible(), true);
         await library.getByRole('heading', { name: 'Saved templates', exact: true }).waitFor();
         assert.equal(await library.getByRole('button', { name: 'New template', exact: true }).isEnabled(), true);
-        const titleBox = await page.getByRole('heading', { name: 'Marketing', exact: true }).boundingBox();
+        const titleBox = await page.getByRole('heading', { name: 'Create and send', exact: true, level: 1 }).boundingBox();
         const settingsBox = await sectionAction(page, 'settings').boundingBox();
-        assert.ok(settingsBox.y > titleBox.y + titleBox.height, 'Section cards should sit below the Marketing heading');
-        const createBox = await sectionAction(page, 'templates').boundingBox();
-        assert.ok(Math.abs(createBox.y - settingsBox.y) <= 1, 'All section cards should stay on one row');
+        assert.ok(settingsBox.height <= 48, 'Settings should be a compact utility');
+        if (width > 760) assert.ok(settingsBox.x > titleBox.x + titleBox.width, 'Utilities should sit to the right of the main workspace');
+        else assert.ok(settingsBox.y > titleBox.y + titleBox.height, 'Phone utilities should follow the main heading');
         const chooser = await page.locator('[data-stage="choosing"]').boundingBox();
         const examples = library.locator('details');
         assert.equal(await examples.getAttribute('open'), null, 'Examples start collapsed when saved templates exist');
