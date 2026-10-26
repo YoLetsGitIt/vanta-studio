@@ -1,11 +1,14 @@
 'use client';
 
+import { useLanguage } from '@/lib/i18n';
+
 import { useEffect, useState } from 'react';
 import { previewMarketingEmail } from '@/lib/api';
 import styles from './marketing.module.css';
 
 /** Renders the email as it will arrive. The last good preview stays up while a newer one loads. */
 export default function EmailPreview({ subject, body, clientName, className = '' }) {
+  const { t: mt } = useLanguage();
   const [preview, setPreview] = useState(null);
   const [error, setError] = useState('');
 
@@ -21,11 +24,11 @@ export default function EmailPreview({ subject, body, clientName, className = ''
   }, [subject, body, clientName]);
 
   if (error) return <p className={styles.error} role="alert">{error}</p>;
-  if (!preview) return <p role="status" className={styles.muted}>Loading preview…</p>;
+  if (!preview) return <p role="status" className={styles.muted}>{mt("Loading preview…")}</p>;
   return (
     <div className={`${styles.mail} ${className}`.trim()}>
-      <p className={styles.mailSubject}><span className={styles.mailLabel}>Subject</span>{preview.subject || '(no subject)'}</p>
-      <iframe title="Email preview" className={styles.mailBody} sandbox="" srcDoc={preview.html} />
+      <p className={styles.mailSubject}><span className={styles.mailLabel}>{mt("Subject")}</span>{preview.subject || '(no subject)'}</p>
+      <iframe title={mt("Email preview")} className={styles.mailBody} sandbox="" srcDoc={preview.html} />
     </div>
   );
 }

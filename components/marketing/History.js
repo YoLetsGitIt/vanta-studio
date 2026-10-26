@@ -1,5 +1,7 @@
 'use client';
 
+import { useLanguage } from '@/lib/i18n';
+
 import { useEffect, useState } from 'react';
 import Button from '@/components/ui/Button';
 import { listMarketingCampaigns, getMarketingCampaignRecipients } from '@/lib/api';
@@ -32,6 +34,7 @@ function Stat({ value, label, tone }) {
 }
 
 function Recipients({ campaign, onResend }) {
+  const { t: mt } = useLanguage();
   const [list, setList] = useState(null);
   const [error, setError] = useState('');
   const [view, setView] = useState('all');
@@ -45,7 +48,7 @@ function Recipients({ campaign, onResend }) {
   }, [campaign.id, campaign.queued]);
 
   if (error) return <p className={styles.error} role="alert">{error}</p>;
-  if (!list) return <p className={styles.muted} role="status">Loading recipients…</p>;
+  if (!list) return <p className={styles.muted} role="status">{mt("Loading recipients…")}</p>;
 
   const count = group => list.filter(r => r.outcome.group === group).length;
   const views = [['all', 'Everyone', list.length], ['opened', 'Opened', count('opened')], ['unopened', 'Not opened', count('unopened')], ['failed', 'Not delivered', count('failed')]];
@@ -57,17 +60,17 @@ function Recipients({ campaign, onResend }) {
   return (
     <div className={styles.recipients}>
       <div className={styles.listBar}>
-        <div className={styles.views} role="group" aria-label="Show">
+        <div className={styles.views} role="group" aria-label={mt("Show")}>
           {views.filter(([id, , n]) => id === 'all' || n > 0).map(([id, label, n]) => (
             <button key={id} type="button" aria-pressed={view === id} className={styles.view} onClick={() => setView(id)}>{label} {n}</button>
           ))}
         </div>
         {tracksOpens && unopened.length > 0 && (
-          <Button size="sm" variant="secondary" onClick={() => onResend(unopened.map(r => r.client_id))}>Email the {unopened.length} who didn’t open</Button>
+          <Button size="sm" variant="secondary" onClick={() => onResend(unopened.map(r => r.client_id))}>{mt("Email the")} {unopened.length} {mt("who didn’t open")}</Button>
         )}
       </div>
-      {!tracksOpens && campaign.sent > 0 && <p className={styles.hint}>No opens recorded. Emails sent from a connected Gmail or Outlook account don’t report opens or clicks.</p>}
-      <ul className={styles.clientList} aria-label="Recipients">
+      {!tracksOpens && campaign.sent > 0 && <p className={styles.hint}>{mt("No opens recorded. Emails sent from a connected Gmail or Outlook account don’t report opens or clicks.")}</p>}
+      <ul className={styles.clientList} aria-label={mt("Recipients")}>
         {shown.map(r => (
           <li key={r.client_id} className={styles.clientRow} style={{ cursor: 'default' }}>
             <span className={styles.clientMain}>{r.name || r.email}<span className={styles.rowSub}>{r.name ? r.email : ''}{r.error && r.outcome.group === 'failed' ? ` · ${r.error}` : ''}</span></span>
@@ -81,6 +84,7 @@ function Recipients({ campaign, onResend }) {
 
 /** Every campaign sent, with who got it and what happened to each email. */
 export default function History({ active: visible = true, onResend, onCompose }) {
+  const { t: mt } = useLanguage();
   const [campaigns, setCampaigns] = useState(null);
   const [open, setOpen] = useState('');
   const [preview, setPreview] = useState(null);
@@ -101,20 +105,20 @@ export default function History({ active: visible = true, onResend, onCompose })
     return () => { active = false; clearTimeout(timer); };
   }, [visible]);
 
-  if (campaigns === null) return <p className={styles.muted} role="status">Loading campaigns…</p>;
+  if (campaigns === null) return <p className={styles.muted} role="status">{mt("Loading campaigns…")}</p>;
   if (campaigns.length === 0) {
     return (
       <section className={`${styles.card} ${styles.blank}`}>
-        <h2 className={styles.cardTitle}>Nothing sent yet</h2>
-        <p className={styles.desc}>Campaigns you send show up here with who received them and who opened them.</p>
-        <div><Button onClick={onCompose}>Send your first email</Button></div>
+        <h2 className={styles.cardTitle}>{mt("Nothing sent yet")}</h2>
+        <p className={styles.desc}>{mt("Campaigns you send show up here with who received them and who opened them.")}</p>
+        <div><Button onClick={onCompose}>{mt("Send your first email")}</Button></div>
       </section>
     );
   }
 
   return (
     <>
-      {campaigns.some(c => c.unknown > 0) && <p className={styles.notice} role="status">Some send outcomes are unknown. Check your connected mailbox’s Sent folder before resending those messages.</p>}
+      {campaigns.some(c => c.unknown > 0) && <p className={styles.notice} role="status">{mt("Some send outcomes are unknown. Check your connected mailbox’s Sent folder before resending those messages.")}</p>}
       {campaigns.map(c => {
         const reached = c.delivered || c.sent;
         const isOpen = open === c.id;
@@ -128,15 +132,15 @@ export default function History({ active: visible = true, onResend, onCompose })
               {statusPill(c)}
             </div>
             <div className={styles.miniStats}>
-              <Stat value={c.recipient_count} label="Recipients" />
-              <Stat value={reached} label={c.delivered ? 'Delivered' : 'Sent'} />
-              <Stat value={c.opened} label={reached && c.opened ? `Opened · ${Math.round((c.opened / reached) * 100)}%` : 'Opened'} />
-              <Stat value={c.clicked} label="Clicked" />
-              {c.failed + c.unknown > 0 && <Stat value={c.failed + c.unknown} label="Not delivered" tone="bad" />}
+              <Stat value={c.recipient_count} label={mt("Recipients")} />
+              <Stat value={reached} label={c.delivered ? mt("Delivered") : mt("Sent")} />
+              <Stat value={c.opened} label={reached && c.opened ? `Opened · ${Math.round((c.opened / reached) * 100)}%` : mt("Opened")} />
+              <Stat value={c.clicked} label={mt("Clicked")} />
+              {c.failed + c.unknown > 0 && <Stat value={c.failed + c.unknown} label={mt("Not delivered")} tone="bad" />}
             </div>
             <div className={styles.actions}>
-              <Button size="sm" variant="secondary" aria-expanded={isOpen} onClick={() => setOpen(isOpen ? '' : c.id)}>{isOpen ? 'Hide recipients' : 'See recipients'}</Button>
-              <Button size="sm" variant="ghost" onClick={() => setPreview(c)}>View email</Button>
+              <Button size="sm" variant="secondary" aria-expanded={isOpen} onClick={() => setOpen(isOpen ? '' : c.id)}>{isOpen ? mt("Hide recipients") : mt("See recipients")}</Button>
+              <Button size="sm" variant="ghost" onClick={() => setPreview(c)}>{mt("View email")}</Button>
             </div>
             {isOpen && <Recipients campaign={c} onResend={onResend} />}
           </section>
