@@ -39,6 +39,7 @@ const PERSONALISATION_GROUPS = [
   ['Studio details', [['studio_name', 'Studio name'], ['studio_address', 'Studio address'], ['booking_link', 'Booking link']]],
 ];
 const same = (a, b) => a.name === b.name && a.subject === b.subject && a.body === b.body;
+const TrashIcon = () => <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M9 6V4h6v2M5 6l1 14h12l1-14M10 10v6M14 10v6" /></svg>;
 
 /** Choose a starting point, write the message, then use the separate action panel. */
 export default function Templates({ available, ready, preset, onSent, onNeedSetup }) {
@@ -50,6 +51,11 @@ export default function Templates({ available, ready, preset, onSent, onNeedSetu
   const [busy, setBusy] = useState(false);
   const [preview, setPreview] = useState(false);
   const [showChoices, setShowChoices] = useState(false);
+  const [savedOpen, setSavedOpen] = useState(true);
+  const [examplesOpen, setExamplesOpen] = useState(false);
+  const libraryInitialised = useRef(false);
+  const newTemplateButton = useRef(null);
+  const savedSummary = useRef(null);
   const [editorOpen, setEditorOpen] = useState(false);
   const [step, setStep] = useState('write');
   const [sendTemplate, setSendTemplate] = useState(null);
@@ -59,11 +65,16 @@ export default function Templates({ available, ready, preset, onSent, onNeedSetu
   const focused = useRef('body');
   const fields = { subject: useRef(null), body: useRef(null) };
 
-  async function load() { setLoadError(''); const data = await listMarketingTemplates(); setTemplates(data.templates); return data.templates; }
+  async function load() {
+    setLoadError('');
+    const data = await listMarketingTemplates();
+    setTemplates(data.templates);
+    if (!libraryInitialised.current) { setExamplesOpen(data.templates.length === 0); libraryInitialised.current = true; }
+    return data.templates;
+  }
   useEffect(() => { load().catch(err => setLoadError(err.message || mt('Couldn’t load templates.'))); }, []);
 
   const hasSavedTemplates = (templates?.length ?? 0) > 0;
-  const ExampleGroup = hasSavedTemplates ? 'details' : 'section';
   const examplesHeading = <h3 id="example-template-heading" className={styles.libraryHeading}>{mt("Start from an example")}</h3>;
   const dirty = !same(form, baseline);
   const example = !form.id && STARTERS.some(starter => same(starter, baseline));
@@ -81,7 +92,7 @@ export default function Templates({ available, ready, preset, onSent, onNeedSetu
       // Loading an example is a starting point, not an edit made by the user.
       setForm(next); setBaseline(next);
     }
-    setEditorOpen(true); setShowChoices(false);
+    setEditorOpen(true); setShowChoices(false); setExamplesOpen(false); setSavedOpen(true);
     requestAnimationFrame(() => {
       editorHead.current?.focus({ preventScroll: true });
       if (window.matchMedia('(max-width: 1279px)').matches) editorHead.current?.scrollIntoView({ block: 'start' });
@@ -99,10 +110,21 @@ export default function Templates({ available, ready, preset, onSent, onNeedSetu
     }
     catch (err) { showError(err); return null; } finally { setBusy(false); }
   }
-  async function remove() {
-    if (!await requestConfirmation({ title: mt("Delete template"), message: mt('Delete “{name}”? Emails already queued keep their message.', { name: form.name }), confirmLabel: mt("Delete"), danger: true })) return;
+  async function remove(template) {
+    if (busy || !template?.id) return;
+    if (!await requestConfirmation({ title: mt("Delete template"), message: mt('Delete “{name}”? Emails already queued keep their message.', { name: template.name }), confirmLabel: mt("Delete"), danger: true })) return;
     setBusy(true);
-    try { await deleteMarketingTemplate(form.id); setForm(BLANK); setBaseline(BLANK); setEditorOpen(false); goStep('write'); await load(); } catch (err) { showError(err); } finally { setBusy(false); }
+    try {
+      await deleteMarketingTemplate(template.id);
+      const remaining = (templates || []).filter(item => item.id !== template.id);
+      setTemplates(remaining);
+      if (form.id === template.id) {
+        setForm(BLANK); setBaseline(BLANK); setEditorOpen(false); setShowChoices(false); setSendTemplate(null);
+        setSavedOpen(true); setExamplesOpen(remaining.length === 0); setFlowKey(value => value + 1); goStep('write');
+        requestAnimationFrame(() => newTemplateButton.current?.focus());
+      } else requestAnimationFrame(() => savedSummary.current?.focus());
+      showFeedback(mt("Template deleted."), 'success');
+    } catch (err) { showError(err); } finally { setBusy(false); }
   }
   async function use() {
     if (busy || !complete) return;
@@ -111,6 +133,7 @@ export default function Templates({ available, ready, preset, onSent, onNeedSetu
   }
   function startAgain() {
     setForm(BLANK); setBaseline(BLANK); setSendTemplate(null); setEditorOpen(false); setShowChoices(false);
+    setSavedOpen(true); setExamplesOpen(!hasSavedTemplates);
     setFlowKey(value => value + 1); goStep('write');
   }
   // Drops the placeholder where the cursor was in whichever of subject or message was used last.
@@ -130,25 +153,27 @@ export default function Templates({ available, ready, preset, onSent, onNeedSetu
       </ol>
       {loadError && <div role="alert" className={`${styles.card} ${styles.workspaceError}`}><p>{loadError}</p><Button onClick={() => load().catch(err => setLoadError(err.message))}>{mt("Try again")}</Button></div>}
       <div hidden={step !== 'write'} data-stage={editorOpen ? 'editing' : 'choosing'} className={`${styles.templateWorkspace} ${styles.flowPanel} ${!editorOpen ? styles.templateChooser : ''}`}>
-        {editorOpen && <button type="button" className={`${styles.chip} ${styles.mobileChoices}`} aria-expanded={showChoices} onClick={() => setShowChoices(value => !value)}>{mt("Choose a saved template or example")}</button>}
-        <nav data-expanded={!editorOpen || showChoices} className={`${styles.card} ${styles.tplNav} ${styles.templateLibrary}`} aria-label={mt("Templates")} data-has-saved={hasSavedTemplates}>
+        {editorOpen && <button type="button" disabled={busy} className={`${styles.chip} ${styles.libraryToggle}`} aria-expanded={showChoices} aria-controls="marketing-template-library" onClick={() => setShowChoices(value => !value)}>{mt("Choose a saved template or example")}<span aria-hidden="true">{showChoices ? '⌃' : '⌄'}</span></button>}
+        <div className={styles.templateChooser} hidden={editorOpen && !showChoices}>
+        <nav id="marketing-template-library" data-expanded={!editorOpen || showChoices} className={`${styles.card} ${styles.tplNav} ${styles.templateLibrary}`} aria-label={mt("Templates")} data-has-saved={hasSavedTemplates}>
           <div className={styles.libraryIntro}>
             <div className={styles.libraryIntroText}>
-              <h2 className={styles.cardTitle}>{mt("Your templates")}</h2>
               <p className={styles.hint}>{mt(hasSavedTemplates ? "Choose one of your saved templates to edit or send." : "Reuse a saved message, or start from an example.")}</p>
             </div>
-            <Button fullWidth variant={editorOpen ? 'secondary' : 'primary'} disabled={busy} onClick={() => open(BLANK)}><span aria-hidden="true">＋</span>{mt("New template")}</Button>
+            <Button ref={newTemplateButton} fullWidth variant={editorOpen ? 'secondary' : 'primary'} disabled={busy} onClick={() => open(BLANK)}><span aria-hidden="true">＋</span>{mt("New template")}</Button>
           </div>
-          <section className={`${styles.libraryGroup} ${styles.savedTemplateGroup}`} aria-labelledby="saved-template-heading">
-            <div className={styles.libraryGroupHead}>
-              <h3 id="saved-template-heading">{mt("Saved templates")}</h3>
+          <details open={savedOpen} onToggle={event => setSavedOpen(event.currentTarget.open)} className={`${styles.libraryGroup} ${styles.savedTemplateGroup} ${styles.libraryDisclosure}`} aria-labelledby="saved-template-heading">
+            <summary ref={savedSummary} className={styles.exampleSummary}>
+              <h2 id="saved-template-heading" className={styles.libraryHeading}>{mt("Your templates")}</h2>
               {templates && <span className={styles.libraryCount}>{templates.length}</span>}
-            </div>
+              <span className={styles.disclosureArrow} aria-hidden="true">⌄</span>
+            </summary>
+            <div className={styles.libraryContents}>
             {templates === null ? <p className={styles.muted} role="status">{mt("Loading…")}</p>
               : templates.length === 0 ? <p className={styles.hint}>{mt("None saved yet. Write one, or start from an example below.")}</p> : (
                 <ul className={styles.tplList}>
                   {templates.map(t => (
-                    <li key={t.id}>
+                    <li key={t.id} className={styles.savedTemplateRow}>
                       <button type="button" disabled={busy} className={styles.tplItem} aria-current={form.id === t.id ? 'true' : undefined} onClick={() => open(t)}>
                         <span className={styles.savedTemplateIcon} aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9Z" /><path d="M14 3v6h6M8 13h8M8 17h5" /></svg></span>
                         <span className={styles.templateChoiceText}>
@@ -158,13 +183,15 @@ export default function Templates({ available, ready, preset, onSent, onNeedSetu
                         </span>
                         <span className={styles.savedTemplateArrow} aria-hidden="true">→</span>
                       </button>
+                      <button type="button" disabled={busy} className={styles.templateDelete} aria-label={mt('Delete template: {name}', { name: t.name })} title={mt("Delete template")} onClick={() => remove(t)}><TrashIcon /></button>
                     </li>
                   ))}
                 </ul>
               )}
-          </section>
-          <ExampleGroup className={`${styles.libraryGroup} ${styles.exampleTemplateGroup} ${hasSavedTemplates ? styles.exampleDisclosure : ''}`} aria-labelledby="example-template-heading">
-            {hasSavedTemplates ? <summary className={styles.exampleSummary}>{examplesHeading}<span className={styles.disclosureArrow} aria-hidden="true">⌄</span></summary> : examplesHeading}
+            </div>
+          </details>
+          <details open={examplesOpen} onToggle={event => setExamplesOpen(event.currentTarget.open)} className={`${styles.libraryGroup} ${styles.exampleTemplateGroup} ${styles.exampleDisclosure}`} aria-labelledby="example-template-heading">
+            <summary className={styles.exampleSummary}>{examplesHeading}<span className={styles.disclosureArrow} aria-hidden="true">⌄</span></summary>
             <div className={styles.exampleGroups}>
             {STARTER_GROUPS.map(group => (
               <div key={group.title} data-tone={group.tone} className={styles.exampleGroup}>
@@ -185,8 +212,9 @@ export default function Templates({ available, ready, preset, onSent, onNeedSetu
               </div>
             ))}
             </div>
-          </ExampleGroup>
+          </details>
         </nav>
+        </div>
 
         {editorOpen && <section className={`${styles.card} ${styles.templateEditor} ${styles.revealEditor}`} aria-label={mt("Template editor")}>
           <div className={styles.editorHead}>
@@ -194,9 +222,12 @@ export default function Templates({ available, ready, preset, onSent, onNeedSetu
               <h2 className={styles.cardTitle} tabIndex={-1} ref={editorHead}>{form.id ? mt("Edit template") : mt("New template")}</h2>
               <p className={styles.desc}>{mt("Write once, personalise for each client.")}</p>
             </div>
+            <div className={styles.editorTools}>
             {dirty ? <span className={`${styles.pill} ${styles.statusDirty}`}>{mt("Unsaved changes")}</span>
               : form.id ? <span className={`${styles.pill} ${styles.pillOn}`}>{mt("Saved template")}</span>
                 : example && <span className={`${styles.pill} ${styles.pillBusy}`}>{mt("Example")}</span>}
+            {form.id && <Button size="sm" variant="ghost" className={styles.templateDelete} disabled={busy} aria-label={mt("Delete template")} onClick={() => remove(form)}><TrashIcon />{mt("Delete")}</Button>}
+            </div>
           </div>
           <div className={styles.editorGroup}>
             <h3 className={styles.editorGroupTitle}>{mt("Template details")}</h3>
@@ -240,7 +271,6 @@ export default function Templates({ available, ready, preset, onSent, onNeedSetu
             <summary>{mt("Manage template")}</summary>
             <div className={styles.manageActions}>
               <Button fullWidth size="sm" variant="ghost" disabled={busy} onClick={() => { setForm({ name: `${form.name} (copy)`, subject: form.subject, body: form.body }); setBaseline(BLANK); }}>{mt("Make a copy")}</Button>
-              <Button fullWidth size="sm" variant="ghost" className={styles.deleteTemplate} disabled={busy} onClick={remove}>{mt("Delete")}</Button>
             </div>
           </details>}
         </aside>}

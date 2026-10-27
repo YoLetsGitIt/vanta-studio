@@ -235,10 +235,7 @@
 .selectedNote .audience { padding: 0.25rem 0.7rem; font-size: 0.85rem; }
 @media (max-width: 560px) { .findRow { grid-template-columns: minmax(0, 1fr); } }
 
-.mobileChoices { display: none; }
 @media (max-width: 720px) {
-  .mobileChoices { display: block; min-height: 44px; text-align: left; }
-  .tplNav[data-expanded="false"] { display: none; }
   .actions > * { min-height: 44px; }
 }
 
@@ -246,6 +243,7 @@
 .workspacePage { max-width: 1500px; width: 100%; }
 .templateWorkspace { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; align-items: start; }
 .templateWorkspace > * { min-width: 0; }
+.libraryToggle { display: flex; align-items: center; justify-content: space-between; gap: 1rem; grid-column: 1 / -1; justify-self: start; min-height: 44px; text-align: left; }
 .templateLibrary { gap: 0; padding: 0; overflow: hidden; }
 .libraryIntro { padding: 1.15rem; display: flex; flex-direction: column; gap: 0.75rem; }
 .libraryIntroText { display: flex; flex-direction: column; gap: 0.45rem; min-width: 0; }
@@ -286,21 +284,17 @@
 .manageTemplate { padding: 0.8rem 1.1rem; }
 .manageTemplate summary { cursor: pointer; font-size: 0.82rem; font-weight: 600; color: var(--text-muted); }
 .manageActions { margin-top: 0.65rem; display: flex; flex-direction: column; gap: 0.25rem; }
-.templateActions .deleteTemplate { color: var(--color-danger); }
-@media (max-width: 1279px) {
-  .templateWorkspace .mobileChoices { display: block; min-height: 44px; text-align: left; }
-  .templateWorkspace .tplNav[data-expanded="false"] { display: none; }
-}
 @media (min-width: 1280px) {
-  .templateWorkspace { grid-template-columns: 220px minmax(0, 1fr) 236px; }
+  .templateWorkspace { grid-template-columns: minmax(0, 1fr) 260px; }
   .templateActions { position: sticky; top: 1rem; }
 }
 @media (min-width: 1600px) {
-  .templateWorkspace { grid-template-columns: 260px minmax(0, 1fr) 260px; }
+  .templateWorkspace { grid-template-columns: minmax(0, 1fr) 280px; }
 }
 
 /* Begin with a template choice, then reveal the tools for that message. */
-.templateChooser { grid-template-columns: minmax(0, 1fr); width: 100%; max-width: 1180px; container: template-picker / inline-size; }
+.templateChooser { grid-column: 1 / -1; grid-template-columns: minmax(0, 1fr); width: 100%; max-width: 1180px; container: template-picker / inline-size; }
+.templateChooser[hidden] { display: none; }
 .templateChooser .templateLibrary { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.25rem; padding: 0; border: 0; border-radius: 0; background: none; overflow: visible; }
 .templateChooser .libraryIntro { padding: 0 0 0.25rem; flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem; }
 .templateChooser .libraryIntro .cardTitle { font-size: 1.25rem; letter-spacing: -0.02em; }
@@ -347,6 +341,17 @@
 .templateChooser .templateLibrary[data-has-saved="true"] .tplList { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); max-height: none; overflow: visible; }
 .templateChooser .templateLibrary[data-has-saved="true"] .tplItem { height: 100%; }
 .templateLibrary .exampleDisclosure { display: block; padding: 0; background: transparent; }
+.templateLibrary .libraryDisclosure { display: block; padding: 0; }
+.libraryContents { padding: 0.25rem 1rem 1rem; }
+.libraryDisclosure .exampleSummary .libraryHeading { color: var(--text); font-size: 1rem; }
+.libraryDisclosure .libraryCount { margin-left: auto; }
+.libraryDisclosure[open] .disclosureArrow { transform: rotate(180deg); }
+.savedTemplateRow { position: relative; min-width: 0; display: flex; align-items: stretch; gap: 0.35rem; }
+.savedTemplateRow .tplItem { flex: 1; min-width: 0; }
+.templateDelete { display: inline-flex; align-items: center; justify-content: center; gap: 0.35rem; flex: none; min-width: 44px; min-height: 44px; align-self: center; border: 1px solid transparent; border-radius: 8px; padding: 0.5rem; background: transparent; color: var(--text-muted); cursor: pointer; font: inherit; }
+.templateDelete:hover:not(:disabled), .templateDelete:focus-visible { color: var(--color-danger); background: var(--color-danger-surface); border-color: var(--color-danger-border); }
+.templateDelete:disabled { opacity: 0.5; cursor: default; }
+.editorTools { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
 .exampleSummary { display: flex; align-items: center; justify-content: space-between; gap: 1rem; min-height: 48px; padding: 0.8rem 1rem; cursor: pointer; list-style: none; }
 .exampleSummary::-webkit-details-marker { display: none; }
 .exampleSummary:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; border-radius: inherit; }

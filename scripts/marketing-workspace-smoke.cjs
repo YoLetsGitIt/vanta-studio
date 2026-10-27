@@ -3,12 +3,12 @@
 const assert = require('node:assert/strict');
 const { chromium, webkit } = require(process.env.VANTA_PLAYWRIGHT_PATH || 'playwright');
 const which = process.env.VANTA_MARKETING_CASE || 'all';
-const cases = name => which === 'all' || which === name;
+const cases = name => which === 'all' || which.split(',').includes(name);
 const base = process.env.VANTA_STUDIO_TEST_URL || 'http://127.0.0.1:3029';
 const user = { id: '22222222-2222-4222-8222-222222222222', email: 'local@example.test', role: 'authenticated', aud: 'authenticated', user_metadata: { full_name: 'Local Studio' } };
 const session = { access_token: 'local-test-token', refresh_token: 'local-refresh-token', expires_at: 2000000000, expires_in: 3600, token_type: 'bearer', user };
 
-async function setup(browser, width, { ready = true, available = true, saveFailures = 0, sendFailures = 0, recipientFailures = 0, initialTemplates = [], lang = 'en', theme = 'dark', reducedMotion = 'no-preference' } = {}) {
+async function setup(browser, width, { ready = true, available = true, saveFailures = 0, deleteFailures = 0, sendFailures = 0, recipientFailures = 0, initialTemplates = [], lang = 'en', theme = 'dark', reducedMotion = 'no-preference' } = {}) {
   const context = await browser.newContext({ viewport: { width, height: process.env.STUDIO_MOBILE_TOUCH ? 844 : 1000 }, reducedMotion, ...(process.env.STUDIO_MOBILE_TOUCH ? {isMobile:true,hasTouch:true} : {}) });
   await context.addInitScript(({ auth, lang, theme }) => {
     if (window !== window.top) return;
@@ -34,6 +34,13 @@ async function setup(browser, width, { ready = true, available = true, saveFailu
       if (path.endsWith('/marketing/templates/local-template') && method === 'PUT') {
         const saved = { ...body, id: 'local-template' }; templates[0] = saved;
         return route.fulfill({ json: saved });
+      }
+      if (/\/marketing\/templates\/[^/]+$/.test(path) && method === 'DELETE') {
+        if (deleteFailures-- > 0) return route.fulfill({ status: 503, json: { error: 'Local template delete unavailable' } });
+        const index = templates.findIndex(t => t.id === path.split('/').at(-1));
+        if (index < 0) return route.fulfill({ status: 404, json: { error: 'Template not found' } });
+        templates.splice(index, 1);
+        return route.fulfill({ json: { status: 'deleted' } });
       }
       if (path.endsWith('/marketing/settings') && method === 'PUT') {
         settings = body; ready = true; return route.fulfill({ json: { settings } });
@@ -110,6 +117,72 @@ async function screenshot(page, name) {
 (async () => {
   const browser = await (process.env.STUDIO_BROWSER === 'webkit' ? webkit : chromium).launch({ headless: true, ...(process.env.STUDIO_CHROMIUM_EXECUTABLE && process.env.STUDIO_BROWSER !== 'webkit' ? { executablePath: process.env.STUDIO_CHROMIUM_EXECUTABLE } : {}) });
   try {
+    for (const width of cases('library') ? [390, 1440] : []) {
+      const initialTemplates = [
+        { id: 'saved-one', name: 'Saved one', subject: 'First subject', body: 'First message' },
+        { id: 'saved-two', name: 'Saved two', subject: 'Second subject', body: 'Second message' },
+      ];
+      const { context, page, writes, unexpected, errors } = await setup(browser, width, { initialTemplates, deleteFailures: 1 });
+      await page.goto(`${base}/dashboard/marketing.html`, { waitUntil: 'networkidle' });
+      const library = page.getByRole('navigation', { name: 'Templates', exact: true });
+      const saved = library.locator('details[aria-labelledby="saved-template-heading"]');
+      const examples = library.locator('details[aria-labelledby="example-template-heading"]');
+      const toggle = page.getByRole('button', { name: 'Choose a saved template or example', exact: true });
+      const editor = page.getByRole('region', { name: 'Template editor', exact: true });
+      const dialog = page.getByRole('alertdialog', { name: 'Delete template', exact: true });
+      const subject = page.getByRole('textbox', { name: 'Subject', exact: true });
+      const deletions = () => writes.filter(w => w.method === 'DELETE');
+      await saved.getByRole('button', { name: /^Saved one/ }).waitFor();
+      assert.equal(await examples.getAttribute('open'), null);
+      await saved.locator('summary').focus(); await page.keyboard.press('Enter');
+      assert.equal(await saved.getByRole('button', { name: /^Saved one/ }).isVisible(), false);
+      await page.keyboard.press('Enter');
+      await saved.getByRole('button', { name: /^Saved one/ }).click();
+      await editor.waitFor();
+      assert.equal(await library.isVisible(), false);
+      assert.equal(await toggle.getAttribute('aria-expanded'), 'false');
+      await subject.fill('My unsaved draft');
+      await toggle.click();
+      await saved.getByRole('button', { name: 'Delete template: Saved two', exact: true }).click();
+      await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+      assert.equal(deletions().length, 0);
+      assert.equal(await subject.inputValue(), 'My unsaved draft');
+      await saved.getByRole('button', { name: 'Delete template: Saved two', exact: true }).click();
+      await dialog.getByRole('button', { name: 'Delete', exact: true }).click();
+      await page.getByText('Local template delete unavailable', { exact: true }).waitFor();
+      assert.equal(await saved.getByRole('button', { name: /^Saved two/ }).isVisible(), true);
+      assert.equal(await subject.inputValue(), 'My unsaved draft');
+      await saved.getByRole('button', { name: 'Delete template: Saved two', exact: true }).click();
+      await dialog.getByRole('button', { name: 'Delete', exact: true }).click();
+      await saved.getByRole('button', { name: /^Saved two/ }).waitFor({ state: 'detached' });
+      assert.equal(await subject.inputValue(), 'My unsaved draft', 'Deleting another template must retain the current draft');
+      assert.equal(await saved.getByRole('button', { name: /^Saved one/ }).getAttribute('aria-current'), 'true');
+      await toggle.click();
+      await editor.getByRole('button', { name: 'Delete template', exact: true }).click();
+      await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+      assert.equal(deletions().length, 2);
+      await editor.getByRole('button', { name: 'Delete template', exact: true }).click();
+      await dialog.getByRole('button', { name: 'Delete', exact: true }).click();
+      await saved.getByText('None saved yet. Write one, or start from an example below.', { exact: true }).waitFor();
+      assert.equal(await editor.count(), 0);
+      await examples.getByRole('button', { name: 'Flash day', exact: true }).waitFor();
+      await examples.getByRole('button', { name: 'Flash day', exact: true }).click();
+      assert.equal(await library.isVisible(), false, 'Choosing an example must hide the library on every screen size');
+      assert.equal(await subject.inputValue(), 'Flash day at {{studio_name}}');
+      await toggle.click();
+      assert.equal(await examples.getAttribute('open'), null, 'Examples close after selection');
+      assert.equal(await subject.inputValue(), 'Flash day at {{studio_name}}');
+      await examples.locator('summary').focus(); await page.keyboard.press('Enter');
+      await examples.getByRole('button', { name: 'We miss you', exact: true }).click();
+      assert.equal(await library.isVisible(), false);
+      assert.equal(await page.getByRole('textbox', { name: 'Template name', exact: true }).inputValue(), 'We miss you');
+      assert.equal(writes.filter(w => w.path.endsWith('/marketing/campaigns') || w.path.endsWith('/marketing/test')).length, 0);
+      assert.deepEqual(deletions().map(w => w.path.split('/').at(-1)), ['saved-two', 'saved-two', 'saved-one']);
+      await noOverflow(page); await screenshot(page, `simplified-editor-${width}`);
+      assert.deepEqual(unexpected, []); assert.deepEqual(errors, []);
+      console.log(`PASS collapsible library, hidden examples after selection, keyboard control, delete cancel/failure/retry and draft retention at ${width}px`);
+      await context.close();
+    }
     for (const width of cases('personalisation') ? [390, 1440] : []) {
       const { context, page, writes, unexpected, errors } = await setup(browser, width);
       await page.goto(`${base}/dashboard/marketing.html`, { waitUntil: 'networkidle' });
@@ -266,8 +339,8 @@ async function screenshot(page, name) {
       const nav = page.getByRole('navigation', { name: 'Templates', exact: true });
       async function choose(label) {
         if (!await nav.isVisible()) await page.getByRole('button', { name: 'Choose a saved template or example', exact: true }).click();
-        const choice = nav.getByRole('button', { name: label });
-        if (!await choice.isVisible()) await nav.locator('details summary').click();
+        const choice = nav.getByRole('button', { name: label, includeHidden: true });
+        if (!await choice.isVisible()) await choice.locator('xpath=ancestor::details').locator('summary').click();
         await choice.click();
       }
       const dialog = page.getByRole('alertdialog', { name: 'Discard changes', exact: true });
@@ -342,7 +415,7 @@ async function screenshot(page, name) {
         assert.equal(await editor.count(), 0);
         assert.equal(await actions.count(), 0);
         assert.equal(await library.isVisible(), true);
-        await library.getByRole('heading', { name: 'Saved templates', exact: true }).waitFor();
+        await library.getByRole('heading', { name: 'Your templates', exact: true }).waitFor();
         assert.equal(await library.getByRole('button', { name: 'New template', exact: true }).isEnabled(), true);
         const titleBox = await page.getByRole('heading', { name: 'Create and send', exact: true, level: 1 }).boundingBox();
         const settingsBox = await sectionAction(page, 'settings').boundingBox();
@@ -350,10 +423,10 @@ async function screenshot(page, name) {
         if (width > 760) assert.ok(settingsBox.x > titleBox.x + titleBox.width, 'Utilities should sit to the right of the main workspace');
         else assert.ok(settingsBox.y > titleBox.y + titleBox.height, 'Phone utilities should follow the main heading');
         const chooser = await page.locator('[data-stage="choosing"]').boundingBox();
-        const examples = library.locator('details');
+        const examples = library.locator('details[aria-labelledby="example-template-heading"]');
         assert.equal(await examples.getAttribute('open'), null, 'Examples start collapsed when saved templates exist');
         assert.equal(await library.getByRole('button', {name:'Flash day',exact:true}).isVisible(), false);
-        const savedGroup = await library.locator('section').filter({has: page.getByRole('heading',{name:'Saved templates',exact:true})}).boundingBox();
+        const savedGroup = await library.locator('details[aria-labelledby="saved-template-heading"]').boundingBox();
         const examplesGroup = await examples.boundingBox();
         assert.ok(Math.abs(savedGroup.width-chooser.width)<=1, 'Saved templates should use the main chooser width');
         assert.ok(examplesGroup.y>=savedGroup.y+savedGroup.height, 'Examples should follow saved templates');
@@ -372,7 +445,7 @@ async function screenshot(page, name) {
           assert.ok((await button.boundingBox()).height >= 44, 'Template choices should have comfortable touch targets');
         }
         await noOverflow(page); await screenshot(page, `chooser-${width}-${theme}`);
-        await library.getByRole('heading', { name: 'Saved templates', exact: true }).waitFor();
+        await library.getByRole('heading', { name: 'Your templates', exact: true }).waitFor();
         await library.getByRole('heading', { name: 'Promotions', exact: true }).waitFor();
         await library.getByRole('heading', { name: 'Client care', exact: true }).waitFor();
         await library.getByRole('button', { name: /^Studio flash day/ }).click();
@@ -385,10 +458,10 @@ async function screenshot(page, name) {
         await editor.getByRole('heading', { name: 'Personalisation', exact: true }).waitFor();
         await settleTemplatePanels(page);
         if (width >= 1280) {
-          const l = await library.boundingBox(), e = await editor.boundingBox(), a = await actions.boundingBox();
-          assert.ok(l.x + l.width <= e.x && e.x + e.width <= a.x, 'Library, editor and actions should be three separate columns');
-          assert.equal(await library.getByRole('button', { name: /^Studio flash day/ }).getAttribute('aria-current'), 'true');
-          await library.getByText('Selected', { exact: false }).waitFor();
+          const e = await editor.boundingBox(), a = await actions.boundingBox();
+          assert.ok(e.x + e.width <= a.x, 'The editor should use the space beside the actions');
+          assert.equal(await library.isVisible(), false, 'Library should close on desktop after selection');
+          assert.equal(await page.locator('#marketing-template-library button[aria-current="true"]').count(), 1);
         } else {
           assert.equal(await library.isVisible(), false);
           const e = await editor.boundingBox(), a = await actions.boundingBox();
@@ -404,7 +477,7 @@ async function screenshot(page, name) {
         await preview.getByRole('button', { name: 'Close', exact: true }).click();
         await actions.locator('summary').click();
         await actions.getByRole('button', { name: 'Make a copy', exact: true }).waitFor();
-        await actions.getByRole('button', { name: 'Delete', exact: true }).waitFor();
+        await editor.getByRole('button', { name: 'Delete template', exact: true }).waitFor();
         await actions.locator('summary').click();
         await actions.scrollIntoViewIfNeeded();
         await screenshot(page, `actions-${width}-${theme}`);
@@ -423,7 +496,7 @@ async function screenshot(page, name) {
         assert.equal(await page.getByRole('textbox').count(), 0, 'Editor fields must not be present before choosing');
         assert.equal(await page.getByRole('complementary', { name: 'Template actions', exact: true }).count(), 0);
         assert.equal(await page.getByRole('button', { name: 'Choose a saved template or example', exact: true }).count(), 0);
-        assert.equal(await library.locator('details').count(), 0, 'Examples remain prominent before any templates are saved');
+        assert.equal(await library.locator('details[aria-labelledby="example-template-heading"]').getAttribute('open'), '', 'Examples start expanded before any templates are saved');
         await library.getByRole('button',{name:'Flash day',exact:true}).waitFor();
         const newButton = library.getByRole('button', { name: 'New template', exact: true });
         await newButton.focus(); await page.keyboard.press('Enter');
@@ -513,7 +586,7 @@ async function screenshot(page, name) {
       const { context, page, errors } = await setup(browser, 390, { lang });
       await page.goto(`${base}/dashboard/marketing.html`, { waitUntil: 'networkidle' });
       await selected(page, 'templates');
-      await page.locator('nav[aria-label] button').first().click();
+      await page.locator('#marketing-template-library button').first().click();
       const fields = page.locator('#panel-templates section[aria-label] input, #panel-templates section[aria-label] textarea');
       await fields.nth(0).fill('Local translation test');
       await fields.nth(1).fill('Local offer');
