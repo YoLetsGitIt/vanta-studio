@@ -243,6 +243,8 @@
 .workspacePage { max-width: 1500px; width: 100%; }
 .templateWorkspace { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; align-items: start; }
 .templateWorkspace > * { min-width: 0; }
+.templateNavigation { grid-column: 1 / -1; display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem 1rem; scroll-margin-top: 1rem; }
+.templateNavigation > button { min-height: 44px; }
 .libraryToggle { display: flex; align-items: center; justify-content: space-between; gap: 1rem; grid-column: 1 / -1; justify-self: start; min-height: 44px; text-align: left; }
 .templateLibrary { gap: 0; padding: 0; overflow: hidden; }
 .libraryIntro { padding: 1.15rem; display: flex; flex-direction: column; gap: 0.75rem; }

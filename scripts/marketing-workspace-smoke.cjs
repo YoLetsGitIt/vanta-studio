@@ -117,6 +117,69 @@ async function screenshot(page, name) {
 (async () => {
   const browser = await (process.env.STUDIO_BROWSER === 'webkit' ? webkit : chromium).launch({ headless: true, ...(process.env.STUDIO_CHROMIUM_EXECUTABLE && process.env.STUDIO_BROWSER !== 'webkit' ? { executablePath: process.env.STUDIO_CHROMIUM_EXECUTABLE } : {}) });
   try {
+    for (const width of cases('back') ? [390, 1440] : []) {
+      const initialTemplates = [
+        { id: 'saved-one', name: 'Saved one', subject: 'First subject', body: 'First message' },
+        { id: 'saved-two', name: 'Saved two', subject: 'Second subject', body: 'Second message' },
+      ];
+      const { context, page, writes, unexpected, errors } = await setup(browser, width, { initialTemplates });
+      await page.goto(`${base}/dashboard/marketing.html`, { waitUntil: 'networkidle' });
+      const library = page.getByRole('navigation', { name: 'Templates', exact: true });
+      const editor = page.getByRole('region', { name: 'Template editor', exact: true });
+      const back = page.getByRole('button', { name: 'Back to templates', exact: true });
+      const discard = page.getByRole('alertdialog', { name: 'Discard changes', exact: true });
+      const subject = page.getByRole('textbox', { name: 'Subject', exact: true });
+      await library.getByRole('button', { name: /^Saved one/ }).click();
+      await page.waitForFunction(() => document.activeElement?.textContent === 'Edit template');
+      assert.ok(await back.evaluate(el => {
+        const rect = el.getBoundingClientRect();
+        return el.contains(document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2));
+      }), 'Back must be visible immediately after choosing a saved template');
+      await back.focus(); await page.keyboard.press('Enter');
+      await library.waitFor();
+      assert.equal(await editor.count(), 0);
+      assert.equal(await discard.count(), 0, 'Untouched templates should return directly to selection');
+      await library.getByRole('button', { name: /^Saved two/ }).click();
+      assert.equal(await subject.inputValue(), 'Second subject');
+      await subject.fill('My unsaved edit');
+      await back.click();
+      await discard.getByRole('button', { name: 'Cancel', exact: true }).click();
+      assert.equal(await subject.inputValue(), 'My unsaved edit');
+      assert.equal(await library.isVisible(), false);
+      await back.click();
+      await discard.getByRole('button', { name: 'Discard', exact: true }).click();
+      await library.waitFor();
+      assert.equal(await editor.count(), 0);
+      await library.getByRole('button', { name: /^Saved two/ }).click();
+      assert.equal(await subject.inputValue(), 'Second subject', 'Discarded edits must not persist');
+      await continueFlow(page);
+      await page.getByRole('checkbox', { name: /Alice Local/ }).check();
+      await page.getByRole('button', { name: 'Back to template', exact: true }).click();
+      await back.click();
+      await library.getByRole('button', { name: /^Saved one/ }).click();
+      await continueFlow(page);
+      assert.equal(await page.getByRole('checkbox', { name: /Alice Local/ }).isChecked(), false, 'A newly selected template should start with a fresh audience');
+      await page.getByRole('button', { name: 'Back to template', exact: true }).click();
+      await back.click();
+      const examples = library.locator('details[aria-labelledby="example-template-heading"]');
+      await examples.locator('summary').click();
+      await library.getByRole('button', { name: 'Flash day', exact: true }).click();
+      await back.click();
+      await library.getByRole('button', { name: 'We miss you', exact: true }).waitFor();
+      assert.equal(await discard.count(), 0, 'Choosing an example alone is not an unsaved edit');
+      await library.getByRole('button', { name: 'We miss you', exact: true }).click();
+      await page.waitForFunction(() => document.activeElement?.textContent === 'New template');
+      assert.ok(await back.evaluate(el => {
+        const rect = el.getBoundingClientRect();
+        return el.contains(document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2));
+      }), 'Back must stay visible after choosing another example');
+      assert.equal(await page.getByRole('textbox', { name: 'Template name', exact: true }).inputValue(), 'We miss you');
+      assert.equal(writes.filter(w => !w.path.endsWith('/marketing/preview')).length, 0, 'Going back must not save, delete or send anything');
+      await noOverflow(page); await screenshot(page, `back-to-templates-${width}`);
+      assert.deepEqual(unexpected, []); assert.deepEqual(errors, []);
+      console.log(`PASS back from saved/example templates, keyboard entry, discard/cancel, reselection and fresh audience at ${width}px`);
+      await context.close();
+    }
     for (const width of cases('library') ? [390, 1440] : []) {
       const initialTemplates = [
         { id: 'saved-one', name: 'Saved one', subject: 'First subject', body: 'First message' },

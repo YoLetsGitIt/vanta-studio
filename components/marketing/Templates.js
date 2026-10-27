@@ -62,6 +62,7 @@ export default function Templates({ available, ready, preset, onSent, onNeedSetu
   const [flowKey, setFlowKey] = useState(0);
   const flowHead = useRef(null);
   const editorHead = useRef(null);
+  const templateNavigation = useRef(null);
   const focused = useRef('body');
   const fields = { subject: useRef(null), body: useRef(null) };
 
@@ -95,7 +96,7 @@ export default function Templates({ available, ready, preset, onSent, onNeedSetu
     setEditorOpen(true); setShowChoices(false); setExamplesOpen(false); setSavedOpen(true);
     requestAnimationFrame(() => {
       editorHead.current?.focus({ preventScroll: true });
-      if (window.matchMedia('(max-width: 1279px)').matches) editorHead.current?.scrollIntoView({ block: 'start' });
+      templateNavigation.current?.scrollIntoView({ block: window.matchMedia('(max-width: 1279px)').matches ? 'start' : 'nearest' });
     });
   }
   async function save(notify = true) {
@@ -136,6 +137,17 @@ export default function Templates({ available, ready, preset, onSent, onNeedSetu
     setSavedOpen(true); setExamplesOpen(!hasSavedTemplates);
     setFlowKey(value => value + 1); goStep('write');
   }
+  async function backToTemplates() {
+    if (busy) return;
+    if (dirty && !await requestConfirmation({ title: mt("Discard changes"), message: mt("You have unsaved changes to this template."), confirmLabel: mt("Discard"), danger: true })) return;
+    const fromExample = example;
+    startAgain();
+    setExamplesOpen(fromExample || !hasSavedTemplates);
+    requestAnimationFrame(() => {
+      savedSummary.current?.focus({ preventScroll: true });
+      savedSummary.current?.scrollIntoView({ block: 'start' });
+    });
+  }
   // Drops the placeholder where the cursor was in whichever of subject or message was used last.
   function insert(token) {
     const key = focused.current, el = fields[key].current, value = form[key];
@@ -153,7 +165,10 @@ export default function Templates({ available, ready, preset, onSent, onNeedSetu
       </ol>
       {loadError && <div role="alert" className={`${styles.card} ${styles.workspaceError}`}><p>{loadError}</p><Button onClick={() => load().catch(err => setLoadError(err.message))}>{mt("Try again")}</Button></div>}
       <div hidden={step !== 'write'} data-stage={editorOpen ? 'editing' : 'choosing'} className={`${styles.templateWorkspace} ${styles.flowPanel} ${!editorOpen ? styles.templateChooser : ''}`}>
-        {editorOpen && <button type="button" disabled={busy} className={`${styles.chip} ${styles.libraryToggle}`} aria-expanded={showChoices} aria-controls="marketing-template-library" onClick={() => setShowChoices(value => !value)}>{mt("Choose a saved template or example")}<span aria-hidden="true">{showChoices ? '⌃' : '⌄'}</span></button>}
+        {editorOpen && <div ref={templateNavigation} className={styles.templateNavigation}>
+          <Button variant="ghost" disabled={busy} onClick={backToTemplates}><span aria-hidden="true">←</span>{mt("Back to templates")}</Button>
+          <button type="button" disabled={busy} className={`${styles.chip} ${styles.libraryToggle}`} aria-expanded={showChoices} aria-controls="marketing-template-library" onClick={() => setShowChoices(value => !value)}>{mt("Choose a saved template or example")}<span aria-hidden="true">{showChoices ? '⌃' : '⌄'}</span></button>
+        </div>}
         <div className={styles.templateChooser} hidden={editorOpen && !showChoices}>
         <nav id="marketing-template-library" data-expanded={!editorOpen || showChoices} className={`${styles.card} ${styles.tplNav} ${styles.templateLibrary}`} aria-label={mt("Templates")} data-has-saved={hasSavedTemplates}>
           <div className={styles.libraryIntro}>
