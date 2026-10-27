@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import { getSupabase } from '@/lib/supabase';
 import { completeStudioSignup, getMyStudioAccount } from '@/lib/api';
 import SignUpFlow from '@/components/SignUpFlow';
@@ -11,7 +10,6 @@ import StatePanel from '@/components/ui/StatePanel';
 
 
 export default function HomePage() {
-  const router = useRouter();
   const [tab, setTab] = useState('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -35,7 +33,8 @@ export default function HomePage() {
           const { error: signInError } = await getSupabase().auth.signInWithPassword(saved);
           if (signInError) throw signInError;
           window.sessionStorage.removeItem('vanta-pending-signup');
-          router.replace('/dashboard');
+          // Load a document after auth so static-export navigation cannot expose RSC data.
+          window.location.replace('/dashboard/home');
           return;
         } catch (err) {
           setNotice(err.message || 'Payment setup is complete. Please sign in to continue.');
@@ -44,11 +43,11 @@ export default function HomePage() {
         setTab('signup');
       }
       const { data: { session } } = await getSupabase().auth.getSession();
-      if (session) router.replace('/dashboard');
+      if (session) window.location.replace('/dashboard/home');
       else setChecking(false);
     }
     initialize();
-  }, [router]);
+  }, []);
 
   async function handleSignIn(e) {
     e.preventDefault();
@@ -68,7 +67,7 @@ export default function HomePage() {
     // Verify this is a studio account
     try {
       await getMyStudioAccount();
-      router.replace(email.trim().toLowerCase() === 'studio@test.com' ? '/dashboard?tour=1' : '/dashboard');
+      window.location.replace(email.trim().toLowerCase() === 'studio@test.com' ? '/dashboard/home?tour=1' : '/dashboard/home');
     } catch {
       // No studio account — sign them out and block access
       await supabase.auth.signOut();
