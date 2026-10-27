@@ -1,0 +1,38 @@
+.card, .shortcuts { min-width: 0; border: 1px solid var(--border); background: var(--bg-card); border-radius: 16px; padding: 1.5rem; color: var(--text); }
+.card { scroll-margin-top: 1rem; }
+.header, .shortcuts { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+.intro { min-width: 0; }
+.eyebrow { font-size: .68rem; letter-spacing: .12em; color: var(--text-dim); font-weight: 600; }
+.header h2 { margin: .35rem 0; font-size: 1.15rem; font-weight: 600; letter-spacing: -.025em; }
+.progress, .message, .shortcuts p { margin: 0; color: var(--text-dim); font-size: .82rem; line-height: 1.6; }
+.actions { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
+.primary, .secondary { display: inline-flex; align-items: center; justify-content: center; gap: .65rem; min-height: 44px; padding: .6rem .9rem; border: 1px solid var(--border); border-radius: 9px; font: inherit; font-size: .8rem; font-weight: 600; text-decoration: none; cursor: pointer; }
+.primary { background: var(--text); color: var(--bg-base); }
+.secondary { background: transparent; color: var(--text); }
+.message { margin-top: 1rem; }
+.steps { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; list-style: none; padding: 0; margin: 1rem 0 0; }
+.step { min-width: 0; padding: 1rem; border: 1px solid var(--border-faint); border-radius: 11px; }
+.reviewed { background: var(--accent-tint); }
+.check { display: flex; align-items: flex-start; gap: .65rem; cursor: pointer; }
+.check input { flex-shrink: 0; width: 18px; height: 18px; margin: 1px 0 0; accent-color: var(--text); cursor: pointer; }
+.stepTitle { font-size: .85rem; font-weight: 600; line-height: 1.5; }
+.stepTitle small { display: inline-block; margin-left: .5rem; color: var(--text-dim); font-size: .67rem; font-weight: 400; }
+.description { margin: .45rem 0 .6rem; color: var(--text-dim); font-size: .78rem; line-height: 1.6; }
+.stepActions { display: flex; align-items: center; flex-wrap: wrap; column-gap: 1rem; row-gap: .25rem; }
+.stepActions a, .stepActions button { min-height: 36px; display: inline-flex; align-items: center; gap: .5rem; color: var(--text); font: inherit; font-size: .78rem; font-weight: 500; }
+.stepActions a { text-underline-offset: 3px; }
+.stepActions button { border: 0; background: none; padding: 0; color: var(--text-dim); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.skipped { color: var(--text-dim); font-size: .72rem; }
+.error { margin: 1rem 0 0; font-size: .82rem; line-height: 1.5; color: var(--color-danger, #dc7878); }
+.error button { margin-left: .5rem; min-height: 44px; border: 0; background: none; color: inherit; font: inherit; text-decoration: underline; cursor: pointer; }
+.card button:disabled, .card input:disabled { opacity: .55; cursor: wait; }
+.card :is(a, button, input):focus-visible, .shortcuts a:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 4px; }
+.shortcuts { margin-bottom: 1.5rem; }
+.shortcuts strong { font-size: .9rem; }
+.shortcuts p { margin-top: .3rem; }
+@media (max-width: 700px) {
+  .card, .shortcuts { padding: 1rem; border-radius: 12px; }
+  .steps { grid-template-columns: minmax(0, 1fr); }
+  .actions { width: 100%; }
+  .step { padding: .85rem; }
+}

@@ -30,6 +30,7 @@ import CompleteBookingModal from '@/components/CompleteBookingModal';
 import RejectBookingModal from '@/components/RejectBookingModal';
 import SendSelectionLinkModal from '@/components/SendSelectionLinkModal';
 import DashboardQuickActions from '@/components/DashboardQuickActions';
+import StudioSetupChecklist from '@/components/StudioSetupChecklist';
 import { requestConfirmation, showError, showFeedback } from '@/lib/feedback';
 import { bookingActions } from '@/lib/bookingActions';
 
@@ -410,20 +411,7 @@ export default function HomePage() {
           />
         )}
 
-        {!loading && isEmptyDashboard && (
-          <div style={s.emptyState}>
-            <div style={s.emptyIcon}>✦</div>
-            <div style={s.emptyCopy}>
-              <span style={s.emptyEyebrow}>YOUR STUDIO IS READY</span>
-              <h2 style={s.emptyTitle}>Start with your booking flow.</h2>
-              <p style={s.emptyText}>Set up the details clients will see, then invite your artists when you&apos;re ready.</p>
-            </div>
-            <div style={s.emptyActions}>
-              <button type="button" style={s.emptyPrimary} onClick={() => router.push('/dashboard/settings?tab=bookings')}>Set up bookings <span>→</span></button>
-              <button type="button" style={s.emptySecondary} onClick={() => router.push('/dashboard/artists?onboarding=1')}>Add your first artist</button>
-            </div>
-          </div>
-        )}
+        {!loading && !loadError && <StudioSetupChecklist />}
 
 
         {/* ── NEEDS ATTENTION ───────────────────────────────────── */}

@@ -5,6 +5,7 @@ import { WidgetPreview, ConsentFormPreview } from '@/components/forms/FormPrevie
 import StudioLogoUpload from '@/components/StudioLogoUpload';
 import SmartSchedulingSettings from '@/components/SmartSchedulingSettings';
 import SMSSettings from '@/components/SMSSettings';
+import { StudioSetupLinks } from '@/components/StudioSetupChecklist';
 
 import { useEffect, useState, useRef, useCallback } from 'react';
 import dynamic from 'next/dynamic';
@@ -720,6 +721,8 @@ export default function SettingsPage() {
           ))}
         </div>
       </div>
+
+      <StudioSetupLinks />
 
       <div className="studio-feature-grid" style={s.grid}>
 
