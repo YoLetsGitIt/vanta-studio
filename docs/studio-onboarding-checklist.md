@@ -3,7 +3,8 @@
 Home includes a six-step checklist for studio details/timezone, hours/stations,
 artists, bookings/consent, payments and importing. Each step opens its existing
 setup screen. Import data remains visible when the checklist is collapsed.
-Settings includes Setup checklist and Import data shortcuts on every tab.
+The Account tab in Settings includes Setup checklist and Import data shortcuts.
+They are hidden on the Studio, Bookings and Payments tabs.
 
 The owner explicitly marks a step reviewed after checking its settings. Existing
 defaults, opening a screen or importing a single file do not mark a step complete.
@@ -36,7 +37,7 @@ approve artists, import records, connect Stripe or start a subscription.
 `scripts/studio-setup-checklist-smoke.cjs` exercises the production export at
 390px and 1440px using intercepted services: all action destinations, progress,
 skip/undo, refresh/fresh-context restoration, collapse persistence, read/save
-failures, Settings shortcuts on all tabs and Import navigation.
+failures, Account-only shortcuts, direct Account tab navigation and Import navigation.
 
 Backend `TestStudioOnboardingPersistenceAndIsolation` and
 `TestStudioOnboardingAccessAndValidation` use disposable loopback PostgreSQL.

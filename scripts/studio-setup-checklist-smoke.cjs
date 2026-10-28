@@ -98,9 +98,17 @@ const output = process.env.STUDIO_QA_OUTPUT || path.resolve(__dirname, '../../ar
       const shortcuts = page.getByRole('complementary', { name: 'Studio setup shortcuts' });
       for (const tab of ['Studio', 'Bookings', 'Payments', 'Account']) {
         await page.locator('.studio-settings-tabs').getByRole('button', { name: tab, exact: true }).click();
-        assert.equal(await shortcuts.getByRole('link', { name: 'Import data' }).getAttribute('href'), '/dashboard/import');
+        if (tab === 'Account') {
+          await shortcuts.waitFor();
+          assert.equal(await shortcuts.getByRole('link', { name: 'Import data', exact: true }).getAttribute('href'), '/dashboard/import');
+        } else {
+          await shortcuts.waitFor({ state: 'detached' });
+        }
         await fits();
       }
+      await page.goto(`${base}/dashboard/settings?tab=account`, { waitUntil: 'networkidle' });
+      await shortcuts.waitFor();
+      assert.equal(await shortcuts.getByRole('link', { name: 'Setup checklist', exact: true }).getAttribute('href'), '/dashboard/home#studio-setup');
       await page.screenshot({ path: path.join(output, `settings-shortcuts-${width}.png`), fullPage: true });
       await shortcuts.getByRole('link', { name: 'Setup checklist' }).click();
       await page.waitForURL(`${base}/dashboard/home#studio-setup`); await progress(5);
@@ -109,7 +117,7 @@ const output = process.env.STUDIO_QA_OUTPUT || path.resolve(__dirname, '../../ar
       await page.locator('.studio-dashboard-main h1').waitFor();
       await fits();
       assert.deepEqual(errors, []);
-      results.push({ width, passed: true, savedUpdates: writes.length, checks: ['read retry', 'all six action destinations', 'no inferred completion', 'failed save recovery', 'optional skip and undo', 'progress and collapse persistence', 'fresh context restoration', 'reopen completed step', 'settings shortcuts on all tabs', 'import navigation', 'no overflow or runtime errors'] });
+      results.push({ width, passed: true, savedUpdates: writes.length, checks: ['read retry', 'all six action destinations', 'no inferred completion', 'failed save recovery', 'optional skip and undo', 'progress and collapse persistence', 'fresh context restoration', 'reopen completed step', 'settings shortcuts restricted to Account tab', 'direct Account tab navigation', 'import navigation', 'no overflow or runtime errors'] });
       console.log(`PASS ${width}px: checklist, saved progress, retries, skip/undo, navigation and Settings shortcuts.`);
       await context.close();
     }

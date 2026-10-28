@@ -722,7 +722,7 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      <StudioSetupLinks />
+      {tab === 'account' && <StudioSetupLinks />}
 
       <div className="studio-feature-grid" style={s.grid}>
 
