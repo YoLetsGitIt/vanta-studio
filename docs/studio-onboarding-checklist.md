@@ -2,7 +2,9 @@
 
 Home includes a six-step checklist for studio details/timezone, hours/stations,
 artists, bookings/consent, payments and importing. Each step opens its existing
-setup screen. Importing is available through the import step when expanded.
+setup screen through its linked title and short description. Rows have no numbered
+circles or separate navigation buttons. The header combines the title and progress.
+Importing is available through the import step when expanded.
 The Account tab in Settings includes Setup checklist and Import data shortcuts.
 They are hidden on the Studio, Bookings and Payments tabs.
 
