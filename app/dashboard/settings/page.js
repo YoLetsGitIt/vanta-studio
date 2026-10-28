@@ -665,7 +665,7 @@ export default function SettingsPage() {
       sessionStorage.removeItem(`vanta-studio-tour-start:${session.user.id}`);
     }
     await getSupabase().auth.signOut();
-    router.replace('/');
+    window.location.replace('/'); // full load; see dashboard/layout.js
   }
 
   function copyLink() {
