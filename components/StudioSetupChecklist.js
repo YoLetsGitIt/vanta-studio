@@ -68,7 +68,7 @@ export default function StudioSetupChecklist() {
     finally { setSaving(false); }
   }
 
-  const reviewed = STEPS.filter(step => ['complete', 'skipped'].includes(state?.steps?.[step.id])).length;
+  const done = STEPS.filter(step => ['complete', 'skipped'].includes(state?.steps?.[step.id])).length;
   const expanded = state && !state.collapsed;
   const nextStep = STEPS.find(step => !['complete', 'skipped'].includes(state?.steps?.[step.id]));
 
@@ -77,18 +77,17 @@ export default function StudioSetupChecklist() {
       <div className={styles.header}>
         <div className={styles.intro}>
           <h2 id="studio-setup-title">Studio setup checklist</h2>
-          <p className={styles.subtitle}>{reviewed === STEPS.length ? 'Your setup reviews are complete. You can revisit any step below.' : 'Get ready for your first booking. Review each step at your own pace.'}</p>
+          <p className={styles.subtitle}>{done === STEPS.length ? 'All steps are done. You can revisit any step below.' : 'A few essentials before your first booking.'}</p>
         </div>
         <div className={styles.actions}>
-          <a className={styles.primary} href="/dashboard/import">Import data <ArrowIcon /></a>
           {state && <button type="button" className={styles.collapse} aria-expanded={!!expanded} aria-controls="studio-setup-steps" disabled={saving || loading} onClick={() => update({ collapsed: !state.collapsed })}>{expanded ? 'Hide checklist' : 'Show checklist'}<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="m6 8 4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg></button>}
         </div>
       </div>
       {state && <div className={styles.progressRow}>
-        <div className={styles.progressTrack} role="progressbar" aria-label="Setup reviews" aria-valuemin={0} aria-valuemax={STEPS.length} aria-valuenow={reviewed} aria-valuetext={`${reviewed} of ${STEPS.length} steps reviewed`}>
-          <span style={{ width: `${reviewed / STEPS.length * 100}%` }} />
+        <div className={styles.progressTrack} role="progressbar" aria-label="Setup progress" aria-valuemin={0} aria-valuemax={STEPS.length} aria-valuenow={done} aria-valuetext={`${done} of ${STEPS.length} steps done`}>
+          <span style={{ width: `${done / STEPS.length * 100}%` }} />
         </div>
-        <p className={styles.progress} role="status"><strong>{reviewed} of {STEPS.length}</strong> steps reviewed{saving ? ' · Saving…' : ''}</p>
+        <p className={styles.progress} role="status"><strong>{done} of {STEPS.length}</strong> steps done{saving ? ' · Saving…' : ''}</p>
       </div>}
       {loading && <p className={styles.message} role="status">Loading setup progress…</p>}
       {error && <p className={styles.error} role="alert">{error} {!state && <button type="button" disabled={loading} onClick={load}>Try again</button>}</p>}
@@ -99,7 +98,7 @@ export default function StudioSetupChecklist() {
               const status = state.steps?.[step.id] || 'pending';
               return (
                 <li key={step.id} className={styles.step} data-status={status} data-next={nextStep?.id === step.id || undefined}>
-                  <span className={styles.stepNumber} aria-hidden="true">{status === 'complete' ? <CheckIcon /> : String(index + 1).padStart(2, '0')}</span>
+                  <span className={styles.stepNumber} aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>
                   <div className={styles.stepCopy}>
                     <div className={styles.stepHeader}>
                       <h3 className={styles.stepTitle}>{step.title}</h3>
@@ -110,19 +109,26 @@ export default function StudioSetupChecklist() {
                   <div className={styles.stepActions}>
                     <a href={step.href}>{step.action} <ArrowIcon /></a>
                   </div>
-                  <div className={styles.reviewActions}>
-                    <label className={styles.reviewControl}>
-                      <input className={styles.reviewInput} type="checkbox" aria-label={`Mark ${step.title} as reviewed`} checked={status === 'complete'} disabled={saving || loading} onChange={event => update({ step: step.id, status: event.target.checked ? 'complete' : 'pending' })} />
-                      <CheckIcon className={styles.reviewTick} />
-                      <span>{status === 'complete' ? 'Reviewed' : 'Mark reviewed'}</span>
-                    </label>
+                  <div className={styles.completionActions}>
+                    <button
+                      type="button"
+                      className={styles.completeButton}
+                      aria-label={`Complete ${step.title}`}
+                      aria-pressed={status === 'complete'}
+                      title={status === 'complete' ? 'Completed. Click to undo.' : `Complete ${step.title}`}
+                      aria-disabled={saving || loading}
+                      onClick={() => {
+                        if (!saving && !loading) update({ step: step.id, status: status === 'complete' ? 'pending' : 'complete' });
+                      }}
+                    >
+                      {status === 'complete' ? <CheckIcon /> : 'Complete'}
+                    </button>
                     {step.optional && <button type="button" className={styles.skipButton} aria-pressed={status === 'skipped'} disabled={saving || loading} onClick={() => update({ step: step.id, status: status === 'skipped' ? 'pending' : 'skipped' })}>{status === 'skipped' ? 'Undo skip' : 'Not needed'}</button>}
                   </div>
                 </li>
               );
             })}
           </ul>
-          <p className={styles.footnote}>Mark each step reviewed after checking its settings. You can skip the optional steps.</p>
         </div>
       )}
     </section>

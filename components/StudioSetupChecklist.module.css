@@ -6,10 +6,8 @@
 :global(html:root) .header h2 { margin: 0 0 .4rem; font-size: 1.25rem; font-weight: 600; letter-spacing: -.025em; line-height: 1.35; }
 :global(html:root) .subtitle { margin: 0; color: var(--text-dim); font-size: .9rem; line-height: 1.6; }
 :global(html:root) .actions { display: flex; align-items: center; gap: .65rem; flex-wrap: wrap; }
-:global(html:root) .primary, :global(html:root) .collapse { display: inline-flex; align-items: center; justify-content: center; gap: .6rem; min-height: 44px; padding: .6rem .9rem; border: 1px solid var(--border); border-radius: 8px; font: inherit; font-size: .85rem; font-weight: 600; text-decoration: none; cursor: pointer; transition: background 150ms, border-color 150ms; }
-:global(html:root) .primary { background: var(--text); color: var(--bg-base); }
-:global(html:root) .primary:hover { opacity: .88; }
-:global(html:root) .primary svg, :global(html:root) .collapse svg { width: 16px; height: 16px; flex-shrink: 0; }
+:global(html:root) .collapse { display: inline-flex; align-items: center; justify-content: center; gap: .6rem; min-height: 44px; padding: .6rem .9rem; border: 1px solid var(--border); border-radius: 8px; font: inherit; font-size: .85rem; font-weight: 600; text-decoration: none; cursor: pointer; transition: background 150ms, border-color 150ms; }
+:global(html:root) .collapse svg { width: 16px; height: 16px; flex-shrink: 0; }
 :global(html:root) .collapse { background: transparent; color: var(--text-dim); border-color: transparent; padding-inline: .55rem; font-weight: 500; }
 :global(html:root) .collapse:hover { background: var(--accent-tint); color: var(--text); }
 :global(html:root) .collapse[aria-expanded="true"] svg { transform: rotate(180deg); }
@@ -23,7 +21,6 @@
 :global(html:root) .step:last-child { border-bottom: 0; }
 :global(html:root) .step[data-next="true"] { background: color-mix(in srgb, var(--text) 3%, transparent); }
 :global(html:root) .stepNumber { display: grid; place-items: center; align-self: start; width: 32px; height: 32px; border: 1px solid var(--border); border-radius: 50%; color: var(--text-dim); font-size: .8rem; font-weight: 500; font-variant-numeric: tabular-nums; }
-:global(html:root) .stepNumber svg { width: 20px; height: 20px; }
 :global(html:root) .step[data-next="true"] .stepNumber { background: var(--text); border-color: var(--text); color: var(--bg-base); }
 :global(html:root) .step[data-status="complete"] .stepNumber { background: var(--accent-tint); color: var(--text); }
 :global(html:root) .step[data-status="skipped"] .stepNumber { border-style: dashed; }
@@ -36,16 +33,15 @@
 :global(html:root) .stepActions a { display: inline-flex; align-items: center; justify-content: space-between; gap: .6rem; width: 100%; min-height: 44px; padding: .5rem .7rem; border: 1px solid var(--border); border-radius: 7px; color: var(--text); font-size: .82rem; line-height: 1.4; font-weight: 500; text-decoration: none; transition: background 150ms; }
 :global(html:root) .stepActions a svg { flex-shrink: 0; width: 16px; height: 16px; }
 :global(html:root) .stepActions a:hover { background: var(--accent-tint); border-color: var(--text-ghost); }
-:global(html:root) .reviewActions { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; padding-left: .25rem; }
-:global(html:root) .reviewControl { position: relative; display: inline-flex; align-items: center; gap: .5rem; min-height: 44px; margin: 0; color: var(--text-dim); font-size: .82rem; cursor: pointer; white-space: nowrap; }
-:global(html:root) .reviewInput { appearance: none; width: 18px; height: 18px; flex-shrink: 0; margin: 0; border: 1px solid var(--text-dim); border-radius: 4px; background: transparent; cursor: pointer; }
-:global(html:root) .reviewInput:checked { background: var(--text); border-color: var(--text); }
-:global(html:root) .reviewTick { position: absolute; left: 0; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; color: var(--bg-base); pointer-events: none; opacity: 0; }
-:global(html:root) .reviewInput:checked + .reviewTick { opacity: 1; }
-:global(html:root) .step[data-status="complete"] .reviewControl { color: var(--text); }
-:global(html:root) .skipButton { min-height: 32px; padding: 0; margin-left: 26px; border: 0; background: none; color: var(--text-dim); font: inherit; font-size: .78rem; cursor: pointer; text-decoration: underline; text-decoration-color: var(--text-ghost); text-underline-offset: 3px; }
+:global(html:root) .completionActions { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .2rem; }
+:global(html:root) .completeButton { display: inline-flex; align-items: center; justify-content: center; min-width: 96px; height: 44px; padding: .5rem .8rem; border: 1px solid var(--border); border-radius: 8px; background: transparent; color: var(--text); font: inherit; font-size: .82rem; font-weight: 500; cursor: pointer; transition: background 150ms, border-color 150ms; }
+:global(html:root) .completeButton:hover { background: var(--accent-tint); border-color: var(--text-ghost); }
+:global(html:root) .completeButton[aria-pressed="true"] { width: 44px; min-width: 44px; padding: 0; border-radius: 50%; background: var(--text); border-color: var(--text); color: var(--bg-base); }
+:global(html:root) .completeButton[aria-pressed="true"]:hover { opacity: .85; }
+:global(html:root) .completeButton svg { width: 22px; height: 22px; }
+:global(html:root) .completeButton[aria-disabled="true"] { opacity: .55; cursor: wait; }
+:global(html:root) .skipButton { min-height: 32px; padding: 0; margin-left: 0; border: 0; background: none; color: var(--text-dim); font: inherit; font-size: .78rem; cursor: pointer; text-decoration: underline; text-decoration-color: var(--text-ghost); text-underline-offset: 3px; }
 :global(html:root) .skipButton:hover { color: var(--text); text-decoration-color: currentColor; }
-:global(html:root) .footnote { margin: 1rem 0 0; color: var(--text-dim); font-size: .8rem; line-height: 1.6; }
 :global(html:root) .message { margin: 1rem 0 0; color: var(--text-dim); font-size: .8rem; line-height: 1.6; }
 :global(html:root) .error { margin: 1rem 0 0; font-size: .8rem; line-height: 1.5; color: var(--color-danger, #dc7878); }
 :global(html:root) .error button { margin-left: .5rem; min-height: 44px; border: 0; background: none; color: inherit; font: inherit; text-decoration: underline; cursor: pointer; }
@@ -75,7 +71,7 @@
   :global(html:root) .stepCopy { grid-column: 2 / -1; }
   :global(html:root) .stepActions { grid-column: 2; justify-self: start; }
   :global(html:root) .stepActions a { width: auto; min-width: 200px; }
-  :global(html:root) .reviewActions { grid-column: 3; }
+  :global(html:root) .completionActions { grid-column: 3; }
 }
 @container studio-setup (max-width: 540px) {
   :global(html:root) .step { grid-template-columns: 28px minmax(0, 1fr); gap: .5rem .65rem; padding: 1rem .85rem; }
@@ -83,7 +79,7 @@
   :global(html:root) .stepCopy { grid-column: 2; }
   :global(html:root) .stepActions { grid-column: 2; justify-self: stretch; margin-top: .3rem; }
   :global(html:root) .stepActions a { width: 100%; min-width: 0; }
-  :global(html:root) .reviewActions { grid-column: 2; flex-direction: row; align-items: center; justify-content: flex-start; flex-wrap: wrap; gap: 0 .8rem; padding: 0; }
+  :global(html:root) .completionActions { grid-column: 2; flex-direction: row; align-items: center; justify-content: flex-start; flex-wrap: wrap; gap: 0 .8rem; padding: 0; }
   :global(html:root) .skipButton { margin-left: 0; min-height: 44px; }
   :global(html:root) .progressRow { flex-direction: column-reverse; align-items: stretch; gap: .65rem; }
   :global(html:root) .progressTrack { width: 100%; }
@@ -92,7 +88,7 @@
   :global(html:root) .card, :global(html:root) .shortcuts { padding: 1rem; border-radius: 12px; }
   :global(html:root) .header { gap: .85rem; }
   :global(html:root) .header h2 { font-size: 1.1rem; }
-  :global(html:root) .actions { width: 100%; justify-content: space-between; }
+  :global(html:root) .actions { width: 100%; justify-content: flex-end; }
 }
 @media (prefers-reduced-motion: reduce) { :global(html:root) .card *, :global(html:root) .shortcuts * { transition: none !important; } }
-@media (any-pointer: coarse) { :global(html:root) .card a, :global(html:root) .reviewControl, :global(html:root) .skipButton { min-height: 44px; } }
+@media (any-pointer: coarse) { :global(html:root) .card a, :global(html:root) .completeButton, :global(html:root) .skipButton { min-height: 44px; } }
