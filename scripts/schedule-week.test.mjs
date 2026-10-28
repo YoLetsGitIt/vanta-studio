@@ -45,3 +45,27 @@ test('calendar arithmetic and overnight durations survive daylight saving', () =
   assert.equal(week[6].key, '2026-10-04');
   assert.equal(week[6].bookings[0].displayEnd.getHours(), 4);
 });
+
+test('time grid keeps the working day and stretches to fit early, late and overnight bookings', async () => {
+  const { weekHourRange } = await import('../lib/scheduleWeek.mjs');
+  const date = new Date('2026-10-26T12:00:00+11:00');
+  assert.deepEqual(weekHourRange(weekSchedule([], date)), { startHour: 8, endHour: 20 });
+  const stretched = weekSchedule([
+    { bookingId: 'early', chosenTime: '2026-10-27T06:30:00+11:00', durationMins: 60 },
+    { bookingId: 'late', chosenTime: '2026-10-28T21:15:00+11:00', durationMins: 30 },
+  ], date);
+  assert.deepEqual(weekHourRange(stretched), { startHour: 6, endHour: 22 });
+  const overnight = weekSchedule([{ bookingId: 'night', chosenTime: '2026-10-28T23:00:00+11:00', durationMins: 180 }], date);
+  assert.deepEqual(weekHourRange(overnight), { startHour: 0, endHour: 24 });
+});
+
+test('overlapping bookings get side-by-side lanes; back-to-back bookings stay full width', async () => {
+  const { layoutDayLanes } = await import('../lib/scheduleWeek.mjs');
+  const at = (id, time, durationMins) => ({ bookingId: id, chosenTime: `2026-10-26T${time}:00+11:00`, durationMins });
+  const [monday] = weekSchedule([at('a', '10:00', 120), at('b', '11:00', 60), at('c', '12:00', 60), at('d', '15:00', 60)], new Date('2026-10-26T12:00:00+11:00'));
+  const lanes = Object.fromEntries(layoutDayLanes(monday.bookings).map(item => [item.entry.bookingId, [item.lane, item.lanes]]));
+  assert.deepEqual(lanes.a, [0, 2]);
+  assert.deepEqual(lanes.b, [1, 2]);
+  assert.deepEqual(lanes.c, [0, 1], 'c starts as a and b end, so it overlaps nothing and is full width');
+  assert.deepEqual(lanes.d, [0, 1], 'a separate booking later in the day is full width');
+});

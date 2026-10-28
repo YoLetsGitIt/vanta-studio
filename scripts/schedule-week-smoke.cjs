@@ -58,6 +58,12 @@ let entries = [
     assert.equal(await card('Overnight Wednesday').count(), 2);
     assert.equal(await card('Next week client').count(), 0);
     assert.deepEqual(ranges.at(-1), { start: '2026-10-25', end: '2026-11-02' });
+    // Time grid: blocks sit at their time, and simultaneous bookings share the column.
+    const box = async id => (await card(id).first().boundingBox());
+    assert.ok((await box('Early Tuesday')).y < (await box('Late Tuesday')).y, 'Earlier bookings must sit higher');
+    const lanes = await Promise.all(['Monday client 1', 'Monday client 2', 'Monday client 3'].map(box));
+    assert.equal(new Set(lanes.map(b => Math.round(b.x))).size, 3, 'Three 10am bookings must sit side by side');
+    assert.ok(Math.abs(lanes[0].y - lanes[1].y) < 2, 'Simultaneous bookings must share a row');
     await page.getByText('13 appointments', { exact: true }).waitFor();
     await filter.selectOption('artist-1');
     assert.equal(await week.locator('[data-booking-id]').count(), 2);
@@ -90,6 +96,7 @@ let entries = [
     await card('Fresh booking').waitFor();
     for (const theme of ['dark', 'light']) {
       await page.evaluate(value => document.documentElement.dataset.theme = value, theme);
+      await page.waitForTimeout(400); // let colour transitions finish
       await page.screenshot({ path: `${screenshots}/week-${theme}-1440.png` });
     }
     await week.locator('section').first().getByRole('button').first().click();
