@@ -76,9 +76,8 @@ export default function StudioSetupChecklist() {
     <section id="studio-setup" className={styles.card} aria-labelledby="studio-setup-title" aria-busy={loading || saving}>
       <div className={styles.header}>
         <div className={styles.intro}>
-          <span className={styles.eyebrow}>{reviewed === STEPS.length ? 'READY WHEN YOU ARE' : 'MAKE YOURSELF AT HOME'}</span>
           <h2 id="studio-setup-title">Studio setup checklist</h2>
-          <p className={styles.subtitle}>{reviewed === STEPS.length ? 'Your setup reviews are complete. You can revisit any step below.' : 'A few essentials before your first booking.'}</p>
+          <p className={styles.subtitle}>{reviewed === STEPS.length ? 'Your setup reviews are complete. You can revisit any step below.' : 'Get ready for your first booking. Review each step at your own pace.'}</p>
         </div>
         <div className={styles.actions}>
           <a className={styles.primary} href="/dashboard/import">Import data <ArrowIcon /></a>
@@ -87,7 +86,7 @@ export default function StudioSetupChecklist() {
       </div>
       {state && <div className={styles.progressRow}>
         <div className={styles.progressTrack} role="progressbar" aria-label="Setup reviews" aria-valuemin={0} aria-valuemax={STEPS.length} aria-valuenow={reviewed} aria-valuetext={`${reviewed} of ${STEPS.length} steps reviewed`}>
-          {STEPS.map(step => <span key={step.id} data-status={state.steps?.[step.id] || 'pending'} />)}
+          <span style={{ width: `${reviewed / STEPS.length * 100}%` }} />
         </div>
         <p className={styles.progress} role="status"><strong>{reviewed} of {STEPS.length}</strong> steps reviewed{saving ? ' · Saving…' : ''}</p>
       </div>}
@@ -100,26 +99,30 @@ export default function StudioSetupChecklist() {
               const status = state.steps?.[step.id] || 'pending';
               return (
                 <li key={step.id} className={styles.step} data-status={status} data-next={nextStep?.id === step.id || undefined}>
-                  <div className={styles.stepHeader}>
-                    <span className={styles.stepNumber} aria-hidden="true">{status === 'complete' ? <CheckIcon /> : String(index + 1).padStart(2, '0')}</span>
-                    <h3 className={styles.stepTitle}>{step.title}</h3>
-                    {status === 'skipped' ? <span className={styles.badge}>Skipped</span> : nextStep?.id === step.id ? <span className={styles.nextBadge}>Next step</span> : step.optional && <span className={styles.badge}>Optional</span>}
+                  <span className={styles.stepNumber} aria-hidden="true">{status === 'complete' ? <CheckIcon /> : String(index + 1).padStart(2, '0')}</span>
+                  <div className={styles.stepCopy}>
+                    <div className={styles.stepHeader}>
+                      <h3 className={styles.stepTitle}>{step.title}</h3>
+                      {status === 'skipped' ? <span className={styles.badge}>Skipped</span> : step.optional && <span className={styles.badge}>Optional</span>}
+                    </div>
+                    <p className={styles.description}>{step.description}</p>
                   </div>
-                  <p className={styles.description}>{step.description}</p>
                   <div className={styles.stepActions}>
                     <a href={step.href}>{step.action} <ArrowIcon /></a>
-                    {step.optional && <button type="button" className={styles.skipButton} aria-pressed={status === 'skipped'} disabled={saving || loading} onClick={() => update({ step: step.id, status: status === 'skipped' ? 'pending' : 'skipped' })}>{status === 'skipped' ? 'Undo skip' : 'Not needed'}</button>}
+                  </div>
+                  <div className={styles.reviewActions}>
                     <label className={styles.reviewControl}>
                       <input className={styles.reviewInput} type="checkbox" aria-label={`Mark ${step.title} as reviewed`} checked={status === 'complete'} disabled={saving || loading} onChange={event => update({ step: step.id, status: event.target.checked ? 'complete' : 'pending' })} />
                       <CheckIcon className={styles.reviewTick} />
                       <span>{status === 'complete' ? 'Reviewed' : 'Mark reviewed'}</span>
                     </label>
+                    {step.optional && <button type="button" className={styles.skipButton} aria-pressed={status === 'skipped'} disabled={saving || loading} onClick={() => update({ step: step.id, status: status === 'skipped' ? 'pending' : 'skipped' })}>{status === 'skipped' ? 'Undo skip' : 'Not needed'}</button>}
                   </div>
                 </li>
               );
             })}
           </ul>
-          <p className={styles.footnote}>Go at your own pace. Mark a step reviewed after checking its settings. Payments and imports are optional.</p>
+          <p className={styles.footnote}>Mark each step reviewed after checking its settings. You can skip the optional steps.</p>
         </div>
       )}
     </section>
