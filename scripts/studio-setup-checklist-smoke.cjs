@@ -78,11 +78,11 @@ const output = process.env.STUDIO_QA_OUTPUT || path.resolve(__dirname, '../../ar
       await checklist().getByRole('alert').waitFor();
       assert.equal(await completion('Hours and stations').getAttribute('aria-pressed'), 'false', 'Failed save must not appear completed');
       await completion('Hours and stations').click(); await progress(2);
-      const payments = () => checklist().getByRole('listitem').filter({ has: completion('Payments') });
-      await payments().getByRole('button', { name: 'Not needed', exact: true }).click(); await progress(3);
-      await payments().getByText('Skipped', { exact: true }).waitFor();
-      await payments().getByRole('button', { name: 'Undo skip', exact: true }).click(); await progress(2);
-      await payments().getByRole('button', { name: 'Not needed', exact: true }).click(); await progress(3);
+      assert.equal(await checklist().getByRole('button', { name: 'Not needed', exact: true }).count(), 0);
+      assert.equal(await checklist().getByRole('button', { name: 'Undo skip', exact: true }).count(), 0);
+      await completion('Payments').click(); await progress(3);
+      await completion('Payments').click(); await progress(2);
+      await completion('Payments').click(); await progress(3);
       await completion('Your artists').click(); await progress(4);
       await completion('Bookings and consent').click(); await progress(5);
       await completion('Clients and upcoming appointments').click(); await progress(6);
@@ -124,8 +124,8 @@ const output = process.env.STUDIO_QA_OUTPUT || path.resolve(__dirname, '../../ar
       await page.locator('.studio-dashboard-main h1').waitFor();
       await fits();
       assert.deepEqual(errors, []);
-      results.push({ width, passed: true, savedUpdates: writes.length, checks: ['Complete button and icon-only saved state', 'keyboard complete and undo', 'read retry', 'all six action destinations', 'no inferred completion', 'failed save recovery', 'optional skip and undo', 'progress and collapse persistence', 'fresh context restoration', 'reopen completed step', 'settings shortcuts restricted to Account tab', 'direct Account tab navigation', 'import navigation', 'no overflow or runtime errors'] });
-      console.log(`PASS ${width}px: checklist, saved progress, retries, skip/undo, navigation and Settings shortcuts.`);
+      results.push({ width, passed: true, savedUpdates: writes.length, checks: ['Complete button and icon-only saved state', 'keyboard complete and undo', 'read retry', 'all six action destinations', 'no inferred completion', 'failed save recovery', 'optional completion and undo; skip actions removed', 'progress and collapse persistence', 'fresh context restoration', 'reopen completed step', 'settings shortcuts restricted to Account tab', 'direct Account tab navigation', 'import navigation', 'no overflow or runtime errors'] });
+      console.log(`PASS ${width}px: checklist, saved progress, retries, completion/undo, navigation and Settings shortcuts.`);
       await context.close();
     }
   } finally {

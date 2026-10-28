@@ -34,14 +34,16 @@
 :global(html:root) .stepActions a svg { flex-shrink: 0; width: 16px; height: 16px; }
 :global(html:root) .stepActions a:hover { background: var(--accent-tint); border-color: var(--text-ghost); }
 :global(html:root) .completionActions { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .2rem; }
-:global(html:root) .completeButton { display: inline-flex; align-items: center; justify-content: center; min-width: 96px; height: 44px; padding: .5rem .8rem; border: 1px solid var(--border); border-radius: 8px; background: transparent; color: var(--text); font: inherit; font-size: .82rem; font-weight: 500; cursor: pointer; transition: background 150ms, border-color 150ms; }
-:global(html:root) .completeButton:hover { background: var(--accent-tint); border-color: var(--text-ghost); }
-:global(html:root) .completeButton[aria-pressed="true"] { width: 44px; min-width: 44px; padding: 0; border-radius: 50%; background: var(--text); border-color: var(--text); color: var(--bg-base); }
-:global(html:root) .completeButton[aria-pressed="true"]:hover { opacity: .85; }
-:global(html:root) .completeButton svg { width: 22px; height: 22px; }
-:global(html:root) .completeButton[aria-disabled="true"] { opacity: .55; cursor: wait; }
-:global(html:root) .skipButton { min-height: 32px; padding: 0; margin-left: 0; border: 0; background: none; color: var(--text-dim); font: inherit; font-size: .78rem; cursor: pointer; text-decoration: underline; text-decoration-color: var(--text-ghost); text-underline-offset: 3px; }
-:global(html:root) .skipButton:hover { color: var(--text); text-decoration-color: currentColor; }
+:global(html:root) .completionButton { display: inline-flex; align-items: center; justify-content: center; width: 96px; min-width: 44px; height: 44px; padding: .5rem .8rem; border: 1px solid var(--border); border-radius: 8px; background: transparent; color: var(--text); font: inherit; font-size: .82rem; font-weight: 500; cursor: pointer; transition: width 220ms ease, border-radius 220ms ease, background 200ms, border-color 200ms, color 200ms; }
+:global(html:root) .completionButton:hover { background: var(--accent-tint); border-color: var(--text-ghost); }
+:global(html:root) .completionButton[aria-pressed="true"] { width: 44px; min-width: 44px; padding: 0; border-radius: 50%; background: var(--text); border-color: var(--text); color: var(--bg-base); }
+:global(html:root) .completionButton[aria-pressed="true"]:hover { opacity: .85; }
+:global(html:root) .completionButton svg { width: 22px; height: 22px; }
+:global(html:root) .completionButton[data-animate="true"] svg { animation: tickAppear 220ms ease-out 80ms both; }
+:global(html:root) .completionButton[data-animate="true"] svg path { stroke-dasharray: 1; animation: tickDraw 300ms ease-out 80ms both; }
+@keyframes tickAppear { from { opacity: 0; transform: scale(.65); } to { opacity: 1; transform: scale(1); } }
+@keyframes tickDraw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+:global(html:root) .completionButton[aria-disabled="true"] { opacity: .55; cursor: wait; }
 :global(html:root) .message { margin: 1rem 0 0; color: var(--text-dim); font-size: .8rem; line-height: 1.6; }
 :global(html:root) .error { margin: 1rem 0 0; font-size: .8rem; line-height: 1.5; color: var(--color-danger, #dc7878); }
 :global(html:root) .error button { margin-left: .5rem; min-height: 44px; border: 0; background: none; color: inherit; font: inherit; text-decoration: underline; cursor: pointer; }
@@ -80,7 +82,6 @@
   :global(html:root) .stepActions { grid-column: 2; justify-self: stretch; margin-top: .3rem; }
   :global(html:root) .stepActions a { width: 100%; min-width: 0; }
   :global(html:root) .completionActions { grid-column: 2; flex-direction: row; align-items: center; justify-content: flex-start; flex-wrap: wrap; gap: 0 .8rem; padding: 0; }
-  :global(html:root) .skipButton { margin-left: 0; min-height: 44px; }
   :global(html:root) .progressRow { flex-direction: column-reverse; align-items: stretch; gap: .65rem; }
   :global(html:root) .progressTrack { width: 100%; }
 }
@@ -90,5 +91,5 @@
   :global(html:root) .header h2 { font-size: 1.1rem; }
   :global(html:root) .actions { width: 100%; justify-content: flex-end; }
 }
-@media (prefers-reduced-motion: reduce) { :global(html:root) .card *, :global(html:root) .shortcuts * { transition: none !important; } }
-@media (any-pointer: coarse) { :global(html:root) .card a, :global(html:root) .completeButton, :global(html:root) .skipButton { min-height: 44px; } }
+@media (prefers-reduced-motion: reduce) { :global(html:root) .card *, :global(html:root) .shortcuts * { transition: none !important; animation: none !important; } }
+@media (any-pointer: coarse) { :global(html:root) .card a, :global(html:root) .completionButton { min-height: 44px; } }

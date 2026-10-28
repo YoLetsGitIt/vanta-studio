@@ -10,8 +10,14 @@ The owner selects Complete after checking a step's settings. Once saved, the
 button displays a tick; selecting it again undoes completion. The control retains
 keyboard focus during saving and exposes its state with `aria-pressed`. Existing
 defaults, opening a screen or importing a single file do not mark a step complete.
-Payments and importing can be marked Not needed, and skips can be undone.
-The progress count includes completed and skipped steps as steps done.
+Payments and importing remain optional, with the same Complete control as other steps.
+The Not needed and Undo skip actions are removed. Previously saved skips remain
+counted as done; selecting Complete changes a skipped step to completed, and
+selecting its tick again returns it to pending.
+
+After a successful completion save, the button contracts and the tick draws in.
+Saved ticks do not replay the animation on page load. Reduced-motion preferences
+disable the animation and transitions.
 
 Progress and collapse preferences are stored per studio on the server, shared
 across browsers/devices. No local-storage checklist state is used. A failed save
@@ -38,7 +44,7 @@ approve artists, import records, connect Stripe or start a subscription.
 
 `scripts/studio-setup-checklist-smoke.cjs` exercises the production export at
 390px and 1440px using intercepted services: all action destinations, progress,
-skip/undo, refresh/fresh-context restoration, collapse persistence, read/save
+completion/undo, refresh/fresh-context restoration, collapse persistence, read/save
 failures, Complete-to-tick transitions, keyboard completion/undo, Account-only
 shortcuts, direct Account tab navigation and Import navigation.
 

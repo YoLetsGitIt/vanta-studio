@@ -14,7 +14,7 @@ const STEPS = [
 ];
 
 function CheckIcon({ className }) {
-  return <svg className={className} viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="m5 10 3.2 3.2L15 6.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>;
+  return <svg className={className} viewBox="0 0 20 20" fill="none" aria-hidden="true"><path pathLength="1" d="m5 10 3.2 3.2L15 6.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>;
 }
 
 function ArrowIcon() {
@@ -49,6 +49,7 @@ export default function StudioSetupChecklist() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [animatedStep, setAnimatedStep] = useState(null);
 
   async function load() {
     setLoading(true);
@@ -61,9 +62,14 @@ export default function StudioSetupChecklist() {
   useEffect(() => { load(); }, []);
 
   async function update(change) {
+    setAnimatedStep(null);
     setSaving(true);
     setError('');
-    try { setState(await updateStudioOnboarding(change)); }
+    try {
+      const saved = await updateStudioOnboarding(change);
+      setState(saved);
+      if (change.status === 'complete' && saved.steps?.[change.step] === 'complete') setAnimatedStep(change.step);
+    }
     catch (err) { setError(err.message || 'Could not save setup progress. Please try again.'); }
     finally { setSaving(false); }
   }
@@ -112,7 +118,11 @@ export default function StudioSetupChecklist() {
                   <div className={styles.completionActions}>
                     <button
                       type="button"
-                      className={styles.completeButton}
+                      className={styles.completionButton}
+                      data-animate={animatedStep === step.id || undefined}
+                      onAnimationEnd={event => {
+                        if (event.target.tagName.toLowerCase() === 'path') setAnimatedStep(current => current === step.id ? null : current);
+                      }}
                       aria-label={`Complete ${step.title}`}
                       aria-pressed={status === 'complete'}
                       title={status === 'complete' ? 'Completed. Click to undo.' : `Complete ${step.title}`}
@@ -123,7 +133,6 @@ export default function StudioSetupChecklist() {
                     >
                       {status === 'complete' ? <CheckIcon /> : 'Complete'}
                     </button>
-                    {step.optional && <button type="button" className={styles.skipButton} aria-pressed={status === 'skipped'} disabled={saving || loading} onClick={() => update({ step: step.id, status: status === 'skipped' ? 'pending' : 'skipped' })}>{status === 'skipped' ? 'Undo skip' : 'Not needed'}</button>}
                   </div>
                 </li>
               );
