@@ -1,7 +1,7 @@
 1:"$Sreact.fragment"
 2:I[52895,[],""]
 3:I[78723,[],""]
-4:I[34897,["5653","static/chunks/5653-3b5c18d45140b8dd.js","6944","static/chunks/app/features/page-df14334a92214b9f.js"],"default"]
+4:I[34897,["5653","static/chunks/5653-3b5c18d45140b8dd.js","6944","static/chunks/app/features/page-e9f8814a44e54470.js"],"default"]
 5:I[39158,[],"OutletBoundary"]
 7:I[31115,[],"AsyncMetadataOutlet"]
 9:I[39158,[],"ViewportBoundary"]
