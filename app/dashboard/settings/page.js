@@ -675,6 +675,7 @@ export default function SettingsPage() {
     });
   }
 
+  const isBillingExempt = billingDetails?.billing_exempt === true;
   const isCanceling = billingDetails?.cancel_at_period_end === true;
   const periodEndLabel = billingDetails?.current_period_end
     ? new Date(billingDetails.current_period_end).toLocaleDateString()
@@ -1496,6 +1497,12 @@ export default function SettingsPage() {
 
         <section style={{ ...s.card, gridColumn: '1 / -1' }}>
           <h2 style={s.sectionTitle}>Billing</h2>
+          {isBillingExempt ? <div>
+            <p style={s.sectionDesc}>This demo studio has complimentary access.</p>
+            <p style={{ margin: '0.75rem 0 0', fontWeight: 600 }}>No billing required</p>
+            <p style={s.sectionDesc}>No subscription, payment card or recurring charges.</p>
+          </div> : <>
+
           <p style={s.sectionDesc}>
             {formatCents(billingDetails?.base_tier_cents ?? 3000)}/mo AUD covers up to {billingDetails?.base_tier_seats ?? 6} artists,
             then {formatCents(billingDetails?.per_extra_seat_cents ?? 500)}/artist beyond that.
@@ -1574,6 +1581,7 @@ export default function SettingsPage() {
               </div>
             </div>
           )}
+          </>}
         </section>
 
         {cancelModalOpen && (

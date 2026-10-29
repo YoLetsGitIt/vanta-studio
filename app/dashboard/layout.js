@@ -59,6 +59,7 @@ const TOUR_STEPS = [
 // No reminder is shown ahead of time; this only ever renders once the dashboard is
 // actually locked.
 function subscriptionInactive(studio) {
+  if (studio?.billing_exempt) return false;
   return studio?.subscription_status !== 'trialing' && studio?.subscription_status !== 'active';
 }
 
