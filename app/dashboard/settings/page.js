@@ -681,7 +681,7 @@ export default function SettingsPage() {
     : '';
   const hasBillingPeriod = !!billingDetails?.current_period_end;
   const billingHeroLabel = isCanceling ? 'Access ends' : hasBillingPeriod ? 'Next payment' : 'Estimated monthly';
-  const billingHeroCents = hasBillingPeriod ? (billingDetails?.next_amount_due_cents ?? 0) : (billingDetails?.estimated_monthly_cents ?? 6000);
+  const billingHeroCents = hasBillingPeriod ? (billingDetails?.next_amount_due_cents ?? 0) : (billingDetails?.estimated_monthly_cents ?? 3000);
   const billingSeatCount = billingDetails?.seat_count ?? 0;
 
   const embedSnippet = studioId
@@ -1497,8 +1497,8 @@ export default function SettingsPage() {
         <section style={{ ...s.card, gridColumn: '1 / -1' }}>
           <h2 style={s.sectionTitle}>Billing</h2>
           <p style={s.sectionDesc}>
-            {formatCents(billingDetails?.base_tier_cents ?? 6000)}/mo AUD covers up to {billingDetails?.base_tier_seats ?? 6} artists,
-            then {formatCents(billingDetails?.per_extra_seat_cents ?? 1500)}/artist beyond that.
+            {formatCents(billingDetails?.base_tier_cents ?? 3000)}/mo AUD covers up to {billingDetails?.base_tier_seats ?? 6} artists,
+            then {formatCents(billingDetails?.per_extra_seat_cents ?? 500)}/artist beyond that.
           </p>
 
           {billingNotice && <p style={{ fontSize: '0.82rem', color: 'var(--accent)', margin: 0 }}>{billingNotice}</p>}

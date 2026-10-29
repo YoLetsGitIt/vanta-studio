@@ -334,7 +334,7 @@ export default function StudiosPage({ featuresOnly = false }) {
         </section>
         <section id="pricing" className="studios-pricing" aria-labelledby="pricing-title">
           <div><p className="studios-eyebrow">Straightforward pricing</p><h2 id="pricing-title">One studio plan.</h2><p>Start with a 14-day free trial. A card is required; billing begins when the trial ends unless you cancel.</p></div>
-          <div className="studios-price-card"><h3>Vanta Studio</h3><p className="studios-price"><strong>A$60</strong> / month</p><p>Includes up to 6 artists.<br />A$15/month per additional artist.</p><a className="studios-hero-cta" href="https://studio.vanta.tattoo/?signup">Start free trial →</a><p className="studios-price-fine">Online deposits add a client-paid fee of 3% + A$0.50 per transaction. For example, an A$100 deposit costs the client A$103.50. This is separate from the studio subscription.</p></div>
+          <div className="studios-price-card"><h3>Vanta Studio</h3><p className="studios-price"><strong>A$30</strong> / month</p><p>Includes up to 6 artists.<br />A$5/month per additional artist.</p><a className="studios-hero-cta" href="https://studio.vanta.tattoo/?signup">Start free trial →</a><p className="studios-price-fine">Online deposits add a client-paid fee of 3% + A$0.50 per transaction. For example, an A$100 deposit costs the client A$103.50. This is separate from the studio subscription.</p></div>
         </section>
         <section className="studios-faq" aria-labelledby="faq-title">
           <p className="studios-eyebrow">Getting started</p><h2 id="faq-title">A few things before you switch.</h2>

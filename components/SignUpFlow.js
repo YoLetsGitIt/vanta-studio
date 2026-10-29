@@ -345,11 +345,11 @@ function IntroStep({ onNext, onSwitchToSignIn }) {
         <div style={s.ctaInfo}>
           <span style={s.planLabel}>Studio plan</span>
           <div style={s.planPriceRow}>
-            <span style={s.planPriceAmount}>$60</span>
+            <span style={s.planPriceAmount}>$30</span>
             <span style={s.planPriceUnit}>/mo AUD</span>
           </div>
           <p style={s.planPriceDetail}>
-            Includes up to 6 artists. Add more for $15/artist per month.
+            Includes up to 6 artists. Add more for $5/artist per month.
           </p>
         </div>
 
