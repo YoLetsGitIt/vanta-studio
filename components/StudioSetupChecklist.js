@@ -5,12 +5,12 @@ import { getStudioOnboarding, updateStudioOnboarding } from '@/lib/api';
 import styles from './StudioSetupChecklist.module.css';
 
 const STEPS = [
-  { id: 'profile', title: 'Studio details and timezone', description: 'Name, address and timezone.', href: '/dashboard/settings?tab=studio', action: 'Review studio' },
-  { id: 'hours', title: 'Hours and stations', description: 'Opening hours and available stations.', href: '/dashboard/settings?tab=studio', action: 'Set hours and stations' },
-  { id: 'artists', title: 'Your artists', description: 'Invite and approve your artists.', href: '/dashboard/artists?onboarding=1', action: 'Add artists' },
-  { id: 'bookings', title: 'Bookings and consent', description: 'Forms, deposits and reminders.', href: '/dashboard/settings?tab=bookings', action: 'Set up bookings' },
-  { id: 'payments', title: 'Payments', description: 'Connect Stripe to accept payments.', href: '/dashboard/settings?tab=payments', action: 'Set up payments', optional: true },
-  { id: 'import', title: 'Clients and upcoming appointments', description: 'Acuity, Jotform or CSV. Clients first.', href: '/dashboard/import', action: 'Open importer', optional: true },
+  { id: 'profile', title: 'Studio details', href: '/dashboard/settings?tab=studio', action: 'Review studio' },
+  { id: 'hours', title: 'Hours & stations', href: '/dashboard/settings?tab=studio', action: 'Set hours and stations' },
+  { id: 'artists', title: 'Artists', href: '/dashboard/artists?onboarding=1', action: 'Add artists' },
+  { id: 'bookings', title: 'Bookings & consent', href: '/dashboard/settings?tab=bookings', action: 'Set up bookings' },
+  { id: 'payments', title: 'Payments', href: '/dashboard/settings?tab=payments', action: 'Set up payments', optional: true },
+  { id: 'import', title: 'Import clients', href: '/dashboard/import', action: 'Open importer', optional: true },
 ];
 
 function CheckIcon({ className }) {
@@ -76,23 +76,13 @@ export default function StudioSetupChecklist() {
 
   const done = STEPS.filter(step => ['complete', 'skipped'].includes(state?.steps?.[step.id])).length;
   const expanded = state && !state.collapsed;
-  const nextStep = STEPS.find(step => !['complete', 'skipped'].includes(state?.steps?.[step.id]));
 
   return (
     <section id="studio-setup" className={styles.card} aria-labelledby="studio-setup-title" aria-busy={loading || saving}>
       <div className={styles.compactHeader}>
-        <div className={styles.intro}>
-          <h2 id="studio-setup-title">Studio setup checklist</h2>
-          {state && <div className={styles.compactProgress}>
-            <div className={styles.compactTrack} role="progressbar" aria-label="Setup progress" aria-valuemin={0} aria-valuemax={STEPS.length} aria-valuenow={done} aria-valuetext={`${done} of ${STEPS.length} steps done`}>
-              <span style={{ width: `${done / STEPS.length * 100}%` }} />
-            </div>
-            <p className={styles.progress} role="status"><strong>{done} of {STEPS.length}</strong> steps done{saving ? ' · Saving…' : ''}</p>
-          </div>}
-        </div>
-        <div className={styles.compactActions}>
-          {state && <button type="button" className={styles.collapse} aria-expanded={!!expanded} aria-controls="studio-setup-steps" disabled={saving || loading} onClick={() => update({ collapsed: !state.collapsed })}>{expanded ? 'Hide checklist' : 'Show checklist'}<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="m6 8 4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg></button>}
-        </div>
+        <h2 id="studio-setup-title">Studio setup</h2>
+        {state && <p className={styles.progress} role="status">{done} of {STEPS.length} done{saving ? ' · Saving…' : ''}</p>}
+        {state && <button type="button" className={styles.collapse} aria-label={expanded ? 'Hide checklist' : 'Show checklist'} aria-expanded={!!expanded} aria-controls="studio-setup-steps" disabled={saving || loading} onClick={() => update({ collapsed: !state.collapsed })}>{expanded ? 'Hide' : 'Show'}<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="m6 8 4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg></button>}
       </div>
       {loading && <p className={styles.message} role="status">Loading setup progress…</p>}
       {error && <p className={styles.error} role="alert">{error} {!state && <button type="button" disabled={loading} onClick={load}>Try again</button>}</p>}
@@ -102,36 +92,29 @@ export default function StudioSetupChecklist() {
             {STEPS.map(step => {
               const status = state.steps?.[step.id] || 'pending';
               return (
-                <li key={step.id} className={styles.compactStep} data-status={status} data-next={nextStep?.id === step.id || undefined}>
+                <li key={step.id} className={styles.compactStep} data-status={status}>
+                  <button
+                    type="button"
+                    className={styles.completionButton}
+                    data-animate={animatedStep === step.id || undefined}
+                    onAnimationEnd={event => {
+                      if (event.target.tagName.toLowerCase() === 'path') setAnimatedStep(current => current === step.id ? null : current);
+                    }}
+                    aria-label={`Complete ${step.title}`}
+                    aria-pressed={status === 'complete'}
+                    title={status === 'complete' ? 'Completed. Click to undo.' : `Complete ${step.title}`}
+                    aria-disabled={saving || loading}
+                    onClick={() => {
+                      if (!saving && !loading) update({ step: step.id, status: status === 'complete' ? 'pending' : 'complete' });
+                    }}
+                  >
+                    <span className={styles.completionMark} aria-hidden="true">{status === 'complete' && <CheckIcon />}</span>
+                  </button>
                   <a className={styles.stepLink} href={step.href} aria-label={`${step.title}: ${step.action}`}>
-                    <div className={styles.stepCopy}>
-                      <div className={styles.compactTitleRow}>
-                        <h3 className={styles.linkedTitle}>{step.title}</h3>
-                        {status === 'skipped' ? <span className={styles.optional}>Skipped</span> : step.optional && <span className={styles.optional}>Optional</span>}
-                      </div>
-                      <p className={styles.shortDescription}>{step.description}</p>
-                    </div>
+                    <h3 className={styles.linkedTitle}>{step.title}</h3>
+                    {status === 'skipped' ? <span className={styles.optional}>Skipped</span> : step.optional && <span className={styles.optional}>Optional</span>}
                     <ArrowIcon />
                   </a>
-                  <div className={styles.compactCompletion}>
-                    <button
-                      type="button"
-                      className={styles.completionButton}
-                      data-animate={animatedStep === step.id || undefined}
-                      onAnimationEnd={event => {
-                        if (event.target.tagName.toLowerCase() === 'path') setAnimatedStep(current => current === step.id ? null : current);
-                      }}
-                      aria-label={`Complete ${step.title}`}
-                      aria-pressed={status === 'complete'}
-                      title={status === 'complete' ? 'Completed. Click to undo.' : `Complete ${step.title}`}
-                      aria-disabled={saving || loading}
-                      onClick={() => {
-                        if (!saving && !loading) update({ step: step.id, status: status === 'complete' ? 'pending' : 'complete' });
-                      }}
-                    >
-                      {status === 'complete' ? <CheckIcon /> : 'Complete'}
-                    </button>
-                  </div>
                 </li>
               );
             })}

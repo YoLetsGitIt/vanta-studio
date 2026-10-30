@@ -1,38 +1,28 @@
 /* Dashboard navigation can retain an earlier stylesheet; scope these rules above it. */
 :global(html:root) .card, :global(html:root) .shortcuts { min-width: 0; border: 1px solid var(--border); background: var(--bg-card); border-radius: 16px; padding: 1.5rem; color: var(--text); }
 :global(html:root) .card { container: studio-setup / inline-size; scroll-margin-top: 1rem; }
-:global(html:root) .compactHeader { display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; flex-wrap: wrap; }
-:global(html:root) .intro { min-width: 0; }
-:global(html:root) .compactHeader h2 { margin: 0; font-size: 1.25rem; font-weight: 600; letter-spacing: -.025em; line-height: 1.35; }
-:global(html:root) .compactActions { display: flex; align-items: center; gap: .65rem; flex-wrap: wrap; }
-:global(html:root) .collapse { display: inline-flex; align-items: center; justify-content: center; gap: .6rem; min-height: 44px; padding: .6rem .9rem; border: 1px solid var(--border); border-radius: 8px; font: inherit; font-size: .85rem; font-weight: 600; text-decoration: none; cursor: pointer; transition: background 150ms, border-color 150ms; }
-:global(html:root) .collapse svg { width: 16px; height: 16px; flex-shrink: 0; }
-:global(html:root) .collapse { background: transparent; color: var(--text-dim); border-color: transparent; padding-inline: .55rem; font-weight: 500; }
+:global(html:root) .compactHeader { display: flex; align-items: center; gap: .75rem; }
+:global(html:root) .compactHeader h2 { margin: 0; font-size: 1rem; font-weight: 600; letter-spacing: -.02em; line-height: 1.4; }
+:global(html:root) .progress { margin: 0 0 0 auto; color: var(--text-dim); font-size: .78rem; line-height: 1.4; }
+:global(html:root) .collapse { display: inline-flex; align-items: center; justify-content: center; gap: .25rem; min-height: 44px; padding: .35rem .4rem; border: 0; border-radius: 6px; background: transparent; color: var(--text-dim); font: inherit; font-size: .78rem; cursor: pointer; }
 :global(html:root) .collapse:hover { background: var(--accent-tint); color: var(--text); }
+:global(html:root) .collapse svg { width: 14px; height: 14px; flex-shrink: 0; }
 :global(html:root) .collapse[aria-expanded="true"] svg { transform: rotate(180deg); }
-:global(html:root) .compactProgress { display: flex; flex-direction: row-reverse; justify-content: flex-end; align-items: center; gap: 1rem; padding-top: .5rem; }
-:global(html:root) .compactTrack { display: block; flex: none; width: 160px; height: 5px; overflow: hidden; border-radius: 5px; background: var(--border); }
-:global(html:root) .compactTrack span { display: block; flex: none; height: 100%; border-radius: inherit; background: var(--text); transition: width 150ms; }
-:global(html:root) .progress { margin: 0; color: var(--text-dim); font-size: .82rem; line-height: 1.5; }
-:global(html:root) .progress strong { color: var(--text); font-weight: 600; }
-:global(html:root) .compactSteps { display: flex; flex-direction: column; gap: 0; list-style: none; padding: 0; margin: 1rem 0 0; border-top: 1px solid var(--border); }
-:global(html:root) .compactStep { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) 96px; align-items: center; gap: 1.5rem; padding: .75rem 0; border-bottom: 1px solid var(--border-faint); }
-:global(html:root) .compactStep:last-child { border-bottom: 0; padding-bottom: 0; }
-:global(html:root) .stepLink { min-width: 0; display: flex; align-items: center; gap: 1rem; min-height: 48px; color: var(--text); text-decoration: none; border-radius: 5px; }
-:global(html:root) .stepLink > svg { flex-shrink: 0; width: 16px; height: 16px; color: var(--text-dim); margin-left: auto; transition: transform 150ms; }
+:global(html:root) .compactSteps { list-style: none; padding: 0; margin: .5rem 0 0; border-top: 1px solid var(--border-faint); }
+:global(html:root) .compactStep { min-width: 0; display: flex; align-items: center; gap: .25rem; border-bottom: 1px solid var(--border-faint); }
+:global(html:root) .compactStep:last-child { border-bottom: 0; }
+:global(html:root) .stepLink { flex: 1; min-width: 0; display: flex; align-items: center; gap: .65rem; min-height: 48px; padding: .4rem 0; color: var(--text); text-decoration: none; border-radius: 5px; }
+:global(html:root) .stepLink > svg { flex-shrink: 0; width: 15px; height: 15px; color: var(--text-dim); margin-left: auto; transition: transform 150ms; }
 :global(html:root) .stepLink:hover > svg { transform: translateX(3px); color: var(--text); }
 :global(html:root) .stepLink:hover .linkedTitle { text-decoration: underline; text-underline-offset: 4px; }
-:global(html:root) .stepCopy { min-width: 0; }
-:global(html:root) .compactTitleRow { display: flex; align-items: baseline; flex-wrap: wrap; gap: .25rem .65rem; }
-:global(html:root) .linkedTitle { min-width: 0; margin: 0; font-size: .95rem; font-weight: 600; line-height: 1.4; letter-spacing: -.01em; }
-:global(html:root) .optional { color: var(--text-dim); font-size: .72rem; line-height: 1.4; font-weight: 400; }
-:global(html:root) .shortDescription { margin: .2rem 0 0; color: var(--text-dim); font-size: .82rem; line-height: 1.5; }
-:global(html:root) .compactCompletion { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .2rem; }
-:global(html:root) .completionButton { display: inline-flex; align-items: center; justify-content: center; width: 96px; min-width: 44px; height: 44px; padding: .5rem .8rem; border: 1px solid var(--border); border-radius: 8px; background: transparent; color: var(--text); font: inherit; font-size: .82rem; font-weight: 500; cursor: pointer; transition: width 220ms ease, border-radius 220ms ease, background 200ms, border-color 200ms, color 200ms; }
-:global(html:root) .completionButton:hover { background: var(--accent-tint); border-color: var(--text-ghost); }
-:global(html:root) .completionButton[aria-pressed="true"] { width: 44px; min-width: 44px; padding: 0; border-radius: 50%; background: var(--text); border-color: var(--text); color: var(--bg-base); }
-:global(html:root) .completionButton[aria-pressed="true"]:hover { opacity: .85; }
-:global(html:root) .completionButton svg { width: 22px; height: 22px; }
+:global(html:root) .linkedTitle { min-width: 0; margin: 0; font-size: .875rem; font-weight: 500; line-height: 1.4; }
+:global(html:root) .optional { flex-shrink: 0; color: var(--text-dim); font-size: .7rem; line-height: 1.4; }
+:global(html:root) .compactStep[data-status="complete"] .linkedTitle { color: var(--text-muted); }
+:global(html:root) .completionButton { flex: 0 0 44px; display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; min-width: 44px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--text); cursor: pointer; }
+:global(html:root) .completionMark { box-sizing: border-box; display: grid; place-items: center; width: 20px; height: 20px; border: 1px solid var(--text-ghost); border-radius: 5px; transition: background 150ms, border-color 150ms, color 150ms; }
+:global(html:root) .completionButton:hover .completionMark { border-color: var(--text); }
+:global(html:root) .completionButton[aria-pressed="true"] .completionMark { background: var(--text); border-color: var(--text); color: var(--bg-base); }
+:global(html:root) .completionButton svg { width: 16px; height: 16px; }
 :global(html:root) .completionButton[data-animate="true"] svg { animation: tickAppear 220ms ease-out 80ms both; }
 :global(html:root) .completionButton[data-animate="true"] svg path { stroke-dasharray: 1; animation: tickDraw 300ms ease-out 80ms both; }
 @keyframes tickAppear { from { opacity: 0; transform: scale(.65); } to { opacity: 1; transform: scale(1); } }
@@ -62,22 +52,16 @@
   :global(html:root) .shortcutGrid { grid-template-columns: minmax(0, 1fr); gap: .6rem; }
   :global(html:root) .shortcutLink { padding: .85rem; gap: .7rem; }
 }
-@container studio-setup (max-width: 540px) {
-  :global(html:root) .compactStep { gap: .75rem; }
-  :global(html:root) .stepLink { gap: .4rem; }
-  :global(html:root) .compactProgress { flex-wrap: wrap; justify-content: flex-end; }
-  :global(html:root) .compactTrack { width: 90px; }
-}
 @container studio-setup (max-width: 360px) {
-  :global(html:root) .compactHeader { align-items: flex-start; gap: .4rem; }
-  :global(html:root) .compactActions { margin-left: auto; }
-  :global(html:root) .compactStep { grid-template-columns: minmax(0, 1fr); gap: .35rem; }
-  :global(html:root) .compactCompletion { align-items: flex-start; }
+  :global(html:root) .compactHeader { flex-wrap: wrap; gap: 0 .5rem; }
+  :global(html:root) .compactHeader h2 { flex: 1; }
+  :global(html:root) .progress { order: 3; flex-basis: 100%; margin: 0 0 .35rem; }
+  :global(html:root) .stepLink { gap: .4rem; }
 }
 @media (max-width: 700px) {
   :global(html:root) .card, :global(html:root) .shortcuts { padding: 1rem; border-radius: 12px; }
   :global(html:root) .compactHeader { gap: .85rem; }
-  :global(html:root) .compactHeader h2 { font-size: 1.1rem; }
+  :global(html:root) .compactHeader h2 { font-size: 1rem; }
 
 }
 @media (prefers-reduced-motion: reduce) { :global(html:root) .card *, :global(html:root) .shortcuts * { transition: none !important; animation: none !important; } }
