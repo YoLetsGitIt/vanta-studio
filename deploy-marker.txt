@@ -1,1 +1,5 @@
-signout-full-load 2026-10-28T22:21:08Z
+{
+  "release": "studio-setup-simplify-2026-10-30",
+  "source_commit": "1cb79f9a3ad84f7585259922c206d9cfb6113e1e",
+  "published_at": "2026-10-30T02:01:19.333054+00:00"
+}
