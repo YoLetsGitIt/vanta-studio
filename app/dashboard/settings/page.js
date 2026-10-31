@@ -222,6 +222,7 @@ export default function SettingsPage() {
   const [payForfeitedDeposits, setPayForfeitedDeposits] = useState(false);
   const [rescheduleWindow, setRescheduleWindow] = useState(null);
   const [sendReminder7d, setSendReminder7d] = useState(true);
+  const [sendReminder3d, setSendReminder3d] = useState(false);
   const [sendReminder24h, setSendReminder24h] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -317,6 +318,7 @@ export default function SettingsPage() {
         setPayForfeitedDeposits(account.studio?.pay_artist_on_forfeited_deposits ?? false);
         setRescheduleWindow(account.studio?.reschedule_window_hours ?? null);
         setSendReminder7d(account.studio?.send_reminder_7d ?? true);
+        setSendReminder3d(account.studio?.send_reminder_3d ?? false);
         setSendReminder24h(account.studio?.send_reminder_24h ?? true);
         setEmail(session?.user?.email ?? '');
         setStudioId(account.studio_id);
@@ -379,7 +381,7 @@ export default function SettingsPage() {
     try {
       const wc = parseFloat(walkinCut);
       const pc = parseFloat(personalCut);
-      await updateStudioProfile(name.trim(), address.trim(), widgetBgColor, widgetAccentColor, isNaN(wc) ? 0 : wc, isNaN(pc) ? 0 : pc, aftercareInstructions, timezone, addressLat, addressLng, paymentRecordingReq, rescheduleWindow, widgetConsentTemplateId || null, sendReminder7d, sendReminder24h, payForfeitedDeposits, schedulingMode, piercingAftercareInstructions);
+      await updateStudioProfile(name.trim(), address.trim(), widgetBgColor, widgetAccentColor, isNaN(wc) ? 0 : wc, isNaN(pc) ? 0 : pc, aftercareInstructions, timezone, addressLat, addressLng, paymentRecordingReq, rescheduleWindow, widgetConsentTemplateId || null, sendReminder7d, sendReminder24h, payForfeitedDeposits, schedulingMode, piercingAftercareInstructions, sendReminder3d);
       invalidate('studio-account');
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
@@ -1020,48 +1022,70 @@ export default function SettingsPage() {
           <h2 style={s.sectionTitle}>Emails</h2>
           <p style={s.sectionDesc}>Booking confirmation is always sent. Choose which reminder emails your clients receive.</p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 0', borderBottom: '1px solid var(--border)' }}>
-              <div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '14px 0', borderBottom: '1px solid var(--border)' }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text)' }}>7-day reminder</div>
-                <div style={{ fontSize: 13, color: 'var(--text-ghost)', marginTop: 2 }}>Sent to clients 7 days before their appointment</div>
+                <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4, lineHeight: 1.45 }}>Sent to clients 7 days before their appointment</div>
               </div>
               <button
+                type="button"
+                disabled={saving}
                 role="switch"
                 aria-label="7-day reminder"
                 aria-checked={sendReminder7d}
                 onClick={() => { setSendReminder7d(v => !v); }}
-                style={{
-                  width: 44, height: 24, borderRadius: 12, border: '1px solid var(--switch-edge)', cursor: 'pointer',
-                  background: sendReminder7d ? 'var(--switch-on)' : 'var(--switch-off)',
-                  position: 'relative', transition: 'background 0.2s', flexShrink: 0,
-                }}
+                style={{ width: 52, height: 44, padding: 0, border: 0, background: 'transparent', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
               >
+                <span aria-hidden="true" style={{ display: 'block', flex: 'none', boxSizing: 'border-box', width: 44, height: 24, borderRadius: 999, border: '1px solid var(--switch-edge)', background: sendReminder7d ? 'var(--switch-on)' : 'var(--switch-off)', position: 'relative', transition: 'background 0.2s' }}>
                 <span style={{
-                  position: 'absolute', top: 3, left: sendReminder7d ? 23 : 3, width: 18, height: 18,
-                  borderRadius: '50%', background: 'var(--switch-thumb)', boxShadow: '0 1px 3px rgba(0,0,0,0.65)', transition: 'left 0.2s',
+                  position: 'absolute', top: 2, left: 2, transform: sendReminder7d ? 'translateX(20px)' : 'translateX(0)', width: 18, height: 18,
+                  borderRadius: '50%', background: 'var(--switch-thumb)', boxShadow: '0 1px 3px rgba(0,0,0,0.65)', transition: 'transform 0.2s',
                 }} />
+                </span>
               </button>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 0' }}>
-              <div>
-                <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text)' }}>24-hour reminder</div>
-                <div style={{ fontSize: 13, color: 'var(--text-ghost)', marginTop: 2 }}>Sent to clients 24 hours before their appointment</div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '14px 0', borderBottom: '1px solid var(--border)' }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text)' }}>3-day reminder</div>
+                <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4, lineHeight: 1.45 }}>Sent to clients 3 days before their appointment</div>
               </div>
               <button
+                type="button"
+                disabled={saving}
+                role="switch"
+                aria-label="3-day reminder"
+                aria-checked={sendReminder3d}
+                onClick={() => { setSendReminder3d(v => !v); }}
+                style={{ width: 52, height: 44, padding: 0, border: 0, background: 'transparent', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+              >
+                <span aria-hidden="true" style={{ display: 'block', flex: 'none', boxSizing: 'border-box', width: 44, height: 24, borderRadius: 999, border: '1px solid var(--switch-edge)', background: sendReminder3d ? 'var(--switch-on)' : 'var(--switch-off)', position: 'relative', transition: 'background 0.2s' }}>
+                <span style={{
+                  position: 'absolute', top: 2, left: 2, transform: sendReminder3d ? 'translateX(20px)' : 'translateX(0)', width: 18, height: 18,
+                  borderRadius: '50%', background: 'var(--switch-thumb)', boxShadow: '0 1px 3px rgba(0,0,0,0.65)', transition: 'transform 0.2s',
+                }} />
+                </span>
+              </button>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '14px 0' }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text)' }}>24-hour reminder</div>
+                <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4, lineHeight: 1.45 }}>Sent to clients 24 hours before their appointment</div>
+              </div>
+              <button
+                type="button"
+                disabled={saving}
                 role="switch"
                 aria-label="24-hour reminder"
                 aria-checked={sendReminder24h}
                 onClick={() => { setSendReminder24h(v => !v); }}
-                style={{
-                  width: 44, height: 24, borderRadius: 12, border: '1px solid var(--switch-edge)', cursor: 'pointer',
-                  background: sendReminder24h ? 'var(--switch-on)' : 'var(--switch-off)',
-                  position: 'relative', transition: 'background 0.2s', flexShrink: 0,
-                }}
+                style={{ width: 52, height: 44, padding: 0, border: 0, background: 'transparent', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
               >
+                <span aria-hidden="true" style={{ display: 'block', flex: 'none', boxSizing: 'border-box', width: 44, height: 24, borderRadius: 999, border: '1px solid var(--switch-edge)', background: sendReminder24h ? 'var(--switch-on)' : 'var(--switch-off)', position: 'relative', transition: 'background 0.2s' }}>
                 <span style={{
-                  position: 'absolute', top: 3, left: sendReminder24h ? 23 : 3, width: 18, height: 18,
-                  borderRadius: '50%', background: 'var(--switch-thumb)', boxShadow: '0 1px 3px rgba(0,0,0,0.65)', transition: 'left 0.2s',
+                  position: 'absolute', top: 2, left: 2, transform: sendReminder24h ? 'translateX(20px)' : 'translateX(0)', width: 18, height: 18,
+                  borderRadius: '50%', background: 'var(--switch-thumb)', boxShadow: '0 1px 3px rgba(0,0,0,0.65)', transition: 'transform 0.2s',
                 }} />
+                </span>
               </button>
             </div>
           </div>
