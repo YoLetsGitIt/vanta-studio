@@ -138,9 +138,14 @@ export function WidgetPreview({ bg, accent, studioName, logoUrl, fields, consent
         {fields?.availability_windows?.enabled && (
           <div style={fld}>
             <span style={lbl}>Your availability{fields.availability_windows.required ? ' *' : ' (optional)'}</span>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2 }}>
               {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d, i) => (
-                <div key={d} style={{ padding: '0.35rem 0', borderRadius: 6, fontSize: '0.68rem', fontWeight: 600, textAlign: 'center', border: `1px solid ${i === 1 ? accent : 'rgba(255,255,255,0.1)'}`, background: i === 1 ? hexToRgbaStr(accent, 0.12) : 'rgba(255,255,255,0.04)', color: i === 1 ? accent : 'rgba(255,255,255,0.45)' }}>{d}</div>
+                <div key={d} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                  <span style={{ fontSize: '0.62rem', fontWeight: 600, textAlign: 'center', color: 'rgba(255,255,255,0.45)' }}>{d}</span>
+                  <div style={{ position: 'relative', height: 64, borderRadius: 3, background: 'rgba(255,255,255,0.06)' }}>
+                    {(i === 1 || i === 5) && <div style={{ position: 'absolute', left: 2, right: 2, top: i === 1 ? 10 : 6, height: i === 1 ? 30 : 20, borderRadius: 3, background: 'rgba(255,255,255,0.85)' }} />}
+                  </div>
+                </div>
               ))}
             </div>
           </div>

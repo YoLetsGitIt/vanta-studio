@@ -78,20 +78,33 @@ async function openForm(page) {
 
       // Required: blocks submit with a clear message.
       await page.getByRole('button', { name: 'Request booking', exact: true }).click();
-      await page.getByText('Please choose at least one day you’re available.').waitFor();
+      await page.getByText('Please add at least one time you’re available.').waitFor();
       assert.equal(writes.filter(w => w.path.endsWith('/client-booking')).length, 0);
 
-      await page.getByRole('button', { name: 'Tuesday', exact: true }).click();
-      await page.getByRole('button', { name: 'Saturday', exact: true }).click();
-      await page.getByRole('combobox', { name: 'Tuesday until', exact: true }).selectOption('17:00');
-      await page.getByRole('combobox', { name: 'Saturday from', exact: true }).selectOption('09:00');
-      await page.getByRole('combobox', { name: 'Saturday until', exact: true }).selectOption('12:30');
-      // Toggling a day off and on again works.
-      await page.getByRole('button', { name: 'Remove Saturday', exact: true }).click();
-      assert.equal(await page.getByRole('combobox', { name: 'Saturday from', exact: true }).count(), 0);
-      await page.getByRole('button', { name: 'Saturday', exact: true }).click();
-      await page.getByRole('combobox', { name: 'Saturday from', exact: true }).selectOption('09:00');
-      await page.getByRole('combobox', { name: 'Saturday until', exact: true }).selectOption('12:30');
+      // Drag down Tuesday 10:00 → 17:00 and Saturday 9:00 → 12:30 (grid starts 8am, 15px per half hour).
+      async function drag(day, fromSlot, toSlot) {
+        const box = await page.locator(`[data-day="${day}"]`).boundingBox();
+        const x = box.x + box.width / 2;
+        await page.mouse.move(x, box.y + fromSlot * 15 + 7);
+        await page.mouse.down();
+        await page.mouse.move(x, box.y + ((fromSlot + toSlot) / 2) * 15 + 7, { steps: 4 });
+        await page.mouse.move(x, box.y + toSlot * 15 + 7, { steps: 4 });
+        await page.mouse.up();
+      }
+      await drag('Tuesday', 4, 17);
+      await drag('Saturday', 2, 8);
+      await page.getByText('10am – 5pm').waitFor();
+      await page.getByText('9am – 12:30pm').waitFor();
+      // Tapping a block removes it; dragging it back restores it.
+      const sat = await page.locator('[data-day="Saturday"]').boundingBox();
+      await page.mouse.click(sat.x + sat.width / 2, sat.y + 5 * 15 + 7);
+      assert.equal(await page.getByText('9am – 12:30pm').count(), 0);
+      await drag('Saturday', 2, 8);
+      // A touching range on the same day merges into one.
+      await drag('Tuesday', 18, 19);
+      await page.getByText('10am – 6pm').waitFor();
+      await page.getByRole('button', { name: 'Remove Tuesday 10am – 6pm', exact: true }).click();
+      await drag('Tuesday', 4, 17);
 
       // Nothing overflows the card on a phone.
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
