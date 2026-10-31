@@ -1096,14 +1096,12 @@ export default function SettingsPage() {
         */}
 
         <section style={{ ...s.card, gridColumn: '1 / -1' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
+            <div style={{ flex: '1 1 260px', minWidth: 0 }}>
               <h2 style={s.sectionTitle}>{t('consent_forms')}</h2>
               <p style={s.sectionDesc}>Create consent forms with custom fields, e-signatures, and minor / guardian support.</p>
             </div>
-            {/* New form button — re-enable when multiple consent forms are supported
-            <button onClick={openNewTemplate} style={s.addTemplateBtn}>{t('new_form')}</button>
-            */}
+            <button type="button" onClick={openNewTemplate} style={{ ...s.addTemplateBtn, minHeight: 44, maxWidth: '100%' }}>Create consent form template</button>
           </div>
 
           {walkInUrl && (
@@ -1118,7 +1116,7 @@ export default function SettingsPage() {
           )}
 
           {consentTemplates.length === 0 && (
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-ghost)', fontStyle: 'italic' }}>No forms yet. Click "+ New form" to create one.</p>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-ghost)', fontStyle: 'italic' }}>No consent forms yet. Create a template to get started.</p>
           )}
 
           {consentTemplates.map(t => (
@@ -1420,23 +1418,22 @@ export default function SettingsPage() {
                     {consentTemplates.length > 0 && (
                       <>
                         <div style={{ borderTop: '1px solid var(--border)', margin: '0.1rem 0' }} />
-                        <div style={s.formFieldRow}>
+                        <div style={{ ...s.formFieldRow, flexWrap: 'wrap' }}>
                           <span style={{ flex: 1, fontSize: '0.83rem', fontWeight: 500, color: widgetConsentTemplateId ? 'var(--text)' : 'var(--text-ghost)' }}>
                             Consent form
                           </span>
-                          {/* Multi-template picker — re-enable when studios can have multiple consent forms
-                          {widgetConsentTemplateId && (
+                          {widgetConsentTemplateId && consentTemplates.length > 1 && (
                             <select
+                              aria-label="Booking consent form template"
                               value={widgetConsentTemplateId}
                               onChange={e => setWidgetConsentTemplateId(e.target.value)}
-                              style={{ ...s.input, width: 'auto', fontSize: '0.8rem', padding: '0.3rem 0.6rem' }}
+                              style={{ ...s.input, flex: '1 1 180px', minWidth: 0, maxWidth: '100%', width: 'auto', fontSize: '0.8rem', padding: '0.3rem 0.6rem' }}
                             >
                               {consentTemplates.map(t => (
                                 <option key={t.id} value={t.id}>{t.name}</option>
                               ))}
                             </select>
                           )}
-                          */}
                           <button
                             role="switch"
                             aria-label="Consent form field"
