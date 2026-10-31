@@ -15,6 +15,7 @@ import { initials, toISODate, hasArtist } from '@/lib/format';
 import { useLanguage } from '@/lib/i18n';
 import { showError } from '@/lib/feedback';
 import { bookingActions } from '@/lib/bookingActions';
+import { canCollectDeposits } from '@/lib/deposits';
 
 const HOUR_PX   = 64;
 const DAY_START = 8;
@@ -105,7 +106,7 @@ function useBookingActions(afterChange) {
   const [rescheduleSaving, setRescheduleSaving] = useState(false);
 
   useEffect(() => {
-    getStripeStatus().then(s => setStripeConnected(!!(s?.connected && s?.charges_enabled))).catch(() => {});
+    getStripeStatus().then(s => setStripeConnected(canCollectDeposits(s))).catch(() => {});
   }, []);
 
   function openDetail(entry) {

@@ -159,7 +159,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
   // ── Remote data
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const { artists, stations: allStations, hours: studioHours, clients: pastClients, stripeConnected, loading, error: loadError, retry } = useNewAppointmentData(open);
+  const { artists, stations: allStations, hours: studioHours, clients: pastClients, stripeConnected, stripeCharges, loading, error: loadError, retry } = useNewAppointmentData(open);
 
   useEffect(() => {
     if (!open) return;
@@ -762,7 +762,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
                     {depositMode === 'later' && <span style={bd.hint}>{stripeConnected ? 'This will appear as an unpaid deposit to collect.' : 'Record the external payment when it is received.'}</span>}
                     {depositMode === 'paid' && <span style={bd.hint}>The deposit will be recorded as received now.</span>}
                     {(() => {
-                      const da = depositMode === 'later' && stripeConnected ? parseFloat(depositAmount) || 0 : 0;
+                      const da = depositMode === 'later' && stripeCharges ? parseFloat(depositAmount) || 0 : 0;
                       if (da <= 0) return null;
                       const feeCents = Math.round(da * 0.03 * 100) + 50;
                       const total = da + feeCents / 100;

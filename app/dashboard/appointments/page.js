@@ -15,6 +15,7 @@ import SendSelectionLinkModal from '@/components/SendSelectionLinkModal';
 import { showError } from '@/lib/feedback';
 import { bookingActions } from '@/lib/bookingActions';
 import StatePanel from '@/components/ui/StatePanel';
+import { canCollectDeposits } from '@/lib/deposits';
 
 const STATUS_FILTERS = [
   { value: 'pending',                              tKey: 'status_pending',            tone: 'warning' },
@@ -173,7 +174,7 @@ function AppointmentsInner() {
 
   useEffect(() => {
     getStripeStatus()
-      .then(s => setStripeConnected(s?.connected && s?.charges_enabled))
+      .then(s => setStripeConnected(canCollectDeposits(s)))
       .catch(() => {});
   }, []);
 

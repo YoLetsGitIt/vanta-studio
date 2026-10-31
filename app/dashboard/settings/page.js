@@ -5,6 +5,7 @@ import { WidgetPreview, ConsentFormPreview } from '@/components/forms/FormPrevie
 import StudioLogoUpload from '@/components/StudioLogoUpload';
 // import SmartSchedulingSettings from '@/components/SmartSchedulingSettings'; // smart scheduling temporarily hidden
 import SMSSettings from '@/components/SMSSettings';
+import DepositPaymentOptions from '@/components/DepositPaymentOptions';
 import { StudioSetupLinks } from '@/components/StudioSetupChecklist';
 
 import { useEffect, useState, useRef, useCallback } from 'react';
@@ -970,8 +971,8 @@ export default function SettingsPage() {
         <section style={{ ...s.card, gridColumn: '1 / -1' }}>
           <h2 style={s.sectionTitle}>{t('stripe_connect')}</h2>
           <p style={s.sectionDesc}>
-            Connect your Stripe account to collect deposits from clients when sending selection links.
-            Payments go directly to your Stripe account minus the platform fee.
+            Connect your Stripe account so clients can pay deposits by card.
+            Payments go directly to your Stripe account minus the platform fee. You can also offer PayID or bank transfer below.
           </p>
 
           {stripeStatus === null ? (
@@ -1012,6 +1013,8 @@ export default function SettingsPage() {
             </div>
           )}
         </section>
+
+        <DepositPaymentOptions styles={s} stripeReady={!!(stripeStatus?.connected && stripeStatus?.charges_enabled)} />
 
         </>}
 

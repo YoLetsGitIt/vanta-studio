@@ -33,6 +33,7 @@ import DashboardQuickActions from '@/components/DashboardQuickActions';
 import StudioSetupChecklist from '@/components/StudioSetupChecklist';
 import { requestConfirmation, showError, showFeedback } from '@/lib/feedback';
 import { bookingActions } from '@/lib/bookingActions';
+import { canCollectDeposits } from '@/lib/deposits';
 
 
 function formatTime(iso) {
@@ -98,8 +99,17 @@ export default function HomePage() {
       setUnpaidDepositBookings(items => items.filter(item => item.id !== id));
       setReviewBooking(current => current?.id === id ? { ...current, deposit_required: false, deposit_amount: null, status: current.status === 'awaiting_payment' ? 'confirmed' : current.status } : current);
     }
+    function received(event) {
+      const { bookingId: id, status } = event.detail;
+      setUnpaidDepositBookings(items => items.filter(item => item.id !== id));
+      setReviewBooking(current => current?.id === id ? { ...current, deposit_paid_at: new Date().toISOString(), deposit_confirmed_at: new Date().toISOString(), status: status || current.status } : current);
+    }
     window.addEventListener('booking-deposit-cancelled', cancelled);
-    return () => window.removeEventListener('booking-deposit-cancelled', cancelled);
+    window.addEventListener('booking-deposit-received', received);
+    return () => {
+      window.removeEventListener('booking-deposit-cancelled', cancelled);
+      window.removeEventListener('booking-deposit-received', received);
+    };
   }, []);
 
   const TODAY_SENT_KEY = `consent_sent_${new Date().toISOString().slice(0, 10)}`;
@@ -193,7 +203,7 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
-    getStripeStatus().then(status => setStripeConnected(!!(status?.connected && status?.charges_enabled))).catch(() => {});
+    getStripeStatus().then(status => setStripeConnected(canCollectDeposits(status))).catch(() => {});
   }, []);
 
   const firstTemplate = consentTemplates[0];
