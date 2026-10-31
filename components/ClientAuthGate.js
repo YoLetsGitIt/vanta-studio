@@ -33,10 +33,22 @@ export default function ClientAuthGate({ studioId, studioName, logoUrl, purpose 
         // Covers a returning client whose app profile was never created.
         await ensureClientProfile(data.session);
       } else {
-        const { data, error } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: window.location.href, data: { full_name: name.trim(), name: name.trim(), dob, phone: phone.trim(), ...(collectMarketing ? { marketing_email: marketing, marketing_sms: marketing } : {}) } } });
+        const details = { full_name: name.trim(), name: name.trim(), dob, phone: phone.trim(), ...(collectMarketing ? { marketing_email: marketing, marketing_sms: marketing } : {}) };
+        // Create a confirmed account on the backend so clients can book straight away, with no email step.
+        const created = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/users`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: email.trim(), password, name: name.trim(), accountType: 'user', termsAcceptedVersion: '1.0' }),
+        });
+        if (created.status === 409) {
+          setMode('signin');
+          throw new Error('You already have a Vanta account with this email. Sign in with your password.');
+        }
+        if (!created.ok) throw new Error((await created.text()).trim() || 'Could not create your account. Please try again.');
+        const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
         if (error) throw error;
-        if (data.session) await ensureClientProfile(data.session, name.trim());
-        else setNotice('Check your email to confirm your account, then return to this page to continue.');
+        await supabase.auth.updateUser({ data: details }).catch(() => {});
+        await ensureClientProfile(data.session, name.trim());
       }
     } catch (e2) {
       setErr(e2.message ?? 'Something went wrong. Please try again.');

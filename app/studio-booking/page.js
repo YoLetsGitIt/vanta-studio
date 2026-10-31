@@ -553,7 +553,7 @@ function WalkInInner() {
             {!isPiercing && <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
               <label style={s.label}>Colour</label>
               <div style={{ display: 'flex', gap: '0.5rem' }}>
-                {['Black', 'Grey', 'Color'].map(opt => {
+                {[['Black & Grey', 'Black & grey'], ['Color', 'Colour']].map(([opt, label]) => {
                   const active = colorStyle === opt;
                   return (
                     <button
@@ -574,7 +574,7 @@ function WalkInInner() {
                         fontFamily: 'inherit',
                       }}
                     >
-                      {opt}
+                      {label}
                     </button>
                   );
                 })}

@@ -429,7 +429,7 @@ export default function BookingDetailPanel({
             {sessionType && <Fact label={t('bdp_session')}>{cap(sessionType.replace(/_/g, ' '))}</Fact>}
             {placement   && <Fact label={t('bdp_placement')}>{placement}</Fact>}
             {size        && <Fact label={t('bdp_size')}>{size}</Fact>}
-            {color       && <Fact label={t('bdp_style')}>{color}</Fact>}
+            {color       && <Fact label={t('bdp_style')}>{color.replace(/^Color\b/, 'Colour')}</Fact>}
             {design      && <Fact label={t('bdp_design')} block>{design}</Fact>}
             {notes       && <Fact label={t('bdp_notes')} block>{notes}</Fact>}
             {refImages.length > 0 && (

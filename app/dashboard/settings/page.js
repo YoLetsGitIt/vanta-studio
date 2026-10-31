@@ -18,8 +18,7 @@ import {
   listConsentTemplates, createConsentTemplate, updateConsentTemplate, deleteConsentTemplate,
   getStripeStatus, startStripeOnboarding, disconnectStripe,
   getFormConfig, updateFormConfig,
-  startBillingCheckout, getBillingDetails, cancelBillingSubscription, reactivateBillingSubscription, openBillingPortal,
-} from '@/lib/api';
+  startBillingCheckout, getBillingDetails, cancelBillingSubscription, reactivateBillingSubscription, openBillingPortal, getBookingLink, updateBookingLink } from '@/lib/api';
 import { getSupabase } from '@/lib/supabase';
 import { invalidate } from '@/lib/cache';
 import { getTheme, setTheme } from '@/lib/theme';
@@ -198,6 +197,8 @@ function AddressAutocomplete({ value, onChange, onSelect, inputStyle }) {
   );
 }
 
+const SHORT_LINK_BASE = (process.env.NEXT_PUBLIC_MARKETING_URL || 'https://vanta.tattoo').replace(/\/$/, '');
+
 export default function SettingsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -230,7 +231,11 @@ export default function SettingsPage() {
   const [copied, setCopied] = useState(false);
   const [embedCopied, setEmbedCopied] = useState(false);
   const [walkInUrl, setWalkInUrl] = useState('');
-  const consentUrl = walkInUrl.replace('/studio-booking?s=', '/consent?s=');
+  const [bookingSlug, setBookingSlug] = useState('');
+  const [slugDraft, setSlugDraft] = useState('');
+  const [slugSaving, setSlugSaving] = useState(false);
+  const [slugError, setSlugError] = useState('');
+  const consentUrl = bookingSlug ? `${SHORT_LINK_BASE}/c/${bookingSlug}` : walkInUrl.replace('/studio-booking?s=', '/consent?s=');
   const [studioId, setStudioId] = useState('');
   const [theme, setThemeState] = useState('dark');
   const [tab, setTab] = useState('studio');
@@ -323,6 +328,8 @@ export default function SettingsPage() {
         setEmail(session?.user?.email ?? '');
         setStudioId(account.studio_id);
         setWalkInUrl(window.location.origin + '/studio-booking?s=' + account.studio_id);
+        // Swap in the short vanta.tattoo link once it loads; the long link still works.
+        getBookingLink().then(({ slug }) => { setBookingSlug(slug); setSlugDraft(slug); setWalkInUrl(`${SHORT_LINK_BASE}/b/${slug}`); }).catch(() => {});
         if (hoursData.hours?.length === 7) setHours(hoursData.hours);
         setStations(stationsData.stations ?? []);
         setConsentTemplates(templateData.templates ?? []);
@@ -668,6 +675,20 @@ export default function SettingsPage() {
     }
     await getSupabase().auth.signOut();
     window.location.replace('/'); // full load; see dashboard/layout.js
+  }
+
+  async function saveBookingSlug(event) {
+    event.preventDefault();
+    setSlugError('');
+    setSlugSaving(true);
+    try {
+      const { slug } = await updateBookingLink(slugDraft);
+      setBookingSlug(slug); setSlugDraft(slug); setWalkInUrl(`${SHORT_LINK_BASE}/b/${slug}`);
+    } catch (err) {
+      setSlugError(err.message);
+    } finally {
+      setSlugSaving(false);
+    }
   }
 
   function copyLink() {
@@ -1347,6 +1368,18 @@ export default function SettingsPage() {
             </div>
             <DownloadableQR value={walkInUrl} filename="booking-qr" />
           </div>
+          {bookingSlug && (
+            <form onSubmit={saveBookingSlug} style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '1rem' }}>
+              <label htmlFor="booking-slug" style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text)' }}>Link name</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>vanta.tattoo/b/</span>
+                <input id="booking-slug" className="vanta-input" value={slugDraft} onChange={e => setSlugDraft(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))} maxLength={40} autoCapitalize="none" autoCorrect="off" spellCheck={false} style={{ flex: '1 1 140px', minWidth: 0, background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 8, padding: '0.5rem 0.7rem', fontSize: '16px', color: 'var(--text)' }} />
+                <button type="submit" style={s.copyBtn} disabled={slugSaving || slugDraft === bookingSlug || slugDraft.length < 3}>{slugSaving ? 'Saving…' : 'Save'}</button>
+              </div>
+              {slugError ? <p role="alert" style={{ margin: 0, fontSize: '0.78rem', color: 'var(--color-danger)' }}>{slugError}</p>
+                : <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-ghost)' }}>Changing it stops the old link and QR codes working.</p>}
+            </form>
+          )}
         </section>
 
         <section style={{ ...s.card, gridColumn: '1 / -1' }}>

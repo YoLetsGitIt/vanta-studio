@@ -118,7 +118,7 @@ export function WidgetPreview({ bg, accent, studioName, logoUrl, fields, consent
         <div style={fld}>
           <span style={lbl}>Colour</span>
           <div style={{ display: 'flex', gap: 5 }}>
-            {['Black', 'Grey', 'Color'].map((opt, i) => (
+            {['Black & grey', 'Colour'].map((opt, i) => (
               <div key={opt} style={{ flex: 1, padding: '0.35rem 0', borderRadius: 7, fontSize: '0.72rem', fontWeight: i === 0 ? 600 : 500, textAlign: 'center', border: `1px solid ${i === 0 ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.1)'}`, background: i === 0 ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.04)', color: i === 0 ? '#fff' : 'rgba(255,255,255,0.45)' }}>{opt}</div>
             ))}
           </div>
