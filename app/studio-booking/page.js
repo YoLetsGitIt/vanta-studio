@@ -9,6 +9,7 @@ import ClientAccountActions from '@/components/ClientAccountActions';
 import DateOfBirthInput from '@/components/ui/DateOfBirthInput';
 import { ensureClientProfile, subscribeClientSession } from '@/lib/client-account';
 import { getSupabase } from '@/lib/supabase';
+import { WEEK_DAYS, TIME_OPTIONS, formatTime } from '@/lib/availability';
 import { getStudioPublic, createWalkIn, walkinUploadSign, signatureUploadSign, getStudioConsentTemplates, getFormConfigPublic } from '@/lib/api';
 
 function detectCountry() {
@@ -155,6 +156,8 @@ function WalkInInner() {
   const [hasAllergies, setHasAllergies] = useState(false);
   const [allergyDetails, setAllergyDetails] = useState('');
   const [notes, setNotes]           = useState('');
+  // Weekly availability: { [day_of_week]: { start, end } }
+  const [availability, setAvailability] = useState({});
   const photoInputRef = useRef(null);
   const [photos, setPhotos]         = useState([]);
   const [photoPreviews, setPhotoPreviews] = useState([]);
@@ -174,7 +177,8 @@ function WalkInInner() {
 
   // field(key) returns {enabled, required} from the loaded config, defaulting to enabled/not-required
   function field(key) {
-    return formConfig?.[key] ?? { enabled: true, required: false };
+    // Weekly availability is newer than the other fields, so it stays off unless the studio turned it on.
+    return formConfig?.[key] ?? { enabled: key !== 'availability_windows', required: false };
   }
 
   // Load studio, form config, and consent templates in parallel
@@ -255,6 +259,11 @@ function WalkInInner() {
     if (!phoneNum.trim()) { setSubmitError('Please provide your phone number.'); return; }
     if (!dob) { setSubmitError('Please provide your date of birth.'); return; }
     if (field('body_location').enabled && placements.length === 0) { setSubmitError('Please select at least one placement.'); return; }
+    const availabilityDays = Object.keys(availability);
+    if (field('availability_windows').enabled) {
+      if (field('availability_windows').required && availabilityDays.length === 0) { setSubmitError('Please choose at least one day you’re available.'); return; }
+      if (availabilityDays.some(d => availability[d].end <= availability[d].start)) { setSubmitError('Check your availability — each finish time must be after its start time.'); return; }
+    }
 
     // Validate consent form templates — only enforce required ones
     for (const t of consentTemplates) {
@@ -358,6 +367,9 @@ function WalkInInner() {
         color:                isPiercing ? '' : colorStyle,
         notes,
         allergies:            hasAllergies ? (allergyDetails.trim() || 'Yes') : '',
+        availability_windows: field('availability_windows').enabled
+          ? Object.entries(availability).map(([dow, w]) => ({ day_of_week: Number(dow), start_time: w.start, end_time: w.end }))
+          : [],
         image_paths:          imagePaths,
         consent_accepted:     consentSubmissions.length > 0,
         consent_submissions:  consentSubmissions,
@@ -607,6 +619,16 @@ function WalkInInner() {
               </div>
             )}
           </Section>
+
+          {/* ── Weekly availability ── */}
+          {field('availability_windows').enabled && (
+            <Section title="Your availability">
+              <p style={s.sectionHint}>
+                {field('availability_windows').required ? 'Choose at least one day' : 'Optional'} — which days and times usually suit you each week?
+              </p>
+              <WeeklyAvailability value={availability} onChange={setAvailability} />
+            </Section>
+          )}
 
           {/* ── Reference photos ── */}
           {field('image_paths').enabled && (
@@ -860,6 +882,53 @@ function SignaturePad({ onCapture, label = 'Client signature' }) {
   );
 }
 
+function WeeklyAvailability({ value, onChange }) {
+  function toggle(dow) {
+    const next = { ...value };
+    if (next[dow]) delete next[dow];
+    else next[dow] = { start: '10:00', end: '18:00' };
+    onChange(next);
+  }
+  function setTime(dow, prop, time) {
+    onChange({ ...value, [dow]: { ...value[dow], [prop]: time } });
+  }
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+      <div role="group" aria-label="Days you're available" style={s.dayGrid}>
+        {WEEK_DAYS.map(({ dow, short, long }) => {
+          const on = !!value[dow];
+          return (
+            <button
+              key={dow} type="button" aria-pressed={on} aria-label={long}
+              onClick={() => toggle(dow)}
+              style={{ ...s.dayChip, ...(on ? s.placementChipActive : {}) }}
+            >{short}</button>
+          );
+        })}
+      </div>
+      {WEEK_DAYS.filter(({ dow }) => value[dow]).map(({ dow, long }) => {
+        const w = value[dow];
+        const bad = w.end <= w.start;
+        return (
+          <div key={dow} style={s.availRow}>
+            <span style={s.availDay}>{long}</span>
+            <div style={s.availTimes}>
+              <select aria-label={`${long} from`} style={{ ...s.input, ...s.availSelect }} value={w.start} onChange={e => setTime(dow, 'start', e.target.value)}>
+                {TIME_OPTIONS.slice(0, -1).map(t => <option key={t} value={t}>{formatTime(t)}</option>)}
+              </select>
+              <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>to</span>
+              <select aria-label={`${long} until`} aria-invalid={bad || undefined} style={{ ...s.input, ...s.availSelect, ...(bad ? { borderColor: 'var(--color-danger)' } : {}) }} value={w.end} onChange={e => setTime(dow, 'end', e.target.value)}>
+                {TIME_OPTIONS.slice(1).map(t => <option key={t} value={t}>{formatTime(t)}</option>)}
+              </select>
+              <button type="button" aria-label={`Remove ${long}`} onClick={() => toggle(dow)} style={s.availRemove}>✕</button>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function Required() {
   return <span aria-hidden="true" style={{ color: 'var(--color-danger)', marginLeft: 3 }}>*</span>;
 }
@@ -995,6 +1064,20 @@ const s = {
     cursor: 'default',
   },
 
+  dayGrid: { display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: '0.35rem' },
+  dayChip: {
+    background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8,
+    color: 'var(--text-dim)', fontSize: '0.8rem', fontWeight: 600, minHeight: 44, padding: 0,
+    cursor: 'pointer', fontFamily: 'inherit', touchAction: 'manipulation',
+  },
+  availRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap' },
+  availDay: { fontSize: '0.85rem', fontWeight: 600, color: '#fff', minWidth: 84 },
+  availTimes: { display: 'flex', alignItems: 'center', gap: '0.4rem', flex: '1 1 240px', justifyContent: 'flex-end' },
+  availSelect: { width: 'auto', flex: '1 1 0', minWidth: 0, maxWidth: 120, padding: '0.55rem 0.5rem' },
+  availRemove: {
+    background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '0.8rem',
+    width: 32, height: 44, cursor: 'pointer', flexShrink: 0, fontFamily: 'inherit',
+  },
   photoGrid: { display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.5rem' },
   photoThumb: { position: 'relative', width: 72, height: 72, borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)' },
   thumbImg: { width: '100%', height: '100%', objectFit: 'cover' },

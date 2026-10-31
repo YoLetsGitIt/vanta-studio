@@ -15,6 +15,7 @@ import Button, { IconButton } from '@/components/ui/Button';
 import BookingSMS from '@/components/BookingSMS';
 import MarketingConsent from '@/components/MarketingConsent';
 import { Pill, Section, Fact, SkeletonBar, DetailSkeleton, detailStyles } from '@/components/ui/DetailParts';
+import { describeAvailability } from '@/lib/availability';
 
 const PAYMENT_LABELS = { cash: 'Cash', card: 'Card / POS', bank_transfer: 'Bank Transfer' };
 
@@ -113,6 +114,7 @@ export default function BookingDetailPanel({
   const color       = booking?.color             ?? null;
   const design      = booking?.design_details    ?? entry?.designDetails  ?? null;
   const notes       = booking?.additional_notes  ?? entry?.notes          ?? null;
+  const availability = describeAvailability(booking?.availability_windows);
   const refImages   = booking?.reference_images  ?? [];
   const quote       = booking?.estimated_quote   ?? entry?.estimatedQuote ?? null;
   const duration    = booking?.proposed_duration_minutes ?? entry?.durationMins ?? null;
@@ -432,6 +434,11 @@ export default function BookingDetailPanel({
             {color       && <Fact label={t('bdp_style')}>{color.replace(/^Color\b/, 'Colour')}</Fact>}
             {design      && <Fact label={t('bdp_design')} block>{design}</Fact>}
             {notes       && <Fact label={t('bdp_notes')} block>{notes}</Fact>}
+            {availability.length > 0 && (
+              <Fact label="Weekly availability" block>
+                {availability.map(a => <span key={a.day} style={{ display: 'block' }}><span style={{ fontWeight: 600 }}>{a.day}</span> · {a.times}</span>)}
+              </Fact>
+            )}
             {refImages.length > 0 && (
               <div>
                 <span style={p.factLabel}>{t('bdp_ref_photos')}</span>

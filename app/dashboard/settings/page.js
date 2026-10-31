@@ -3,7 +3,7 @@
 import Dialog from '@/components/ui/Dialog';
 import { WidgetPreview, ConsentFormPreview } from '@/components/forms/FormPreviews';
 import StudioLogoUpload from '@/components/StudioLogoUpload';
-import SmartSchedulingSettings from '@/components/SmartSchedulingSettings';
+// import SmartSchedulingSettings from '@/components/SmartSchedulingSettings'; // smart scheduling temporarily hidden
 import SMSSettings from '@/components/SMSSettings';
 import { StudioSetupLinks } from '@/components/StudioSetupChecklist';
 
@@ -1117,12 +1117,14 @@ export default function SettingsPage() {
 
         <SMSSettings styles={s} />
 
+        {/* Piercing aftercare instructions — temporarily hidden
         <section style={{ ...s.card, gridColumn: '1 / -1' }}>
           <h2 style={s.sectionTitle}>Piercing aftercare instructions</h2>
           <p style={s.sectionDesc}>Your studio’s guidance is attached to completed piercing appointments. Tattoo instructions are kept separate.</p>
           <textarea aria-label="Piercing aftercare instructions" style={{ ...s.input, minHeight: 120, resize: 'vertical', lineHeight: 1.6 }} value={piercingAftercareInstructions} onChange={e => setPiercingAftercareInstructions(e.target.value)} placeholder="Add your studio’s piercing aftercare instructions…" />
           <button onClick={saveProfile} style={s.saveBtn} disabled={saving}>{saving ? t('saving') : saved ? t('saved') : t('save')}</button>
         </section>
+        */}
 
         {/* Aftercare instructions — temporarily hidden
         <section style={{ ...s.card, gridColumn: '1 / -1' }}>
@@ -1433,6 +1435,7 @@ export default function SettingsPage() {
                       { key: 'skin_tone',      label: 'Skin tone' },
                       { key: 'notes',          label: 'Additional notes' },
                       { key: 'allergies',      label: 'Allergies' },
+                      { key: 'availability_windows', label: 'Weekly availability' },
                       { key: 'image_paths',    label: 'Reference photos' },
                     ].map(({ key, label }) => {
                       const entry = formFields[key] ?? { enabled: false, required: false };
@@ -1527,6 +1530,7 @@ export default function SettingsPage() {
           </div>
         </section>
 
+        {/* Smart scheduling — temporarily hidden
         <section style={{ ...s.card, gridColumn: '1 / -1' }}>
           <h2 style={s.sectionTitle}>Smart scheduling</h2>
           <SmartSchedulingSettings mode={schedulingMode} onChange={setSchedulingMode} disabled={saving} />
@@ -1535,6 +1539,7 @@ export default function SettingsPage() {
             {saving ? t('saving') : saved ? t('saved') : t('save')}
           </button>
         </section>
+        */}
 
         </>}
 
