@@ -1,5 +1,5 @@
 {
-  "release": "studio-setup-simplify-2026-10-30",
-  "source_commit": "1cb79f9a3ad84f7585259922c206d9cfb6113e1e",
-  "published_at": "2026-10-30T02:01:19.333054+00:00"
+  "release": "consent-template-create-2026-10-31",
+  "source_commit": "4dd4c18b39334aea51b1ce0fe7e2f9784438a0bf",
+  "published_at": "2026-10-31T02:55:52.338859+00:00"
 }
