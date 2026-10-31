@@ -1,6 +1,1 @@
-{
-  "release": "studio-3day-reminders-2026-10-31",
-  "source_commit": "1b24d9c3e85f713f20ebc39e3b9541d81f836e39",
-  "backend_commit": "f12db17687e5966b3aa0cb20ab06fd0251aacdb6",
-  "published_at": "2026-10-31T04:46:51.281434+00:00"
-}
+2026-10-31T05:02:00Z colour+shortlinks+auth
