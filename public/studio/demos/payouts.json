@@ -1,0 +1,20 @@
+{
+  "src": "/studio/demos/payouts.mp4",
+  "poster": "/studio/demos/payouts-poster.jpg",
+  "duration": 13,
+  "title": "Artist earnings & payouts",
+  "chapters": [
+    {
+      "at": 0,
+      "title": "See earnings, paid amounts and outstanding balances."
+    },
+    {
+      "at": 4.1,
+      "title": "Open an artist’s payout record."
+    },
+    {
+      "at": 8.6,
+      "title": "Keep the payment method and history together."
+    }
+  ]
+}

@@ -1,25 +1,24 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import { getSupabase } from '@/lib/supabase';
 import { completeStudioSignup, getMyStudioAccount } from '@/lib/api';
 import SignUpFlow from '@/components/SignUpFlow';
 import Button from '@/components/ui/Button';
 import Field from '@/components/ui/Field';
 import StatePanel from '@/components/ui/StatePanel';
+import styles from './StudioAuth.module.css';
+const marketing = (process.env.NEXT_PUBLIC_MARKETING_URL || 'https://vanta.tattoo').replace(/\/$/, '');
 
 
-export default function HomePage() {
-  const router = useRouter();
-  const [tab, setTab] = useState('signin');
+export default function StudioAuth({ initialTab = 'signin' }) {
+  const [tab, setTab] = useState(initialTab);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(true);
-  const [wide, setWide] = useState(false); // sign-up's intro step has enough content to earn a wider card
 
   useEffect(() => {
     async function initialize() {
@@ -35,7 +34,8 @@ export default function HomePage() {
           const { error: signInError } = await getSupabase().auth.signInWithPassword(saved);
           if (signInError) throw signInError;
           window.sessionStorage.removeItem('vanta-pending-signup');
-          router.replace('/dashboard');
+          // Load a document after auth so static-export navigation cannot expose RSC data.
+          window.location.replace('/dashboard/home');
           return;
         } catch (err) {
           setNotice(err.message || 'Payment setup is complete. Please sign in to continue.');
@@ -44,11 +44,11 @@ export default function HomePage() {
         setTab('signup');
       }
       const { data: { session } } = await getSupabase().auth.getSession();
-      if (session) router.replace('/dashboard');
+      if (session) window.location.replace('/dashboard/home');
       else setChecking(false);
     }
     initialize();
-  }, [router]);
+  }, []);
 
   async function handleSignIn(e) {
     e.preventDefault();
@@ -68,7 +68,7 @@ export default function HomePage() {
     // Verify this is a studio account
     try {
       await getMyStudioAccount();
-      router.replace(email.trim().toLowerCase() === 'studio@test.com' ? '/dashboard?tour=1' : '/dashboard');
+      window.location.replace(email.trim().toLowerCase() === 'studio@test.com' ? '/dashboard/home?tour=1' : '/dashboard/home');
     } catch {
       // No studio account — sign them out and block access
       await supabase.auth.signOut();
@@ -80,16 +80,26 @@ export default function HomePage() {
   if (checking) return <StatePanel title="Loading your studio…" busy />;
 
   return (
-    <div data-theme={tab === 'signup' ? 'dark' : undefined} className={`vanta-page${tab === 'signup' ? ' vanta-page--signup' : ''}`} style={s.page}>
-      <div style={s.noise} />
-      <style>{GLOBAL_CSS}</style>
-
-      <div className={`vanta-card${tab === 'signup' ? ' vanta-card--signup' : ''}`} style={{ ...s.card, maxWidth: wide ? 960 : 420 }}>
-        <div style={s.brand}>
-          <span style={s.wordmark}>vanta</span>
-          <span style={s.wordmarkSub}>studio</span>
-        </div>
-
+    <div data-theme="dark" className={styles.page}>
+      <div className={styles.scene} aria-hidden="true">
+        <picture>
+          <source media="(max-width: 700px)" srcSet="/studio/walkthrough/portrait/0183.webp" />
+          <img src="/studio/walkthrough/landscape/0183.webp" alt="" fetchPriority="high" />
+        </picture>
+      </div>
+      <header className={styles.header}>
+        <a className={styles.brand} href={marketing} aria-label="Vanta home">
+          vanta<span>.</span><small>STUDIO</small>
+        </a>
+        <a className={styles.returnLink} href={`${marketing}/studio`}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="m10 5-7 7 7 7M3 12h18" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          Back to studio
+        </a>
+      </header>
+      <main className={styles.main}>
+      <section className={styles.card} aria-label={tab === 'signup' ? 'Create your Vanta account' : 'Sign in to Vanta'}>
         {tab === 'signin' ? (
           <>
             <h1 style={s.authHeading}>Welcome back</h1>
@@ -133,9 +143,10 @@ export default function HomePage() {
             </p>
           </>
         ) : (
-          <SignUpFlow onSwitchToSignIn={() => { setTab('signin'); setError(''); setWide(false); }} onWideChange={setWide} />
+          <SignUpFlow onSwitchToSignIn={() => { setTab('signin'); setError(''); }} />
         )}
-      </div>
+      </section>
+      </main>
     </div>
   );
 }
@@ -167,89 +178,12 @@ function LockIcon({ size = 16 }) {
   );
 }
 
-// Shared across the sign-in form here and SignUpFlow's own forms — one plain <style> tag on
-// the page applies to the whole document, so these classes work in both without duplicating
-// the rules. Kept to properties inline styles don't already set (box-shadow, filter,
-// transform) since an inline style always wins over a stylesheet rule for the same property.
-const GLOBAL_CSS = `
-.vanta-input { transition: border-color 0.15s ease, box-shadow 0.15s ease; }
-.vanta-input:focus { outline: none; border-color: rgba(213,208,199,0.34); box-shadow: 0 0 0 2px rgba(213,208,199,0.06); }
-.vanta-btn { transition: filter 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease; }
-.vanta-btn:hover:not(:disabled) { filter: brightness(1.08); }
-.vanta-btn:active:not(:disabled) { transform: translateY(1px); filter: brightness(0.97); }
-.vanta-back-btn { transition: background 0.15s ease, border-color 0.15s ease; }
-.vanta-back-btn:hover { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.18); }
-.vanta-link { transition: opacity 0.15s ease; }
-.vanta-link:hover { opacity: 0.75; }
-.vanta-card::before {
-  content: '';
-  position: absolute;
-  top: 0; left: 20%; right: 20%;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(213,208,199,0.5), transparent);
-}
-.vanta-card--signup { transform-origin: 50% 58%; animation: vanta-signup-card-in 1.05s cubic-bezier(0.16, 1, 0.3, 1) both; }
-.vanta-card--signup > * { animation: vanta-signup-content-in 0.72s cubic-bezier(0.16, 1, 0.3, 1) 0.32s both; }
-.vanta-card--signup > :nth-child(3) { animation-delay: 0.44s; }
-@keyframes vanta-signup-card-in { 0% { opacity: 0; transform: perspective(900px) translateY(90px) rotateX(14deg) scale(0.86); filter: blur(12px); } 62% { opacity: 1; transform: perspective(900px) translateY(-8px) rotateX(-1.5deg) scale(1.018); filter: blur(0); } 100% { opacity: 1; transform: perspective(900px) translateY(0) rotateX(0) scale(1); filter: blur(0); } }
-@keyframes vanta-signup-content-in { from { opacity: 0; transform: translateY(24px); filter: blur(6px); } to { opacity: 1; transform: translateY(0); filter: blur(0); } }
-@media (prefers-reduced-motion: reduce) { .vanta-card--signup, .vanta-card--signup > * { animation: none; } }
-`;
-
 const s = {
-  page: {
-    minHeight: '100vh',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    background: 'var(--bg-base)',
-    padding: '1.5rem',
-    position: 'relative',
-    overflow: 'hidden',
-  },
-  noise: {
-    position: 'absolute',
-    inset: 0,
-    opacity: 0.025,
-    backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 256 256\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'noise\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.9\' numOctaves=\'4\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23noise)\'/%3E%3C/svg%3E")',
-    backgroundSize: '256px 256px',
-    pointerEvents: 'none',
-  },
-  card: {
-    width: '100%',
-    background: 'var(--bg-card)',
-    border: '1px solid var(--border-faint)',
-    boxShadow: 'var(--shadow-card)',
-    borderRadius: 16,
-    padding: '2.25rem 2rem',
-    backdropFilter: 'blur(12px)',
-    position: 'relative',
-    zIndex: 1,
-    transition: 'max-width 0.25s ease',
-  },
-  brand: {
-    display: 'flex',
-    alignItems: 'baseline',
-    gap: '0.4rem',
-    marginBottom: '1.5rem',
-  },
-  wordmark: {
-    fontSize: '1.6rem',
-    fontWeight: 700,
-    color: 'var(--text)',
-    letterSpacing: '-0.02em',
-  },
-  wordmarkSub: {
-    fontSize: '1.1rem',
-    fontWeight: 500,
-    color: 'var(--text-muted)',
-    letterSpacing: '0.02em',
-  },
   authHeading: {
-    fontSize: '1.3rem',
-    fontWeight: 700,
+    fontSize: 'clamp(1.65rem, 3vw, 2rem)',
+    fontWeight: 500,
     color: 'var(--text)',
-    margin: '0 0 0.35rem',
+    margin: '0 0 0.5rem',
     letterSpacing: '-0.01em',
   },
   authSubheading: {

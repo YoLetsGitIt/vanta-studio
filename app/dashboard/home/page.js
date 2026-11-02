@@ -25,10 +25,12 @@ import {
 import { useRouter } from 'next/navigation';
 import { initials, toISODate } from '@/lib/format';
 import BookingDetailPanel from '@/components/BookingDetailPanel';
+import CancelDepositButton from '@/components/CancelDepositButton';
 import CompleteBookingModal from '@/components/CompleteBookingModal';
 import RejectBookingModal from '@/components/RejectBookingModal';
 import SendSelectionLinkModal from '@/components/SendSelectionLinkModal';
 import DashboardQuickActions from '@/components/DashboardQuickActions';
+import StudioSetupChecklist from '@/components/StudioSetupChecklist';
 import { requestConfirmation, showError, showFeedback } from '@/lib/feedback';
 import { bookingActions } from '@/lib/bookingActions';
 
@@ -89,6 +91,16 @@ export default function HomePage() {
   const [stripeConnected, setStripeConnected] = useState(false);
   const [loadError, setLoadError] = useState('');
   const router = useRouter();
+
+  useEffect(() => {
+    function cancelled(event) {
+      const id = event.detail.bookingId;
+      setUnpaidDepositBookings(items => items.filter(item => item.id !== id));
+      setReviewBooking(current => current?.id === id ? { ...current, deposit_required: false, deposit_amount: null, status: current.status === 'awaiting_payment' ? 'confirmed' : current.status } : current);
+    }
+    window.addEventListener('booking-deposit-cancelled', cancelled);
+    return () => window.removeEventListener('booking-deposit-cancelled', cancelled);
+  }, []);
 
   const TODAY_SENT_KEY = `consent_sent_${new Date().toISOString().slice(0, 10)}`;
   const [sentToday, setSentToday] = useState(() => {
@@ -399,20 +411,7 @@ export default function HomePage() {
           />
         )}
 
-        {!loading && isEmptyDashboard && (
-          <div style={s.emptyState}>
-            <div style={s.emptyIcon}>✦</div>
-            <div style={s.emptyCopy}>
-              <span style={s.emptyEyebrow}>YOUR STUDIO IS READY</span>
-              <h2 style={s.emptyTitle}>Start with your booking flow.</h2>
-              <p style={s.emptyText}>Set up the details clients will see, then invite your artists when you&apos;re ready.</p>
-            </div>
-            <div style={s.emptyActions}>
-              <button type="button" style={s.emptyPrimary} onClick={() => router.push('/dashboard/settings?tab=bookings')}>Set up bookings <span>→</span></button>
-              <button type="button" style={s.emptySecondary} onClick={() => router.push('/dashboard/artists?onboarding=1')}>Add your first artist</button>
-            </div>
-          </div>
-        )}
+        {!loading && !loadError && <StudioSetupChecklist />}
 
 
         {/* ── NEEDS ATTENTION ───────────────────────────────────── */}
@@ -451,6 +450,7 @@ export default function HomePage() {
                 <AttentionGroup title="Unpaid deposits" tone="danger" icon="card" count={awaitingPaymentCount} subtitle="Deposit not yet received" open={!!openAttentionGroups.payment} onToggle={() => toggleAttentionGroup('payment')}>
                   {unpaidDepositBookings.map(booking => (
                     <AttentionItem key={booking.id} title={booking.requester_name ?? 'Client'} subtitle={bookingSubtitle(booking)} onClick={() => openBookingReview(booking)}>
+                      <CancelDepositButton bookingId={booking.id} disabled={attentionAction === `deposit-${booking.id}`} />
                       <button
                         style={s.inlinePrimary}
                         disabled={attentionAction === `deposit-${booking.id}` || !booking.requester_email}

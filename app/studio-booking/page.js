@@ -4,6 +4,11 @@ import { useState, useEffect, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Field from '@/components/ui/Field';
 import Button from '@/components/ui/Button';
+import ClientAuthGate from '@/components/ClientAuthGate';
+import ClientAccountActions from '@/components/ClientAccountActions';
+import DateOfBirthInput from '@/components/ui/DateOfBirthInput';
+import { ensureClientProfile, subscribeClientSession } from '@/lib/client-account';
+import { getSupabase } from '@/lib/supabase';
 import { getStudioPublic, createWalkIn, walkinUploadSign, signatureUploadSign, getStudioConsentTemplates, getFormConfigPublic } from '@/lib/api';
 
 function detectCountry() {
@@ -79,6 +84,8 @@ const COUNTRIES = [
   { id: 'VN', flag: '🇻🇳', name: 'Vietnam',        dial: '+84'  },
 ];
 
+const PIERCING_PLACEMENTS = ['Earlobe', 'Helix', 'Tragus', 'Conch', 'Daith', 'Rook', 'Industrial', 'Nostril', 'Septum', 'Eyebrow', 'Lip', 'Tongue', 'Navel', 'Nipple', 'Other'];
+
 const PLACEMENTS = [
   'Ankle', 'Arm', 'Back', 'Calf', 'Chest', 'Foot', 'Forearm',
   'Hand', 'Head', 'Hip', 'Knee', 'Neck', 'Ribs', 'Shoulder',
@@ -92,11 +99,44 @@ function WalkInInner() {
   const [studio, setStudio]   = useState(null);
   const [studioErr, setStudioErr] = useState('');
   const [formConfig, setFormConfig] = useState(null); // null = loading
+  const [session, setSession] = useState(undefined);
+  const [accountReady, setAccountReady] = useState(false);
+  const [accountError, setAccountError] = useState('');
+  const [accountRetry, setAccountRetry] = useState(0);
+  const accountUser = useRef(null);
+
+  useEffect(() => subscribeClientSession(setSession, () => {
+    setSession(null);
+  }), []);
+
+  useEffect(() => {
+    setAccountReady(false);
+    setAccountError('');
+    if (!session) return;
+    let cancelled = false;
+    ensureClientProfile(session).then(profile => {
+      if (cancelled) return;
+      const metadata = session.user?.user_metadata ?? {};
+      if (accountUser.current !== session.user.id) {
+        const details = {
+          name: [profile.name, metadata.full_name, metadata.name].find(value => value?.trim() && value.trim() !== 'User')?.trim() || '',
+          dob: metadata.dob?.trim() || '',
+          phone: profile.phone?.trim() || metadata.phone?.trim() || '',
+        };
+        setFullName(details.name);
+        setDob(details.dob);
+        const country = [...COUNTRIES].sort((a, b) => b.dial.length - a.dial.length).find(country => details.phone.startsWith(country.dial));
+        setPhoneCode(country?.id || detectCountry());
+        setPhoneNum(country ? details.phone.slice(country.dial.length).trim() : details.phone);
+        accountUser.current = session.user.id;
+      }
+      setAccountReady(true);
+    }).catch(error => { if (!cancelled) setAccountError(error.message); });
+    return () => { cancelled = true; };
+  }, [session, accountRetry]);
 
   // Form state
-  const [firstName, setFirstName]   = useState('');
-  const [lastName, setLastName]     = useState('');
-  const [email, setEmail]           = useState('');
+  const [fullName, setFullName]     = useState('');
   const [phoneCode, setPhoneCode]   = useState(() => detectCountry());
   const [phoneNum,  setPhoneNum]    = useState('');
   const [smsOptIn, setSMSOptIn] = useState(false);
@@ -109,6 +149,8 @@ function WalkInInner() {
   const [size, setSize]             = useState('');
   const [sizeUnit, setSizeUnit]     = useState('cm');
   const [colorStyle, setColorStyle] = useState('');
+  const [appointmentType, setAppointmentType] = useState('tattoo');
+  const isPiercing = appointmentType === 'piercing';
   const [retouch, setRetouch]       = useState(false);
   const [hasAllergies, setHasAllergies] = useState(false);
   const [allergyDetails, setAllergyDetails] = useState('');
@@ -128,6 +170,7 @@ function WalkInInner() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [done, setDone]             = useState(false);
+  const bookingPhone = phoneNum.trim().startsWith('+') ? phoneNum.trim() : `${COUNTRIES.find(c => c.id === phoneCode)?.dial ?? ''} ${phoneNum}`.trim();
 
   // field(key) returns {enabled, required} from the loaded config, defaulting to enabled/not-required
   function field(key) {
@@ -201,9 +244,16 @@ function WalkInInner() {
 
   async function handleSubmit(e) {
     e.preventDefault();
-    if (!firstName.trim() || !lastName.trim()) { setSubmitError('Please provide your first and last name.'); return; }
-    if (!email.trim()) { setSubmitError('Please provide your email address.'); return; }
+    const { data: { session: currentSession } } = await getSupabase().auth.getSession();
+    if (!currentSession || currentSession.user.id !== session?.user.id) {
+      setSession(currentSession ?? null);
+      setSubmitError('Please sign in again before requesting your booking.');
+      return;
+    }
+    if (!fullName.trim()) { setSubmitError('Please provide your full name.'); return; }
+    if (!currentSession.user.email?.trim()) { setSubmitError('Please sign in with an account that has an email address.'); return; }
     if (!phoneNum.trim()) { setSubmitError('Please provide your phone number.'); return; }
+    if (!dob) { setSubmitError('Please provide your date of birth.'); return; }
     if (field('body_location').enabled && placements.length === 0) { setSubmitError('Please select at least one placement.'); return; }
 
     // Validate consent form templates — only enforce required ones
@@ -282,7 +332,7 @@ function WalkInInner() {
           template_id:            t.id,
           answers:                ts.answers ?? {},
           is_minor:               isMinor,
-          signer_name:            `${firstName} ${lastName}`.trim(),
+          signer_name:            fullName.trim(),
           client_signature_path:  clientSigPath,
           guardian_name:          isMinor ? guardianName : '',
           guardian_relationship:  isMinor ? guardianRelationship : '',
@@ -294,24 +344,26 @@ function WalkInInner() {
 
       await createWalkIn(studioId, {
         artist_id:            artistId,
-        name:                 `${firstName} ${lastName}`.trim(),
-        email,
-        phone: `${COUNTRIES.find(c => c.id === phoneCode)?.dial ?? ''} ${phoneNum}`.trim(),
+        name:                 fullName.trim(),
+        email: currentSession.user.email,
+        phone: bookingPhone,
         sms_reminder_opt_in: smsOptIn,
         dob,
-        skin_tone:            skinTone,
+        skin_tone:            isPiercing ? '' : skinTone,
 
-        session_type:         retouch ? 'retouch' : '',
+        session_type:         isPiercing ? 'piercing' : retouch ? 'retouch' : '',
         body_location:        placements.join(', '),
         design_details:       design,
-        size:                 size.trim() ? `${size.trim()}${sizeUnit}` : '',
-        color:                colorStyle,
+        size:                 !isPiercing && size.trim() ? `${size.trim()}${sizeUnit}` : '',
+        color:                isPiercing ? '' : colorStyle,
         notes,
         allergies:            hasAllergies ? (allergyDetails.trim() || 'Yes') : '',
         image_paths:          imagePaths,
         consent_accepted:     consentSubmissions.length > 0,
         consent_submissions:  consentSubmissions,
       });
+      // Match consent: remember reviewed details for the next visit.
+      getSupabase().auth.updateUser({ data: { full_name: fullName.trim(), name: fullName.trim(), dob, phone: bookingPhone } }).catch(() => {});
       setDone(true);
     } catch (err) {
       setSubmitError(err.message);
@@ -323,6 +375,10 @@ function WalkInInner() {
   if (!studioId) return <p style={s.msg}>Invalid link — no studio ID.</p>;
   if (studioErr) return <p role="alert" style={{ ...s.msg, color: 'var(--color-danger)' }}>{studioErr}</p>;
   if (!studio || formConfig === null) return <p style={s.msg}>Loading…</p>;
+  if (session === undefined) return <p style={s.msg}>Checking your account…</p>;
+  if (!session) return <ClientAuthGate studioId={studioId} studioName={studio.name} logoUrl={studio.logo_url} purpose="booking" />;
+  if (accountError) return <div style={s.card}><p role="alert" style={s.error}>{accountError}</p><Button onClick={() => setAccountRetry(value => value + 1)}>Try again</Button></div>;
+  if (!accountReady) return <p style={s.msg}>Loading your details…</p>;
 
   if (done) {
     return (
@@ -343,22 +399,18 @@ function WalkInInner() {
       </div>
 
       <form onSubmit={handleSubmit} style={s.form}>
+          <ClientAccountActions email={session.user.email} />
 
-          {/* ── About you ── */}
-          <Section title="About you" first>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-              <Field label="First name">
-                <input style={s.input} type="text" value={firstName} required onChange={e => setFirstName(e.target.value)} placeholder="First" />
-              </Field>
-              <Field label="Last name">
-                <input style={s.input} type="text" value={lastName} required onChange={e => setLastName(e.target.value)} placeholder="Last" />
-              </Field>
-            </div>
+          <Section title="Your details" first>
+            <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: 13 }}>Review your details and update anything that has changed.</p>
+            <Field label="Full name">
+              <input style={s.input} type="text" value={fullName} required autoComplete="name" onChange={e => setFullName(e.target.value)} placeholder="Your name" />
+            </Field>
             <Field label="Date of birth">
-              <input style={{ ...s.input, colorScheme: 'dark' }} type="date" value={dob} required onChange={e => setDob(e.target.value)} />
+              <DateOfBirthInput style={s.input} value={dob} onChange={setDob} />
             </Field>
             <Field label="Email">
-              <input style={s.input} type="email" value={email} required onChange={e => setEmail(e.target.value)} placeholder="you@example.com" />
+              <input style={s.input} type="email" value={session.user.email || ''} required readOnly autoComplete="email" placeholder="you@example.com" />
             </Field>
             <Field label="Phone" id="booking-phone" required>
               <div style={s.phoneRow}>
@@ -385,13 +437,14 @@ function WalkInInner() {
             </Field>
           </Section>
 
-          <label style={{ display: 'flex', gap: 10, fontSize: 13, lineHeight: 1.6, marginBottom: 24 }}>
-            <input type="checkbox" checked={smsOptIn} onChange={e => setSMSOptIn(e.target.checked)} />
-            Send me one SMS reminder before this appointment. Optional; I can stop SMS reminders using the link in the message.
-          </label>
-
           {/* ── Your tattoo ── */}
-          <Section title="Your tattoo">
+          <Section title="Your appointment">
+            <Field label="Appointment type">
+              <select style={s.input} value={appointmentType} onChange={e => { setAppointmentType(e.target.value); setPlacements([]); }}>
+                <option value="tattoo">Tattoo</option>
+                <option value="piercing">Piercing</option>
+              </select>
+            </Field>
             {field('artist_id').enabled && (
               <Field label={<>Artist preference{field('artist_id').required ? null : <Optional />}</>}>
                 <select style={s.input} value={artistId} required={field('artist_id').required} onChange={e => setArtistId(e.target.value)}>
@@ -414,7 +467,7 @@ function WalkInInner() {
                   </span>
                 </label>
                 <div style={s.chipGrid}>
-                  {PLACEMENTS.map(p => {
+                  {(isPiercing ? PIERCING_PLACEMENTS : PLACEMENTS).map(p => {
                     const active = placements.includes(p);
                     return (
                       <button
@@ -440,12 +493,12 @@ function WalkInInner() {
             )}
 
             {field('design_details').enabled && (
-              <Field label={<>Design description{field('design_details').required ? null : <Optional />}</>}>
+              <Field label={<>{isPiercing ? 'Piercing details' : 'Design description'}{field('design_details').required ? null : <Optional />}</>}>
                 <textarea style={{ ...s.input, ...s.textarea }} value={design} required={field('design_details').required} onChange={e => setDesign(e.target.value)} placeholder="Describe what you'd like…" />
               </Field>
             )}
 
-            {field('skin_tone').enabled && (
+            {!isPiercing && field('skin_tone').enabled && (
               <Field label={<>Skin tone{field('skin_tone').required ? null : <Optional />}</>}>
                 <select style={s.input} value={skinTone} required={field('skin_tone').required} onChange={e => setSkinTone(e.target.value)}>
                   <option value="">Select skin tone…</option>
@@ -456,7 +509,7 @@ function WalkInInner() {
               </Field>
             )}
 
-            {field('size').enabled && (
+            {!isPiercing && field('size').enabled && (
               <Field id="booking-size" required={field('size').required} label={<>Size{!field('size').required && <Optional />}</>}>
                 <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                   <input
@@ -490,14 +543,14 @@ function WalkInInner() {
               </Field>
             )}
 
-            {field('retouch').enabled && (
+            {!isPiercing && field('retouch').enabled && (
               <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: 'var(--text-dim)', cursor: 'pointer' }}>
                 <input type="checkbox" checked={retouch} onChange={e => setRetouch(e.target.checked)} style={{ width: 16, height: 16, accentColor: '#d5d0c7', cursor: 'pointer' }} />
                 This is a touch-up / retouch
               </label>
             )}
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+            {!isPiercing && <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
               <label style={s.label}>Colour</label>
               <div style={{ display: 'flex', gap: '0.5rem' }}>
                 {['Black', 'Grey', 'Color'].map(opt => {
@@ -527,6 +580,8 @@ function WalkInInner() {
                 })}
               </div>
             </div>
+
+            }
 
             {field('notes').enabled && (
               <Field label={<>Additional notes{field('notes').required ? null : <Optional />}</>}>
@@ -658,6 +713,10 @@ function WalkInInner() {
 
           {/* ── Submit ── */}
           <div style={s.submitSection}>
+            <label style={{ display: 'flex', gap: 10, fontSize: 13, lineHeight: 1.6, marginBottom: 24 }}>
+              <input type="checkbox" checked={smsOptIn} onChange={e => setSMSOptIn(e.target.checked)} />
+              Send me one SMS reminder before this appointment. Optional; I can stop SMS reminders using the link in the message.
+            </label>
             {submitError && <p role="alert" style={s.error}>{submitError}</p>}
             <Button type="submit" loading={submitting} loadingLabel="Submitting…" fullWidth>Request booking</Button>
           </div>
@@ -895,6 +954,7 @@ const s = {
     borderRadius: 8,
     color: '#ffffff',
     fontSize: '0.875rem',
+    minHeight: 44,
     padding: '0.65rem 0.85rem',
     outline: 'none',
     width: '100%',

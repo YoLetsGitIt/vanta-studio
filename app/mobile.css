@@ -127,7 +127,7 @@
   }
   .studio-feature-header { padding: 8px 12px !important; }
   .studio-schedule-page { min-height: 0; }
-  .studio-schedule-page > .studio-feature-header { flex-wrap: nowrap !important; gap: 12px !important; }
+  .studio-schedule-page .studio-feature-header { flex-wrap: nowrap !important; gap: 12px !important; }
   .studio-schedule-toggles { width: auto; flex-shrink: 0; gap: 4px !important; }
   .studio-schedule-toggles h1 {
     position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap;
@@ -148,7 +148,7 @@
   .studio-appointments-page > .studio-feature-header {
     display: grid !important; grid-template-columns: auto minmax(0, 1fr); align-items: center;
   }
-  .studio-booking-filter-row { grid-column: 1 / -1; flex-wrap: nowrap; }
+  .studio-booking-filter-row { grid-column: 1 / -1; flex-wrap: nowrap; min-width: 0; }
   .studio-booking-filter-row .studio-scroll-tabs { flex: 1; width: auto; padding-bottom: 0; }
   .studio-clients-page > .studio-feature-header { flex-direction: row !important; align-items: center !important; }
   .studio-clients-page > .studio-feature-header > div:last-child { flex: 1; max-width: none !important; }
@@ -190,7 +190,7 @@
   }
   .studio-dashboard-shell:has(.studio-schedule-page) > .studio-mobile-header,
   .studio-dashboard-shell:has(.studio-schedule-page) > .studio-mobile-nav,
-  .studio-schedule-page > .studio-feature-header,
+  .studio-schedule-page .studio-feature-header,
   .studio-schedule-page .studio-schedule-filter { display: none !important; }
   .studio-calendar-toolbar {
     display: flex; align-items: center; gap: 4px; flex-shrink: 0;
@@ -290,7 +290,23 @@
   }
   .studio-home-four-col { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 8px !important; }
   /* The bottom navigation already names the page, so give the calendar the space. */
-  .studio-schedule-page > .studio-feature-header { padding: 10px 16px !important; gap: 8px !important; }
+  .studio-schedule-page .studio-feature-header { padding: 10px 16px !important; gap: 8px !important; }
   .studio-schedule-toggles h1 { display: none; }
   .studio-schedule-filter { padding: 6px 16px !important; }
+}
+
+/* Consent editing keeps the form actions visible while its fields scroll. */
+.studio-consent-editor-grid > div { min-width: 0; }
+.studio-consent-field-toolbar { flex-wrap: wrap; gap: 0.75rem; }
+.studio-consent-field-toolbar > span { flex-shrink: 0; }
+@media (max-width: 900px) {
+  .studio-consent-preview { position: static !important; }
+}
+@media (any-pointer: coarse) {
+  .studio-consent-editor button { min-width: 44px; }
+  .studio-consent-editor label:has(input[type="checkbox"]) { min-height: 44px; }
+}
+@media (max-width: 480px) {
+  .studio-consent-field-toolbar { flex-direction: column; align-items: stretch !important; }
+  .studio-consent-field-toolbar > div { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

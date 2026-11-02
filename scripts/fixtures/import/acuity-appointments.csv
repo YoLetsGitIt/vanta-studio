@@ -1,0 +1,6 @@
+Appointment ID,Start Time,End Time,Time Zone,First Name,Last Name,Phone,Email,Calendar,Type,Amount Paid,Price,Canceled,Notes
+1001,10/30/2030 10:00am,10/30/2030 11:30am,Australia/Melbourne,Alex,River,+61 412 345 678,alex@example.test,Sam Anderson,Tattoo,100,450,no,Upcoming
+1002,10/30/2030 12:00pm,10/30/2030 1:00pm,Australia/Melbourne,Casey,Stone,,casey@example.test,Sam Anderson,Tattoo,50,200,yes,Cancelled
+1003,10/20/2020 10:00am,10/20/2020 11:00am,Australia/Melbourne,Past,Client,,past@example.test,Sam Anderson,Tattoo,200,200,no,Past
+1004,10/30/2030 10:00am,10/30/2030 11:30am,Australia/Melbourne,Alex,River,+61 412 345 678,alex@example.test,Sam Anderson,Tattoo,100,450,no,Repeated appointment
+1005,10/32/2030 10:00am,10/32/2030 11:30am,Australia/Melbourne,Bad,Date,,bad@example.test,Sam Anderson,Tattoo,,450,no,Check date

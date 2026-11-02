@@ -14,7 +14,7 @@ export default function StudioJourney() {
   const [chapter, setChapter] = useState(0);
   const [sceneStatus, setSceneStatus] = useState('loading');
   const [motion, setMotion] = useState(true);
-  const [booking, setBooking] = useState({ idea: 'A little botanical piece', time: 'Fri 28 Aug · 10:00 am', paid: false, signed: false });
+  const [booking, setBooking] = useState({ idea: 'A little botanical piece', time: 'Fri 9 Oct · 10:00 am', paid: false, signed: false });
   const bookingPhase = BOOKING_STEPS.some(step => step.id === phase);
 
   useEffect(() => {
@@ -146,7 +146,7 @@ export default function StudioJourney() {
           <p className="sj-eyebrow">03 / IN THE STUDIO</p>
           <h2 tabIndex={-1} ref={titleRef}>The day is in place.<br /><em>Stay with the work.</em></h2>
           <div className="sj-appointment"><span className="sj-status-dot" aria-hidden="true" /><div><strong>{booking.idea.trim() || 'Your next piece'}</strong><span>Alex Morgan · {booking.time || 'Time to be selected'}</span></div><span className="sj-appointment-label">EXAMPLE</span></div>
-          <p className="sj-booking-outcome">{booking.paid ? '✓ Deposit paid · Booking confirmed' : 'Enquiry → estimate → availability → artist selection → deposit'}{booking.signed && ' · Consent stored'}</p><div className="sj-end-actions"><a className="sj-light-button" href="/?signup">Start free trial <span aria-hidden="true">↗</span></a><button onClick={() => goTo(0)}>Walk through again ↺</button></div>
+          <p className="sj-booking-outcome">{booking.paid ? '✓ Deposit paid · Booking confirmed' : 'Enquiry → estimate → availability → artist selection → deposit'}{booking.signed && ' · Consent stored'}</p><div className="sj-end-actions"><a className="sj-light-button" href="/signup">Start free trial <span aria-hidden="true">↗</span></a><button onClick={() => goTo(0)}>Walk through again ↺</button></div>
           <small className="sj-trial-note">14 days · Card required · <a href="/features#pricing">Pricing & terms</a></small>
         </section>}
       </div>

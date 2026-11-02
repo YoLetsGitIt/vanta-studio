@@ -12,7 +12,7 @@
 .sj-fallback{background:linear-gradient(#11190e50,#11190e70),url('/studio/reception.jpg') center/cover}
 .studio-journey[data-scene="ready"] .sj-fallback{visibility:hidden}
 .studio-journey[data-scene="fallback"] .sj-canvas{visibility:hidden}
-.sj-shade{background:linear-gradient(180deg,#10191466,transparent 25%,#0a140b10 40%,#0a140baa 70%,#0a140be0)}
+.sj-shade{background:linear-gradient(180deg,#10141266,transparent 25%,#10141205 40%,#10141288 70%,#101412cf)}
 .sj-nav{position:fixed;z-index:5;top:0;left:0;right:0;padding:22px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px;background:linear-gradient(#162019aa,transparent)}
 .sj-brand{font-size:32px;font-weight:800;letter-spacing:-2px;line-height:.85}
 .sj-brand>span{color:#bfb79c}
@@ -173,3 +173,7 @@
 .sj-story .sj-tablet{display:flex;flex-direction:column;overflow:hidden}
 .sj-story-scroll{min-height:0;overflow-y:auto;scrollbar-width:thin;flex:1;overscroll-behavior-y:contain}
 @media(max-width:699px){.sj-story .sj-tablet-top{display:none}.sj-story .sj-steps{padding-top:7px}}
+
+/* Directional scrim keeps copy legible without tinting the entire room green. */
+.studio-journey[data-phase=reception] .sj-shade,.studio-journey[data-phase=studio] .sj-shade{background:linear-gradient(90deg,#101512b3,transparent 78%),linear-gradient(0deg,#10151299,transparent 60%)}
+@media(max-width:700px){.studio-journey[data-phase=reception] .sj-shade,.studio-journey[data-phase=studio] .sj-shade{background:linear-gradient(0deg,#101512e6,#10151280 45%,transparent 85%)}}

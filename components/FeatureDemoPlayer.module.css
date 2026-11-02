@@ -1,0 +1,29 @@
+.player{width:100%;min-width:0;color:#ede6d6;background:#11120f;border:1px solid #ffffff10;border-radius:18px;padding:12px}.stage{overflow:hidden;border:1px solid #ffffff18;border-radius:14px;background:#10110f}.stage video{display:block;width:100%;height:auto;max-height:68dvh;object-fit:contain;background:#10110f}.meta{display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:8px 20px;padding:15px 2px;font-size:13px}.meta small{font-size:11px;color:#b8b4a6}.chapters{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.chapters button{display:flex;align-items:flex-start;gap:10px;min-height:56px;text-align:left;border:1px solid #ffffff1a;border-radius:10px;padding:13px;background:transparent;color:#bbb8ac;font:inherit;font-size:12px!important;line-height:1.5;cursor:pointer;transition:background .18s,border-color .18s}.chapters button span{font-size:10px;color:#ccb991;padding-top:2px}.chapters [aria-pressed=true]{background:#dfd1ae0c;border-color:#dfd1ae65;color:#eee5cf}.chapters button:hover{background:#dfd1ae12}.chapters button:focus-visible,.stage video:focus-visible{outline:2px solid #e9d4a4;outline-offset:3px}.error{font-size:13px;padding:16px}.error button{background:none;color:inherit;border:0;text-decoration:underline;min-height:44px;cursor:pointer}@media(max-width:700px){.stage{border-radius:10px}.stage video{max-height:none}.chapters{grid-template-columns:1fr}.chapters button{min-height:48px;padding:12px}.meta{padding-top:12px;line-height:1.5}}@media(prefers-reduced-motion:reduce){.chapters button{transition:none}}
+
+/* Artist recordings keep the full phone visible instead of filling a wide stage. */
+.player[data-portrait]{max-width:380px;margin-inline:auto;padding:10px;background:#10130f}
+.player[data-portrait] .stage{width:fit-content;max-width:100%;margin:auto;border:0;border-radius:24px}
+.player[data-portrait] video{width:auto;max-width:100%;height:min(57dvh,590px);max-height:none;aspect-ratio:432/966}
+.player[data-portrait] .meta{line-height:1.5;padding:14px 5px 12px}
+.player[data-portrait] .meta small{display:block;width:100%;font-size:10px}
+.player[data-portrait] .chapters{grid-template-columns:1fr;gap:6px}
+.player[data-portrait] .chapters button{min-height:44px;padding:10px 12px}
+@media(max-width:700px){.player[data-portrait] video{height:auto;width:100%;max-height:65dvh}.player[data-portrait] .stage{max-width:280px}}
+
+/* One artist tour: a full phone frame with optional chapters alongside it. */
+.player[data-tour]{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:auto 1fr;gap:8px 32px;max-width:none;padding:20px 28px}
+.player[data-tour] .stage{grid-column:2;grid-row:1/3;border-radius:10px}
+.player[data-tour] video{height:min(64dvh,680px);aspect-ratio:520/1180}
+.player[data-tour] .meta{grid-column:1;align-content:start;justify-content:flex-start;padding:14px 0;font-size:18px}
+.player[data-tour] .meta small{font-size:11px}
+.player[data-tour] .chapters{grid-column:1;align-content:start;gap:8px}
+.player[data-tour] .chapters button{min-height:48px;font-size:14px!important;align-items:center}
+.player[data-tour] .chapters button span{min-width:32px;font-variant-numeric:tabular-nums}
+@media(max-width:700px){.player[data-tour]{display:flex;flex-direction:column;padding:12px;gap:4px}.player[data-tour] .stage{max-width:100%;order:0}.player[data-tour] video{height:auto;max-height:66dvh;width:auto;max-width:100%}.player[data-tour] .meta{order:1;font-size:15px}.player[data-tour] .chapters{order:2;display:grid;grid-template-columns:1fr 1fr}.player[data-tour] .chapters button{font-size:11px!important;gap:6px;padding:8px;min-height:48px}}
+
+/* The narrated tour has a landscape composition and chapters below the video. */
+.player[data-tour]:not([data-portrait]){display:block}
+.player[data-tour]:not([data-portrait]) .stage{width:100%}
+.player[data-tour]:not([data-portrait]) video{width:100%;height:auto;max-height:68dvh;aspect-ratio:16/9}
+.player[data-tour]:not([data-portrait]) .chapters{grid-template-columns:repeat(3,minmax(0,1fr))}
+@media(max-width:700px){.player[data-tour]:not([data-portrait]) .chapters{grid-template-columns:1fr 1fr}}

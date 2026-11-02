@@ -1,0 +1,28 @@
+{
+  "version": 4,
+  "frameCount": 441,
+  "receptionFrame": 58,
+  "tabletFrames": [
+    121,
+    152
+  ],
+  "artistFrames": [
+    153,
+    320
+  ],
+  "artistDirectFrames": [
+    321,
+    440
+  ],
+  "artistSeatedFrame": 296,
+  "variants": {
+    "portrait": {
+      "frames": 441,
+      "bytes": 13194464
+    },
+    "landscape": {
+      "frames": 441,
+      "bytes": 21036556
+    }
+  }
+}

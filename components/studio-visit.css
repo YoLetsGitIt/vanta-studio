@@ -87,7 +87,6 @@
 .studio-visit .visit-nav-links { display: flex; gap: 24px; align-items: center; }
 .studio-visit .visit-nav-links a { font-size: 12px; text-decoration: none; padding-block: 12px; }
 .studio-visit .visit-menu { display: none; }
-.studio-visit .visit-skip { position: absolute; top: 100px; right: 6vw; z-index: 7; font-size: 10px; letter-spacing: 1px; padding: 12px; color: #bbbba9; }
 .studio-visit .enter a { min-height: 44px; }
 .studio-visit .reception { scroll-margin-top: 76px; }
 .studio-visit .chapter-link { display: inline-block; min-height: 44px; padding: 15px 0; margin-top: 12px; font-size: 12px; text-underline-offset: 5px; color: #d6d8c7; }
@@ -135,7 +134,6 @@
  .studio-visit .visit-menu summary span { margin-left:12px; }
  .studio-visit .visit-menu > div { position:absolute; top:78px; right:24px; left:24px; padding:12px; background:#1a201afc; border:1px solid #e8ddc433; border-radius:12px; }
  .studio-visit .visit-menu a { display:block; padding:16px; font-size:14px; text-decoration:none; }
- .studio-visit .visit-skip { top:85px; right:20px; }
  .studio-visit .door-copy { top:26%; }
  .studio-visit .visit-chapter { grid-template-columns:1fr; gap:30px; padding:55px 24px; }
  .studio-visit .visit-focus .chapter-copy { grid-row:1; }

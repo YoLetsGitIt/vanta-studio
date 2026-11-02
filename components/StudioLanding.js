@@ -272,7 +272,7 @@ export default function StudiosPage({ featuresOnly = false }) {
   const storyRefs = { booking: bookingRef, operations: operationsRef, finances: financesRef };
   return (
     <div className="studios-page">
-      <div className="studios-page-nav"><header className="studio-marketing-nav"><a href="/" className="studio-marketing-brand"><img className="studio-brand-symbol" src="/brand/vanta-eclipse.svg" alt="" width="48" height="48" /><img className="studio-brand-wordmark" src="/brand/vanta-studio.svg" alt="Vanta Studio" width="170" height="80" /></a><nav aria-label="Studio navigation"><a href="/signin">Sign in</a><a href="/?signup">Try Vanta Studio <span aria-hidden="true">↗</span></a></nav><details className="studio-mobile-menu"><summary aria-label="Open navigation"><span /><span /></summary><nav aria-label="Mobile studio navigation"><a href="/signin">Sign in</a><a href="/?signup">Try Vanta Studio <span aria-hidden="true">↗</span></a></nav></details></header></div>
+      <div className="studios-page-nav"><header className="studio-marketing-nav"><a href="/" className="studio-marketing-brand"><img className="studio-brand-symbol" src="/brand/vanta-eclipse.svg" alt="" width="48" height="48" /><img className="studio-brand-wordmark" src="/brand/vanta-studio.svg" alt="Vanta Studio" width="170" height="80" /></a><nav aria-label="Studio navigation"><a href="/signin">Sign in</a><a href="/signup">Try Vanta Studio <span aria-hidden="true">↗</span></a></nav><details className="studio-mobile-menu"><summary aria-label="Open navigation"><span /><span /></summary><nav aria-label="Mobile studio navigation"><a href="/signin">Sign in</a><a href="/signup">Try Vanta Studio <span aria-hidden="true">↗</span></a></nav></details></header></div>
       <main className="studios-main">
         {featuresOnly && <header className="feature-page-heading"><a href="/">← Back to the studio</a><h1>The details behind the day.</h1><p>Explore the tools that keep your studio together.</p></header>}
         {!featuresOnly && <section className="studios-hero">
@@ -334,7 +334,7 @@ export default function StudiosPage({ featuresOnly = false }) {
         </section>
         <section id="pricing" className="studios-pricing" aria-labelledby="pricing-title">
           <div><p className="studios-eyebrow">Straightforward pricing</p><h2 id="pricing-title">One studio plan.</h2><p>Start with a 14-day free trial. A card is required; billing begins when the trial ends unless you cancel.</p></div>
-          <div className="studios-price-card"><h3>Vanta Studio</h3><p className="studios-price"><strong>A$60</strong> / month</p><p>Includes up to 6 artists.<br />A$15/month per additional artist.</p><a className="studios-hero-cta" href="https://studio.vanta.tattoo/?signup">Start free trial →</a><p className="studios-price-fine">Online deposits add a client-paid fee of 3% + A$0.50 per transaction. For example, an A$100 deposit costs the client A$103.50. This is separate from the studio subscription.</p></div>
+          <div className="studios-price-card"><h3>Vanta Studio</h3><p className="studios-price"><strong>A$30</strong> / month</p><p>Includes up to 6 artists.<br />A$5/month per additional artist.</p><a className="studios-hero-cta" href="https://studio.vanta.tattoo/signup">Start free trial →</a><p className="studios-price-fine">Online deposits add a client-paid fee of 3% + A$0.50 per transaction. For example, an A$100 deposit costs the client A$103.50. This is separate from the studio subscription.</p></div>
         </section>
         <section className="studios-faq" aria-labelledby="faq-title">
           <p className="studios-eyebrow">Getting started</p><h2 id="faq-title">A few things before you switch.</h2>
@@ -359,7 +359,7 @@ export default function StudiosPage({ featuresOnly = false }) {
           <p className="studios-eyebrow">Built for working studios</p>
           <h2>Let’s walk through your studio.</h2>
           <p>Bring your booking process and your questions. We’ll show you how Vanta Studio could fit your team.</p>
-          <a className="studios-hero-cta" href="/?signup">Start free trial <span aria-hidden="true">→</span></a>
+          <a className="studios-hero-cta" href="/signup">Start free trial <span aria-hidden="true">→</span></a>
         </motion.section>
         <footer className="studio-marketing-footer">
           <a href="/" className="studio-marketing-brand"><img className="studio-brand-symbol" src="/brand/vanta-eclipse.svg" alt="" width="48" height="48" /><img className="studio-brand-wordmark" src="/brand/vanta-studio.svg" alt="Vanta Studio" width="170" height="80" /></a>

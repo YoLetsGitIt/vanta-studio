@@ -1,0 +1,4 @@
+First Name,Last Name,Email,Phone,Notes,Days Since Last Appointment
+Alex,River,alex@example.test,+61 412 345 678,Prefers mornings,4
+Phone,Only,,0412 000 001,Imported without email,
+Alex,River,ALEX@example.test,+61 412 345 678,Duplicate contact,4

@@ -1,5 +1,6 @@
 'use client';
 
+import CancelDepositButton from '@/components/CancelDepositButton';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { getStations, getClientConsents, getNotes, addNote, deleteNote, getBookingConsentSubmissions, getStudioClients, generateConsentLink, getStudioBookingPayment, listConsentTemplates, downloadConsentPdf } from '@/lib/api';
@@ -8,7 +9,7 @@ import { statusColors, statusLabel, capitalise as cap } from '@/lib/status';
 import { formatDob as fmtDob, hasArtist } from '@/lib/format';
 import { getCached, setCached } from '@/lib/cache';
 import { useLanguage } from '@/lib/i18n';
-import { showError } from '@/lib/feedback';
+import { showError, showFeedback } from '@/lib/feedback';
 import { getBookingSourceLabel } from '@/lib/bookingType';
 import Button, { IconButton } from '@/components/ui/Button';
 import BookingSMS from '@/components/BookingSMS';
@@ -93,6 +94,8 @@ export default function BookingDetailPanel({
   const [submissionsExpanded, setSubmissionsExpanded] = useState(false);
 
   // ── Normalise fields from booking (priority) with entry as fallback ────────
+  const [cancelledDepositId, setCancelledDepositId] = useState(null);
+  const depositCancelled = cancelledDepositId === (booking?.id ?? entry?.bookingId);
   const b           = booking ?? entry ?? {};
   const bookingId   = booking?.id     ?? entry?.bookingId;
   const clientName  = booking?.requester_name    ?? entry?.clientName    ?? '—';
@@ -115,9 +118,10 @@ export default function BookingDetailPanel({
   const duration    = booking?.proposed_duration_minutes ?? entry?.durationMins ?? null;
   const chosenTime  = booking?.chosen_time       ?? entry?.chosenTime     ?? null;
   const proposedTime = booking?.proposed_time_primary    ?? null;
-  const status      = booking?.status            ?? entry?.status         ?? null;
-  const depositRequired   = booking?.deposit_required    ?? false;
-  const depositAmount     = booking?.deposit_amount      ?? null;
+  const rawStatus   = booking?.status ?? entry?.status ?? null;
+  const status      = depositCancelled && rawStatus === 'awaiting_payment' ? 'confirmed' : rawStatus;
+  const depositRequired   = !depositCancelled && (booking?.deposit_required ?? false);
+  const depositAmount     = depositCancelled ? null : booking?.deposit_amount ?? null;
   const depositPaidAt     = booking?.deposit_paid_at     ?? null;
   const depositConfirmedAt = booking?.deposit_confirmed_at ?? null;
   const depositPaid       = !!depositPaidAt || !!(entry?.depositPaid);
@@ -421,7 +425,7 @@ export default function BookingDetailPanel({
 
         {/* ── Tattoo ── */}
         {(sessionType || placement || size || color || design || notes || refImages.length > 0) && (
-          <Section title="Tattoo">
+          <Section title={booking?.session_type === 'piercing' ? 'Piercing' : 'Tattoo'}>
             {sessionType && <Fact label={t('bdp_session')}>{cap(sessionType.replace(/_/g, ' '))}</Fact>}
             {placement   && <Fact label={t('bdp_placement')}>{placement}</Fact>}
             {size        && <Fact label={t('bdp_size')}>{size}</Fact>}
@@ -471,6 +475,9 @@ export default function BookingDetailPanel({
                     </div>
                   );
                 })()}
+                {depositRequired && !depositPaid && !depositConfirmedAt && chosenTime && ['confirmed', 'awaiting_payment', 'requires_confirmation'].includes(status) && (
+                  <CancelDepositButton bookingId={bookingId} onCancelled={() => setCancelledDepositId(bookingId)} disabled={actionLoading} />
+                )}
                 {depositPaidAt && (
                   <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
                     Paid {new Date(depositPaidAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
@@ -498,7 +505,7 @@ export default function BookingDetailPanel({
           )}
         >
           {dob && <Fact label="Date of birth">{fmtDob(dob)}{clientAge != null && ` · ${clientAge} yrs`}</Fact>}
-          <Fact label="Email">{email || <span style={{ color: 'var(--text-muted)' }}>{t('clients_no_email')}</span>}</Fact>
+          <Fact block label="Email">{email && <button type="button" style={{ ...detailStyles.textLink, display: 'block', minHeight: 44 }} onClick={() => navigator.clipboard.writeText(email).then(() => showFeedback('Email copied.', 'success')).catch(showError)}>Copy email</button>}{email || <span style={{ color: 'var(--text-muted)' }}>{t('clients_no_email')}</span>}</Fact>
           <Fact label="Phone">
             {phone ? (
               <button
@@ -538,9 +545,10 @@ export default function BookingDetailPanel({
 
           <MarketingConsent
             email={email}
+            phone={phone}
             clientKey={clientProfile?.id}
             marketing={clientProfile && clientProfile.email_marketing_opt_in !== undefined
-              ? { optIn: marketingOverride ?? clientProfile.email_marketing_opt_in === true, unsubscribed: clientProfile.email_unsubscribed === true }
+              ? { optIn: marketingOverride ?? clientProfile.email_marketing_opt_in === true, smsOptIn: marketingOverride ?? clientProfile.sms_marketing_opt_in === true, unsubscribed: clientProfile.email_unsubscribed === true }
               : null}
             onChange={setMarketingOverride}
           />

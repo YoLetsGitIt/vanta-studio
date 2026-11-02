@@ -1,0 +1,20 @@
+{
+  "src": "/studio/demos/consent.mp4",
+  "poster": "/studio/demos/consent-poster.jpg",
+  "duration": 13,
+  "title": "Consent, made yours",
+  "chapters": [
+    {
+      "at": 0,
+      "title": "Add the questions that matter to your studio."
+    },
+    {
+      "at": 4.3,
+      "title": "Require an answer before it can be submitted."
+    },
+    {
+      "at": 8.6,
+      "title": "Collect a client signature with your consent form."
+    }
+  ]
+}

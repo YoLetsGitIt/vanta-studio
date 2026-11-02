@@ -1,0 +1,12 @@
+.controls {
+  display: grid;
+  grid-template-rows: 1fr;
+  flex-shrink: 0;
+  min-width: 0;
+  transition: grid-template-rows 180ms ease, visibility 180ms;
+}
+.controlsInner { min-height: 0; overflow: hidden; }
+.controls[data-collapsed] { grid-template-rows: 0fr; visibility: hidden; }
+@media (prefers-reduced-motion: reduce) {
+  .controls { transition: none; }
+}

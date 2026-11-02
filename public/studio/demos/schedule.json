@@ -1,0 +1,20 @@
+{
+  "src": "/studio/demos/schedule.mp4",
+  "poster": "/studio/demos/schedule-poster.jpg",
+  "duration": 12,
+  "title": "A place for every appointment",
+  "chapters": [
+    {
+      "at": 0,
+      "title": "Start with the artist’s day."
+    },
+    {
+      "at": 4,
+      "title": "Switch to stations to see every chair."
+    },
+    {
+      "at": 8.3,
+      "title": "See each booking, artist and allocated station."
+    }
+  ]
+}

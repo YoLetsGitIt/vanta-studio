@@ -5,6 +5,7 @@ import { WidgetPreview, ConsentFormPreview } from '@/components/forms/FormPrevie
 import StudioLogoUpload from '@/components/StudioLogoUpload';
 import SmartSchedulingSettings from '@/components/SmartSchedulingSettings';
 import SMSSettings from '@/components/SMSSettings';
+import { StudioSetupLinks } from '@/components/StudioSetupChecklist';
 
 import { useEffect, useState, useRef, useCallback } from 'react';
 import dynamic from 'next/dynamic';
@@ -209,6 +210,7 @@ export default function SettingsPage() {
   const [addressLng, setAddressLng] = useState(null);
   const [email, setEmail] = useState('');
   const [aftercareInstructions, setAftercareInstructions] = useState('');
+  const [piercingAftercareInstructions, setPiercingAftercareInstructions] = useState('');
   const [widgetBgColor, setWidgetBgColor] = useState('#111111');
   const [logoUrl, setLogoUrl] = useState('');
   const [widgetAccentColor, setWidgetAccentColor] = useState('#d5d0c7');
@@ -220,6 +222,7 @@ export default function SettingsPage() {
   const [payForfeitedDeposits, setPayForfeitedDeposits] = useState(false);
   const [rescheduleWindow, setRescheduleWindow] = useState(null);
   const [sendReminder7d, setSendReminder7d] = useState(true);
+  const [sendReminder3d, setSendReminder3d] = useState(false);
   const [sendReminder24h, setSendReminder24h] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -304,6 +307,7 @@ export default function SettingsPage() {
         if (account.studio?.latitude != null) setAddressLat(account.studio.latitude);
         if (account.studio?.longitude != null) setAddressLng(account.studio.longitude);
         setAftercareInstructions(account.studio?.aftercare_instructions ?? '');
+        setPiercingAftercareInstructions(account.studio?.piercing_aftercare_instructions ?? '');
         setWidgetBgColor(account.studio?.widget_bg_color || '#111111');
         setWidgetAccentColor(account.studio?.widget_accent_color || '#d5d0c7');
         setTimezone(account.studio?.timezone || 'Australia/Sydney');
@@ -314,6 +318,7 @@ export default function SettingsPage() {
         setPayForfeitedDeposits(account.studio?.pay_artist_on_forfeited_deposits ?? false);
         setRescheduleWindow(account.studio?.reschedule_window_hours ?? null);
         setSendReminder7d(account.studio?.send_reminder_7d ?? true);
+        setSendReminder3d(account.studio?.send_reminder_3d ?? false);
         setSendReminder24h(account.studio?.send_reminder_24h ?? true);
         setEmail(session?.user?.email ?? '');
         setStudioId(account.studio_id);
@@ -370,13 +375,24 @@ export default function SettingsPage() {
     load();
   }, []);
 
+  const selectedReminderCount = [sendReminder7d, sendReminder3d, sendReminder24h].filter(Boolean).length;
+
+  function toggleEmailReminder(enabled, setEnabled) {
+    if (!enabled && selectedReminderCount >= 2) {
+      showError('You can select up to 2 email reminders. Turn one off to choose another.');
+      return;
+    }
+    setEnabled(!enabled);
+  }
+
   async function saveProfile() {
+    if (selectedReminderCount > 2) { setProfileError('Choose up to 2 reminder emails. Turn one off before saving.'); return; }
     if (!name.trim()) { setProfileError('Studio name is required.'); return; }
     setSaving(true); setProfileError('');
     try {
       const wc = parseFloat(walkinCut);
       const pc = parseFloat(personalCut);
-      await updateStudioProfile(name.trim(), address.trim(), widgetBgColor, widgetAccentColor, isNaN(wc) ? 0 : wc, isNaN(pc) ? 0 : pc, aftercareInstructions, timezone, addressLat, addressLng, paymentRecordingReq, rescheduleWindow, widgetConsentTemplateId || null, sendReminder7d, sendReminder24h, payForfeitedDeposits, schedulingMode);
+      await updateStudioProfile(name.trim(), address.trim(), widgetBgColor, widgetAccentColor, isNaN(wc) ? 0 : wc, isNaN(pc) ? 0 : pc, aftercareInstructions, timezone, addressLat, addressLng, paymentRecordingReq, rescheduleWindow, widgetConsentTemplateId || null, sendReminder7d, sendReminder24h, payForfeitedDeposits, schedulingMode, piercingAftercareInstructions, sendReminder3d);
       invalidate('studio-account');
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
@@ -662,7 +678,7 @@ export default function SettingsPage() {
       sessionStorage.removeItem(`vanta-studio-tour-start:${session.user.id}`);
     }
     await getSupabase().auth.signOut();
-    router.replace('/');
+    window.location.replace('/'); // full load; see dashboard/layout.js
   }
 
   function copyLink() {
@@ -672,13 +688,14 @@ export default function SettingsPage() {
     });
   }
 
+  const isBillingExempt = billingDetails?.billing_exempt === true;
   const isCanceling = billingDetails?.cancel_at_period_end === true;
   const periodEndLabel = billingDetails?.current_period_end
     ? new Date(billingDetails.current_period_end).toLocaleDateString()
     : '';
   const hasBillingPeriod = !!billingDetails?.current_period_end;
   const billingHeroLabel = isCanceling ? 'Access ends' : hasBillingPeriod ? 'Next payment' : 'Estimated monthly';
-  const billingHeroCents = hasBillingPeriod ? (billingDetails?.next_amount_due_cents ?? 0) : (billingDetails?.estimated_monthly_cents ?? 6000);
+  const billingHeroCents = hasBillingPeriod ? (billingDetails?.next_amount_due_cents ?? 0) : (billingDetails?.estimated_monthly_cents ?? 3000);
   const billingSeatCount = billingDetails?.seat_count ?? 0;
 
   const embedSnippet = studioId
@@ -718,6 +735,8 @@ export default function SettingsPage() {
           ))}
         </div>
       </div>
+
+      {tab === 'account' && <StudioSetupLinks />}
 
       <div className="studio-feature-grid" style={s.grid}>
 
@@ -919,16 +938,14 @@ export default function SettingsPage() {
                 aria-checked={payForfeitedDeposits}
                 aria-label="Pay artist on forfeited deposits"
                 onClick={() => setPayForfeitedDeposits(v => !v)}
-                style={{
-                  width: 44, height: 24, borderRadius: 12, border: '1px solid var(--switch-edge)', cursor: 'pointer',
-                  background: payForfeitedDeposits ? 'var(--switch-on)' : 'var(--switch-off)',
-                  position: 'relative', transition: 'background 0.2s', flexShrink: 0,
-                }}
+                style={{ width: 44, height: 24, padding: 0, border: 0, background: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
               >
+                <span aria-hidden="true" style={{ display: 'block', width: 44, height: 24, borderRadius: 12, border: '1px solid var(--switch-edge)', background: payForfeitedDeposits ? 'var(--switch-on)' : 'var(--switch-off)', position: 'relative', transition: 'background 0.2s' }}>
                 <span style={{
                   position: 'absolute', top: 2, left: payForfeitedDeposits ? 22 : 2, width: 18, height: 18,
                   borderRadius: '50%', background: 'var(--switch-thumb)', border: '1px solid var(--switch-edge)', boxShadow: '0 1px 3px rgba(0,0,0,0.65)', transition: 'left 0.2s',
                 }} />
+                </span>
               </button>
             </div>
             {profileError && <p style={s.errorText}>{profileError}</p>}
@@ -1012,59 +1029,96 @@ export default function SettingsPage() {
 
         <section style={{ ...s.card, gridColumn: '1 / -1' }}>
           <h2 style={s.sectionTitle}>Emails</h2>
-          <p style={s.sectionDesc}>Booking confirmation is always sent. Choose which reminder emails your clients receive.</p>
+          <p style={s.sectionDesc}>Booking confirmation is always sent. Choose up to 2 reminder emails for your clients.</p>
+          <p id="email-reminder-limit" role="status" style={{ fontSize: '0.8rem', color: selectedReminderCount > 2 ? 'var(--color-danger)' : 'var(--text-muted)', margin: 0 }}>
+            {selectedReminderCount > 2
+              ? 'Turn off a reminder before saving. You can select up to 2.'
+              : `${selectedReminderCount} of 2 selected.${selectedReminderCount === 2 ? ' Turn one off to choose another.' : ''}`}
+          </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 0', borderBottom: '1px solid var(--border)' }}>
-              <div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '14px 0', borderBottom: '1px solid var(--border)' }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text)' }}>7-day reminder</div>
-                <div style={{ fontSize: 13, color: 'var(--text-ghost)', marginTop: 2 }}>Sent to clients 7 days before their appointment</div>
+                <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4, lineHeight: 1.45 }}>Sent to clients 7 days before their appointment</div>
               </div>
               <button
+                type="button"
+                disabled={saving}
+                aria-describedby="email-reminder-limit"
                 role="switch"
                 aria-label="7-day reminder"
                 aria-checked={sendReminder7d}
-                onClick={() => { setSendReminder7d(v => !v); }}
-                style={{
-                  width: 44, height: 24, borderRadius: 12, border: '1px solid var(--switch-edge)', cursor: 'pointer',
-                  background: sendReminder7d ? 'var(--switch-on)' : 'var(--switch-off)',
-                  position: 'relative', transition: 'background 0.2s', flexShrink: 0,
-                }}
+                onClick={() => toggleEmailReminder(sendReminder7d, setSendReminder7d)}
+                style={{ width: 52, height: 44, padding: 0, border: 0, background: 'transparent', cursor: saving ? 'not-allowed' : 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
               >
+                <span aria-hidden="true" style={{ display: 'block', flex: 'none', boxSizing: 'border-box', width: 44, height: 24, borderRadius: 999, border: '1px solid var(--switch-edge)', background: sendReminder7d ? 'var(--switch-on)' : 'var(--switch-off)', position: 'relative', transition: 'background 0.2s' }}>
                 <span style={{
-                  position: 'absolute', top: 3, left: sendReminder7d ? 23 : 3, width: 18, height: 18,
-                  borderRadius: '50%', background: 'var(--switch-thumb)', boxShadow: '0 1px 3px rgba(0,0,0,0.65)', transition: 'left 0.2s',
+                  position: 'absolute', top: 2, left: 2, transform: sendReminder7d ? 'translateX(20px)' : 'translateX(0)', width: 18, height: 18,
+                  borderRadius: '50%', background: 'var(--switch-thumb)', boxShadow: '0 1px 3px rgba(0,0,0,0.65)', transition: 'transform 0.2s',
                 }} />
+                </span>
               </button>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 0' }}>
-              <div>
-                <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text)' }}>24-hour reminder</div>
-                <div style={{ fontSize: 13, color: 'var(--text-ghost)', marginTop: 2 }}>Sent to clients 24 hours before their appointment</div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '14px 0', borderBottom: '1px solid var(--border)' }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text)' }}>3-day reminder</div>
+                <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4, lineHeight: 1.45 }}>Sent to clients 3 days before their appointment</div>
               </div>
               <button
+                type="button"
+                disabled={saving}
+                aria-describedby="email-reminder-limit"
+                role="switch"
+                aria-label="3-day reminder"
+                aria-checked={sendReminder3d}
+                onClick={() => toggleEmailReminder(sendReminder3d, setSendReminder3d)}
+                style={{ width: 52, height: 44, padding: 0, border: 0, background: 'transparent', cursor: saving ? 'not-allowed' : 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+              >
+                <span aria-hidden="true" style={{ display: 'block', flex: 'none', boxSizing: 'border-box', width: 44, height: 24, borderRadius: 999, border: '1px solid var(--switch-edge)', background: sendReminder3d ? 'var(--switch-on)' : 'var(--switch-off)', position: 'relative', transition: 'background 0.2s' }}>
+                <span style={{
+                  position: 'absolute', top: 2, left: 2, transform: sendReminder3d ? 'translateX(20px)' : 'translateX(0)', width: 18, height: 18,
+                  borderRadius: '50%', background: 'var(--switch-thumb)', boxShadow: '0 1px 3px rgba(0,0,0,0.65)', transition: 'transform 0.2s',
+                }} />
+                </span>
+              </button>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '14px 0' }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text)' }}>24-hour reminder</div>
+                <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4, lineHeight: 1.45 }}>Sent to clients 24 hours before their appointment</div>
+              </div>
+              <button
+                type="button"
+                disabled={saving}
+                aria-describedby="email-reminder-limit"
                 role="switch"
                 aria-label="24-hour reminder"
                 aria-checked={sendReminder24h}
-                onClick={() => { setSendReminder24h(v => !v); }}
-                style={{
-                  width: 44, height: 24, borderRadius: 12, border: '1px solid var(--switch-edge)', cursor: 'pointer',
-                  background: sendReminder24h ? 'var(--switch-on)' : 'var(--switch-off)',
-                  position: 'relative', transition: 'background 0.2s', flexShrink: 0,
-                }}
+                onClick={() => toggleEmailReminder(sendReminder24h, setSendReminder24h)}
+                style={{ width: 52, height: 44, padding: 0, border: 0, background: 'transparent', cursor: saving ? 'not-allowed' : 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
               >
+                <span aria-hidden="true" style={{ display: 'block', flex: 'none', boxSizing: 'border-box', width: 44, height: 24, borderRadius: 999, border: '1px solid var(--switch-edge)', background: sendReminder24h ? 'var(--switch-on)' : 'var(--switch-off)', position: 'relative', transition: 'background 0.2s' }}>
                 <span style={{
-                  position: 'absolute', top: 3, left: sendReminder24h ? 23 : 3, width: 18, height: 18,
-                  borderRadius: '50%', background: 'var(--switch-thumb)', boxShadow: '0 1px 3px rgba(0,0,0,0.65)', transition: 'left 0.2s',
+                  position: 'absolute', top: 2, left: 2, transform: sendReminder24h ? 'translateX(20px)' : 'translateX(0)', width: 18, height: 18,
+                  borderRadius: '50%', background: 'var(--switch-thumb)', boxShadow: '0 1px 3px rgba(0,0,0,0.65)', transition: 'transform 0.2s',
                 }} />
+                </span>
               </button>
             </div>
           </div>
-          <button onClick={saveProfile} style={s.saveBtn} disabled={saving}>
+          <button onClick={saveProfile} style={s.saveBtn} disabled={saving || selectedReminderCount > 2}>
             {saving ? t('saving') : saved ? t('saved') : t('save')}
           </button>
         </section>
 
         <SMSSettings styles={s} />
+
+        <section style={{ ...s.card, gridColumn: '1 / -1' }}>
+          <h2 style={s.sectionTitle}>Piercing aftercare instructions</h2>
+          <p style={s.sectionDesc}>Your studio’s guidance is attached to completed piercing appointments. Tattoo instructions are kept separate.</p>
+          <textarea aria-label="Piercing aftercare instructions" style={{ ...s.input, minHeight: 120, resize: 'vertical', lineHeight: 1.6 }} value={piercingAftercareInstructions} onChange={e => setPiercingAftercareInstructions(e.target.value)} placeholder="Add your studio’s piercing aftercare instructions…" />
+          <button onClick={saveProfile} style={s.saveBtn} disabled={saving}>{saving ? t('saving') : saved ? t('saved') : t('save')}</button>
+        </section>
 
         {/* Aftercare instructions — temporarily hidden
         <section style={{ ...s.card, gridColumn: '1 / -1' }}>
@@ -1083,14 +1137,12 @@ export default function SettingsPage() {
         */}
 
         <section style={{ ...s.card, gridColumn: '1 / -1' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
+            <div style={{ flex: '1 1 260px', minWidth: 0 }}>
               <h2 style={s.sectionTitle}>{t('consent_forms')}</h2>
               <p style={s.sectionDesc}>Create consent forms with custom fields, e-signatures, and minor / guardian support.</p>
             </div>
-            {/* New form button — re-enable when multiple consent forms are supported
-            <button onClick={openNewTemplate} style={s.addTemplateBtn}>{t('new_form')}</button>
-            */}
+            <button type="button" onClick={openNewTemplate} style={{ ...s.addTemplateBtn, minHeight: 44, maxWidth: '100%' }}>Create consent form template</button>
           </div>
 
           {walkInUrl && (
@@ -1105,7 +1157,7 @@ export default function SettingsPage() {
           )}
 
           {consentTemplates.length === 0 && (
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-ghost)', fontStyle: 'italic' }}>No forms yet. Click "+ New form" to create one.</p>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-ghost)', fontStyle: 'italic' }}>No consent forms yet. Create a template to get started.</p>
           )}
 
           {consentTemplates.map(t => (
@@ -1129,9 +1181,21 @@ export default function SettingsPage() {
 
         {/* ── Template builder modal ── */}
         {templateBuilderOpen && (
-          <Dialog title={editingTemplate ? 'Edit form' : 'New consent form'} onClose={() => setTemplateBuilderOpen(false)} dismissDisabled={templateSaving} maxWidth={980}>
+          <Dialog
+            title={editingTemplate ? 'Edit form' : 'New consent form'}
+            onClose={() => setTemplateBuilderOpen(false)}
+            dismissDisabled={templateSaving}
+            maxWidth={980}
+            className="studio-consent-editor"
+            footer={<>
+              <button style={s.cancelBtn} disabled={templateSaving} onClick={() => setTemplateBuilderOpen(false)}>Cancel</button>
+              <button style={{ ...s.saveBtn, flex: 2 }} onClick={saveTemplate} disabled={templateSaving}>
+                {templateSaving ? 'Saving…' : 'Save form'}
+              </button>
+            </>}
+          >
 
-              <div className="studio-feature-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', alignItems: 'start' }}>
+              <div className="studio-feature-grid studio-consent-editor-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', alignItems: 'start' }}>
                 {/* Left — editor */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                   <div style={s.field}>
@@ -1151,7 +1215,7 @@ export default function SettingsPage() {
                   </div>
 
                   <div style={{ borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+                    <div className="studio-consent-field-toolbar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
                       <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Fields ({templateFields.length})</span>
                       <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
                         {[['heading','Heading'],['paragraph','Paragraph'],['checkbox','Checkbox'],['text','Text'],['textarea','Textarea'],['yesno','Yes/No']].map(([type, label]) => (
@@ -1200,7 +1264,7 @@ export default function SettingsPage() {
                 </div>
 
                 {/* Right — preview */}
-                <div style={{ position: 'sticky', top: 0 }}>
+                <div className="studio-consent-preview" style={{ position: 'sticky', top: 0 }}>
                   <ConsentFormPreview
                     name={templateName}
                     fields={templateFields}
@@ -1212,12 +1276,6 @@ export default function SettingsPage() {
 
               {templateError && <p role="alert" style={{ fontSize: '0.8rem', color: 'var(--color-danger)', margin: 0 }}>{templateError}</p>}
 
-              <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
-                <button style={s.cancelBtn} disabled={templateSaving} onClick={() => setTemplateBuilderOpen(false)}>Cancel</button>
-                <button style={{ ...s.saveBtn, flex: 2 }} onClick={saveTemplate} disabled={templateSaving}>
-                  {templateSaving ? 'Saving…' : 'Save form'}
-                </button>
-              </div>
           </Dialog>
         )}
 
@@ -1407,23 +1465,22 @@ export default function SettingsPage() {
                     {consentTemplates.length > 0 && (
                       <>
                         <div style={{ borderTop: '1px solid var(--border)', margin: '0.1rem 0' }} />
-                        <div style={s.formFieldRow}>
+                        <div style={{ ...s.formFieldRow, flexWrap: 'wrap' }}>
                           <span style={{ flex: 1, fontSize: '0.83rem', fontWeight: 500, color: widgetConsentTemplateId ? 'var(--text)' : 'var(--text-ghost)' }}>
                             Consent form
                           </span>
-                          {/* Multi-template picker — re-enable when studios can have multiple consent forms
-                          {widgetConsentTemplateId && (
+                          {widgetConsentTemplateId && consentTemplates.length > 1 && (
                             <select
+                              aria-label="Booking consent form template"
                               value={widgetConsentTemplateId}
                               onChange={e => setWidgetConsentTemplateId(e.target.value)}
-                              style={{ ...s.input, width: 'auto', fontSize: '0.8rem', padding: '0.3rem 0.6rem' }}
+                              style={{ ...s.input, flex: '1 1 180px', minWidth: 0, maxWidth: '100%', width: 'auto', fontSize: '0.8rem', padding: '0.3rem 0.6rem' }}
                             >
                               {consentTemplates.map(t => (
                                 <option key={t.id} value={t.id}>{t.name}</option>
                               ))}
                             </select>
                           )}
-                          */}
                           <button
                             role="switch"
                             aria-label="Consent form field"
@@ -1484,9 +1541,15 @@ export default function SettingsPage() {
 
         <section style={{ ...s.card, gridColumn: '1 / -1' }}>
           <h2 style={s.sectionTitle}>Billing</h2>
+          {isBillingExempt ? <div>
+            <p style={s.sectionDesc}>This demo studio has complimentary access.</p>
+            <p style={{ margin: '0.75rem 0 0', fontWeight: 600 }}>No billing required</p>
+            <p style={s.sectionDesc}>No subscription, payment card or recurring charges.</p>
+          </div> : <>
+
           <p style={s.sectionDesc}>
-            {formatCents(billingDetails?.base_tier_cents ?? 6000)}/mo AUD covers up to {billingDetails?.base_tier_seats ?? 6} artists,
-            then {formatCents(billingDetails?.per_extra_seat_cents ?? 1500)}/artist beyond that.
+            {formatCents(billingDetails?.base_tier_cents ?? 3000)}/mo AUD covers up to {billingDetails?.base_tier_seats ?? 6} artists,
+            then {formatCents(billingDetails?.per_extra_seat_cents ?? 500)}/artist beyond that.
           </p>
 
           {billingNotice && <p style={{ fontSize: '0.82rem', color: 'var(--accent)', margin: 0 }}>{billingNotice}</p>}
@@ -1562,6 +1625,7 @@ export default function SettingsPage() {
               </div>
             </div>
           )}
+          </>}
         </section>
 
         {cancelModalOpen && (

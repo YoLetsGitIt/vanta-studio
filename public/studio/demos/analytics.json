@@ -1,0 +1,20 @@
+{
+  "src": "/studio/demos/analytics.mp4",
+  "poster": "/studio/demos/analytics-poster.jpg",
+  "duration": 13,
+  "title": "See how your studio is doing",
+  "chapters": [
+    {
+      "at": 0,
+      "title": "Choose the period you want to understand."
+    },
+    {
+      "at": 4.3,
+      "title": "Track bookings, revenue and booking sources."
+    },
+    {
+      "at": 8.4,
+      "title": "See new clients, returning clients and spending."
+    }
+  ]
+}

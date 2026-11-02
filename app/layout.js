@@ -2,6 +2,7 @@ import './globals.css';
 import './mobile.css';
 import { getThemeInitScript } from '@/lib/theme';
 import { Space_Grotesk } from 'next/font/google';
+import ContactEmailSignupGate from '../components/ContactEmailSignupGate';
 
 const spaceGrotesk = Space_Grotesk({
   subsets: ['latin'],
@@ -23,6 +24,7 @@ export default function RootLayout({ children }) {
       <body className={spaceGrotesk.variable}>
         <script dangerouslySetInnerHTML={{ __html: getThemeInitScript() }} />
         {children}
+        <ContactEmailSignupGate />
       </body>
     </html>
   );

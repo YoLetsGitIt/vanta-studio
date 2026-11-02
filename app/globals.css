@@ -391,8 +391,10 @@ textarea {
 }
 
 @media (any-pointer: coarse) {
-  :where(button:not([role="switch"]), .studio-button, .studio-control) { min-height: var(--target-size-touch) !important; }
+  :where(button, .studio-button, .studio-control) { min-height: var(--target-size-touch) !important; min-width: var(--target-size-touch) !important; }
   .studio-button--icon { min-width: var(--target-size-touch) !important; }
+  button[role="switch"] { display: inline-flex; align-items: center; justify-content: center; }
+  select { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
   /* Avoid iOS zooming the viewport when a form field receives focus. */
   input:not([type="checkbox"]):not([type="radio"]), textarea, select { font-size: max(1rem, 16px) !important; }
 }
@@ -422,4 +424,9 @@ textarea {
 @media (max-width: 760px) {
   .studio-settings-page { padding: 20px 16px 48px !important; min-width: 0; }
   .studio-settings-header { flex-wrap: wrap; gap: 12px; }
+}
+
+@media (max-width: 600px) {
+  .studio-analytics-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 10px !important; }
+  .studio-analytics-kpis > * { padding: 12px !important; min-width: 0; }
 }

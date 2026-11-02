@@ -1,0 +1,40 @@
+.button{position:relative;isolation:isolate;display:block;width:244px;height:96px;max-width:100%;margin:27px auto 0;padding:0;border:0;background:none;color:#f0dfbc;font-family:var(--font-body),Arial,sans-serif;cursor:pointer;-webkit-tap-highlight-color:transparent;filter:drop-shadow(0 8px 18px #0004);transition:transform .25s,color .2s}
+.button::before{content:'';position:absolute;inset:0;z-index:-2;background:#151b17dd;clip-path:polygon(11.5% 18.75%,40.5% 18.75%,50% 8.3%,59.5% 18.75%,88.5% 18.75%,96% 37.5%,96% 62.5%,88.5% 81.25%,59.5% 81.25%,50% 91.7%,40.5% 81.25%,11.5% 81.25%,4% 62.5%,4% 37.5%)}
+.flash{position:absolute;inset:0;width:100%;height:100%;stroke:currentColor;stroke-width:1.2;stroke-linecap:round;stroke-linejoin:round;overflow:visible;pointer-events:none}
+.outline{stroke-dasharray:1;animation:flashDraw 1.3s ease-out both}
+.detail{opacity:.4;stroke-width:.8}
+.needle{stroke-width:1.45;transform-origin:47px 67px;animation:needleMark 1.5s ease-in-out 2}
+.spark{opacity:.65;stroke-width:.8}
+.inkLine{stroke-width:1.4;stroke-dasharray:1;animation:flashDraw .9s .5s ease-out both}
+.tip{opacity:.7}
+.label{position:absolute;left:84px;right:25px;top:35px;text-align:center;font-size:13px;font-weight:600;line-height:1.4;letter-spacing:1.4px;text-transform:uppercase;pointer-events:none}
+.ink{position:absolute;z-index:-1;inset:0;clip-path:polygon(11.5% 18.75%,40.5% 18.75%,50% 8.3%,59.5% 18.75%,88.5% 18.75%,96% 37.5%,96% 62.5%,88.5% 81.25%,59.5% 81.25%,50% 91.7%,40.5% 81.25%,11.5% 81.25%,4% 62.5%,4% 37.5%);pointer-events:none}.ink::before{content:'';position:absolute;inset:0;background:#efdfbc;clip-path:circle(0 at 19% 72%)}
+.button[data-pressed=true]{color:#20271f;transform:scale(.98)}
+.button[data-pressed=true] .flash,.button[data-pressed=true] .label{color:#f0dfbc;mix-blend-mode:difference}
+.button[data-pressed=true] .ink::before{animation:inkStamp .7s ease-out both}
+.button[data-pressed=true] .needle{animation:none;transform:translateY(2px)}
+.button:focus-visible{outline:2px solid #efdfbc;outline-offset:5px;border-radius:12px}
+@media(hover:hover){.button:hover{transform:translateY(-3px);color:#fff0d0;filter:drop-shadow(0 8px 22px #ddb66e25)}.button:hover .inkLine{animation:flashDraw .65s ease-out both}.button[data-pressed=true]:hover{color:#20271f;transform:scale(.98)}}
+@keyframes flashDraw{from{stroke-dashoffset:1;opacity:.15}to{stroke-dashoffset:0;opacity:1}}
+@keyframes needleMark{0%,45%,100%{transform:translateY(0)}52%,68%{transform:translateY(1.8px)}60%,76%{transform:translateY(-.6px)}}
+@keyframes inkStamp{0%{clip-path:circle(0 at 19% 72%);opacity:1}70%{clip-path:circle(105% at 19% 72%);opacity:1}100%{clip-path:circle(105% at 19% 72%);opacity:1}}
+@media(min-width:760px){.button{margin-top:31px;width:268px;height:105px}.label{left:92px;right:28px;top:38px;font-size:14px}}
+@media(max-height:500px) and (min-width:600px){.button{margin-top:16px;width:220px;height:87px}.label{left:76px;right:23px;top:31px;font-size:12px}}
+@media(prefers-reduced-motion:reduce){.button,.flash *,.ink::before{animation:none!important;transition:none!important}.button[data-pressed=true]{color:#f0dfbc}}
+.button[data-animated=false],.button[data-animated=false] .flash *,.button[data-animated=false] .ink::before{animation:none!important;transition:none!important}.button[data-animated=false][data-pressed=true]{color:#f0dfbc}
+
+/* Artist variant: a phone buzzing with an incoming booking request. */
+.phone{stroke-width:1.35}
+.phoneBody{transform-origin:47px 47px;animation:phoneBuzz 2.4s ease-in-out 1.1s 3}
+.phoneScreen{opacity:.45;stroke-width:1}
+.phoneBadge{fill:#e9c98f;stroke:#151b17;stroke-width:1.2;transform-origin:55px 25px;animation:badgePop .5s 1s cubic-bezier(.3,1.6,.5,1) both}
+.buzz{opacity:0;stroke-width:1;animation:buzzMarks 2.4s ease-out 1.1s 3}
+.button[data-pressed=true] .phoneBody{animation:none;transform:translateY(2px)}
+.button[data-pressed=true] .buzz{animation:none;opacity:0}
+@media(hover:hover){.button[data-icon=phone]:hover .phoneBody{animation:phoneBuzz .9s ease-in-out}.button[data-icon=phone]:hover .buzz{animation:buzzMarks .9s ease-out}}
+@keyframes phoneBuzz{0%,30%,100%{transform:rotate(0)}33%{transform:rotate(-7deg)}37%{transform:rotate(6deg)}41%{transform:rotate(-5deg)}45%{transform:rotate(4deg)}49%{transform:rotate(-2deg)}53%{transform:rotate(0)}}
+@keyframes buzzMarks{0%,30%{opacity:0;transform:scale(.85)}38%{opacity:.75}60%,100%{opacity:0;transform:scale(1.1)}}
+@keyframes badgePop{from{transform:scale(0)}to{transform:scale(1)}}
+.buzz{transform-origin:47px 46px}
+@media(prefers-reduced-motion:reduce){.phoneBadge{transform:none}}
+.button[data-animated=false] .phoneBadge{transform:none}

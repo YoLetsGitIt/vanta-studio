@@ -126,19 +126,6 @@ export default function FinancialPage() {
   function onStartChange(e) { setStartDate(e.target.value); setActiveQuick(null); }
   function onEndChange(e)   { setEndDate(e.target.value);   setActiveQuick(null); }
 
-  function exportCSV() {
-    if (!stats?.weekly?.length) return;
-    const rows = [
-      ['Week Start', 'Gross Sales', 'Deposits Collected'],
-      ...stats.weekly.map(w => [w.week_start, w.gross_sales ?? 0, w.deposits_collected ?? 0]),
-    ];
-    const csv = rows.map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
-    a.download = `revenue-${startDate}-to-${endDate}.csv`;
-    a.click();
-  }
-
   function handleLock() {
     setUnlocked(false);
     sessionStorage.removeItem('financial_unlocked');
@@ -186,10 +173,6 @@ export default function FinancialPage() {
             <span style={st.dateArrow}>→</span>
             <input type="date" aria-label="End date" value={endDate} min={startDate} max={today} onChange={onEndChange} style={st.dateInput} />
           </div>
-          <div style={st.dateSep} />
-          <button onClick={exportCSV} disabled={!stats?.weekly?.length} style={st.exportBtn} title="Export weekly stats as CSV">
-            {t('revenue_export')}
-          </button>
         </div>
       </div>
 
@@ -325,6 +308,14 @@ function FinancialContent({ s, weeklyChart, startDate, endDate, isLight }) {
                 <Bar dataKey="deposits" fill="var(--color-info)"    radius={[4,4,0,0]} name="Deposits" />
               </BarChart>
             </ResponsiveContainer>
+            <details style={{ marginTop: 16 }}>
+              <summary style={{ cursor: 'pointer', minHeight: 44, lineHeight: '44px' }}>View chart data</summary>
+              <table style={{ width: '100%', textAlign: 'left', fontSize: 14 }}>
+                <caption style={{ textAlign: 'left', padding: '8px 0' }}>Weekly sales and deposits</caption>
+                <thead><tr><th scope="col">Week</th><th scope="col">Gross sales</th><th scope="col">Deposits</th></tr></thead>
+                <tbody>{weeklyChart.map(row => <tr key={row.week}><th scope="row">{row.week}</th><td>{fmt(row.gross)}</td><td>{fmt(row.deposits)}</td></tr>)}</tbody>
+              </table>
+            </details>
             <div style={st.legend}>
               <LegendDot color="var(--color-success)" label="Gross sales" />
               <LegendDot color="var(--color-info)" label="Deposits" />
@@ -962,12 +953,6 @@ const st = {
     color: 'var(--text-dim)', fontSize: '0.85rem', fontWeight: 500, cursor: 'pointer',
   },
   weekBtnActive: { background: 'var(--accent)', border: '1px solid var(--accent)', color: 'var(--accent-contrast)', fontWeight: 700 },
-  exportBtn: {
-    padding: '0.4rem 0.9rem', borderRadius: 20,
-    border: '1px solid var(--border-strong)', background: 'transparent',
-    color: 'var(--text-dim)', fontSize: '0.85rem', fontWeight: 500, cursor: 'pointer',
-    whiteSpace: 'nowrap',
-  },
 
   tabBar: {
     display: 'flex', alignItems: 'center', gap: '0.25rem', flexWrap: 'wrap',

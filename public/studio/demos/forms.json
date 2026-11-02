@@ -1,0 +1,20 @@
+{
+  "src": "/studio/demos/forms.mp4",
+  "poster": "/studio/demos/forms-poster.jpg",
+  "duration": 13,
+  "title": "Your booking form",
+  "chapters": [
+    {
+      "at": 0,
+      "title": "Choose the fields your studio needs."
+    },
+    {
+      "at": 4.3,
+      "title": "Make important answers required."
+    },
+    {
+      "at": 8.5,
+      "title": "Your chosen fields appear in the live preview."
+    }
+  ]
+}

@@ -467,6 +467,8 @@ function ArtistDetail({ artist, onBack, onApprove, onReject, onRemove, onToggleA
   const [scheduleEdits,   setScheduleEdits]   = useState({}); // { dow: { start, end, on } }
   const [scheduleSaving,  setScheduleSaving]  = useState(false);
   const [scheduleError,   setScheduleError]   = useState('');
+  const [detailLoadErrors, setDetailLoadErrors] = useState([]);
+  const [detailLoadAttempt, setDetailLoadAttempt] = useState(0);
 
   // Day labels and their Sunday-indexed dow values
   const SCHED_DAYS = [
@@ -509,11 +511,11 @@ function ArtistDetail({ artist, onBack, onApprove, onReject, onRemove, onToggleA
   }
 
   useEffect(() => {
-    getStudioArtistStats(artist.id).then(setStats).catch(() => {});
+    getStudioArtistStats(artist.id).then(setStats).catch(() => setDetailLoadErrors(previous => [...new Set([...previous, 'Performance'])]));
     getArtistWorkSchedule(artist.artistId)
       .then(d => setWorkSchedule(d.schedule ?? []))
-      .catch(() => setWorkSchedule([]));
-  }, [artist.id]);
+      .catch(() => setDetailLoadErrors(previous => [...new Set([...previous, 'Work schedule'])]));
+  }, [artist.id, detailLoadAttempt]);
 
   useEffect(() => {
     const today = new Date();
@@ -526,11 +528,12 @@ function ArtistDetail({ artist, onBack, onApprove, onReject, onRemove, onToggleA
         const entries = (d.entries ?? []).filter(e => e.artistId === artist.artistId);
         setSchedule(entries);
       })
-      .catch(() => setSchedule([]));
-  }, [artist.id]);
+      .catch(() => setDetailLoadErrors(previous => [...new Set([...previous, 'Upcoming schedule'])]));
+  }, [artist.id, detailLoadAttempt]);
 
   return (
     <div className="studio-feature-page studio-artists-page" style={s.page}>
+      {detailLoadErrors.length > 0 && <div role="alert" style={{ padding: 16 }}><p>Unable to load: {detailLoadErrors.join(', ')}.</p><button type="button" className="studio-button studio-button--secondary" onClick={() => { setDetailLoadErrors([]); setDetailLoadAttempt(value => value + 1); }}>Try again</button></div>}
       <div className="studio-feature-header" style={s.detailHeader}>
         <button onClick={onBack} style={s.backBtn}>← Artists</button>
       </div>

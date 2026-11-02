@@ -59,6 +59,7 @@ const TOUR_STEPS = [
 // No reminder is shown ahead of time; this only ever renders once the dashboard is
 // actually locked.
 function subscriptionInactive(studio) {
+  if (studio?.billing_exempt) return false;
   return studio?.subscription_status !== 'trialing' && studio?.subscription_status !== 'active';
 }
 
@@ -181,7 +182,9 @@ function DashboardShell({ children }) {
     async function init() {
       const supabase = getSupabase();
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { router.replace('/signin'); return; }
+      // Full page loads: the auth pages may come from a different build, and a
+      // client-side hop between builds fails and lands on the raw /signin.txt.
+      if (!session) { window.location.replace('/signin'); return; }
       setUser(session.user);
 
       let studioAccount;
@@ -189,7 +192,7 @@ function DashboardShell({ children }) {
         studioAccount = await getMyStudioAccount();
       } catch {
         await getSupabase().auth.signOut();
-        router.replace('/signin');
+        window.location.replace('/signin');
         return;
       }
 
@@ -221,7 +224,7 @@ function DashboardShell({ children }) {
       sessionStorage.removeItem(`vanta-studio-tour-start:${user.id}`);
     }
     await getSupabase().auth.signOut();
-    router.replace('/signin');
+    window.location.replace('/signin');
   }
 
   if (!ready) {

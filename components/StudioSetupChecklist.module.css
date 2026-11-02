@@ -1,0 +1,68 @@
+/* Dashboard navigation can retain an earlier stylesheet; scope these rules above it. */
+:global(html:root) .card, :global(html:root) .shortcuts { min-width: 0; border: 1px solid var(--border); background: var(--bg-card); border-radius: 16px; padding: 1.5rem; color: var(--text); }
+:global(html:root) .card { container: studio-setup / inline-size; scroll-margin-top: 1rem; }
+:global(html:root) .compactHeader { display: flex; align-items: center; gap: .75rem; }
+:global(html:root) .compactHeader h2 { margin: 0; font-size: 1rem; font-weight: 600; letter-spacing: -.02em; line-height: 1.4; }
+:global(html:root) .progress { margin: 0 0 0 auto; color: var(--text-dim); font-size: .78rem; line-height: 1.4; }
+:global(html:root) .collapse { display: inline-flex; align-items: center; justify-content: center; gap: .25rem; min-height: 44px; padding: .35rem .4rem; border: 0; border-radius: 6px; background: transparent; color: var(--text-dim); font: inherit; font-size: .78rem; cursor: pointer; }
+:global(html:root) .collapse:hover { background: var(--accent-tint); color: var(--text); }
+:global(html:root) .collapse svg { width: 14px; height: 14px; flex-shrink: 0; }
+:global(html:root) .collapse[aria-expanded="true"] svg { transform: rotate(180deg); }
+:global(html:root) .compactSteps { list-style: none; padding: 0; margin: .5rem 0 0; border-top: 1px solid var(--border-faint); }
+:global(html:root) .compactStep { min-width: 0; display: flex; align-items: center; gap: .25rem; border-bottom: 1px solid var(--border-faint); }
+:global(html:root) .compactStep:last-child { border-bottom: 0; }
+:global(html:root) .stepLink { flex: 1; min-width: 0; display: flex; align-items: center; gap: .65rem; min-height: 48px; padding: .4rem 0; color: var(--text); text-decoration: none; border-radius: 5px; }
+:global(html:root) .stepLink > svg { flex-shrink: 0; width: 15px; height: 15px; color: var(--text-dim); margin-left: auto; transition: transform 150ms; }
+:global(html:root) .stepLink:hover > svg { transform: translateX(3px); color: var(--text); }
+:global(html:root) .stepLink:hover .linkedTitle { text-decoration: underline; text-underline-offset: 4px; }
+:global(html:root) .linkedTitle { min-width: 0; margin: 0; font-size: .875rem; font-weight: 500; line-height: 1.4; }
+:global(html:root) .optional { flex-shrink: 0; color: var(--text-dim); font-size: .7rem; line-height: 1.4; }
+:global(html:root) .compactStep[data-status="complete"] .linkedTitle { color: var(--text-muted); }
+:global(html:root) .completionButton { flex: 0 0 44px; display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; min-width: 44px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--text); cursor: pointer; }
+:global(html:root) .completionMark { box-sizing: border-box; display: grid; place-items: center; width: 20px; height: 20px; border: 1px solid var(--text-ghost); border-radius: 5px; transition: background 150ms, border-color 150ms, color 150ms; }
+:global(html:root) .completionButton:hover .completionMark { border-color: var(--text); }
+:global(html:root) .completionButton[aria-pressed="true"] .completionMark { background: var(--text); border-color: var(--text); color: var(--bg-base); }
+:global(html:root) .completionButton svg { width: 16px; height: 16px; }
+:global(html:root) .completionButton[data-animate="true"] svg { animation: tickAppear 220ms ease-out 80ms both; }
+:global(html:root) .completionButton[data-animate="true"] svg path { stroke-dasharray: 1; animation: tickDraw 300ms ease-out 80ms both; }
+@keyframes tickAppear { from { opacity: 0; transform: scale(.65); } to { opacity: 1; transform: scale(1); } }
+@keyframes tickDraw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+:global(html:root) .completionButton[aria-disabled="true"] { opacity: .55; cursor: wait; }
+:global(html:root) .message { margin: 1rem 0 0; color: var(--text-dim); font-size: .8rem; line-height: 1.6; }
+:global(html:root) .error { margin: 1rem 0 0; font-size: .8rem; line-height: 1.5; color: var(--color-danger, #dc7878); }
+:global(html:root) .error button { margin-left: .5rem; min-height: 44px; border: 0; background: none; color: inherit; font: inherit; text-decoration: underline; cursor: pointer; }
+:global(html:root) .card button:disabled, :global(html:root) .card input:disabled { opacity: .55; cursor: wait; }
+:global(html:root) .card :is(a, button, input):focus-visible, :global(html:root) .shortcuts a:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 4px; }
+:global(html:root) .shortcuts { display: block; container: account-setup / inline-size; margin-bottom: 1.5rem; padding: 1.25rem; }
+:global(html:root) .shortcutHeader h2 { margin: 0; font-size: .95rem; font-weight: 600; line-height: 1.4; letter-spacing: -.02em; }
+:global(html:root) .shortcutHeader p { margin: .3rem 0 0; color: var(--text-dim); font-size: .78rem; line-height: 1.6; }
+:global(html:root) .shortcutGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; margin-top: 1rem; }
+:global(html:root) .shortcutLink { min-width: 0; display: flex; align-items: center; gap: .85rem; padding: 1rem; border: 1px solid var(--border-faint); border-radius: 10px; color: var(--text); text-decoration: none; transition: border-color 150ms, background 150ms; }
+:global(html:root) .shortcutLink:hover { border-color: color-mix(in srgb, var(--text) 25%, transparent); background: var(--accent-tint); }
+:global(html:root) .shortcutIcon { flex-shrink: 0; display: grid; place-items: center; width: 36px; height: 36px; border: 1px solid var(--border); border-radius: 10px; color: var(--text-dim); }
+:global(html:root) .shortcutIcon svg { width: 20px; height: 20px; }
+:global(html:root) .shortcutCopy { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: .3rem; }
+:global(html:root) .shortcutCopy strong { font-size: .8rem; font-weight: 600; line-height: 1.4; }
+:global(html:root) .shortcutCopy > span { color: var(--text-dim); font-size: .73rem; line-height: 1.6; }
+:global(html:root) .shortcutLink > svg { flex-shrink: 0; width: 18px; height: 18px; color: var(--text-dim); transition: transform 150ms; }
+:global(html:root) .shortcutLink:hover > svg { transform: translateX(3px); color: var(--text); }
+:global(html:root) .importShortcut { background: color-mix(in srgb, var(--text) 2%, transparent); border-color: var(--border); }
+:global(html:root) .importShortcut .shortcutIcon { background: var(--text); border-color: var(--text); color: var(--bg-base); }
+@container account-setup (max-width: 620px) {
+  :global(html:root) .shortcutGrid { grid-template-columns: minmax(0, 1fr); gap: .6rem; }
+  :global(html:root) .shortcutLink { padding: .85rem; gap: .7rem; }
+}
+@container studio-setup (max-width: 360px) {
+  :global(html:root) .compactHeader { flex-wrap: wrap; gap: 0 .5rem; }
+  :global(html:root) .compactHeader h2 { flex: 1; }
+  :global(html:root) .progress { order: 3; flex-basis: 100%; margin: 0 0 .35rem; }
+  :global(html:root) .stepLink { gap: .4rem; }
+}
+@media (max-width: 700px) {
+  :global(html:root) .card, :global(html:root) .shortcuts { padding: 1rem; border-radius: 12px; }
+  :global(html:root) .compactHeader { gap: .85rem; }
+  :global(html:root) .compactHeader h2 { font-size: 1rem; }
+
+}
+@media (prefers-reduced-motion: reduce) { :global(html:root) .card *, :global(html:root) .shortcuts * { transition: none !important; animation: none !important; } }
+@media (any-pointer: coarse) { :global(html:root) .card a, :global(html:root) .completionButton { min-height: 44px; } }

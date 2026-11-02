@@ -1,0 +1,20 @@
+{
+  "src": "/studio/demos/languages.mp4",
+  "poster": "/studio/demos/languages-poster.jpg",
+  "duration": 13,
+  "title": "Work in your language",
+  "chapters": [
+    {
+      "at": 0,
+      "title": "English, Simplified Chinese and Korean."
+    },
+    {
+      "at": 4,
+      "title": "Switch to Simplified Chinese in Settings."
+    },
+    {
+      "at": 8.4,
+      "title": "Or work in Korean. Switch whenever you need."
+    }
+  ]
+}

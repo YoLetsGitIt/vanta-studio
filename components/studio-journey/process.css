@@ -30,3 +30,14 @@
 .sv-story{opacity:1}
 .sv-device{opacity:clamp(0,calc(var(--story-reveal,1)*4),1)}
 .studio-journey[data-motion=off] .sv-device{opacity:1}
+/* Actual Studio screenshots: preserve the interface and its proportions. */
+.sv-device-real{background:#181b19;border-color:#181b19;padding:10px 3px 3px}
+.sv-real-screen{border-radius:13px;overflow:hidden;background:#111;aspect-ratio:460/680}
+.sv-real-screen img{display:block;width:100%;height:100%;object-fit:contain;object-position:top;animation:sv-screen-in .3s ease-out}
+.sv-story-nav>span{max-width:260px;line-height:1.5}.sv-story-nav{gap:15px}.sv-story-nav button{flex-shrink:0}
+@keyframes sv-screen-in{from{opacity:.3}to{opacity:1}}
+@media(max-width:759px){.sv-device-slot{width:min(100%,310px)}.sv-story-nav>span{max-width:230px}}
+@media(max-height:660px) and (max-width:759px){.sv-device-slot{width:min(100%,245px)}.sv-story-nav>span{max-width:180px;font-size:9px}}
+@media(max-height:500px) and (min-width:600px){.sv-device-slot{width:350px;zoom:.62}.sv-story-nav>span{max-width:240px}}
+.studio-journey[data-motion=off] .sv-real-screen img{animation:none}
+@media(prefers-reduced-motion:reduce){.sv-real-screen img{animation:none}}

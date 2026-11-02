@@ -4,6 +4,9 @@ import { useState, useEffect, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { getSupabase } from '@/lib/supabase';
 import { getStudioPublic, getStudioConsentTemplates } from '@/lib/api';
+import DateOfBirthInput from '@/components/ui/DateOfBirthInput';
+import ClientAccountActions from '@/components/ClientAccountActions';
+import ClientAuthGate from '@/components/ClientAuthGate';
 
 // The studio's reusable consent QR code lands here (/consent?s=<studioId>). Unlike the
 // emailed single-use link on vanta.tattoo, the client must sign in or create an account
@@ -63,6 +66,8 @@ function ConsentForm() {
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone]           = useState(false);
   const [submitErr, setSubmitErr] = useState('');
+  const [marketingEmail, setMarketingEmail] = useState(false);
+  const [marketingSMS, setMarketingSMS] = useState(false);
 
   useEffect(() => {
     const supabase = getSupabase();
@@ -74,6 +79,7 @@ function ConsentForm() {
   // Derive name / phone / DOB from the signed-in account: the Vanta profile first,
   // then whatever was entered at sign-up. `known` stays null until that's resolved.
   const [known, setKnown] = useState(null);
+  const accountUser = useRef(null);
   useEffect(() => {
     if (!session) { setKnown(null); return; }
     let cancelled = false;
@@ -88,16 +94,18 @@ function ConsentForm() {
         }
         if (res.ok) profile = await res.json();
       } catch {}
-      const profName = profile?.name && profile.name !== 'User' ? profile.name : '';
       const k = {
-        name:  profName || m.full_name || m.name || '',
-        phone: profile?.phone || m.phone || '',
-        dob:   m.dob || '',
+        name: [profile?.name, m.full_name, m.name].find(value => value?.trim() && value.trim() !== 'User')?.trim() || '',
+        phone: profile?.phone?.trim() || m.phone?.trim() || '',
+        dob: m.dob?.trim() || '',
       };
       if (cancelled) return;
-      setSignerName(v => v || k.name);
-      setPhone(v => v || k.phone);
-      setDob(v => v || k.dob);
+      if (accountUser.current !== session.user.id) {
+        setSignerName(k.name);
+        setPhone(k.phone);
+        setDob(k.dob);
+        accountUser.current = session.user.id;
+      }
       setKnown(k);
     })();
     return () => { cancelled = true; };
@@ -193,7 +201,7 @@ function ConsentForm() {
         });
       }
 
-      await submitStudioConsent(studioId, session.access_token, signerName.trim(), dob, phone.trim(), { email: session.user?.user_metadata?.marketing_email, sms: session.user?.user_metadata?.marketing_sms }, submissions);
+      await submitStudioConsent(studioId, session.access_token, signerName.trim(), dob, phone.trim(), { email: marketingEmail, sms: marketingSMS }, submissions);
       // Remember their details on the account so they aren't asked again.
       getSupabase().auth.updateUser({ data: { full_name: signerName.trim(), name: signerName.trim(), dob, phone: phone.trim() } }).catch(() => {});
       setDone(true);
@@ -220,7 +228,7 @@ function ConsentForm() {
   }
 
   if (!session) {
-    return <AuthGate studioName={info.studio_name} logoUrl={info.logo_url} />;
+    return <ClientAuthGate studioId={studioId} studioName={info.studio_name} logoUrl={info.logo_url} />;
   }
 
   if (done) {
@@ -237,48 +245,39 @@ function ConsentForm() {
 
   const templates = info.templates ?? [];
 
-  // Name / DOB / phone come from the account; only ask for whatever it's missing.
-  const missingName  = !known.name;
-  const missingDob   = !known.dob;
-  const missingPhone = !known.phone;
-  const needsDetails = missingName || missingDob || missingPhone;
-
   return (
     <div style={{ width: '100%', maxWidth: 540 }}>
       {info.logo_url && <img src={info.logo_url} alt={`${info.studio_name} logo`} style={{ maxHeight: 56, maxWidth: 200, objectFit: 'contain', display: 'block', marginBottom: '0.6rem' }} />}
       <p style={{ ...s.studioTag, marginBottom: '0.75rem' }}>{info.studio_name}</p>
 
       <form onSubmit={handleSubmit} style={s.form}>
-        {needsDetails && (
-          <div style={s.templateBox}>
-            <p style={s.templateTitle}>Your details</p>
-            <p style={{ ...s.hint, margin: '0.25rem 0 0.85rem' }}>Signed in as {session.user?.email}. We need a few more details for your client record.</p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
-              {missingName && (
-                <div>
-                  <p style={{ ...s.label, marginBottom: '0.3rem' }}>Full name <span style={{ color: '#e86f6f' }}>*</span></p>
-                  <input style={s.input} type="text" required autoComplete="name" value={signerName} onChange={e => setSignerName(e.target.value)} placeholder="Your name" />
-                </div>
-              )}
-              {missingDob && (
-                <div>
-                  <p style={{ ...s.label, marginBottom: '0.3rem' }}>Date of birth <span style={{ color: '#e86f6f' }}>*</span></p>
-                  <input style={s.input} type="date" required value={dob} max={new Date().toISOString().slice(0, 10)} onChange={e => setDob(e.target.value)} />
-                </div>
-              )}
-              {missingPhone && (
-                <div>
-                  <p style={{ ...s.label, marginBottom: '0.3rem' }}>Phone number <span style={{ color: '#e86f6f' }}>*</span></p>
-                  <input style={s.input} type="tel" required autoComplete="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="Your phone number" />
-                </div>
-              )}
+        <ClientAccountActions email={session.user?.email} />
+        <div style={s.templateBox}>
+          <p style={s.templateTitle}>Your details</p>
+          <p style={{ ...s.hint, margin: '0.25rem 0 0.85rem' }}>Review your details and update anything that has changed.</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+            <div>
+              <label htmlFor="consent-name" style={{ ...s.label, marginBottom: '0.3rem' }}>Full name <span style={{ color: '#e86f6f' }}>*</span></label>
+              <input id="consent-name" style={s.input} type="text" required autoComplete="name" value={signerName} onChange={e => setSignerName(e.target.value)} placeholder="Your name" />
+            </div>
+            <div>
+              <p style={{ ...s.label, marginBottom: '0.3rem' }}>Date of birth <span style={{ color: '#e86f6f' }}>*</span></p>
+              <DateOfBirthInput style={s.input} value={dob} onChange={setDob} />
+            </div>
+            <div>
+              <label htmlFor="consent-email" style={{ ...s.label, marginBottom: '0.3rem' }}>Email</label>
+              <input id="consent-email" style={s.input} type="email" readOnly autoComplete="email" value={session.user?.email || ''} />
+            </div>
+            <div>
+              <label htmlFor="consent-phone" style={{ ...s.label, marginBottom: '0.3rem' }}>Phone number <span style={{ color: '#e86f6f' }}>*</span></label>
+              <input id="consent-phone" style={s.input} type="tel" required autoComplete="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="Your phone number" />
             </div>
           </div>
-        )}
+        </div>
 
         {templates.length === 0 && (
           <p style={s.muted}>
-            By submitting you confirm that you have read and agree to the studio&apos;s consent policy and consent to receive tattoo services.
+            By submitting you confirm that you have read and agree to the studio&apos;s consent policy and consent to receive the agreed studio services.
           </p>
         )}
 
@@ -367,6 +366,18 @@ function ConsentForm() {
           );
         })}
 
+        <fieldset style={{ border: 'none', padding: 0, display: 'grid', gap: 12 }}>
+          <legend style={{ ...s.label, marginBottom: 12 }}>Stay in touch (optional)</legend>
+          <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, color: 'rgba(255,255,255,0.7)', fontSize: '0.8rem', lineHeight: 1.6 }}>
+            <input type="checkbox" checked={marketingEmail} onChange={event => setMarketingEmail(event.target.checked)} />
+            Send me offers and updates from {info.studio_name} by email.
+          </label>
+          <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, color: 'rgba(255,255,255,0.7)', fontSize: '0.8rem', lineHeight: 1.6 }}>
+            <input type="checkbox" checked={marketingSMS} onChange={event => setMarketingSMS(event.target.checked)} />
+            Send me offers and updates from {info.studio_name} by text.
+          </label>
+        </fieldset>
+
         {submitErr && <p style={s.error}>{submitErr}</p>}
 
         <button type="submit" disabled={submitting} style={{ ...s.btn, opacity: submitting ? 0.6 : 1 }}>
@@ -378,100 +389,7 @@ function ConsentForm() {
   );
 }
 
-function AuthGate({ studioName, logoUrl }) {
-  const [mode, setMode]       = useState('signup');
-  const [email, setEmail]     = useState('');
-  const [password, setPassword] = useState('');
-  const [name, setName]     = useState('');
-  const [dob, setDob]       = useState('');
-  const [phone, setPhone]   = useState('');
-  const [agreed, setAgreed]   = useState(false);
-  const [mkt, setMkt]       = useState(false);
-  const [busy, setBusy]       = useState(false);
-  const [err, setErr]         = useState('');
-  const [notice, setNotice]   = useState('');
 
-  async function submit(e) {
-    e.preventDefault();
-    setErr(''); setNotice('');
-    if (mode === 'signup' && !agreed) { setErr('You must agree to the Terms of Use and Privacy Policy.'); return; }
-    setBusy(true);
-    const supabase = getSupabase();
-    try {
-      if (mode === 'signin') {
-        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
-        // Covers a returning client whose app profile was never created.
-        await createProfile(data.session, '');
-      } else {
-        const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { full_name: name.trim(), name: name.trim(), dob, phone: phone.trim(), marketing_email: mkt, marketing_sms: mkt } } });
-        if (error) throw error;
-        if (data.session) await createProfile(data.session, name.trim());
-        else setNotice('Check your email to confirm your account, then scan the QR code again.');
-      }
-    } catch (e2) {
-      setErr(e2.message ?? 'Something went wrong. Please try again.');
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <div style={s.card}>
-      {logoUrl && <img src={logoUrl} alt={`${studioName} logo`} style={{ maxHeight: 56, maxWidth: 200, objectFit: 'contain', alignSelf: 'flex-start' }} />}
-      <p style={s.studioTag}>{studioName}</p>
-      <h2 style={s.heading}>{mode === 'signup' ? 'Create an account' : 'Sign in'}</h2>
-      <p style={s.muted}>
-        {studioName} needs you to {mode === 'signup' ? 'create a Vanta account' : 'sign in'} before completing their consent form.
-      </p>
-      <form onSubmit={submit} style={s.form}>
-        {mode === 'signup' && (
-          <>
-            <input style={s.input} type="text" required autoComplete="name" value={name} onChange={e => setName(e.target.value)} placeholder="Full name" />
-            <div>
-              <p style={{ ...s.label, marginBottom: '0.3rem' }}>Date of birth</p>
-              <input style={s.input} type="date" required value={dob} max={new Date().toISOString().slice(0, 10)} onChange={e => setDob(e.target.value)} />
-            </div>
-            <input style={s.input} type="tel" required autoComplete="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="Phone number" />
-          </>
-        )}
-        <input style={s.input} type="email" required autoComplete="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="Email" />
-        <input style={s.input} type="password" required minLength={6} autoComplete={mode === 'signup' ? 'new-password' : 'current-password'} value={password} onChange={e => setPassword(e.target.value)} placeholder="Password" />
-        {mode === 'signup' && (
-          <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.55rem', fontSize: '0.8rem', lineHeight: '18px', color: 'rgba(255,255,255,0.7)', cursor: 'pointer' }}>
-            <input type="checkbox" checked={agreed} onChange={e => setAgreed(e.target.checked)} style={{ flexShrink: 0, margin: '1px 0 0', width: 16, height: 16, minWidth: 'auto', accentColor: '#f5ecd9' }} />
-            <span>
-              I agree to the{' '}
-              <a href="https://www.vanta.tattoo/terms" target="_blank" rel="noopener noreferrer" style={{ color: '#f5ecd9' }}>Terms of Use</a>
-              {' '}and{' '}
-              <a href="https://www.vanta.tattoo/privacy" target="_blank" rel="noopener noreferrer" style={{ color: '#f5ecd9' }}>Privacy Policy</a>{' '}
-              <span style={{ color: '#e86f6f' }}>*</span>
-            </span>
-          </label>
-        )}
-        {mode === 'signup' && (
-          <>
-            <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.55rem', fontSize: '0.8rem', lineHeight: '18px', color: 'rgba(255,255,255,0.7)', cursor: 'pointer' }}>
-              <input type="checkbox" checked={mkt} onChange={e => setMkt(e.target.checked)} style={{ flexShrink: 0, margin: '1px 0 0', width: 16, height: 16, minWidth: 'auto', accentColor: '#f5ecd9' }} />
-              <span>
-                Send me offers and updates from {studioName} by email &amp; text.
-              </span>
-            </label>
-          </>
-        )}
-        {err && <p style={s.error}>{err}</p>}
-        {notice && <p style={s.hint}>{notice}</p>}
-        <button type="submit" disabled={busy} style={{ ...s.btn, opacity: busy ? 0.6 : 1 }}>
-          {busy ? 'Please wait…' : mode === 'signup' ? 'Create account & continue' : 'Sign in & continue'}
-        </button>
-        <button type="button" onClick={() => { setMode(mode === 'signup' ? 'signin' : 'signup'); setErr(''); setNotice(''); }}
-          style={{ background: 'none', border: 'none', color: '#f5ecd9', cursor: 'pointer', fontSize: '0.82rem', fontFamily: 'inherit' }}>
-          {mode === 'signup' ? 'Already have an account? Sign in' : 'New here? Create an account'}
-        </button>
-      </form>
-    </div>
-  );
-}
 
 const typeBadgeColor = {
   health:  { background: 'rgba(99,102,241,0.15)', color: '#818cf8' },
@@ -556,6 +474,9 @@ function ConsentFormField({ field, value, onChange }) {
 
 function SignaturePad({ onCapture }) {
   const canvasRef = useRef(null);
+  const [signatureMode, setSignatureMode] = useState('draw');
+  const [typedName, setTypedName] = useState('');
+  const [signatureStatus, setSignatureStatus] = useState('');
   const [drawing, setDrawing] = useState(false);
   const [hasDrawn, setHasDrawn] = useState(false);
 
@@ -594,27 +515,62 @@ function SignaturePad({ onCapture }) {
   function endDraw() {
     if (!drawing) return;
     setDrawing(false);
-    if (hasDrawn) canvasRef.current.toBlob(blob => onCapture(blob), 'image/png');
+    if (hasDrawn) {
+      const version = ++captureVersion.current;
+      canvasRef.current.toBlob(blob => {
+        if (version === captureVersion.current) onCapture(blob);
+      }, 'image/png');
+    }
   }
 
   function clear() {
     const canvas = canvasRef.current;
     canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
     setHasDrawn(false);
+    setSignatureStatus('');
     onCapture(null);
+  }
+
+  function captureTyped() {
+    const name = typedName.trim();
+    if (!name) return;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '28px serif';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(name, 20, canvas.height / 2, canvas.width - 40);
+    canvas.toBlob(blob => {
+      onCapture(blob);
+      setSignatureStatus(blob ? 'Signature added.' : 'Unable to add signature. Please try again.');
+    }, 'image/png');
   }
 
   return (
     <div style={s.sigWrap}>
+      <div style={{ display: 'flex', gap: 8, padding: 8 }} role="group" aria-label="Signature method">
+        <button type="button" aria-pressed={signatureMode === 'draw'} onClick={() => { clear(); setSignatureMode('draw'); }} style={{ minHeight: 44 }}>Draw signature</button>
+        <button type="button" aria-pressed={signatureMode === 'type'} onClick={() => { clear(); setSignatureMode('type'); }} style={{ minHeight: 44 }}>Type signature</button>
+      </div>
+      {signatureMode === 'type' && <div style={{ padding: 12 }}>
+        <label style={{ display: 'block' }}>Full name for your electronic signature
+          <input value={typedName} maxLength={120} autoComplete="name" onChange={event => { clear(); setTypedName(event.target.value); }} style={{ ...s.input, width: '100%', minWidth: 0, boxSizing: 'border-box', minHeight: 44, marginTop: 8, padding: 10 }} />
+        </label>
+        <button type="button" disabled={!typedName.trim()} onClick={captureTyped} style={{ minHeight: 44, marginTop: 8 }}>Use typed signature</button>
+        <p role="status">{signatureStatus}</p>
+      </div>}
+
       <canvas
         ref={canvasRef}
+        aria-label="Draw your signature, or choose Type signature for keyboard entry"
         width={440}
         height={140}
-        style={s.sigCanvas}
+        style={{ ...s.sigCanvas, display: signatureMode === 'draw' ? 'block' : 'none' }}
         onMouseDown={startDraw} onMouseMove={draw} onMouseUp={endDraw} onMouseLeave={endDraw}
         onTouchStart={startDraw} onTouchMove={draw} onTouchEnd={endDraw}
       />
-      <div style={s.sigFooter}>
+      <div style={{ ...s.sigFooter, display: signatureMode === 'draw' ? 'flex' : 'none' }}>
         <span style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.3)' }}>Draw your signature above</span>
         <button type="button" onClick={clear} style={s.sigClear}>Clear</button>
       </div>
@@ -703,7 +659,7 @@ const s = {
     border: '1px solid rgba(255,255,255,0.12)',
     borderRadius: 8, padding: '0.65rem 0.85rem',
     fontSize: '0.9rem', color: '#fff', outline: 'none',
-    width: '100%', minWidth: 0, boxSizing: 'border-box',
+    width: '100%', minWidth: 0, minHeight: 44, boxSizing: 'border-box',
     fontFamily: 'inherit',
   },
   templateBox: {

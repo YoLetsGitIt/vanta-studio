@@ -1,120 +1,103 @@
 'use client';
 
+import { useLanguage } from '@/lib/i18n';
+
 import { useCallback, useEffect, useState } from 'react';
-import Link from 'next/link';
 import StatePanel from '@/components/ui/StatePanel';
 import Button from '@/components/ui/Button';
-import AutomationCard from '@/components/marketing/AutomationCard';
-import Campaigns from '@/components/marketing/Campaigns';
-import SenderSettings from '@/components/marketing/SenderSettings';
+import Templates from '@/components/marketing/Templates';
+import MarketingSettings from '@/components/marketing/Settings';
+import History from '@/components/marketing/History';
 import { getMarketing } from '@/lib/api';
 import styles from '@/components/marketing/marketing.module.css';
 
-const TABS = [['automations', 'Automations'], ['campaigns', 'Campaigns'], ['sender', 'Sender']];
-const EVENT_LABELS = { slot_opened: 'Slot opened', session_completed: 'Session completed' };
+const SECTIONS = ['templates', 'history', 'settings'];
+const SECTION_COPY = {
+  templates: ['Create and send', 'Write a template and choose your clients.'],
+  history: ['Sent emails', 'See past emails and their delivery status.'],
+  settings: ['Settings', 'Manage your sending email and connections.'],
+};
 
-function Step({ done, n, title, hint, action }) {
-  return (
-    <li className={`${styles.step} ${done ? styles.stepDone : ''}`}>
-      <span className={styles.stepMark} aria-hidden="true">{done ? '✓' : n}</span>
-      <span className={styles.stepText}>{title}{hint && !done && <span className={styles.stepHint}>{hint}</span>}
-        {done && <span className="sr-only"> (done)</span>}</span>
-      {!done && action}
-    </li>
-  );
+function SectionIcon({ section }) {
+  return <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+    {section === 'templates' && <><rect x="3" y="5" width="18" height="14" rx="3" /><path d="m3 7 9 6 9-6" /></>}
+    {section === 'history' && <><path d="m21 3-7 18-4-7-7-4Z" /><path d="m10 14 5-5" /></>}
+    {section === 'settings' && <><path d="m9 3-1 3-3 1 1 3-2 2 2 2-1 3 3 1 1 3h6l1-3 3-1-1-3 2-2-2-2 1-3-3-1-1-3Z" /><circle cx="12" cy="12" r="3" /></>}
+  </svg>;
 }
 
 export default function MarketingPage() {
+  const { t: mt } = useLanguage();
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
-  const [tab, setTab] = useState('automations');
+  const [tab, setTab] = useState('templates');
+  const [visited, setVisited] = useState(['templates']);
+  const selectTab = useCallback((id, focusPanel = true) => {
+    setTab(id);
+    setVisited(prev => prev.includes(id) ? prev : [...prev, id]);
+    const url = new URL(window.location.href);
+    url.searchParams.set('tab', id);
+    window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash);
+    if (focusPanel) requestAnimationFrame(() => {
+      const panel = document.getElementById(`panel-${id}`);
+      panel?.closest('main')?.scrollIntoView({ block: 'start' });
+      panel?.focus({ preventScroll: true });
+    });
+  }, []);
+  // Resending from history starts a fresh flow with those clients selected.
+  const [preset, setPreset] = useState({ key: 0 });
 
   const load = useCallback(async () => {
     try { setData(await getMarketing()); setError(''); }
     catch (err) { setError(err.message); }
   }, []);
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+    const params = new URLSearchParams(window.location.search);
+    const legacyTab = params.get('tab');
+    const requested = params.has('mailbox') || legacyTab === 'sender' ? 'settings'
+      : legacyTab === 'campaigns' ? 'templates' : legacyTab;
+    if (SECTIONS.includes(requested)) selectTab(requested);
+  }, [load, selectTab]);
 
   if (error && !data) {
-    return <main className={styles.page}><StatePanel tone="error" title="Couldn’t load marketing" description={error} action={<Button onClick={load}>Try again</Button>} /></main>;
+    return <main className={styles.page}><StatePanel tone="error" title={mt("Couldn’t load marketing")} description={error} action={<Button onClick={load}>{mt("Try again")}</Button>} /></main>;
   }
   if (!data) {
-    return <main className={styles.page}><StatePanel busy title="Loading marketing…" /></main>;
+    return <main className={styles.page}><StatePanel busy title={mt("Loading marketing…")} /></main>;
   }
 
-  const { stats, settings, automations, events, available, ready } = data;
-  const patchSettings = next => setData(prev => ({ ...prev, settings: next, ready: Boolean(next.reply_to || (next.domain && next.domain_status === 'verified')) }));
-  const patchAutomation = saved => setData(prev => ({ ...prev, automations: prev.automations.map(a => a.trigger_type === saved.trigger_type ? saved : a) }));
-  const goSender = () => { setTab('sender'); window.scrollTo({ top: 0, behavior: 'smooth' }); };
-
-  const hasClients = stats.consented_clients > 0;
-  const inUse = automations.some(a => a.enabled) || stats.sent_this_month > 0;
-  const setupDone = ready && hasClients && inUse;
-
+  const { available, ready } = data;
+  const goSettings = () => selectTab('settings');
+  const compose = clientIds => { setPreset(prev => ({ clientIds, key: prev.key + 1 })); selectTab('templates'); };
   return (
-    <main className={styles.page}>
-      <header>
-        <h1 className={styles.title}>Marketing</h1>
-        <p className={styles.subtitle}>Email clients who have agreed to hear from you. Only clients you’ve ticked are ever emailed.</p>
+    <main data-marketing-view={tab} className={`${styles.page} ${styles.workspacePage}`}>
+      <header className={`${styles.pageHead} ${styles.marketingHead}`}>
+        <div className={styles.marketingIntro}>
+          <p className={styles.marketingEyebrow}>{mt('Marketing')}</p>
+          <h1 className={styles.title}>{mt(SECTION_COPY[tab][0])}</h1>
+          <p className={styles.subtitle}>{mt(tab === 'templates' ? 'Create email templates and send them to your clients.' : SECTION_COPY[tab][1])}</p>
+          {tab !== 'templates' && <Button id="tab-templates" size="sm" className={styles.returnToCreate} aria-controls="panel-templates" onClick={() => selectTab('templates')}><span aria-hidden="true">←</span>{mt('Create and send')}</Button>}
+        </div>
+        <nav aria-label={mt('Marketing sections')} className={styles.marketingUtilities}>
+          {['history', 'settings'].map(id => <button key={id} type="button" id={`tab-${id}`} aria-pressed={tab === id} aria-controls={`panel-${id}`} className={styles.marketingUtility} onClick={() => selectTab(id, false)}>
+            <SectionIcon section={id} />
+            {mt(SECTION_COPY[id][0])}
+          </button>)}
+        </nav>
       </header>
 
-      {!available && (
-        <div className={styles.notice} role="status">
-          <span><span className={styles.noticeStrong}>Sending is off for now.</span> You can set everything up, and nothing goes out until it’s switched on.</span>
-        </div>
-      )}
-
-      {!setupDone && (
-        <section className={styles.setup} aria-labelledby="setup-title">
-          <h2 className={styles.setupTitle} id="setup-title">Get started in 3 steps</h2>
-          <ol className={styles.steps}>
-            <Step n="1" done={ready} title="Add a reply-to email" hint="So client replies reach you."
-              action={<Button size="sm" onClick={goSender}>Add it</Button>} />
-            <Step n="2" done={hasClients} title="Choose who can be emailed" hint="Tick “agreed to marketing emails” on a client."
-              action={<Link href="/dashboard/clients" className="studio-button studio-button--secondary studio-button--sm">Go to clients</Link>} />
-            <Step n="3" done={inUse} title="Turn on an automation or send a campaign"
-              action={<Button size="sm" variant="secondary" onClick={() => setTab('campaigns')}>Send a campaign</Button>} />
-          </ol>
+      {SECTIONS.map(id => (
+        <section key={id} id={`panel-${id}`} aria-label={mt(SECTION_COPY[id][0])} tabIndex={-1} hidden={tab !== id} className={styles.panel}>
+          {visited.includes(id) && <>
+            {id === 'templates' && <Templates key={preset.key} preset={preset} available={available} ready={ready} onSent={load} onNeedSetup={goSettings} />}
+            {id === 'history' && <>
+              <History active={tab === id} onCompose={() => selectTab('templates')} onResend={compose} />
+            </>}
+            {id === 'settings' && <MarketingSettings data={data} onReload={load} onTemplates={() => selectTab('templates')} onHistory={() => selectTab('history')} />}
+          </>}
         </section>
-      )}
-
-      <div className={styles.summary} aria-label="Summary">
-        <span className={styles.summaryItem}><span className={`${styles.dot} ${styles.dotBlue}`} />{stats.consented_clients} can be emailed</span>
-        <span className={styles.summaryItem}><span className={`${styles.dot} ${styles.dotGreen}`} />{stats.sent_this_month} sent this month</span>
-        {stats.unsubscribed > 0 && <span className={styles.summaryItem}><span className={styles.dot} />{stats.unsubscribed} unsubscribed</span>}
-        {stats.failed_this_month > 0 && <span className={styles.summaryItem}><span className={`${styles.dot} ${styles.dotRed}`} />{stats.failed_this_month} failed</span>}
-      </div>
-
-      <div role="tablist" aria-label="Marketing sections" className={styles.tabs}>
-        {TABS.map(([id, label]) => (
-          <button key={id} role="tab" id={`tab-${id}`} aria-selected={tab === id} aria-controls={`panel-${id}`} className={styles.tab} onClick={() => setTab(id)}>{label}</button>
-        ))}
-      </div>
-
-      <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-        {tab === 'automations' && <>
-          <p className={styles.hint} style={{ fontSize: '0.9rem' }}>Automations send emails for you when something happens. They’re off until you turn them on.</p>
-          {automations.map(a => <AutomationCard key={a.trigger_type} automation={a} available={available} onSaved={patchAutomation} onNeedSetup={goSender} />)}
-          {events.length > 0 && (
-            <details className={styles.details}>
-              <summary>Recent activity ({events.length})</summary>
-              <div className={styles.detailsBody}>
-                <ul className={styles.list}>
-                  {events.map(e => (
-                    <li key={e.id} className={styles.listRow}>
-                      <span>{EVENT_LABELS[e.event_type] || e.event_type}{e.client_name ? ` · ${e.client_name}` : ''}
-                        <span className={styles.rowSub}>{new Date(e.created_at).toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' })}</span></span>
-                      <span className={styles.muted}>{e.sends > 0 ? `${e.sends} email${e.sends === 1 ? '' : 's'} queued` : 'No emails'}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </details>
-          )}
-        </>}
-        {tab === 'campaigns' && <Campaigns available={available} ready={ready} onSent={load} onNeedSetup={goSender} />}
-        {tab === 'sender' && <SenderSettings settings={settings} available={available} onSaved={patchSettings} />}
-      </div>
+      ))}
     </main>
   );
 }

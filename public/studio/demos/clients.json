@@ -1,0 +1,20 @@
+{
+  "src": "/studio/demos/clients.mp4",
+  "poster": "/studio/demos/clients-poster.jpg",
+  "duration": 12,
+  "title": "The whole client story",
+  "chapters": [
+    {
+      "at": 0.1,
+      "title": "Contact details and consent, together."
+    },
+    {
+      "at": 4.1,
+      "title": "Keep preferences and health notes with the client."
+    },
+    {
+      "at": 8.1,
+      "title": "Look back through their booking history."
+    }
+  ]
+}

@@ -9,29 +9,37 @@ import {
   PRESETS,
   suggestMapping,
   suggestKind,
-  normalizeEmail,
-  normalizePhone,
-  parsePrice,
-  parseDateTime,
-  parseDOB,
-  normalizeStatus,
-  parseDurationMinutes,
+  suggestPreset,
 } from '@/lib/importPresets';
-import { importStudioData, getStudioArtists } from '@/lib/api';
+import { prepareImport, importReportCSV } from '@/lib/prepareImport';
+import { importStudioData, getStudioArtists, getMyStudioAccount } from '@/lib/api';
 import { invalidatePrefix } from '@/lib/cache';
+import styles from './ImportPage.module.css';
 
 const CHUNK_SIZE = 200;
 const UNASSIGNED = '';
 
+function ImportIcon({ type = 'upload' }) {
+  return <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    {type === 'check' ? <path d="m5 12 4 4L19 6" /> : type === 'back' ? <path d="M20 12H4m6-6-6 6 6 6" /> : <><path d="M12 16V3m-5 5 5-5 5 5" /><path d="M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4" /></>}
+  </svg>;
+}
+
 export default function ImportPage() {
   const { t } = useLanguage();
-  const [step, setStep] = useState('upload'); // upload | map | preview | importing | done
+  const [step, setStep] = useState('upload'); // upload | map | preview | importing | failed | done
   const [fileName, setFileName] = useState('');
   const [headers, setHeaders] = useState([]);
   const [rows, setRows] = useState([]);
   const [kind, setKind] = useState('clients');
   const [preset, setPreset] = useState('generic');
   const [dayFirst, setDayFirst] = useState(true);
+  const [timezone, setTimezone] = useState('');
+  const [upcomingOnly, setUpcomingOnly] = useState(true);
+  const [reviewTime, setReviewTime] = useState(Date.now);
+  const [referenceError, setReferenceError] = useState('');
+  const [referenceLoading, setReferenceLoading] = useState(true);
+  const importRun = useRef(null);
   const [mapping, setMapping] = useState({});
   const [artists, setArtists] = useState([]);
   const [artistMap, setArtistMap] = useState({});
@@ -39,13 +47,18 @@ export default function ImportPage() {
   const [importTotal, setImportTotal] = useState(0);
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
+  const [dragging, setDragging] = useState(false);
   const fileRef = useRef(null);
 
-  useEffect(() => {
-    getStudioArtists('approved')
-      .then(d => setArtists(d.artists ?? []))
-      .catch(() => {});
-  }, []);
+  async function loadReferences() {
+    setReferenceLoading(true);
+    const [artistResult, accountResult] = await Promise.allSettled([getStudioArtists('approved'), getMyStudioAccount()]);
+    if (artistResult.status === 'fulfilled') setArtists(artistResult.value.artists ?? []);
+    if (accountResult.status === 'fulfilled') setTimezone(value => value || accountResult.value.studio?.timezone || '');
+    setReferenceError([artistResult.status === 'rejected' && 'Could not load studio artists.', accountResult.status === 'rejected' && 'Could not load the studio timezone. Enter it below.'].filter(Boolean).join(' '));
+    setReferenceLoading(false);
+  }
+  useEffect(() => { loadReferences(); }, []);
 
   const fields = kind === 'clients' ? CLIENT_FIELDS : APPOINTMENT_FIELDS;
 
@@ -56,20 +69,28 @@ export default function ImportPage() {
     setError('');
     const reader = new FileReader();
     reader.onload = () => {
-      const { headers: h, rows: r } = parseCSV(String(reader.result));
-      if (h.length === 0 || r.length === 0) {
-        setError('Could not read any rows from that file.');
-        return;
-      }
-      const guessedKind = suggestKind(h);
-      setFileName(file.name);
-      setHeaders(h);
-      setRows(r);
-      setKind(guessedKind);
-      setMapping(suggestMapping(h, guessedKind, 'generic'));
-      setPreset('generic');
-      setStep('map');
+      try {
+        const { headers: h, rows: r } = parseCSV(String(reader.result));
+        if (h.length === 0 || r.length === 0) {
+          setError('Could not read any rows from that file.');
+          return;
+        }
+        const guessedKind = suggestKind(h);
+        const source = suggestPreset(h);
+        setReviewTime(Date.now());
+        setDayFirst(PRESETS[source].dayFirst);
+        setArtistMap({});
+        importRun.current = null;
+        setFileName(file.name);
+        setHeaders(h);
+        setRows(r);
+        setKind(guessedKind);
+        setMapping(suggestMapping(h, guessedKind, source));
+        setPreset(source);
+        setStep('map');
+      } catch (e) { setError(e.message); }
     };
+    reader.onerror = () => setError('Could not read this file. Please choose it again.');
     reader.readAsText(file);
   }
 
@@ -88,110 +109,73 @@ export default function ImportPage() {
 
   // Auto-match artist names when the column or artist list changes.
   useEffect(() => {
-    if (artistNames.length === 0) return;
+    if (referenceLoading || artistNames.length === 0) return;
     setArtistMap(prev => {
       const next = { ...prev };
       for (const raw of artistNames) {
         if (next[raw] !== undefined) continue;
         const lower = raw.toLowerCase();
         const exact = artists.find(a => a.name?.toLowerCase() === lower);
-        const partial = exact ?? artists.find(a =>
-          a.name && (lower.includes(a.name.toLowerCase()) || a.name.toLowerCase().includes(lower)));
-        next[raw] = partial?.artistId ?? UNASSIGNED;
+        next[raw] = exact?.artistId ?? UNASSIGNED;
       }
       return next;
     });
-  }, [artistNames, artists]);
+  }, [artistNames, artists, referenceLoading]);
 
   // ── Step 3: build + validate normalized rows ────────────────────────────────
 
-  const prepared = useMemo(() => {
-    if (step !== 'preview') return [];
-    const get = (r, k) => (mapping[k] ? (r[mapping[k]] ?? '').trim() : '');
-
-    return rows.map((r, idx) => {
-      const errs = [];
-      if (kind === 'clients') {
-        const name = get(r, 'name') || [get(r, 'first_name'), get(r, 'last_name')].filter(Boolean).join(' ');
-        const email = normalizeEmail(get(r, 'email'));
-        const phone = normalizePhone(get(r, 'phone'));
-        if (!name) errs.push('missing name');
-        if (email && !/^\S+@\S+\.\S+$/.test(email)) errs.push('invalid email');
-        if (!email && !phone) errs.push('needs email or phone');
-        return {
-          line: idx + 2,
-          errors: errs,
-          payload: { name, email, phone, dob: parseDOB(get(r, 'dob'), dayFirst), notes: get(r, 'notes') },
-        };
-      }
-
-      const name = get(r, 'client_name') || [get(r, 'client_first_name'), get(r, 'client_last_name')].filter(Boolean).join(' ');
-      const email = normalizeEmail(get(r, 'client_email'));
-      const phone = normalizePhone(get(r, 'client_phone'));
-      const chosen = parseDateTime(
-        { datetime: get(r, 'datetime'), date: get(r, 'date'), time: get(r, 'time') },
-        dayFirst,
-      );
-      if (!name && !email && !phone) errs.push('needs client name, email or phone');
-      if (email && !/^\S+@\S+\.\S+$/.test(email)) errs.push('invalid email');
-      if (!chosen) errs.push('unparseable date/time');
-      const artistName = get(r, 'artist_name');
-      return {
-        line: idx + 2,
-        errors: errs,
-        payload: {
-          client_name: name,
-          client_email: email,
-          client_phone: phone,
-          artist_id: artistName ? (artistMap[artistName] ?? UNASSIGNED) : UNASSIGNED,
-          chosen_time: chosen ?? '',
-          duration_minutes: parseDurationMinutes(get(r, 'duration_minutes')),
-          design_details: get(r, 'design_details'),
-          body_location: get(r, 'body_location'),
-          notes: get(r, 'notes'),
-          price: parsePrice(get(r, 'price')),
-          status: normalizeStatus(get(r, 'status'), chosen),
-        },
-      };
-    });
-  }, [step, rows, mapping, kind, dayFirst, artistMap]);
-
-  const validRows = prepared.filter(p => p.errors.length === 0);
+  const prepared = useMemo(() => prepareImport({ rows, mapping, kind, dayFirst, timezone, artistMap, upcomingOnly, now: reviewTime }),
+    [rows, mapping, kind, dayFirst, timezone, artistMap, upcomingOnly, reviewTime]);
+  const validRows = prepared.filter(p => p.errors.length === 0 && !p.excludedReason);
   const invalidRows = prepared.filter(p => p.errors.length > 0);
+  const excludedRows = prepared.filter(p => p.errors.length === 0 && p.excludedReason);
+  const unmappedHeaders = headers.filter(header => !Object.values(mapping).includes(header));
+  const unassignedCount = kind === 'appointments' ? validRows.filter(p => !p.payload.artist_id).length : 0;
+  let validTimezone = false;
+  try { if (timezone.trim()) { new Intl.DateTimeFormat('en', { timeZone: timezone.trim() }).format(); validTimezone = true; } } catch {}
 
-  // ── Step 4: import ──────────────────────────────────────────────────────────
+  function downloadReport(items, name) {
+    const url = URL.createObjectURL(new Blob([importReportCSV(items, headers)], { type: 'text/csv;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = name;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
 
   async function runImport() {
-    setImportTotal(validRows.length);
+    const run = importRun.current ?? { rows: validRows, next: 0, total: { imported: 0, linked: 0, skipped: 0, errors: [] } };
+    importRun.current = run;
+    setImportTotal(run.rows.length);
     setStep('importing');
     setError('');
-    setProgress(0);
-    const total = { imported: 0, linked: 0, skipped: 0, errors: [] };
     try {
-      for (let i = 0; i < validRows.length; i += CHUNK_SIZE) {
-        const chunk = validRows.slice(i, i + CHUNK_SIZE).map(p => p.payload);
-        const payload = kind === 'clients' ? { clients: chunk } : { appointments: chunk };
-        const res = await importStudioData(payload);
+      for (let i = run.next; i < run.rows.length; i += CHUNK_SIZE) {
+        const chunk = run.rows.slice(i, i + CHUNK_SIZE).map(p => p.payload);
+        const res = await importStudioData(kind === 'clients' ? { clients: chunk } : { appointments: chunk });
         const section = kind === 'clients' ? res.clients : res.appointments;
-        total.imported += section?.imported ?? 0;
-        total.linked += section?.linked ?? 0;
-        total.skipped += section?.skipped ?? 0;
-        for (const e of res.errors ?? []) {
-          total.errors.push({ ...e, line: validRows[i + e.index]?.line });
+        if (!section || !Array.isArray(res.errors)) throw new Error('The server returned an incomplete import result. Retry to check the remaining rows.');
+        run.total.imported += section.imported ?? 0;
+        run.total.linked += section.linked ?? 0;
+        run.total.skipped += section.skipped ?? 0;
+        for (const e of res.errors) {
+          run.total.errors.push({ ...e, ...run.rows[i + e.index], reason: e.reason });
         }
-        setProgress(Math.min(i + CHUNK_SIZE, validRows.length));
+        run.next = Math.min(i + CHUNK_SIZE, run.rows.length);
+        setProgress(run.next);
+        for (const prefix of ['clients:', 'home:', 'schedule:', 'bookings:']) invalidatePrefix(prefix);
       }
-      invalidatePrefix('clients:');
-      invalidatePrefix('home:');
-      setResult(total);
+      setResult({ ...run.total });
       setStep('done');
     } catch (e) {
-      setError(e.message);
-      setStep('preview');
+      setError(`${e.message} Earlier batches have been saved. Retry resumes from the interrupted batch; records already saved are skipped.`);
+      setStep('failed');
     }
   }
 
   function reset() {
+    importRun.current = null;
+    setProgress(0);
     setStep('upload');
     setFileName('');
     setHeaders([]);
@@ -205,49 +189,73 @@ export default function ImportPage() {
 
   // ── Render ──────────────────────────────────────────────────────────────────
 
+  const activeStage = step === 'upload' ? 0 : step === 'map' ? 1 : 2;
+
   return (
-    <div className="studio-feature-page studio-import-page" style={s.page}>
-      <div className="studio-feature-header" style={s.header}>
-        <h1 style={s.title}>{t('import_title')}</h1>
-        <p style={s.sub}>{t('import_desc')}</p>
+    <div className={`${styles.page} studio-feature-page studio-import-page`}>
+      <div className={`${styles.header} studio-feature-header`}>
+        <div className={styles.headerInner}>
+          <a className={styles.backLink} href="/dashboard/settings?tab=account"><ImportIcon type="back" /> Account settings</a>
+          <div className={styles.headingRow}>
+            <div><h1 style={s.title}>{t('import_title')}</h1><p style={s.sub}>{t('import_desc')}</p></div>
+            <ol className={styles.stages} aria-label="Import steps">
+              {['Upload CSV', 'Match columns', 'Review & import'].map((label, index) => <li key={label} aria-current={index === activeStage && step !== 'done' ? 'step' : undefined} data-status={index < activeStage || step === 'done' ? 'complete' : index === activeStage ? 'current' : 'pending'}>
+                <span className={styles.stageNumber} aria-hidden="true">{index < activeStage || step === 'done' ? <ImportIcon type="check" /> : index + 1}</span><span>{label}</span>
+              </li>)}
+            </ol>
+          </div>
+        </div>
       </div>
 
-      <div className="studio-feature-body" style={s.body}>
+      <div className={`${styles.body} studio-feature-body`}>
+        <div className={styles.content}>
         {error && <div role="alert" style={s.error}>{error}</div>}
+        {referenceError && <div role="alert" style={s.error}>{referenceError} <button style={s.btnGhost} onClick={loadReferences}>Retry loading studio details</button></div>}
 
         {step === 'upload' && (
-          <div
-            style={s.dropZone}
-            role="button"
-            tabIndex={0}
-            aria-label="Choose a CSV file to import"
-            onDragOver={e => e.preventDefault()}
-            onDrop={e => { e.preventDefault(); handleFile(e.dataTransfer.files?.[0]); }}
-            onClick={() => fileRef.current?.click()}
-            onKeyDown={e => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                fileRef.current?.click();
-              }
-            }}
-          >
-            <span style={s.dropTitle}>{t('import_drop')}</span>
-            <span style={s.dropSub}>
-              Exports from Square Appointments, Acuity, Fresha or any spreadsheet saved as CSV.
-            </span>
-            <input
-              ref={fileRef}
-              type="file"
-              accept=".csv,text/csv"
-              style={{ display: 'none' }}
-              onChange={e => handleFile(e.target.files?.[0])}
-            />
+          <>
+          <div className={styles.uploadLayout}>
+            <section className={styles.uploadCard} aria-labelledby="csv-upload-title">
+              <div className={styles.cardHeading}><h2 id="csv-upload-title">Bring your records across</h2><p>Upload your client list or appointments, one file at a time.</p></div>
+              <div className={styles.sources} aria-label="Supported CSV sources">{['Acuity', 'Jotform', 'Square', 'Fresha', 'Other CSV'].map(source => <span key={source}>{source}</span>)}</div>
+              <button
+                type="button"
+                className={styles.dropZone}
+                data-dragging={dragging || undefined}
+                aria-label="Choose a CSV file to import"
+                onDragOver={e => { e.preventDefault(); setDragging(true); }}
+                onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget)) setDragging(false); }}
+                onDrop={e => { e.preventDefault(); setDragging(false); handleFile(e.dataTransfer.files?.[0]); }}
+                onClick={() => fileRef.current?.click()}
+              >
+                <span className={styles.uploadIcon}><ImportIcon /></span>
+                <span className={styles.dropTitle}>{dragging ? 'Drop your CSV to get started' : 'Drop your CSV file here'}</span>
+                <span className={styles.dropDescription}>or choose a file from your computer</span>
+                <span className={styles.chooseFile}>Choose CSV file <span aria-hidden="true">→</span></span>
+              </button>
+              <input ref={fileRef} type="file" accept=".csv,text/csv" style={{ display: 'none' }} onChange={e => handleFile(e.target.files?.[0])} />
+              <p className={styles.uploadFootnote}>CSV format · You&apos;ll review everything before importing.</p>
+            </section>
+            <aside className={styles.guide} aria-labelledby="import-guide-title">
+              <span className={styles.eyebrow}>A SMOOTH START</span>
+              <h2 id="import-guide-title">Before you import</h2>
+              <ol>
+                <li><span aria-hidden="true">01</span><div><h3>Clients first</h3><p>Start with your client list, then bring across upcoming appointments.</p></div></li>
+                <li><span aria-hidden="true">02</span><div><h3>Check the details</h3><p>Match your artists and confirm the dates and studio timezone.</p></div></li>
+                <li><span aria-hidden="true">03</span><div><h3>Review, then import</h3><p>Check the preview and any problem rows. Records are saved only after you confirm.</p></div></li>
+              </ol>
+            </aside>
           </div>
+          <div className={styles.notes}>
+            <section><h3>Using Jotform?</h3><p>Choose the submissions CSV. You can match custom question headings in the next step. Submission dates aren&apos;t appointment dates.</p></section>
+            <section><h3>Keep these records handy</h3><p>Signed forms, uploaded files, deposits, payments and balances aren&apos;t transferred by this tool. Keep the original records accessible.</p></section>
+          </div>
+          </>
         )}
 
         {step === 'map' && (
           <>
-            <div style={s.card}>
+            <div className={styles.card}>
               <div style={s.cardTitle}>{fileName} · {rows.length} row{rows.length !== 1 ? 's' : ''}</div>
               <div style={s.controlRow}>
                 <div style={s.control}>
@@ -281,9 +289,19 @@ export default function ImportPage() {
                   </div>
                 </div>
               </div>
+              {kind === 'appointments' && <>
+                <label style={{ ...s.control, flex: 'none' }}>
+                  <span style={s.label}>Studio timezone for dates without an offset</span>
+                  <input aria-label="Import timezone" list="import-timezones" style={s.select} value={timezone} onChange={e => setTimezone(e.target.value)} placeholder="Australia/Melbourne" />
+                  <datalist id="import-timezones">{['Australia/Melbourne', 'Australia/Sydney', 'Australia/Brisbane', 'Australia/Adelaide', 'Australia/Perth', 'Australia/Darwin', 'Australia/Hobart', 'Pacific/Auckland', 'Europe/London', 'America/New_York', 'America/Los_Angeles', 'UTC'].map(zone => <option key={zone} value={zone} />)}</datalist>
+                </label>
+                {!validTimezone && <p style={s.cardSub}>Enter a valid timezone before previewing appointments.</p>}
+                <label style={s.label}><input type="checkbox" checked={upcomingOnly} onChange={e => setUpcomingOnly(e.target.checked)} /> Import upcoming, active appointments only</label>
+                <p style={s.cardSub}>Past, cancelled, completed and no-show bookings will be excluded when this is checked. A timezone column or UTC offset in the file takes priority.</p>
+              </>}
             </div>
 
-            <div style={s.card}>
+            <div className={styles.card}>
               <div style={s.cardTitle}>{t('import_map_cols')}</div>
               <div style={s.mapGrid}>
                 {fields.map(f => (
@@ -307,7 +325,7 @@ export default function ImportPage() {
             </div>
 
             {kind === 'appointments' && artistNames.length > 0 && (
-              <div style={s.card}>
+              <div className={styles.card}>
                 <div style={s.cardTitle}>{t('import_match_artists')}</div>
                 <p style={s.cardSub}>Match names found in the file to artists in your studio. Unmatched appointments import as unassigned.</p>
                 <div style={s.mapGrid}>
@@ -331,13 +349,20 @@ export default function ImportPage() {
 
             <div style={s.btnRow}>
               <button style={s.btnGhost} onClick={reset}>{t('import_start_over')}</button>
-              <button style={s.btnPrimary} onClick={() => setStep('preview')}>{t('import_preview')}</button>
+              <button style={{ ...s.btnPrimary, ...((referenceLoading || (kind === 'appointments' && !validTimezone)) ? s.btnDisabled : {}) }} disabled={referenceLoading || (kind === 'appointments' && !validTimezone)} onClick={() => { setReviewTime(Date.now()); setStep('preview'); }}>{t('import_preview')}</button>
             </div>
           </>
         )}
 
         {step === 'preview' && (
           <>
+            <div className={styles.card}>
+              <div style={s.cardTitle}>{fileName} · {PRESETS[preset].label}</div>
+              {kind === 'appointments' && <p style={s.cardSub}>Timezone: {timezone}. {upcomingOnly ? 'Upcoming active bookings only.' : 'All appointment dates and statuses.'} {unassignedCount} ready bookings will be unassigned; review artist matching if needed.</p>}
+              <p style={s.cardSub}>Existing matching clients and imported bookings are skipped. Existing client details are kept when a contact matches.</p>
+              {unmappedHeaders.length > 0 && <p style={s.cardSub}>Columns not imported: {unmappedHeaders.join(', ')}</p>}
+              {kind === 'appointments' && <p style={s.cardSub}>Prices are booking quotes for upcoming appointments. Deposits, payments and balances are not transferred.</p>}
+            </div>
             <div style={s.statRow}>
               <div style={s.statCard}>
                 <span style={s.statValue}>{validRows.length}</span>
@@ -349,9 +374,15 @@ export default function ImportPage() {
               </div>
             </div>
 
+            {excludedRows.length > 0 && <div className={styles.card}>
+              <div style={s.cardTitle}>{excludedRows.length} rows excluded</div>
+              <p style={s.cardSub}>{Object.entries(excludedRows.reduce((counts, p) => ({ ...counts, [p.excludedReason]: (counts[p.excludedReason] || 0) + 1 }), {})).map(([reason, count]) => `${reason}: ${count}`).join(' · ')}</p>
+              <button style={s.btnGhost} onClick={() => downloadReport(excludedRows, 'excluded-import-rows.csv')}>Download excluded rows</button>
+            </div>}
             {invalidRows.length > 0 && (
-              <div style={s.card}>
-                <div style={s.cardTitle}>Problems</div>
+              <div className={styles.card}>
+                <div style={s.cardTitle}>Problems · these rows will not be imported</div>
+                <button style={s.btnGhost} onClick={() => downloadReport(invalidRows, 'import-problems.csv')}>Download all problems</button>
                 <div style={s.problemList}>
                   {invalidRows.slice(0, 20).map(p => (
                     <div key={p.line} style={s.problemRow}>
@@ -364,19 +395,19 @@ export default function ImportPage() {
               </div>
             )}
 
-            <div style={s.card}>
+            <div className={styles.card}>
               <div style={s.cardTitle}>Preview</div>
               <div style={{ overflowX: 'auto' }}>
                 <table aria-label="Import preview" style={s.table}>
                   <thead>
                     <tr>
-                      {previewColumns(kind).map(c => <th key={c.key} scope="col" style={s.th}>{c.label}</th>)}
+                      {previewColumns(kind, timezone, artists).map(c => <th key={c.key} scope="col" style={s.th}>{c.label}</th>)}
                     </tr>
                   </thead>
                   <tbody>
                     {validRows.slice(0, 50).map(p => (
                       <tr key={p.line}>
-                        {previewColumns(kind).map(c => (
+                        {previewColumns(kind, timezone, artists).map(c => (
                           <td key={c.key} style={s.td}>{c.render(p.payload)}</td>
                         ))}
                       </tr>
@@ -400,8 +431,14 @@ export default function ImportPage() {
           </>
         )}
 
+        {step === 'failed' && <div className={styles.card}>
+          <div style={s.cardTitle}>Import interrupted</div>
+          <p style={s.cardSub}>{progress} of {importTotal} rows processed in completed batches. Keep this page open to resume.</p>
+          <div style={s.btnRow}><button style={s.btnGhost} onClick={reset}>Start another import</button><button style={s.btnPrimary} onClick={runImport}>Retry remaining batches</button></div>
+        </div>}
+
         {step === 'importing' && (
-          <div style={s.card}>
+          <div className={styles.card}>
             <div style={s.cardTitle}>{t('import_importing')}</div>
             <div role="progressbar" aria-label="Import progress" aria-valuemin={0} aria-valuemax={importTotal} aria-valuenow={Math.min(progress, importTotal)} style={s.progressTrack}>
               <div style={{ ...s.progressFill, width: `${Math.round((progress / Math.max(importTotal, 1)) * 100)}%` }} />
@@ -412,6 +449,7 @@ export default function ImportPage() {
 
         {step === 'done' && result && (
           <>
+            <div className={styles.finished} role="status"><span><ImportIcon type="check" /></span><div><h2>Import finished</h2><p>Review the results below, then bring across your next file when you&apos;re ready.</p></div></div>
             <div style={s.statRow}>
               <div style={s.statCard}>
                 <span style={{ ...s.statValue, color: '#4cc98a' }}>{result.imported}</span>
@@ -428,8 +466,9 @@ export default function ImportPage() {
             </div>
 
             {result.errors.length > 0 && (
-              <div style={s.card}>
+              <div className={styles.card}>
                 <div style={s.cardTitle}>Rows the server could not import</div>
+                <button style={s.btnGhost} onClick={() => downloadReport(result.errors, 'server-import-problems.csv')}>Download all server errors</button>
                 <div style={s.problemList}>
                   {result.errors.slice(0, 20).map((e, i) => (
                     <div key={i} style={s.problemRow}>
@@ -447,12 +486,13 @@ export default function ImportPage() {
             </div>
           </>
         )}
+        </div>
       </div>
     </div>
   );
 }
 
-function previewColumns(kind) {
+function previewColumns(kind, timezone, artists) {
   if (kind === 'clients') {
     return [
       { key: 'name',  label: 'Name',  render: p => p.name },
@@ -464,7 +504,9 @@ function previewColumns(kind) {
   }
   return [
     { key: 'client', label: 'Client', render: p => p.client_name || p.client_email || p.client_phone },
-    { key: 'when',   label: 'When',   render: p => p.chosen_time ? new Date(p.chosen_time).toLocaleString('en-AU', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : '—' },
+    { key: 'when',   label: 'When',   render: p => p.chosen_time ? new Date(p.chosen_time).toLocaleString('en-AU', { timeZone: timezone.trim(), day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : '—' },
+    { key: 'artist', label: 'Artist', render: p => artists.find(a => a.artistId === p.artist_id)?.name || 'Unassigned' },
+    { key: 'duration', label: 'Minutes', render: p => p.duration_minutes ?? '—' },
     { key: 'status', label: 'Status', render: p => p.status },
     { key: 'price',  label: 'Price',  render: p => p.price != null ? `$${p.price}` : '—' },
     { key: 'design', label: 'Service', render: p => p.design_details || '—' },
@@ -472,48 +514,33 @@ function previewColumns(kind) {
 }
 
 const s = {
-  page: { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' },
-  header: { padding: '1.75rem 2rem 1.25rem', borderBottom: '1px solid var(--border-faint)', flexShrink: 0 },
-  title: { fontSize: '1.2rem', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.01em', margin: 0 },
-  sub: { fontSize: '0.8rem', color: 'var(--text-faint)', marginTop: '0.2rem', marginBottom: 0 },
-  body: { flex: 1, overflowY: 'auto', padding: '1.25rem 2rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' },
+  title: { fontSize: '1.4rem', fontWeight: 600, color: 'var(--text)', letterSpacing: '-0.035em', margin: 0 },
+  sub: { fontSize: '0.8rem', color: 'var(--text-dim)', lineHeight: 1.6, margin: '0.4rem 0 0' },
 
   error: {
     background: 'rgba(232,111,111,0.08)', border: '1px solid rgba(232,111,111,0.35)',
     borderRadius: 10, padding: '0.7rem 1rem', color: '#e86f6f', fontSize: '0.82rem',
   },
 
-  dropZone: {
-    border: '1.5px dashed var(--border)', borderRadius: 12, padding: '3.5rem 2rem',
-    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem',
-    cursor: 'pointer', background: 'var(--bg-card)',
-  },
-  dropTitle: { fontSize: '0.925rem', fontWeight: 600, color: 'var(--text)' },
-  dropSub: { fontSize: '0.75rem', color: 'var(--text-faint)' },
-
-  card: {
-    background: 'var(--bg-card)', border: '1px solid var(--border-faint)', borderRadius: 12,
-    padding: '1rem 1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem',
-  },
-  cardTitle: { fontSize: '0.82rem', fontWeight: 700, color: 'var(--text)' },
-  cardSub: { fontSize: '0.72rem', color: 'var(--text-faint)', margin: 0 },
+  cardTitle: { fontSize: '0.88rem', fontWeight: 600, color: 'var(--text)', overflowWrap: 'anywhere' },
+  cardSub: { fontSize: '0.77rem', color: 'var(--text-dim)', lineHeight: 1.7, margin: 0 },
 
   controlRow: { display: 'flex', gap: '1.5rem', flexWrap: 'wrap' },
-  control: { display: 'flex', flexDirection: 'column', gap: '0.35rem' },
+  control: { display: 'flex', flex: '1 1 200px', minWidth: 0, flexDirection: 'column', gap: '0.45rem' },
   label: { fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-secondary)' },
   segmented: { display: 'flex', gap: 4, background: 'var(--bg-chip)', borderRadius: 8, padding: 3 },
   segBtn: {
-    background: 'transparent', border: 'none', borderRadius: 6, padding: '0.3rem 0.7rem',
+    background: 'transparent', border: 'none', borderRadius: 6, padding: '0.45rem 0.7rem', minHeight: 36,
     fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', cursor: 'pointer',
   },
   segBtnActive: { background: 'var(--bg-card)', color: 'var(--text)', boxShadow: '0 1px 2px rgba(0,0,0,0.15)' },
   select: {
     background: 'var(--bg-chip)', border: '1px solid var(--border)', borderRadius: 8,
-    color: 'var(--text)', fontSize: '0.78rem', padding: '0.35rem 0.6rem', minWidth: 180,
+    color: 'var(--text)', fontSize: '0.78rem', padding: '0.6rem 0.7rem', minHeight: 42, minWidth: 180, maxWidth: '100%',
   },
 
   mapGrid: { display: 'flex', flexDirection: 'column', gap: '0.45rem' },
-  mapRow: { display: 'flex', alignItems: 'center', gap: '0.5rem 1rem', justifyContent: 'space-between', flexWrap: 'wrap' },
+  mapRow: { display: 'flex', alignItems: 'center', gap: '0.5rem 1rem', justifyContent: 'space-between', flexWrap: 'wrap', padding: '0.4rem 0' },
   mapField: { fontSize: '0.8rem', color: 'var(--text-dim)', fontWeight: 500 },
   mapHint: { fontSize: '0.7rem', color: 'var(--text-ghost)', fontWeight: 400 },
 
@@ -541,14 +568,14 @@ const s = {
     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
   },
 
-  btnRow: { display: 'flex', justifyContent: 'flex-end', gap: '0.6rem', paddingBottom: '1rem' },
+  btnRow: { display: 'flex', justifyContent: 'flex-end', flexWrap: 'wrap', gap: '0.6rem', paddingBottom: '1rem' },
   btnGhost: {
     background: 'var(--bg-chip)', border: '1px solid var(--border)', borderRadius: 8,
-    color: 'var(--text-muted)', fontSize: '0.8rem', fontWeight: 600, padding: '0.5rem 1rem', cursor: 'pointer',
+    color: 'var(--text-muted)', fontSize: '0.8rem', fontWeight: 600, padding: '0.6rem 1rem', minHeight: 42, cursor: 'pointer',
   },
   btnPrimary: {
-    background: 'var(--accent)', border: 'none', borderRadius: 8,
-    color: 'var(--accent-contrast, #111)', fontSize: '0.8rem', fontWeight: 700, padding: '0.5rem 1.1rem', cursor: 'pointer',
+    background: 'var(--text)', border: 'none', borderRadius: 8,
+    color: 'var(--bg-base)', fontSize: '0.8rem', fontWeight: 700, padding: '0.6rem 1.1rem', minHeight: 42, cursor: 'pointer',
   },
   btnDisabled: { opacity: 0.4, cursor: 'not-allowed' },
 

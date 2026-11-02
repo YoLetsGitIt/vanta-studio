@@ -1,14 +1,19 @@
- 'use client';
+'use client';
 import { useEffect, useState } from 'react';
-import StudioVisit from '@/components/StudioVisit';
 import StudioAuth from '@/components/StudioAuth';
+import StatePanel from '@/components/ui/StatePanel';
 
 export default function HomePage() {
-  const [auth, setAuth] = useState(false);
+  const [ready, setReady] = useState(false);
   useEffect(() => {
     // Preserve existing signup links and Stripe success/cancellation callbacks.
     const params = new URLSearchParams(window.location.search);
-    setAuth(params.has('signup') || params.has('signin'));
+    const destination = params.has('signup') ? '/signup' : params.has('signin') ? '/signin' : null;
+    if (destination) {
+      window.location.replace(`${destination}${window.location.search}${window.location.hash}`);
+      return;
+    }
+    setReady(true);
   }, []);
-  return auth ? <StudioAuth /> : <StudioVisit />;
+  return ready ? <StudioAuth /> : <StatePanel title="Opening Vanta…" busy />;
 }

@@ -1,5 +1,7 @@
 'use client';
 
+import { useLanguage } from '@/lib/i18n';
+
 import { useRef, useState } from 'react';
 import Button from '@/components/ui/Button';
 import Field, { Input, Textarea, Select } from '@/components/ui/Field';
@@ -43,6 +45,7 @@ function when(iso) {
 }
 
 export default function AutomationCard({ automation, available, onSaved, onNeedSetup }) {
+  const { t: mt } = useLanguage();
   const meta = META[automation.trigger_type];
   const [form, setForm] = useState(automation);
   const [open, setOpen] = useState(false);
@@ -78,7 +81,7 @@ export default function AutomationCard({ automation, available, onSaved, onNeedS
 
   async function save() {
     setSaving(true); setError('');
-    try { await persist(form.enabled); showFeedback('Saved.', 'success'); }
+    try { await persist(form.enabled); showFeedback(mt("Saved."), 'success'); }
     catch (err) { setError(err.message); }
     finally { setSaving(false); }
   }
@@ -105,13 +108,13 @@ export default function AutomationCard({ automation, available, onSaved, onNeedS
       message: form.trigger_type === 'slot_opened'
         ? `Email up to ${form.audience.max_recipients} opted-in clients about ${who}'s cancelled slot? Only clients who agreed to marketing emails are contacted.`
         : `Send ${who} the thank-you email? They must have agreed to marketing emails.`,
-      confirmLabel: 'Send',
+      confirmLabel: mt("Send"),
     });
     if (!ok) return;
     setSending(candidate.booking_id);
     try {
       await triggerMarketingNow(candidate.booking_id, form.trigger_type);
-      showFeedback('Queued. Emails go out within a minute or two.', 'success');
+      showFeedback(mt("Queued. Emails go out within a minute or two."), 'success');
       await loadCandidates();
     } catch (err) { showError(err); }
     finally { setSending(''); }
@@ -125,12 +128,12 @@ export default function AutomationCard({ automation, available, onSaved, onNeedS
         <div className={styles.autoText}>
           <div className={styles.autoName}>
             <h2 className={styles.cardTitle} id={`auto-${form.trigger_type}`}>{meta.title}</h2>
-            <span className={`${styles.pill} ${form.enabled ? styles.pillOn : ''}`}>{form.enabled ? 'On' : 'Off'}</span>
+            <span className={`${styles.pill} ${form.enabled ? styles.pillOn : ''}`}>{form.enabled ? mt("On") : mt("Off")}</span>
           </div>
           <p className={styles.desc}>{meta.summary(form, delayWords(form.delay_minutes))}</p>
         </div>
         <div className={styles.autoControls}>
-          <Button variant="secondary" size="sm" aria-expanded={open} onClick={() => setOpen(o => !o)}>{open ? 'Close' : 'Edit'}</Button>
+          <Button variant="secondary" size="sm" aria-expanded={open} onClick={() => setOpen(o => !o)}>{open ? mt("Close") : mt("Edit")}</Button>
           <input type="checkbox" role="switch" className={styles.switch} aria-label={`${meta.title}: ${form.enabled ? 'on' : 'off'}`}
             checked={form.enabled} disabled={toggling} onChange={e => toggle(e.target.checked)} />
         </div>
@@ -139,51 +142,51 @@ export default function AutomationCard({ automation, available, onSaved, onNeedS
       {error && (
         <p className={styles.autoAlert} role="alert">
           <span>{error}</span>
-          {needsReplyTo && <Button size="sm" variant="secondary" onClick={onNeedSetup}>Add reply-to</Button>}
+          {needsReplyTo && <Button size="sm" variant="secondary" onClick={onNeedSetup}>{mt("Add reply-to")}</Button>}
         </p>
       )}
 
       {open && (
         <div className={styles.autoBody}>
-          <Field label="Subject"><Input value={form.subject} maxLength={200} onChange={e => set({ subject: e.target.value })} /></Field>
-          <Field label="Message">
+          <Field label={mt("Subject")}><Input value={form.subject} maxLength={200} onChange={e => set({ subject: e.target.value })} /></Field>
+          <Field label={mt("Message")}>
             <Textarea ref={bodyRef} rows={8} value={form.body} maxLength={20000} onChange={e => set({ body: e.target.value })} />
           </Field>
-          <div className={styles.chips} aria-label="Insert a placeholder">
-            <span className={styles.hint}>Insert:</span>
+          <div className={styles.chips} aria-label={mt("Insert a placeholder")}>
+            <span className={styles.hint}>{mt("Insert:")}</span>
             {TOKENS.map(([token, label]) => <button key={token} type="button" className={styles.chip} onClick={() => insert(token)}>{label}</button>)}
           </div>
           <div className={styles.row}>
-            <Field label="When to send">
+            <Field label={mt("When to send")}>
               <Select value={form.delay_minutes} onChange={e => set({ delay_minutes: Number(e.target.value) })}>
                 {DELAYS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
               </Select>
             </Field>
             {form.trigger_type === 'slot_opened' && (
-              <Field label="Max clients to email" hint="Most recent visitors are emailed first.">
+              <Field label={mt("Max clients to email")} hint={mt("Most recent visitors are emailed first.")}>
                 <Input type="number" min={1} max={200} value={form.audience.max_recipients}
                   onChange={e => set({ audience: { max_recipients: e.target.value } })} />
               </Field>
             )}
           </div>
-          {!available && <p className={styles.hint}>Sending isn’t switched on yet. Your changes are saved and apply once it is.</p>}
+          {!available && <p className={styles.hint}>{mt("Sending isn’t switched on yet. Your changes are saved and apply once it is.")}</p>}
           <div className={styles.actions}>
-            <Button onClick={save} loading={saving} loadingLabel="Saving…" disabled={!dirty}>Save changes</Button>
-            <Button variant="secondary" onClick={() => setPreview(true)}>Preview</Button>
+            <Button onClick={save} loading={saving} loadingLabel={mt("Saving…")} disabled={!dirty}>{mt("Save changes")}</Button>
+            <Button variant="secondary" onClick={() => setPreview(true)}>{mt("Preview")}</Button>
             <Button variant="ghost" onClick={candidates ? () => setCandidates(null) : loadCandidates} disabled={!available}>
-              {candidates ? 'Hide recent' : 'Send for a recent booking…'}
+              {candidates ? mt("Hide recent") : mt("Send for a recent booking…")}
             </Button>
           </div>
           {candidates && (
             <div>
               <h3 className={styles.cardTitle}>{meta.candidates}</h3>
-              {candidates.length === 0 ? <p className={styles.muted}>Nothing recent.</p> : (
+              {candidates.length === 0 ? <p className={styles.muted}>{mt("Nothing recent.")}</p> : (
                 <ul className={styles.list}>
                   {candidates.map(c => (
                     <li key={c.booking_id} className={styles.listRow}>
                       <span>{c.client_name || 'Client'}
                         <span className={styles.rowSub}>{when(c.chosen_time)}{c.emailed > 0 ? ` · already emailed ${c.emailed}` : ''}</span></span>
-                      <Button size="sm" variant="secondary" loading={sending === c.booking_id} onClick={() => sendNow(c)}>Send</Button>
+                      <Button size="sm" variant="secondary" loading={sending === c.booking_id} onClick={() => sendNow(c)}>{mt("Send")}</Button>
                     </li>
                   ))}
                 </ul>

@@ -15,6 +15,7 @@ import { useLanguage } from '@/lib/i18n';
 import { showError } from '@/lib/feedback';
 import Button from '@/components/ui/Button';
 import MarketingConsent from '@/components/MarketingConsent';
+import ClientTemplateSend from '@/components/marketing/ClientTemplateSend';
 import { Pill, Section, Fact, SkeletonBar, DetailSkeleton, detailStyles } from '@/components/ui/DetailParts';
 
 const CLIENTS_PER_PAGE = 25;
@@ -25,6 +26,7 @@ function ClientsInner() {
   const [contacts, setContacts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState(null);
@@ -38,9 +40,11 @@ function ClientsInner() {
 
   useEffect(() => {
     async function load() {
+      setLoading(true);
+      setError('');
       try {
         const [contactData, templateData] = await Promise.all([
-          getStudioClients().catch(() => ({ clients: [] })), // contact book is optional
+          getStudioClients(),
           listConsentTemplates().catch(() => ({ templates: [] })),
         ]);
         setConsentTemplates(templateData.templates ?? []);
@@ -53,7 +57,7 @@ function ClientsInner() {
       }
     }
     load();
-  }, []);
+  }, [loadAttempt]);
 
   const clients = useMemo(() => {
     return contacts.map(contact => ({
@@ -67,6 +71,7 @@ function ClientsInner() {
         contactId: contact.id,
         marketingKnown: contact.email_marketing_opt_in !== undefined,
         marketingOptIn: contact.email_marketing_opt_in === true,
+        smsMarketingOptIn: contact.sms_marketing_opt_in === true,
         unsubscribed: contact.email_unsubscribed === true,
       })).sort((a, b) => {
       if (!a.lastBooking) return 1;
@@ -78,7 +83,7 @@ function ClientsInner() {
   const marketingFor = useCallback(client => {
     if (!client || !client.marketingKnown) return null;
     const override = marketingOverrides[client.id];
-    return { optIn: override ?? client.marketingOptIn, unsubscribed: client.unsubscribed };
+    return { optIn: override ?? client.marketingOptIn, smsOptIn: override ?? client.smsMarketingOptIn, unsubscribed: client.unsubscribed };
   }, [marketingOverrides]);
 
   const filtered = useMemo(() => {
@@ -208,7 +213,7 @@ function ClientsInner() {
       <div style={s.layout}>
         <div className="studio-feature-body studio-client-list" style={s.list}>
           {loading && <p role="status" style={s.msg}>{t('loading')}</p>}
-          {error && <p role="alert" style={{ ...s.msg, color: 'var(--status-rejected)' }}>{error}</p>}
+          {error && <div role="alert" style={s.msg}><p style={{ color: 'var(--status-rejected)' }}>{error}</p><Button onClick={() => setLoadAttempt(value => value + 1)}>{t('Try again')}</Button></div>}
           {!loading && !error && filtered.length === 0 && (
             <p style={s.msg}>{t('clients_none')}</p>
           )}
@@ -347,7 +352,7 @@ function ConsentBadge({ status }) {
 function MarketingBadge({ marketing }) {
   if (!marketing) return null;
   if (marketing.unsubscribed) return <span style={{ ...s.badge, ...s.badgeGrey }}>Unsubscribed</span>;
-  if (marketing.optIn) return <span style={{ ...s.badge, ...s.badgeGreen }}>Marketing</span>;
+  if (marketing.optIn || marketing.smsOptIn) return <span style={{ ...s.badge, ...s.badgeGreen }}>Marketing</span>;
   return null;
 }
 
@@ -479,7 +484,7 @@ function ClientDetail({ client, marketing, onMarketingChange, clientKey, onClose
           <span style={s.panelTitle}>{client.name}</span>
           <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
             {consentState && <Pill tone={consentTone}>{consentLabelText}</Pill>}
-            {marketing?.optIn && !marketing.unsubscribed && <Pill tone="info">Marketing emails</Pill>}
+            {(marketing?.optIn || marketing?.smsOptIn) && <Pill tone="info">Marketing</Pill>}
             {marketing?.unsubscribed && <Pill>Unsubscribed</Pill>}
           </div>
         </div>
@@ -504,7 +509,7 @@ function ClientDetail({ client, marketing, onMarketingChange, clientKey, onClose
           {client.dob && <Fact label={t('clients_dob')}>{formatDob(client.dob)}</Fact>}
         </Section>
 
-        {(consentTemplates.length > 0 || (marketing && client.email)) && (
+        {(consentTemplates.length > 0 || (marketing && (client.email || client.phone))) && (
           <Section title="Consent">
             {consentTemplates.slice(0, 1).map(ct => {
               const sentId = linkSentId === ct.id;
@@ -525,9 +530,13 @@ function ClientDetail({ client, marketing, onMarketingChange, clientKey, onClose
                 </div>
               );
             })}
-            <MarketingConsent email={client.email} clientKey={clientKey} marketing={marketing} onChange={onMarketingChange} />
+            <MarketingConsent email={client.email} phone={client.phone} clientKey={clientKey} marketing={marketing} onChange={onMarketingChange} />
           </Section>
         )}
+
+        <Section title="Send an email">
+          <ClientTemplateSend key={clientKey} clientKey={clientKey} email={client.email} marketing={marketing} />
+        </Section>
 
         <Section title={t('clients_profile')}>
           <div>

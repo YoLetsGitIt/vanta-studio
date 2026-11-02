@@ -1,0 +1,159 @@
+.panel {
+  --accent: #dfc6a7;
+  --accent-contrast: #21180e;
+  --accent-tint: rgba(223, 198, 167, 0.09);
+  --accent-tint-border: rgba(223, 198, 167, 0.3);
+  --appointment-input: #1b1b1b;
+  box-shadow: var(--shadow-modal);
+}
+
+:global([data-theme='light']) .panel {
+  --accent: #76522f;
+  --accent-contrast: #fff;
+  --accent-tint: rgba(118, 82, 47, 0.08);
+  --accent-tint-border: rgba(118, 82, 47, 0.3);
+  --appointment-input: #f8f5ef;
+}
+
+.body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  scroll-padding-block: 20px;
+}
+
+.body > * { flex-shrink: 0; }
+
+.fieldRow {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  align-items: start;
+}
+
+.body input, .body select, .body textarea { font-family: inherit; }
+.body input::placeholder, .body textarea::placeholder { color: var(--text-secondary); opacity: 1; }
+.body input:disabled, .body select:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.panel :is(input, select, textarea, button, summary):focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+}
+
+.body :is(input, select, textarea):focus {
+  border-color: var(--accent) !important;
+}
+
+.bookingTypes {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding: 4px;
+  gap: 4px;
+  border: 1px solid var(--border-strong);
+  border-radius: 11px;
+  background: var(--appointment-input);
+}
+
+.bookingTypes button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 44px;
+  padding: 8px 4px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 13px;
+  font-weight: 500;
+  transition: background 150ms, color 150ms;
+}
+
+.bookingTypes button:hover { background: var(--bg-chip); }
+.bookingTypes button[aria-pressed='true'] {
+  background: var(--accent);
+  color: var(--accent-contrast);
+  font-weight: 700;
+}
+
+.choiceMark { display: none; }
+[aria-pressed='true'] > .choiceMark { display: inline; }
+
+.smsConsent {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding-top: 3px;
+  color: var(--text-dim);
+  font-size: 12px;
+  line-height: 1.6;
+  cursor: pointer;
+}
+
+.smsConsent input { flex: 0 0 auto; width: 16px; height: 16px; margin-top: 2px; }
+.consentHint { color: var(--text-secondary); }
+
+.additionalDetails {
+  padding: 0 18px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--bg-panel);
+}
+
+.additionalDetails > summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 58px;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  list-style: none;
+}
+
+.additionalDetails > summary::-webkit-details-marker { display: none; }
+.additionalDetails > summary::after {
+  content: '+';
+  margin-left: auto;
+  color: var(--text-secondary);
+  font-size: 20px;
+  font-weight: 400;
+}
+.additionalDetails[open] > summary::after { content: '−'; }
+.optionalBadge { color: var(--text-secondary); font-size: 11px; font-weight: 400; }
+.additionalBody { display: flex; flex-direction: column; gap: 16px; padding: 0 0 18px; }
+
+.footer {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 24px 20px;
+  border-top: 1px solid var(--border-strong);
+  background: var(--bg-sidebar);
+}
+
+.summary { display: flex; flex-direction: column; gap: 5px; }
+.summaryHeading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.summaryHeading strong { color: var(--text); font-size: 14px; overflow-wrap: anywhere; }
+.summaryHeading strong:last-child:not(:first-child) { color: var(--accent); white-space: nowrap; }
+.summary > span { color: var(--text-secondary); font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+.footer > button { min-height: 46px; }
+
+@media (max-width: 520px) {
+  .body { padding: 16px; gap: 16px; }
+  .fieldRow { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+  .footer { padding: 12px 16px 16px; gap: 10px; }
+}
+
+@media (max-height: 550px) {
+  .footer { padding-block: 8px; gap: 6px; }
+  .summary { gap: 2px; }
+}
