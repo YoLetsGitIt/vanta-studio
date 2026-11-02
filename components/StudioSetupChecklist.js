@@ -29,7 +29,7 @@ export function StudioSetupLinks() {
         <p>Set up your studio and bring your existing records across.</p>
       </div>
       <div className={styles.shortcutGrid}>
-        <a className={styles.shortcutLink} href="/dashboard/home#studio-setup" aria-labelledby="account-setup-checklist-title" aria-describedby="account-setup-checklist-description">
+        <a className={styles.shortcutLink} href="/dashboard/home?setup=1#studio-setup" aria-labelledby="account-setup-checklist-title" aria-describedby="account-setup-checklist-description">
           <span className={styles.shortcutIcon} aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="m4 7 1.5 1.5L8 6m3 1h9M4 12l1.5 1.5L8 11m3 1h9M4 17l1.5 1.5L8 16m3 1h9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg></span>
           <span className={styles.shortcutCopy}><strong id="account-setup-checklist-title">Setup checklist</strong><span id="account-setup-checklist-description">Review your studio, artists and booking setup.</span></span>
           <ArrowIcon />
@@ -54,7 +54,17 @@ export default function StudioSetupChecklist() {
   async function load() {
     setLoading(true);
     setError('');
-    try { setState(await getStudioOnboarding()); }
+    try {
+      let next = await getStudioOnboarding();
+      // The Settings shortcut (?setup=1) brings a dismissed checklist back.
+      const url = new URL(window.location.href);
+      if (url.searchParams.get('setup') === '1') {
+        url.searchParams.delete('setup');
+        window.history.replaceState(window.history.state, '', url);
+        if (next.dismissed) next = await updateStudioOnboarding({ dismissed: false });
+      }
+      setState(next);
+    }
     catch (err) { setError(err.message || 'Could not load setup progress.'); }
     finally { setLoading(false); }
   }
@@ -74,6 +84,8 @@ export default function StudioSetupChecklist() {
     finally { setSaving(false); }
   }
 
+  if (state?.dismissed) return null;
+
   const done = STEPS.filter(step => ['complete', 'skipped'].includes(state?.steps?.[step.id])).length;
   const expanded = state && !state.collapsed;
 
@@ -83,6 +95,7 @@ export default function StudioSetupChecklist() {
         <h2 id="studio-setup-title">Studio setup</h2>
         {state && <p className={styles.progress} role="status">{done} of {STEPS.length} done{saving ? ' · Saving…' : ''}</p>}
         {state && <button type="button" className={styles.collapse} aria-label={expanded ? 'Hide checklist' : 'Show checklist'} aria-expanded={!!expanded} aria-controls="studio-setup-steps" disabled={saving || loading} onClick={() => update({ collapsed: !state.collapsed })}>{expanded ? 'Hide' : 'Show'}<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="m6 8 4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg></button>}
+        {state && <button type="button" className={styles.collapse} aria-label="Dismiss setup checklist" title="Remove this checklist. You can bring it back from Settings → Account." disabled={saving || loading} onClick={() => update({ dismissed: true })}>Dismiss<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="m6 6 8 8m0-8-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg></button>}
       </div>
       {loading && <p className={styles.message} role="status">Loading setup progress…</p>}
       {error && <p className={styles.error} role="alert">{error} {!state && <button type="button" disabled={loading} onClick={load}>Try again</button>}</p>}
