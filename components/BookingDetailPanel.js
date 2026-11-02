@@ -3,6 +3,7 @@
 import CancelDepositButton from '@/components/CancelDepositButton';
 import MarkDepositReceivedButton from '@/components/MarkDepositReceivedButton';
 import BookTimeModal from '@/components/BookTimeModal';
+import { useBookingManagement } from '@/lib/bookingManagement';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { getStations, getClientConsents, getNotes, addNote, deleteNote, getBookingConsentSubmissions, getStudioClients, generateConsentLink, getStudioBookingPayment, listConsentTemplates, downloadConsentPdf } from '@/lib/api';
@@ -73,6 +74,7 @@ export default function BookingDetailPanel({
   const [stationStep,  setStationStep]  = useState(false);
   const [stationError, setStationError] = useState('');
   const [bookTimeOpen, setBookTimeOpen] = useState(false);
+  const bookingManagement = useBookingManagement();
 
   // ── Payment recording status ───────────────────────────────────────────────
   const [paymentSplits, setPaymentSplits] = useState(null); // null = not loaded
@@ -164,8 +166,9 @@ export default function BookingDetailPanel({
   const canAcceptReject   = canAccept || canReject; // kept for layout gate
   const canConfirm        = status === 'requires_confirmation';
   const canReschedule     = status === 'confirmed' && chosenDate && chosenDate > today;
-  // The studio can book any open request straight into a time, without the artist.
-  const canBookTime       = Boolean(bookTimeArtists) && ['pending', 'awaiting_payment', 'requires_confirmation'].includes(status) && !booking?.deposit_paid_at && !booking?.deposit_confirmed_at;
+  // When the studio confirms booking times (Settings → Bookings), it can book any open
+  // request straight into a time, without the artist.
+  const canBookTime       = bookingManagement === 'studio' && Boolean(bookTimeArtists) && ['pending', 'awaiting_payment', 'requires_confirmation'].includes(status) && !booking?.deposit_paid_at && !booking?.deposit_confirmed_at;
 
   const displayStatus = isNoShow ? 'no_show' : status;
   const sc = statusColors(displayStatus);

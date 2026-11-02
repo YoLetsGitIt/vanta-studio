@@ -18,6 +18,7 @@ const pending = { id: 'req-1', requester_name: 'Mia Chen', requester_email: 'mia
       await context.route(/\/studio\/me\/bookings(\?|$)/, r => r.fulfill({ json: { bookings: [current] } }));
       await context.route(/\/studio\/me\/bookings\/req-1$/, r => r.fulfill({ json: current }));
       await context.route(/\/stripe\/status/, r => r.fulfill({ json: { charges_enabled: false, manual_deposits_ready: true } }));
+      await context.route(/\/studio\/me\/booking-management$/, r => r.fulfill({ json: { mode: 'studio' } }));
       await context.route(/\/studio\/me\/bookings\/req-1\/book-time$/, r => {
         booked = r.request().postDataJSON();
         current = { ...current, status: booked.deposit_required ? 'awaiting_payment' : 'confirmed', chosen_time: booked.chosen_time, artist_id: booked.artist_id };
@@ -56,6 +57,35 @@ const pending = { id: 'req-1', requester_name: 'Mia Chen', requester_email: 'mia
       assert(booked.artist_id && booked.artist_id !== pending.artist_id);
       assert.deepEqual(errors, []);
       console.log(`PASS book a time ${withDeposit ? 'with deposit' : 'without deposit'} at ${width}px`);
+      await context.close();
+    }
+    // Artist-confirmed studios don't see "Book a time"; Settings switches it.
+    {
+      const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+      await setup(context);
+      let mode = 'artist'; const puts = [];
+      await context.route(/\/studio\/me\/bookings(\?|$)/, r => r.fulfill({ json: { bookings: [pending] } }));
+      await context.route(/\/studio\/me\/bookings\/req-1$/, r => r.fulfill({ json: pending }));
+      await context.route(/\/studio\/me\/booking-management$/, r => {
+        if (r.request().method() === 'PUT') { mode = r.request().postDataJSON().mode; puts.push(mode); }
+        return r.fulfill({ json: { mode } });
+      });
+      const page = await context.newPage();
+      await page.goto(`${base}/dashboard/appointments?booking=req-1`, { waitUntil: 'networkidle' });
+      await page.getByText('Mia Chen').first().waitFor();
+      await page.waitForTimeout(500);
+      assert.equal(await page.getByRole('button', { name: 'Book a time' }).count(), 0, 'Hidden while artists confirm times');
+      await page.goto(`${base}/dashboard/settings?tab=bookings`, { waitUntil: 'networkidle' });
+      const card = page.locator('section', { has: page.getByRole('heading', { name: 'Who confirms booking times' }) });
+      assert.equal(await card.getByRole('radio', { name: /^Artists/ }).getAttribute('aria-checked'), 'true');
+      await card.getByRole('radio', { name: /^The studio/ }).click();
+      await card.getByRole('status').filter({ hasText: 'Saved' }).waitFor();
+      assert.deepEqual(puts, ['studio']);
+      assert.equal(await card.getByRole('radio', { name: /^The studio/ }).getAttribute('aria-checked'), 'true');
+      if (shots) await card.screenshot({ path: `${shots}/booking-management.png` });
+      await page.goto(`${base}/dashboard/appointments?booking=req-1`, { waitUntil: 'networkidle' });
+      await page.getByRole('button', { name: 'Book a time' }).waitFor();
+      console.log('PASS setting controls Book a time');
       await context.close();
     }
   } finally { await browser.close(); }

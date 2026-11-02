@@ -28,6 +28,7 @@ import { requestConfirmation, showError } from '@/lib/feedback';
 
 import DownloadableQR from '@/components/DownloadableQR';
 import WalkInFormSettings from '@/components/WalkInFormSettings';
+import BookingManagementSettings from '@/components/BookingManagementSettings';
 import PushNotificationSettings from '@/components/PushNotificationSettings';
 
 const DAY_KEYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
@@ -1413,6 +1414,8 @@ export default function SettingsPage() {
             </form>
           )}
         </section>
+
+        <BookingManagementSettings styles={s} />
 
         <WalkInFormSettings styles={s} url={bookingSlug ? `${SHORT_LINK_BASE}/w/${bookingSlug}` : studioId ? `${typeof window === 'undefined' ? '' : window.location.origin}/walkin?s=${studioId}` : ''} />
 
