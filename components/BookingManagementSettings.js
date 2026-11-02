@@ -1,6 +1,6 @@
 'use client';
 
-// Settings → Bookings: who confirms the time of a studio booking.
+// Settings → Booking requests: who confirms the time of a studio booking.
 import { useState } from 'react';
 import { saveBookingManagement, useBookingManagement } from '@/lib/bookingManagement';
 

@@ -13,6 +13,7 @@ import NewAppointmentPanel from '@/components/NewAppointmentPanel';
 import FeedbackHost from '@/components/FeedbackHost';
 import Dialog from '@/components/ui/Dialog';
 import { registerServiceWorker } from '@/lib/push';
+import { useHideHeaderOnScroll } from '@/lib/useHideHeaderOnScroll';
 
 const NAV = [
   { href: '/dashboard/home',         tKey: 'nav_dashboard', icon: HomeIcon },
@@ -49,7 +50,7 @@ const TOUR_STEPS = [
     target: 'nav', targetIndex: index, href, tKey,
   })),
   { title: 'Settings: Studio', body: 'Set your studio name, address, hours, branding, and the details clients see first.', target: 'settings', settingsTab: 'studio', href: '/dashboard/settings?tab=studio' },
-  { title: 'Settings: Bookings', body: 'Build your booking form, share your booking link or widget, set deposits, reminders, and client consent.', target: 'settings', settingsTab: 'bookings', href: '/dashboard/settings?tab=bookings' },
+  { title: 'Settings: Booking requests', body: 'Choose who confirms booking times, build your booking form, and share your booking link or website widget. Walk-ins, consent forms and client messages have their own sections.', target: 'settings', settingsTab: 'requests', href: '/dashboard/settings?tab=requests' },
   { title: 'Settings: Payments', body: 'Connect Stripe, choose how payments are handled, and control payouts across your studio.', target: 'settings', settingsTab: 'payments', href: '/dashboard/settings?tab=payments' },
   { title: 'Settings: Account', body: 'Manage your subscription, billing details, and the account preferences that keep your studio running.', target: 'settings', settingsTab: 'account', href: '/dashboard/settings?tab=account' },
 ];
@@ -148,6 +149,12 @@ function DashboardShell({ children }) {
   useEffect(() => { setMoreOpen(false); }, [pathname]);
   // Lets the studio be added to the Home Screen and receive booking notifications.
   useEffect(() => { registerServiceWorker(); }, []);
+  const shellRef = useRef(null);
+  const headerRef = useRef(null);
+  const mainRef = useRef(null);
+  useHideHeaderOnScroll(shellRef, headerRef, mainRef, ready && !billingBlocked);
+  // A new page always starts with the top bar showing.
+  useEffect(() => { shellRef.current?.removeAttribute('data-header-hidden'); }, [pathname]);
   useEffect(() => {
     const media = window.matchMedia(MOBILE_MEDIA);
     const closeOnDesktop = () => { if (!media.matches) setMoreOpen(false); };
@@ -256,8 +263,8 @@ function DashboardShell({ children }) {
   }
 
   return (
-    <div className="studio-dashboard-shell" style={s.shell}>
-      <header className="studio-mobile-header">
+    <div ref={shellRef} className="studio-dashboard-shell" style={s.shell}>
+      <header ref={headerRef} className="studio-mobile-header">
         <Link href="/dashboard/home" aria-label="Vanta Studio home" style={s.logo}>
           <span style={s.logoMark}>vanta</span><span style={s.logoSub}>studio</span>
         </Link>
@@ -325,7 +332,7 @@ function DashboardShell({ children }) {
           </div>
         </aside>
 
-        <main className="studio-dashboard-main" style={s.main}>{children}</main>
+        <main ref={mainRef} className="studio-dashboard-main" style={s.main}>{children}</main>
       </div>
 
       <nav className="studio-mobile-nav" aria-label="Mobile studio navigation">
@@ -370,7 +377,7 @@ function DashboardShell({ children }) {
 
 const TOUR_HIGHLIGHT_CSS = `
 body[data-vanta-tour-settings-tab="studio"] [data-tour-settings-tab="studio"],
-body[data-vanta-tour-settings-tab="bookings"] [data-tour-settings-tab="bookings"],
+body[data-vanta-tour-settings-tab="requests"] [data-tour-settings-tab="requests"],
 body[data-vanta-tour-settings-tab="payments"] [data-tour-settings-tab="payments"],
 body[data-vanta-tour-settings-tab="account"] [data-tour-settings-tab="account"] {
   position: relative !important;

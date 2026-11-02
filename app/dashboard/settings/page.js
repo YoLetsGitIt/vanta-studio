@@ -30,6 +30,8 @@ import DownloadableQR from '@/components/DownloadableQR';
 import WalkInFormSettings from '@/components/WalkInFormSettings';
 import BookingManagementSettings from '@/components/BookingManagementSettings';
 import PushNotificationSettings from '@/components/PushNotificationSettings';
+import { useBookingManagement } from '@/lib/bookingManagement';
+import { MOBILE_MEDIA } from '@/lib/responsive';
 
 const DAY_KEYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 
@@ -203,6 +205,31 @@ function AddressAutocomplete({ value, onChange, onSelect, inputStyle }) {
 
 const SHORT_LINK_BASE = (process.env.NEXT_PUBLIC_MARKETING_URL || 'https://vanta.tattoo').replace(/\/$/, '');
 
+// Settings sections. On phones they're a list you tap into; on larger screens, tabs.
+const SETTINGS_TABS = [
+  { id: 'studio',   label: 'Studio',           hint: 'Profile, logo, opening hours and stations' },
+  { id: 'requests', label: 'Booking requests', hint: 'Who confirms times, booking form, link and widget' },
+  { id: 'walkins',  label: 'Walk-ins',         hint: 'Walk-in link, QR code and form fields' },
+  { id: 'consent',  label: 'Consent forms',    hint: 'Build the forms clients sign' },
+  { id: 'messages', label: 'Client messages',  hint: 'Emails, reminders and SMS' },
+  { id: 'payments', label: 'Payments',         hint: 'Commission, Stripe and deposit options' },
+  { id: 'account',  label: 'Account',          hint: 'Notifications, billing, appearance and language' },
+];
+// Older links (setup checklist, tour, bookmarks) used a single Bookings tab.
+const LEGACY_TABS = { bookings: 'requests' };
+
+function useIsMobile() {
+  const [mobile, setMobile] = useState(false);
+  useEffect(() => {
+    const query = window.matchMedia(MOBILE_MEDIA);
+    const update = () => setMobile(query.matches);
+    update();
+    query.addEventListener('change', update);
+    return () => query.removeEventListener('change', update);
+  }, []);
+  return mobile;
+}
+
 export default function SettingsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -242,14 +269,33 @@ export default function SettingsPage() {
   const consentUrl = bookingSlug ? `${SHORT_LINK_BASE}/c/${bookingSlug}` : walkInUrl.replace('/studio-booking?s=', '/consent?s=');
   const [studioId, setStudioId] = useState('');
   const [theme, setThemeState] = useState('dark');
-  const [tab, setTab] = useState('studio');
+  const [tab, setTabState] = useState('studio');
+  const isMobile = useIsMobile();
+  const bookingManagement = useBookingManagement();
+  // One-line summaries for the phone settings list.
+  function settingsSummary(id) {
+    switch (id) {
+      case 'studio': return name ? `${name} · profile, hours and stations` : SETTINGS_TABS[0].hint;
+      case 'requests': return bookingManagement === 'studio' ? 'The studio confirms times · form, link and widget'
+        : bookingManagement === 'artist' ? 'Artists confirm times · form, link and widget' : SETTINGS_TABS[1].hint;
+      case 'consent': return consentTemplates.length ? `${consentTemplates.length} consent form${consentTemplates.length === 1 ? '' : 's'}` : 'No consent forms yet';
+      case 'payments': return stripeStatus?.charges_enabled ? 'Stripe connected · commission and deposits' : SETTINGS_TABS[5].hint;
+      case 'account': return email ? `${email} · notifications and billing` : SETTINGS_TABS[6].hint;
+      default: return SETTINGS_TABS.find(tb => tb.id === id)?.hint ?? '';
+    }
+  }
+
+  // The open section lives in the URL (?tab=…), so links, refresh and Back all work.
+  const setTab = id => {
+    setTabState(id);
+    router[isMobile ? 'push' : 'replace'](`/dashboard/settings?tab=${id}`, { scroll: false });
+  };
 
   useEffect(() => { setThemeState(getTheme()); }, []);
 
   useEffect(() => {
-    if (['studio', 'bookings', 'payments', 'account'].includes(requestedTab)) {
-      setTab(requestedTab);
-    }
+    const wanted = LEGACY_TABS[requestedTab] ?? requestedTab;
+    if (SETTINGS_TABS.some(tb => tb.id === wanted)) setTabState(wanted);
   }, [requestedTab]);
 
   function toggleTheme() {
@@ -333,7 +379,7 @@ export default function SettingsPage() {
         setStudioId(account.studio_id);
         setWalkInUrl(window.location.origin + '/studio-booking?s=' + account.studio_id);
         // Swap in the short vanta.tattoo link once it loads; the long link still works.
-        getBookingLink().then(({ slug }) => { setBookingSlug(slug); setSlugDraft(slug); setWalkInUrl(`${SHORT_LINK_BASE}/b/${slug}`); }).catch(() => {});
+        getBookingLink().then(({ slug }) => { if (!slug) return; setBookingSlug(slug); setSlugDraft(slug); setWalkInUrl(`${SHORT_LINK_BASE}/b/${slug}`); }).catch(() => {});
         if (hoursData.hours?.length === 7) setHours(hoursData.hours);
         setStations(stationsData.stations ?? []);
         setConsentTemplates(templateData.templates ?? []);
@@ -739,27 +785,53 @@ export default function SettingsPage() {
 
   return (
     <div className="studio-settings-page" style={s.page}>
+      {isMobile && !requestedTab ? (
+        // Phones: a list of sections with a one-line summary each.
+        <>
+          <h1 style={s.pageTitle}>{t('settings')}</h1>
+          <nav aria-label="Settings sections" style={s.settingsList}>
+            {SETTINGS_TABS.map(tb => (
+              <button key={tb.id} type="button" data-tour-settings-tab={tb.id} onClick={() => setTab(tb.id)} style={s.settingsRow}>
+                <span style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0, textAlign: 'left' }}>
+                  <span style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text)' }}>{tb.label}</span>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>{settingsSummary(tb.id)}</span>
+                </span>
+                <span aria-hidden="true" style={{ color: 'var(--text-ghost)', fontSize: '1.1rem', flexShrink: 0 }}>›</span>
+              </button>
+            ))}
+          </nav>
+        </>
+      ) : <>
       <div className="studio-settings-header" style={s.pageHeader}>
-        <h1 style={s.pageTitle}>{t('settings')}</h1>
-        <div className="studio-settings-tabs" style={s.tabBar}>
-          {[
-            { id: 'studio',   label: 'Studio' },
-            { id: 'bookings', label: 'Bookings' },
-            { id: 'payments', label: 'Payments' },
-            { id: 'account',  label: 'Account' },
-          ].map(tb => (
-            <button
-              key={tb.id}
-              aria-pressed={tab === tb.id}
-              data-tour-settings-tab={tb.id}
-              onMouseDown={e => e.preventDefault()}
-              onClick={() => setTab(tb.id)}
-              style={{ ...s.tabBtn, ...(tab === tb.id ? s.tabBtnActive : {}) }}
-            >
-              {tb.label}
+        {isMobile ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
+            <button type="button" onClick={() => (window.history.length > 1 ? router.back() : router.push('/dashboard/settings'))} style={s.settingsBack}>
+              <span aria-hidden="true">←</span> Settings
             </button>
-          ))}
-        </div>
+            <h1 style={s.pageTitle}>{SETTINGS_TABS.find(tb => tb.id === tab)?.label}</h1>
+          </div>
+        ) : (
+          <>
+            <h1 style={s.pageTitle}>{t('settings')}</h1>
+            <div className="studio-settings-tabs" role="tablist" aria-label="Settings sections" style={s.tabBar}>
+              {SETTINGS_TABS.map(tb => (
+                <button
+                  key={tb.id}
+                  role="tab"
+                  aria-selected={tab === tb.id}
+                  aria-pressed={tab === tb.id}
+                  title={tb.hint}
+                  data-tour-settings-tab={tb.id}
+                  onMouseDown={e => e.preventDefault()}
+                  onClick={() => setTab(tb.id)}
+                  style={{ ...s.tabBtn, ...(tab === tb.id ? s.tabBtnActive : {}) }}
+                >
+                  {tb.label}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
       </div>
 
       {tab === 'account' && <PushNotificationSettings />}
@@ -1032,10 +1104,276 @@ export default function SettingsPage() {
 
         </>}
 
-        {tab === 'bookings' && <>
+        {tab === 'studio' && <>
+        <section style={s.card}>
+          <h2 style={s.sectionTitle}>{t('stations')}</h2>
+          <p style={s.sectionDesc}>Artists are assigned to a free station when a booking is accepted. Every studio must keep at least one active station.</p>
+          {stationLastDayTarget && (
+            <StationLastDayModal
+              saving={stationLoading}
+              existingEndDate={stationLastDayTarget.endDate}
+              onConfirm={confirmStationLastDay}
+              onCancel={() => setStationLastDayTarget(null)}
+            />
+          )}
+          <div style={s.stationList}>
+            {stations.map(st => (
+              <div key={st.id} style={s.stationRow}>
+                <div className="studio-wrap-row" style={s.stationTop}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    <span style={s.stationName}>{st.name}</span>
+                    {st.endDate && (
+                      <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#f59e3a', background: 'rgba(245,158,58,0.1)', border: '1px solid rgba(245,158,58,0.25)', borderRadius: 20, padding: '0.12rem 0.5rem', whiteSpace: 'nowrap' }}>
+                        Last day {new Date(st.endDate + 'T00:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}
+                      </span>
+                    )}
+                  </div>
+                  <div style={s.stationActions}>
+                    <button
+                      style={{ ...s.stationToggleBtn, opacity: stations.length <= 1 ? 0.4 : 1 }}
+                      onClick={() => setStationLastDayTarget({ id: st.id, endDate: st.endDate ?? null })}
+                      disabled={stationLoading || stations.length <= 1}
+                      title={stations.length <= 1 ? 'Add another station before setting this station’s last day.' : undefined}
+                    >
+                      {st.endDate ? 'Change last day' : 'Set last day'}
+                    </button>
+                    <button
+                      style={{ ...s.stationRemoveBtn, opacity: stations.length <= 1 ? 0.4 : 1 }}
+                      onClick={() => handleRemoveStation(st.id)}
+                      disabled={stationLoading || stations.length <= 1}
+                      title={stations.length <= 1 ? 'A studio must have at least one station.' : undefined}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+                {/* Unavailability panel — re-enable with button above
+                {expandedStation === st.id && (
+                  <div style={s.unavailPanel}>
+                    <div className="studio-wrap-row" style={s.unavailAdd}>
+                      <input
+                        type="date"
+                        value={unavailDate}
+                        onChange={e => setUnavailDate(e.target.value)}
+                        style={s.dateInput}
+                      />
+                      <button
+                        style={s.saveBtn}
+                        onClick={() => handleSetUnavailable(st.id)}
+                        disabled={!unavailDate}
+                      >
+                        Mark unavailable
+                      </button>
+                    </div>
+                    {st.unavailability?.length > 0 && (
+                      <div style={s.unavailList}>
+                        {st.unavailability.map(u => (
+                          <div key={u.date} style={s.unavailItem}>
+                            <span style={s.unavailDate}>{u.date.split('T')[0]}</span>
+                            <button style={s.clearBtn} onClick={() => handleClearUnavailable(st.id, u.date)}>✕</button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+                */}
+              </div>
+            ))}
+          </div>
+          <button onClick={handleAddStation} style={s.saveBtn} disabled={stationLoading}>
+            {t('add_station')}
+          </button>
+        </section>
+
+        </>}
+
+        {tab === 'requests' && <>
 
 
 
+
+        <BookingManagementSettings styles={s} />
+
+        <section style={{ ...s.card, gridColumn: '1 / -1' }} aria-labelledby="booking-form-title">
+          <h2 id="booking-form-title" style={s.sectionTitle}>Booking form</h2>
+          <p style={s.sectionDesc}>Choose what clients fill in on your booking link and website widget. Field switches save straight away.</p>
+          <div className="studio-feature-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', alignItems: 'start' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                <label style={s.label}>Form fields</label>
+                <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: '0 0 0.35rem' }}>
+                  Name, date of birth, email, and phone are always shown.
+                </p>
+                {formFields === null ? (
+                  <div style={s.loadingDot} />
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                    {[
+                      { key: 'artist_id',      label: 'Artist preference' },
+                      { key: 'body_location',  label: 'Placement' },
+                      { key: 'design_details', label: 'Design description' },
+                      { key: 'retouch',        label: 'Touch-up / retouch' },
+                      { key: 'size',           label: 'Size' },
+                      { key: 'skin_tone',      label: 'Skin tone' },
+                      { key: 'notes',          label: 'Additional notes' },
+                      { key: 'allergies',      label: 'Allergies' },
+                      { key: 'availability_windows', label: 'Weekly availability' },
+                      { key: 'image_paths',    label: 'Reference photos' },
+                    ].map(({ key, label }) => {
+                      const entry = formFields[key] ?? { enabled: false, required: false };
+                      return (
+                        <div key={key} style={s.formFieldRow}>
+                          <span style={{ flex: 1, fontSize: '0.83rem', fontWeight: 500, color: entry.enabled ? 'var(--text)' : 'var(--text-ghost)' }}>
+                            {label}
+                          </span>
+                          {entry.enabled && (
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', cursor: 'pointer' }}>
+                              <input
+                                type="checkbox"
+                                aria-label={`${label} required`}
+                                checked={entry.required}
+                                onChange={e => handleFormFieldToggle(key, 'required', e.target.checked)}
+                                style={{ accentColor: 'var(--accent)' }}
+                                disabled={formFieldsSaving}
+                              />
+                              <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Required</span>
+                            </label>
+                          )}
+                          <button
+                            role="switch"
+                            aria-label={`${label} field`}
+                            aria-checked={entry.enabled}
+                            onClick={() => handleFormFieldToggle(key, 'enabled', !entry.enabled)}
+                            disabled={formFieldsSaving}
+                            style={{
+                              ...s.fieldToggleBtn,
+                              background: entry.enabled ? 'var(--accent-tint)' : 'var(--bg-chip)',
+                              borderColor: entry.enabled ? 'var(--accent-tint-border)' : 'var(--border)',
+                              color: entry.enabled ? 'var(--accent)' : 'var(--text-ghost)',
+                            }}
+                          >
+                            {entry.enabled ? 'On' : 'Off'}
+                          </button>
+                        </div>
+                      );
+                    })}
+                    {consentTemplates.length > 0 && (
+                      <>
+                        <div style={{ borderTop: '1px solid var(--border)', margin: '0.1rem 0' }} />
+                        <div style={{ ...s.formFieldRow, flexWrap: 'wrap' }}>
+                          <span style={{ flex: 1, fontSize: '0.83rem', fontWeight: 500, color: widgetConsentTemplateId ? 'var(--text)' : 'var(--text-ghost)' }}>
+                            Consent form
+                          </span>
+                          {widgetConsentTemplateId && consentTemplates.length > 1 && (
+                            <select
+                              aria-label="Booking consent form template"
+                              value={widgetConsentTemplateId}
+                              onChange={e => setWidgetConsentTemplateId(e.target.value)}
+                              style={{ ...s.input, flex: '1 1 180px', minWidth: 0, maxWidth: '100%', width: 'auto', fontSize: '0.8rem', padding: '0.3rem 0.6rem' }}
+                            >
+                              {consentTemplates.map(t => (
+                                <option key={t.id} value={t.id}>{t.name}</option>
+                              ))}
+                            </select>
+                          )}
+                          <button
+                            role="switch"
+                            aria-label="Consent form field"
+                            aria-checked={!!widgetConsentTemplateId}
+                            onClick={() => setWidgetConsentTemplateId(widgetConsentTemplateId ? '' : (consentTemplates[0]?.id ?? ''))}
+                            style={{
+                              ...s.fieldToggleBtn,
+                              background: widgetConsentTemplateId ? 'var(--accent-tint)' : 'var(--bg-chip)',
+                              borderColor: widgetConsentTemplateId ? 'var(--accent-tint-border)' : 'var(--border)',
+                              color: widgetConsentTemplateId ? 'var(--accent)' : 'var(--text-ghost)',
+                            }}
+                          >
+                            {widgetConsentTemplateId ? 'On' : 'Off'}
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <button onClick={saveProfile} style={s.saveBtn} disabled={saving}>
+                {saving ? t('saving') : saved ? t('saved') : t('save')}
+              </button>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <WidgetPreview bg={widgetBgColor} accent={widgetAccentColor} logoUrl={logoUrl} studioName={name || 'Your Studio'} fields={formFields} consentTemplate={widgetConsentTemplateId ? consentTemplates.find(t => t.id === widgetConsentTemplateId) : null} />
+            </div>
+          </div>
+        </section>
+
+        <section style={s.card}>
+          <h2 style={s.sectionTitle}>{t('booking_link')}</h2>
+          <p style={s.sectionDesc}>Share this link or QR code so clients can submit booking requests.</p>
+          <div className="studio-wrap-row" style={s.walkInCard}>
+            <div style={s.walkInLeft}>
+              <span style={s.walkInUrl}>{walkInUrl}</span>
+              <button onClick={copyLink} style={s.copyBtn}>{copied ? t('copied') : t('copy_link')}</button>
+            </div>
+            <DownloadableQR value={walkInUrl} filename="booking-qr" />
+          </div>
+          {bookingSlug && (
+            <form onSubmit={saveBookingSlug} style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '1rem' }}>
+              <label htmlFor="booking-slug" style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text)' }}>Link name</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>vanta.tattoo/b/</span>
+                <input id="booking-slug" className="vanta-input" value={slugDraft} onChange={e => setSlugDraft(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))} maxLength={40} autoCapitalize="none" autoCorrect="off" spellCheck={false} style={{ flex: '1 1 140px', minWidth: 0, background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 8, padding: '0.5rem 0.7rem', fontSize: '16px', color: 'var(--text)' }} />
+                <button type="submit" style={s.copyBtn} disabled={slugSaving || slugDraft === bookingSlug || slugDraft.length < 3}>{slugSaving ? 'Saving…' : 'Save'}</button>
+              </div>
+              {slugError ? <p role="alert" style={{ margin: 0, fontSize: '0.78rem', color: 'var(--color-danger)' }}>{slugError}</p>
+                : <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-ghost)' }}>Changing it stops the old link and QR codes working.</p>}
+            </form>
+          )}
+        </section>
+
+        <section style={s.card} aria-labelledby="website-widget-title">
+          <h2 id="website-widget-title" style={s.sectionTitle}>{t('booking_widget')}</h2>
+          <p style={s.sectionDesc}>Embed the booking form on your website. Customise the colours to match your brand.</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div className="studio-form-row" style={s.colorRow}>
+                <div style={s.colorField}>
+                  <label style={s.label}>Background</label>
+                  <div style={s.colorInputWrap}>
+                    <input aria-label="Widget background colour" type="color" value={widgetBgColor} onChange={e => setWidgetBgColor(e.target.value)} style={s.colorSwatch} />
+                    <input
+                      aria-label="Widget background hex colour"
+                      style={{ ...s.input, fontFamily: 'ui-monospace,monospace', fontSize: '0.82rem' }}
+                      value={widgetBgColor}
+                      onChange={e => setWidgetBgColor(e.target.value)}
+                      maxLength={7}
+                    />
+                  </div>
+                </div>
+                <div style={s.colorField}>
+                  <label style={s.label}>Highlight</label>
+                  <div style={s.colorInputWrap}>
+                    <input aria-label="Widget highlight colour" type="color" value={widgetAccentColor} onChange={e => setWidgetAccentColor(e.target.value)} style={s.colorSwatch} />
+                    <input
+                      aria-label="Widget highlight hex colour"
+                      style={{ ...s.input, fontFamily: 'ui-monospace,monospace', fontSize: '0.82rem' }}
+                      value={widgetAccentColor}
+                      onChange={e => setWidgetAccentColor(e.target.value)}
+                      maxLength={7}
+                    />
+                  </div>
+                </div>
+              </div>
+              <button onClick={saveProfile} style={s.saveBtn} disabled={saving}>
+                {saving ? t('saving') : saved ? t('saved') : t('save')}
+              </button>
+              <div style={s.embedCard}>
+                <label style={s.label}>Embed snippet</label>
+                <pre style={s.codeBlock}>{embedSnippet}</pre>
+                <button onClick={copyEmbed} style={s.copyBtn}>{embedCopied ? t('copied') : t('copy_snippet')}</button>
+              </div>
+          </div>
+        </section>
 
         <section style={{ ...s.card, gridColumn: '1 / -1' }}>
           <h2 style={s.sectionTitle}>{t('reschedule_window')}</h2>
@@ -1056,117 +1394,25 @@ export default function SettingsPage() {
           </button>
         </section>
 
+        {/* Smart scheduling — temporarily hidden
         <section style={{ ...s.card, gridColumn: '1 / -1' }}>
-          <h2 style={s.sectionTitle}>Emails</h2>
-          <p style={s.sectionDesc}>Booking confirmation is always sent. Choose up to 2 reminder emails for your clients.</p>
-          <p id="email-reminder-limit" role="status" style={{ fontSize: '0.8rem', color: selectedReminderCount > 2 ? 'var(--color-danger)' : 'var(--text-muted)', margin: 0 }}>
-            {selectedReminderCount > 2
-              ? 'Turn off a reminder before saving. You can select up to 2.'
-              : `${selectedReminderCount} of 2 selected.${selectedReminderCount === 2 ? ' Turn one off to choose another.' : ''}`}
-          </p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '14px 0', borderBottom: '1px solid var(--border)' }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text)' }}>7-day reminder</div>
-                <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4, lineHeight: 1.45 }}>Sent to clients 7 days before their appointment</div>
-              </div>
-              <button
-                type="button"
-                disabled={saving}
-                aria-describedby="email-reminder-limit"
-                role="switch"
-                aria-label="7-day reminder"
-                aria-checked={sendReminder7d}
-                onClick={() => toggleEmailReminder(sendReminder7d, setSendReminder7d)}
-                style={{ width: 52, height: 44, padding: 0, border: 0, background: 'transparent', cursor: saving ? 'not-allowed' : 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
-              >
-                <span aria-hidden="true" style={{ display: 'block', flex: 'none', boxSizing: 'border-box', width: 44, height: 24, borderRadius: 999, border: '1px solid var(--switch-edge)', background: sendReminder7d ? 'var(--switch-on)' : 'var(--switch-off)', position: 'relative', transition: 'background 0.2s' }}>
-                <span style={{
-                  position: 'absolute', top: 2, left: 2, transform: sendReminder7d ? 'translateX(20px)' : 'translateX(0)', width: 18, height: 18,
-                  borderRadius: '50%', background: 'var(--switch-thumb)', boxShadow: '0 1px 3px rgba(0,0,0,0.65)', transition: 'transform 0.2s',
-                }} />
-                </span>
-              </button>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '14px 0', borderBottom: '1px solid var(--border)' }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text)' }}>3-day reminder</div>
-                <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4, lineHeight: 1.45 }}>Sent to clients 3 days before their appointment</div>
-              </div>
-              <button
-                type="button"
-                disabled={saving}
-                aria-describedby="email-reminder-limit"
-                role="switch"
-                aria-label="3-day reminder"
-                aria-checked={sendReminder3d}
-                onClick={() => toggleEmailReminder(sendReminder3d, setSendReminder3d)}
-                style={{ width: 52, height: 44, padding: 0, border: 0, background: 'transparent', cursor: saving ? 'not-allowed' : 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
-              >
-                <span aria-hidden="true" style={{ display: 'block', flex: 'none', boxSizing: 'border-box', width: 44, height: 24, borderRadius: 999, border: '1px solid var(--switch-edge)', background: sendReminder3d ? 'var(--switch-on)' : 'var(--switch-off)', position: 'relative', transition: 'background 0.2s' }}>
-                <span style={{
-                  position: 'absolute', top: 2, left: 2, transform: sendReminder3d ? 'translateX(20px)' : 'translateX(0)', width: 18, height: 18,
-                  borderRadius: '50%', background: 'var(--switch-thumb)', boxShadow: '0 1px 3px rgba(0,0,0,0.65)', transition: 'transform 0.2s',
-                }} />
-                </span>
-              </button>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '14px 0' }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text)' }}>24-hour reminder</div>
-                <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4, lineHeight: 1.45 }}>Sent to clients 24 hours before their appointment</div>
-              </div>
-              <button
-                type="button"
-                disabled={saving}
-                aria-describedby="email-reminder-limit"
-                role="switch"
-                aria-label="24-hour reminder"
-                aria-checked={sendReminder24h}
-                onClick={() => toggleEmailReminder(sendReminder24h, setSendReminder24h)}
-                style={{ width: 52, height: 44, padding: 0, border: 0, background: 'transparent', cursor: saving ? 'not-allowed' : 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
-              >
-                <span aria-hidden="true" style={{ display: 'block', flex: 'none', boxSizing: 'border-box', width: 44, height: 24, borderRadius: 999, border: '1px solid var(--switch-edge)', background: sendReminder24h ? 'var(--switch-on)' : 'var(--switch-off)', position: 'relative', transition: 'background 0.2s' }}>
-                <span style={{
-                  position: 'absolute', top: 2, left: 2, transform: sendReminder24h ? 'translateX(20px)' : 'translateX(0)', width: 18, height: 18,
-                  borderRadius: '50%', background: 'var(--switch-thumb)', boxShadow: '0 1px 3px rgba(0,0,0,0.65)', transition: 'transform 0.2s',
-                }} />
-                </span>
-              </button>
-            </div>
-          </div>
-          <button onClick={saveProfile} style={s.saveBtn} disabled={saving || selectedReminderCount > 2}>
-            {saving ? t('saving') : saved ? t('saved') : t('save')}
-          </button>
-        </section>
-
-        <SMSSettings styles={s} />
-
-        {/* Piercing aftercare instructions — temporarily hidden
-        <section style={{ ...s.card, gridColumn: '1 / -1' }}>
-          <h2 style={s.sectionTitle}>Piercing aftercare instructions</h2>
-          <p style={s.sectionDesc}>Your studio’s guidance is attached to completed piercing appointments. Tattoo instructions are kept separate.</p>
-          <textarea aria-label="Piercing aftercare instructions" style={{ ...s.input, minHeight: 120, resize: 'vertical', lineHeight: 1.6 }} value={piercingAftercareInstructions} onChange={e => setPiercingAftercareInstructions(e.target.value)} placeholder="Add your studio’s piercing aftercare instructions…" />
-          <button onClick={saveProfile} style={s.saveBtn} disabled={saving}>{saving ? t('saving') : saved ? t('saved') : t('save')}</button>
-        </section>
-        */}
-
-        {/* Aftercare instructions — temporarily hidden
-        <section style={{ ...s.card, gridColumn: '1 / -1' }}>
-          <h2 style={s.sectionTitle}>{t('aftercare_instructions')}</h2>
-          <p style={s.sectionDesc}>Aftercare guidance that gets attached to every completed booking. Clients can see this on their booking record after their session.</p>
-          <textarea
-            style={{ ...s.input, minHeight: 120, resize: 'vertical', lineHeight: 1.6 }}
-            value={aftercareInstructions}
-            onChange={e => setAftercareInstructions(e.target.value)}
-            placeholder="e.g. Keep the area clean and moisturised for the first 2 weeks. Avoid direct sunlight…"
-          />
+          <h2 style={s.sectionTitle}>Smart scheduling</h2>
+          <SmartSchedulingSettings mode={schedulingMode} onChange={setSchedulingMode} disabled={saving} />
+          {profileError && <p role="alert" style={s.errorText}>{profileError}</p>}
           <button onClick={saveProfile} style={s.saveBtn} disabled={saving}>
             {saving ? t('saving') : saved ? t('saved') : t('save')}
           </button>
         </section>
         */}
 
+        </>}
+
+        {tab === 'walkins' && <>
+        <WalkInFormSettings styles={s} url={bookingSlug ? `${SHORT_LINK_BASE}/w/${bookingSlug}` : studioId ? `${typeof window === 'undefined' ? '' : window.location.origin}/walkin?s=${studioId}` : ''} />
+
+        </>}
+
+        {tab === 'consent' && <>
         <section style={{ ...s.card, gridColumn: '1 / -1' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
             <div style={{ flex: '1 1 260px', minWidth: 0 }}>
@@ -1310,266 +1556,114 @@ export default function SettingsPage() {
           </Dialog>
         )}
 
-        <section style={s.card}>
-          <h2 style={s.sectionTitle}>{t('stations')}</h2>
-          <p style={s.sectionDesc}>Artists are assigned to a free station when a booking is accepted. Every studio must keep at least one active station.</p>
-          {stationLastDayTarget && (
-            <StationLastDayModal
-              saving={stationLoading}
-              existingEndDate={stationLastDayTarget.endDate}
-              onConfirm={confirmStationLastDay}
-              onCancel={() => setStationLastDayTarget(null)}
-            />
-          )}
-          <div style={s.stationList}>
-            {stations.map(st => (
-              <div key={st.id} style={s.stationRow}>
-                <div className="studio-wrap-row" style={s.stationTop}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                    <span style={s.stationName}>{st.name}</span>
-                    {st.endDate && (
-                      <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#f59e3a', background: 'rgba(245,158,58,0.1)', border: '1px solid rgba(245,158,58,0.25)', borderRadius: 20, padding: '0.12rem 0.5rem', whiteSpace: 'nowrap' }}>
-                        Last day {new Date(st.endDate + 'T00:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}
-                      </span>
-                    )}
-                  </div>
-                  <div style={s.stationActions}>
-                    <button
-                      style={{ ...s.stationToggleBtn, opacity: stations.length <= 1 ? 0.4 : 1 }}
-                      onClick={() => setStationLastDayTarget({ id: st.id, endDate: st.endDate ?? null })}
-                      disabled={stationLoading || stations.length <= 1}
-                      title={stations.length <= 1 ? 'Add another station before setting this station’s last day.' : undefined}
-                    >
-                      {st.endDate ? 'Change last day' : 'Set last day'}
-                    </button>
-                    <button
-                      style={{ ...s.stationRemoveBtn, opacity: stations.length <= 1 ? 0.4 : 1 }}
-                      onClick={() => handleRemoveStation(st.id)}
-                      disabled={stationLoading || stations.length <= 1}
-                      title={stations.length <= 1 ? 'A studio must have at least one station.' : undefined}
-                    >
-                      Remove
-                    </button>
-                  </div>
-                </div>
-                {/* Unavailability panel — re-enable with button above
-                {expandedStation === st.id && (
-                  <div style={s.unavailPanel}>
-                    <div className="studio-wrap-row" style={s.unavailAdd}>
-                      <input
-                        type="date"
-                        value={unavailDate}
-                        onChange={e => setUnavailDate(e.target.value)}
-                        style={s.dateInput}
-                      />
-                      <button
-                        style={s.saveBtn}
-                        onClick={() => handleSetUnavailable(st.id)}
-                        disabled={!unavailDate}
-                      >
-                        Mark unavailable
-                      </button>
-                    </div>
-                    {st.unavailability?.length > 0 && (
-                      <div style={s.unavailList}>
-                        {st.unavailability.map(u => (
-                          <div key={u.date} style={s.unavailItem}>
-                            <span style={s.unavailDate}>{u.date.split('T')[0]}</span>
-                            <button style={s.clearBtn} onClick={() => handleClearUnavailable(st.id, u.date)}>✕</button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-                */}
+        </>}
+
+        {tab === 'messages' && <>
+        <section style={{ ...s.card, gridColumn: '1 / -1' }}>
+          <h2 style={s.sectionTitle}>Emails</h2>
+          <p style={s.sectionDesc}>Booking confirmation is always sent. Choose up to 2 reminder emails for your clients.</p>
+          <p id="email-reminder-limit" role="status" style={{ fontSize: '0.8rem', color: selectedReminderCount > 2 ? 'var(--color-danger)' : 'var(--text-muted)', margin: 0 }}>
+            {selectedReminderCount > 2
+              ? 'Turn off a reminder before saving. You can select up to 2.'
+              : `${selectedReminderCount} of 2 selected.${selectedReminderCount === 2 ? ' Turn one off to choose another.' : ''}`}
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '14px 0', borderBottom: '1px solid var(--border)' }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text)' }}>7-day reminder</div>
+                <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4, lineHeight: 1.45 }}>Sent to clients 7 days before their appointment</div>
               </div>
-            ))}
+              <button
+                type="button"
+                disabled={saving}
+                aria-describedby="email-reminder-limit"
+                role="switch"
+                aria-label="7-day reminder"
+                aria-checked={sendReminder7d}
+                onClick={() => toggleEmailReminder(sendReminder7d, setSendReminder7d)}
+                style={{ width: 52, height: 44, padding: 0, border: 0, background: 'transparent', cursor: saving ? 'not-allowed' : 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+              >
+                <span aria-hidden="true" style={{ display: 'block', flex: 'none', boxSizing: 'border-box', width: 44, height: 24, borderRadius: 999, border: '1px solid var(--switch-edge)', background: sendReminder7d ? 'var(--switch-on)' : 'var(--switch-off)', position: 'relative', transition: 'background 0.2s' }}>
+                <span style={{
+                  position: 'absolute', top: 2, left: 2, transform: sendReminder7d ? 'translateX(20px)' : 'translateX(0)', width: 18, height: 18,
+                  borderRadius: '50%', background: 'var(--switch-thumb)', boxShadow: '0 1px 3px rgba(0,0,0,0.65)', transition: 'transform 0.2s',
+                }} />
+                </span>
+              </button>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '14px 0', borderBottom: '1px solid var(--border)' }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text)' }}>3-day reminder</div>
+                <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4, lineHeight: 1.45 }}>Sent to clients 3 days before their appointment</div>
+              </div>
+              <button
+                type="button"
+                disabled={saving}
+                aria-describedby="email-reminder-limit"
+                role="switch"
+                aria-label="3-day reminder"
+                aria-checked={sendReminder3d}
+                onClick={() => toggleEmailReminder(sendReminder3d, setSendReminder3d)}
+                style={{ width: 52, height: 44, padding: 0, border: 0, background: 'transparent', cursor: saving ? 'not-allowed' : 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+              >
+                <span aria-hidden="true" style={{ display: 'block', flex: 'none', boxSizing: 'border-box', width: 44, height: 24, borderRadius: 999, border: '1px solid var(--switch-edge)', background: sendReminder3d ? 'var(--switch-on)' : 'var(--switch-off)', position: 'relative', transition: 'background 0.2s' }}>
+                <span style={{
+                  position: 'absolute', top: 2, left: 2, transform: sendReminder3d ? 'translateX(20px)' : 'translateX(0)', width: 18, height: 18,
+                  borderRadius: '50%', background: 'var(--switch-thumb)', boxShadow: '0 1px 3px rgba(0,0,0,0.65)', transition: 'transform 0.2s',
+                }} />
+                </span>
+              </button>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '14px 0' }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text)' }}>24-hour reminder</div>
+                <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4, lineHeight: 1.45 }}>Sent to clients 24 hours before their appointment</div>
+              </div>
+              <button
+                type="button"
+                disabled={saving}
+                aria-describedby="email-reminder-limit"
+                role="switch"
+                aria-label="24-hour reminder"
+                aria-checked={sendReminder24h}
+                onClick={() => toggleEmailReminder(sendReminder24h, setSendReminder24h)}
+                style={{ width: 52, height: 44, padding: 0, border: 0, background: 'transparent', cursor: saving ? 'not-allowed' : 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+              >
+                <span aria-hidden="true" style={{ display: 'block', flex: 'none', boxSizing: 'border-box', width: 44, height: 24, borderRadius: 999, border: '1px solid var(--switch-edge)', background: sendReminder24h ? 'var(--switch-on)' : 'var(--switch-off)', position: 'relative', transition: 'background 0.2s' }}>
+                <span style={{
+                  position: 'absolute', top: 2, left: 2, transform: sendReminder24h ? 'translateX(20px)' : 'translateX(0)', width: 18, height: 18,
+                  borderRadius: '50%', background: 'var(--switch-thumb)', boxShadow: '0 1px 3px rgba(0,0,0,0.65)', transition: 'transform 0.2s',
+                }} />
+                </span>
+              </button>
+            </div>
           </div>
-          <button onClick={handleAddStation} style={s.saveBtn} disabled={stationLoading}>
-            {t('add_station')}
+          <button onClick={saveProfile} style={s.saveBtn} disabled={saving || selectedReminderCount > 2}>
+            {saving ? t('saving') : saved ? t('saved') : t('save')}
           </button>
         </section>
 
-        <section style={s.card}>
-          <h2 style={s.sectionTitle}>{t('booking_link')}</h2>
-          <p style={s.sectionDesc}>Share this link or QR code so clients can submit booking requests.</p>
-          <div className="studio-wrap-row" style={s.walkInCard}>
-            <div style={s.walkInLeft}>
-              <span style={s.walkInUrl}>{walkInUrl}</span>
-              <button onClick={copyLink} style={s.copyBtn}>{copied ? t('copied') : t('copy_link')}</button>
-            </div>
-            <DownloadableQR value={walkInUrl} filename="booking-qr" />
-          </div>
-          {bookingSlug && (
-            <form onSubmit={saveBookingSlug} style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '1rem' }}>
-              <label htmlFor="booking-slug" style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text)' }}>Link name</label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>vanta.tattoo/b/</span>
-                <input id="booking-slug" className="vanta-input" value={slugDraft} onChange={e => setSlugDraft(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))} maxLength={40} autoCapitalize="none" autoCorrect="off" spellCheck={false} style={{ flex: '1 1 140px', minWidth: 0, background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 8, padding: '0.5rem 0.7rem', fontSize: '16px', color: 'var(--text)' }} />
-                <button type="submit" style={s.copyBtn} disabled={slugSaving || slugDraft === bookingSlug || slugDraft.length < 3}>{slugSaving ? 'Saving…' : 'Save'}</button>
-              </div>
-              {slugError ? <p role="alert" style={{ margin: 0, fontSize: '0.78rem', color: 'var(--color-danger)' }}>{slugError}</p>
-                : <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-ghost)' }}>Changing it stops the old link and QR codes working.</p>}
-            </form>
-          )}
-        </section>
+        <SMSSettings styles={s} />
 
-        <BookingManagementSettings styles={s} />
-
-        <WalkInFormSettings styles={s} url={bookingSlug ? `${SHORT_LINK_BASE}/w/${bookingSlug}` : studioId ? `${typeof window === 'undefined' ? '' : window.location.origin}/walkin?s=${studioId}` : ''} />
-
+        {/* Piercing aftercare instructions — temporarily hidden
         <section style={{ ...s.card, gridColumn: '1 / -1' }}>
-          <h2 style={s.sectionTitle}>{t('booking_widget')}</h2>
-          <p style={s.sectionDesc}>Embed the booking form on your website. Customise the colours to match your brand.</p>
-          <div className="studio-feature-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', alignItems: 'start' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div className="studio-form-row" style={s.colorRow}>
-                <div style={s.colorField}>
-                  <label style={s.label}>Background</label>
-                  <div style={s.colorInputWrap}>
-                    <input aria-label="Widget background colour" type="color" value={widgetBgColor} onChange={e => setWidgetBgColor(e.target.value)} style={s.colorSwatch} />
-                    <input
-                      aria-label="Widget background hex colour"
-                      style={{ ...s.input, fontFamily: 'ui-monospace,monospace', fontSize: '0.82rem' }}
-                      value={widgetBgColor}
-                      onChange={e => setWidgetBgColor(e.target.value)}
-                      maxLength={7}
-                    />
-                  </div>
-                </div>
-                <div style={s.colorField}>
-                  <label style={s.label}>Highlight</label>
-                  <div style={s.colorInputWrap}>
-                    <input aria-label="Widget highlight colour" type="color" value={widgetAccentColor} onChange={e => setWidgetAccentColor(e.target.value)} style={s.colorSwatch} />
-                    <input
-                      aria-label="Widget highlight hex colour"
-                      style={{ ...s.input, fontFamily: 'ui-monospace,monospace', fontSize: '0.82rem' }}
-                      value={widgetAccentColor}
-                      onChange={e => setWidgetAccentColor(e.target.value)}
-                      maxLength={7}
-                    />
-                  </div>
-                </div>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                <label style={s.label}>Form fields</label>
-                <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: '0 0 0.35rem' }}>
-                  Name, date of birth, email, and phone are always shown.
-                </p>
-                {formFields === null ? (
-                  <div style={s.loadingDot} />
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                    {[
-                      { key: 'artist_id',      label: 'Artist preference' },
-                      { key: 'body_location',  label: 'Placement' },
-                      { key: 'design_details', label: 'Design description' },
-                      { key: 'retouch',        label: 'Touch-up / retouch' },
-                      { key: 'size',           label: 'Size' },
-                      { key: 'skin_tone',      label: 'Skin tone' },
-                      { key: 'notes',          label: 'Additional notes' },
-                      { key: 'allergies',      label: 'Allergies' },
-                      { key: 'availability_windows', label: 'Weekly availability' },
-                      { key: 'image_paths',    label: 'Reference photos' },
-                    ].map(({ key, label }) => {
-                      const entry = formFields[key] ?? { enabled: false, required: false };
-                      return (
-                        <div key={key} style={s.formFieldRow}>
-                          <span style={{ flex: 1, fontSize: '0.83rem', fontWeight: 500, color: entry.enabled ? 'var(--text)' : 'var(--text-ghost)' }}>
-                            {label}
-                          </span>
-                          {entry.enabled && (
-                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', cursor: 'pointer' }}>
-                              <input
-                                type="checkbox"
-                                aria-label={`${label} required`}
-                                checked={entry.required}
-                                onChange={e => handleFormFieldToggle(key, 'required', e.target.checked)}
-                                style={{ accentColor: 'var(--accent)' }}
-                                disabled={formFieldsSaving}
-                              />
-                              <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Required</span>
-                            </label>
-                          )}
-                          <button
-                            role="switch"
-                            aria-label={`${label} field`}
-                            aria-checked={entry.enabled}
-                            onClick={() => handleFormFieldToggle(key, 'enabled', !entry.enabled)}
-                            disabled={formFieldsSaving}
-                            style={{
-                              ...s.fieldToggleBtn,
-                              background: entry.enabled ? 'var(--accent-tint)' : 'var(--bg-chip)',
-                              borderColor: entry.enabled ? 'var(--accent-tint-border)' : 'var(--border)',
-                              color: entry.enabled ? 'var(--accent)' : 'var(--text-ghost)',
-                            }}
-                          >
-                            {entry.enabled ? 'On' : 'Off'}
-                          </button>
-                        </div>
-                      );
-                    })}
-                    {consentTemplates.length > 0 && (
-                      <>
-                        <div style={{ borderTop: '1px solid var(--border)', margin: '0.1rem 0' }} />
-                        <div style={{ ...s.formFieldRow, flexWrap: 'wrap' }}>
-                          <span style={{ flex: 1, fontSize: '0.83rem', fontWeight: 500, color: widgetConsentTemplateId ? 'var(--text)' : 'var(--text-ghost)' }}>
-                            Consent form
-                          </span>
-                          {widgetConsentTemplateId && consentTemplates.length > 1 && (
-                            <select
-                              aria-label="Booking consent form template"
-                              value={widgetConsentTemplateId}
-                              onChange={e => setWidgetConsentTemplateId(e.target.value)}
-                              style={{ ...s.input, flex: '1 1 180px', minWidth: 0, maxWidth: '100%', width: 'auto', fontSize: '0.8rem', padding: '0.3rem 0.6rem' }}
-                            >
-                              {consentTemplates.map(t => (
-                                <option key={t.id} value={t.id}>{t.name}</option>
-                              ))}
-                            </select>
-                          )}
-                          <button
-                            role="switch"
-                            aria-label="Consent form field"
-                            aria-checked={!!widgetConsentTemplateId}
-                            onClick={() => setWidgetConsentTemplateId(widgetConsentTemplateId ? '' : (consentTemplates[0]?.id ?? ''))}
-                            style={{
-                              ...s.fieldToggleBtn,
-                              background: widgetConsentTemplateId ? 'var(--accent-tint)' : 'var(--bg-chip)',
-                              borderColor: widgetConsentTemplateId ? 'var(--accent-tint-border)' : 'var(--border)',
-                              color: widgetConsentTemplateId ? 'var(--accent)' : 'var(--text-ghost)',
-                            }}
-                          >
-                            {widgetConsentTemplateId ? 'On' : 'Off'}
-                          </button>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              <button onClick={saveProfile} style={s.saveBtn} disabled={saving}>
-                {saving ? t('saving') : saved ? t('saved') : t('save')}
-              </button>
-              <div style={s.embedCard}>
-                <label style={s.label}>Embed snippet</label>
-                <pre style={s.codeBlock}>{embedSnippet}</pre>
-                <button onClick={copyEmbed} style={s.copyBtn}>{embedCopied ? t('copied') : t('copy_snippet')}</button>
-              </div>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <WidgetPreview bg={widgetBgColor} accent={widgetAccentColor} logoUrl={logoUrl} studioName={name || 'Your Studio'} fields={formFields} consentTemplate={widgetConsentTemplateId ? consentTemplates.find(t => t.id === widgetConsentTemplateId) : null} />
-            </div>
-          </div>
+          <h2 style={s.sectionTitle}>Piercing aftercare instructions</h2>
+          <p style={s.sectionDesc}>Your studio’s guidance is attached to completed piercing appointments. Tattoo instructions are kept separate.</p>
+          <textarea aria-label="Piercing aftercare instructions" style={{ ...s.input, minHeight: 120, resize: 'vertical', lineHeight: 1.6 }} value={piercingAftercareInstructions} onChange={e => setPiercingAftercareInstructions(e.target.value)} placeholder="Add your studio’s piercing aftercare instructions…" />
+          <button onClick={saveProfile} style={s.saveBtn} disabled={saving}>{saving ? t('saving') : saved ? t('saved') : t('save')}</button>
         </section>
+        */}
 
-        {/* Smart scheduling — temporarily hidden
+        {/* Aftercare instructions — temporarily hidden
         <section style={{ ...s.card, gridColumn: '1 / -1' }}>
-          <h2 style={s.sectionTitle}>Smart scheduling</h2>
-          <SmartSchedulingSettings mode={schedulingMode} onChange={setSchedulingMode} disabled={saving} />
-          {profileError && <p role="alert" style={s.errorText}>{profileError}</p>}
+          <h2 style={s.sectionTitle}>{t('aftercare_instructions')}</h2>
+          <p style={s.sectionDesc}>Aftercare guidance that gets attached to every completed booking. Clients can see this on their booking record after their session.</p>
+          <textarea
+            style={{ ...s.input, minHeight: 120, resize: 'vertical', lineHeight: 1.6 }}
+            value={aftercareInstructions}
+            onChange={e => setAftercareInstructions(e.target.value)}
+            placeholder="e.g. Keep the area clean and moisturised for the first 2 weeks. Avoid direct sunlight…"
+          />
           <button onClick={saveProfile} style={s.saveBtn} disabled={saving}>
             {saving ? t('saving') : saved ? t('saved') : t('save')}
           </button>
@@ -1737,6 +1831,7 @@ export default function SettingsPage() {
         </>}
 
       </div>
+      </>}
       <div style={{ height: '2rem' }} />
     </div>
   );
@@ -1746,6 +1841,9 @@ const s = {
   page: { padding: '2rem 2.5rem 4rem', display: 'flex', flexDirection: 'column', gap: '1.25rem', minHeight: '100%', boxSizing: 'border-box' },
   pageHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' },
   pageTitle: { fontSize: '1.5rem', fontWeight: 700, color: 'var(--text)', margin: 0, letterSpacing: '-0.02em' },
+  settingsList: { display: 'flex', flexDirection: 'column', marginTop: '0.75rem', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 14, overflow: 'hidden' },
+  settingsRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', minHeight: 64, padding: '0.75rem 1rem', background: 'transparent', border: 'none', borderBottom: '1px solid var(--border-faint)', cursor: 'pointer', fontFamily: 'inherit', width: '100%' },
+  settingsBack: { alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 6, minHeight: 44, marginLeft: -6, padding: '0 6px', background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' },
   tabBar: { display: 'inline-flex', flexWrap: 'wrap', gap: 4, padding: 4, background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 12 },
   tabBtn: { padding: '0.5rem 1.1rem', borderRadius: 9, border: '1px solid transparent', background: 'transparent', color: 'var(--text-dim)', fontSize: '0.925rem', fontWeight: 500, cursor: 'pointer' },
   tabBtnActive: { background: 'var(--accent)', border: '1px solid var(--accent)', color: 'var(--accent-contrast)', fontWeight: 700 },

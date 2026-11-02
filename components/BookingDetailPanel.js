@@ -166,7 +166,7 @@ export default function BookingDetailPanel({
   const canAcceptReject   = canAccept || canReject; // kept for layout gate
   const canConfirm        = status === 'requires_confirmation';
   const canReschedule     = status === 'confirmed' && chosenDate && chosenDate > today;
-  // When the studio confirms booking times (Settings → Bookings), it can book any open
+  // When the studio confirms booking times (Settings → Booking requests), it can book any open
   // request straight into a time, without the artist.
   const canBookTime       = bookingManagement === 'studio' && Boolean(bookTimeArtists) && ['pending', 'awaiting_payment', 'requires_confirmation'].includes(status) && !booking?.deposit_paid_at && !booking?.deposit_confirmed_at;
 

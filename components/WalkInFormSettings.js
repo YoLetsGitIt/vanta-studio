@@ -1,6 +1,6 @@
 'use client';
 
-// Settings → Bookings: the walk-in link / QR code and which extra fields it asks for.
+// Settings → Walk-ins: the walk-in link / QR code and which extra fields it asks for.
 // Name, date of birth, email, phone and the artist are always asked; consent forms
 // are always included. Changes save straight away.
 import { useEffect, useState } from 'react';

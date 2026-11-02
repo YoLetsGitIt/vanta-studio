@@ -20,6 +20,16 @@
     border-bottom: 1px solid var(--border); background: var(--bg-sidebar);
   }
   .studio-mobile-header > a { padding: 0 !important; flex-shrink: 0; }
+  /* The top bar floats over the page and slides away while scrolling down
+     (lib/useHideHeaderOnScroll). The page is padded by its height, so content
+     starts below it and scrolls underneath once it's hidden. */
+  .studio-dashboard-shell { position: relative; }
+  .studio-mobile-header {
+    position: absolute; top: 0; left: 0; right: 0; z-index: 25; /* under full-screen panels (30) and dialogs */
+    transition: transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  .studio-dashboard-shell[data-header-hidden] .studio-mobile-header { transform: translateY(-100%); }
+  .studio-dashboard-main { padding-top: var(--mobile-header-h, 61px); scroll-padding-top: var(--mobile-header-h, 61px); }
   .studio-mobile-header > button { min-height: 44px; }
   .studio-mobile-nav {
     display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); flex-shrink: 0;
@@ -309,4 +319,8 @@
 @media (max-width: 480px) {
   .studio-consent-field-toolbar { flex-direction: column; align-items: stretch !important; }
   .studio-consent-field-toolbar > div { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .studio-mobile-header { transition: none; }
 }

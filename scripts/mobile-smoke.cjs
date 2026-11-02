@@ -107,8 +107,9 @@ async function contained(page, label) {
           await page.screenshot({ path: `/private/tmp/studio-landscape-home-${width}.png` });
         }
         if (route === 'settings') {
-          for (const tab of ['studio', 'bookings', 'payments', 'account']) {
-            await page.locator(`[data-tour-settings-tab="${tab}"]`).click();
+          // Phones show a list of sections; open each one directly.
+          for (const tab of ['studio', 'requests', 'walkins', 'consent', 'messages', 'payments', 'account']) {
+            await page.goto(`${base}/dashboard/settings?tab=${tab}`, { waitUntil: 'networkidle' });
             await contained(page, `settings ${tab} at ${width}`);
           }
         }

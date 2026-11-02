@@ -8,7 +8,7 @@ const STEPS = [
   { id: 'profile', title: 'Studio details', href: '/dashboard/settings?tab=studio', action: 'Review studio' },
   { id: 'hours', title: 'Hours & stations', href: '/dashboard/settings?tab=studio', action: 'Set hours and stations' },
   { id: 'artists', title: 'Artists', href: '/dashboard/artists?onboarding=1', action: 'Add artists' },
-  { id: 'bookings', title: 'Bookings & consent', href: '/dashboard/settings?tab=bookings', action: 'Set up bookings' },
+  { id: 'bookings', title: 'Bookings & consent', href: '/dashboard/settings?tab=requests', action: 'Set up bookings' },
   { id: 'payments', title: 'Payments', href: '/dashboard/settings?tab=payments', action: 'Set up payments', optional: true },
   { id: 'import', title: 'Import clients', href: '/dashboard/import', action: 'Open importer', optional: true },
 ];
