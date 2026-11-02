@@ -7,8 +7,11 @@ import ConsentSocialSignIn from '@/app/consent/ConsentSocialSignIn';
 import DateOfBirthInput from '@/components/ui/DateOfBirthInput';
 
 
-export default function ClientAuthGate({ studioId, studioName, logoUrl, purpose = 'consent', collectMarketing = false }) {
+// onGuest: when set (booking links), clients can continue without an account.
+// Guest is the main action; Apple/Google stay prominent; email sign-up is tucked away.
+export default function ClientAuthGate({ studioId, studioName, logoUrl, purpose = 'consent', collectMarketing = false, onGuest }) {
   const [mode, setMode]       = useState('signup');
+  const [showEmail, setShowEmail] = useState(!onGuest);
   const [email, setEmail]     = useState('');
   const [password, setPassword] = useState('');
   const [name, setName]     = useState('');
@@ -61,12 +64,22 @@ export default function ClientAuthGate({ studioId, studioName, logoUrl, purpose 
     <div style={s.card}>
       {logoUrl && <img src={logoUrl} alt={`${studioName} logo`} style={{ maxHeight: 56, maxWidth: 200, objectFit: 'contain', alignSelf: 'flex-start' }} />}
       <p style={s.studioTag}>{studioName}</p>
-      <h2 style={s.heading}>{mode === 'signup' ? 'Create an account' : 'Sign in'}</h2>
-      <p style={s.muted}>
-        {studioName} needs you to {mode === 'signup' ? 'create a Vanta account' : 'sign in'} before {purpose === 'booking' ? 'requesting a booking' : 'completing their consent form'}.
-      </p>
-      <ConsentSocialSignIn returnPath={purpose === 'booking' ? '/studio-booking' : '/consent'} studioId={studioId} disabled={busy} onBusyChange={setBusy} />
-      <form onSubmit={submit} style={s.form}>
+      {onGuest ? <>
+        <h2 style={s.heading}>Book with {studioName}</h2>
+        <p style={s.muted}>No account needed. Continue as a guest, or sign in to save your details for next time.</p>
+        <button type="button" disabled={busy} onClick={onGuest} style={{ ...s.btn, ...s.guestBtn, opacity: busy ? 0.6 : 1 }}>Continue as guest</button>
+        <div style={s.divider}><span style={s.dividerLine} /><span>or sign in</span><span style={s.dividerLine} /></div>
+      </> : <>
+        <h2 style={s.heading}>{mode === 'signup' ? 'Create an account' : 'Sign in'}</h2>
+        <p style={s.muted}>
+          {studioName} needs you to {mode === 'signup' ? 'create a Vanta account' : 'sign in'} before {purpose === 'booking' ? 'requesting a booking' : 'completing their consent form'}.
+        </p>
+      </>}
+      <ConsentSocialSignIn returnPath={purpose === 'booking' ? '/studio-booking' : '/consent'} studioId={studioId} disabled={busy} onBusyChange={setBusy} dividerLabel={showEmail ? (onGuest ? 'or use email' : undefined) : null} />
+      {!showEmail && (
+        <button type="button" disabled={busy} onClick={() => setShowEmail(true)} style={s.linkBtn}>Sign up or sign in with email</button>
+      )}
+      {showEmail && <form onSubmit={submit} style={s.form}>
         {mode === 'signup' && (
           <>
             <input style={s.input} type="text" required autoComplete="name" value={name} onChange={e => setName(e.target.value)} placeholder="Full name" />
@@ -101,7 +114,7 @@ export default function ClientAuthGate({ studioId, studioName, logoUrl, purpose 
           style={{ background: 'none', border: 'none', color: '#f5ecd9', cursor: 'pointer', fontSize: '0.82rem', fontFamily: 'inherit' }}>
           {mode === 'signup' ? 'Already have an account? Sign in' : 'New here? Create an account'}
         </button>
-      </form>
+      </form>}
     </div>
   );
 }
@@ -151,5 +164,18 @@ const s = {
   },
   error: {
     margin: 0, fontSize: '0.8rem', color: '#e86f6f',
+  },
+  guestBtn: {
+    minHeight: 52, marginTop: '0.75rem', fontSize: '1rem', fontFamily: 'inherit',
+  },
+  divider: {
+    display: 'flex', alignItems: 'center', gap: 12, marginTop: '0.5rem',
+    color: 'rgba(255,255,255,0.45)', fontSize: '0.75rem',
+  },
+  dividerLine: { flex: 1, height: 1, background: 'rgba(255,255,255,0.12)' },
+  linkBtn: {
+    background: 'none', border: 'none', color: 'rgba(255,255,255,0.7)', cursor: 'pointer',
+    fontSize: '0.82rem', fontFamily: 'inherit', textDecoration: 'underline', textUnderlineOffset: 3,
+    minHeight: 44, alignSelf: 'center',
   },
 };

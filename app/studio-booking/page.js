@@ -10,7 +10,7 @@ import DateOfBirthInput from '@/components/ui/DateOfBirthInput';
 import { ensureClientProfile, subscribeClientSession } from '@/lib/client-account';
 import { getSupabase } from '@/lib/supabase';
 import WeeklyAvailabilityGrid from '@/components/WeeklyAvailabilityGrid';
-import { getStudioPublic, createWalkIn, walkinUploadSign, signatureUploadSign, getStudioConsentTemplates, getFormConfigPublic } from '@/lib/api';
+import { getStudioPublic, createWalkIn, createGuestStudioBooking, walkinUploadSign, signatureUploadSign, getStudioConsentTemplates, getFormConfigPublic } from '@/lib/api';
 
 function detectCountry() {
   try {
@@ -101,6 +101,10 @@ function WalkInInner() {
   const [studioErr, setStudioErr] = useState('');
   const [formConfig, setFormConfig] = useState(null); // null = loading
   const [session, setSession] = useState(undefined);
+  // Guests book without an account; a signed-in session always takes precedence.
+  const [guestChosen, setGuestChosen] = useState(false);
+  const guest = guestChosen && !session;
+  const [guestEmail, setGuestEmail] = useState('');
   const [accountReady, setAccountReady] = useState(false);
   const [accountError, setAccountError] = useState('');
   const [accountRetry, setAccountRetry] = useState(0);
@@ -248,14 +252,19 @@ function WalkInInner() {
 
   async function handleSubmit(e) {
     e.preventDefault();
-    const { data: { session: currentSession } } = await getSupabase().auth.getSession();
-    if (!currentSession || currentSession.user.id !== session?.user.id) {
-      setSession(currentSession ?? null);
-      setSubmitError('Please sign in again before requesting your booking.');
-      return;
+    let bookingEmail = guestEmail.trim();
+    if (!guest) {
+      const { data: { session: currentSession } } = await getSupabase().auth.getSession();
+      if (!currentSession || currentSession.user.id !== session?.user.id) {
+        setSession(currentSession ?? null);
+        setSubmitError('Please sign in again before requesting your booking.');
+        return;
+      }
+      bookingEmail = currentSession.user.email?.trim() || '';
+      if (!bookingEmail) { setSubmitError('Please sign in with an account that has an email address.'); return; }
     }
     if (!fullName.trim()) { setSubmitError('Please provide your full name.'); return; }
-    if (!currentSession.user.email?.trim()) { setSubmitError('Please sign in with an account that has an email address.'); return; }
+    if (guest && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(bookingEmail)) { setSubmitError('Please provide a valid email address.'); return; }
     if (!phoneNum.trim()) { setSubmitError('Please provide your phone number.'); return; }
     if (!dob) { setSubmitError('Please provide your date of birth.'); return; }
     if (field('body_location').enabled && placements.length === 0) { setSubmitError('Please select at least one placement.'); return; }
@@ -349,10 +358,10 @@ function WalkInInner() {
         });
       }
 
-      await createWalkIn(studioId, {
+      await (guest ? createGuestStudioBooking : createWalkIn)(studioId, {
         artist_id:            artistId,
         name:                 fullName.trim(),
-        email: currentSession.user.email,
+        email: bookingEmail,
         phone: bookingPhone,
         sms_reminder_opt_in: smsOptIn,
         dob,
@@ -373,7 +382,7 @@ function WalkInInner() {
         consent_submissions:  consentSubmissions,
       });
       // Match consent: remember reviewed details for the next visit.
-      getSupabase().auth.updateUser({ data: { full_name: fullName.trim(), name: fullName.trim(), dob, phone: bookingPhone } }).catch(() => {});
+      if (!guest) getSupabase().auth.updateUser({ data: { full_name: fullName.trim(), name: fullName.trim(), dob, phone: bookingPhone } }).catch(() => {});
       setDone(true);
     } catch (err) {
       setSubmitError(err.message);
@@ -386,9 +395,9 @@ function WalkInInner() {
   if (studioErr) return <p role="alert" style={{ ...s.msg, color: 'var(--color-danger)' }}>{studioErr}</p>;
   if (!studio || formConfig === null) return <p style={s.msg}>Loading…</p>;
   if (session === undefined) return <p style={s.msg}>Checking your account…</p>;
-  if (!session) return <ClientAuthGate studioId={studioId} studioName={studio.name} logoUrl={studio.logo_url} purpose="booking" />;
-  if (accountError) return <div style={s.card}><p role="alert" style={s.error}>{accountError}</p><Button onClick={() => setAccountRetry(value => value + 1)}>Try again</Button></div>;
-  if (!accountReady) return <p style={s.msg}>Loading your details…</p>;
+  if (!session && !guest) return <ClientAuthGate studioId={studioId} studioName={studio.name} logoUrl={studio.logo_url} purpose="booking" onGuest={() => setGuestChosen(true)} />;
+  if (!guest && accountError) return <div style={s.card}><p role="alert" style={s.error}>{accountError}</p><Button onClick={() => setAccountRetry(value => value + 1)}>Try again</Button></div>;
+  if (!guest && !accountReady) return <p style={s.msg}>Loading your details…</p>;
 
   if (done) {
     return (
@@ -409,10 +418,15 @@ function WalkInInner() {
       </div>
 
       <form onSubmit={handleSubmit} style={s.form}>
-          <ClientAccountActions email={session.user.email} />
+          {guest ? (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+              <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.78rem', lineHeight: 1.5 }}>Booking as a guest</p>
+              <Button variant="ghost" size="sm" onClick={() => setGuestChosen(false)} style={{ flexShrink: 0 }}>Sign in instead</Button>
+            </div>
+          ) : <ClientAccountActions email={session.user.email} />}
 
           <Section title="Your details" first>
-            <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: 13 }}>Review your details and update anything that has changed.</p>
+            <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: 13 }}>{guest ? `${studio.name} uses these to contact you about your booking.` : 'Review your details and update anything that has changed.'}</p>
             <Field label="Full name">
               <input style={s.input} type="text" value={fullName} required autoComplete="name" onChange={e => setFullName(e.target.value)} placeholder="Your name" />
             </Field>
@@ -420,7 +434,9 @@ function WalkInInner() {
               <DateOfBirthInput style={s.input} value={dob} onChange={setDob} />
             </Field>
             <Field label="Email">
-              <input style={s.input} type="email" value={session.user.email || ''} required readOnly autoComplete="email" placeholder="you@example.com" />
+              {guest
+                ? <input style={s.input} type="email" value={guestEmail} required autoComplete="email" inputMode="email" autoCapitalize="none" onChange={e => setGuestEmail(e.target.value)} placeholder="you@example.com" />
+                : <input style={s.input} type="email" value={session.user.email || ''} required readOnly autoComplete="email" placeholder="you@example.com" />}
             </Field>
             <Field label="Phone" id="booking-phone" required>
               <div style={s.phoneRow}>

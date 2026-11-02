@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { getSupabase } from '@/lib/supabase';
 import styles from './ConsentPage.module.css';
 
-export default function ConsentSocialSignIn({ studioId, returnPath = '/consent', disabled, onBusyChange }) {
+export default function ConsentSocialSignIn({ studioId, returnPath = '/consent', disabled, onBusyChange, dividerLabel = 'or continue with email' }) {
   const [pending, setPending] = useState(null);
   const [error, setError] = useState('');
 
@@ -66,7 +66,7 @@ export default function ConsentSocialSignIn({ studioId, returnPath = '/consent',
         <a href="https://www.vanta.tattoo/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>.
       </p>
       {error && <p role="alert" className={styles.socialError}>{error}</p>}
-      <div className={styles.authDivider}><span>or continue with email</span></div>
+      {dividerLabel && <div className={styles.authDivider}><span>{dividerLabel}</span></div>}
     </div>
   );
 }
