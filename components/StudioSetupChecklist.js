@@ -90,6 +90,8 @@ export default function StudioSetupChecklist() {
   const done = STEPS.filter(step => ['complete', 'skipped'].includes(state?.steps?.[step.id])).length;
   const expanded = state && !state.collapsed;
   const allDone = done === STEPS.length;
+  const isDone = step => ['complete', 'skipped'].includes(state?.steps?.[step.id]);
+  const nextStep = STEPS.find(step => !isDone(step));
   const dismiss = (
     <button type="button" className={allDone ? styles.dismissPrimary : styles.dismiss} aria-label="Dismiss setup checklist" title="Remove this checklist. You can bring it back from Settings → Account." disabled={saving || loading} onClick={() => update({ dismissed: true })}>
       {allDone ? 'Remove checklist' : 'Dismiss'}
@@ -103,6 +105,7 @@ export default function StudioSetupChecklist() {
         <div className={styles.headingGroup}>
           <h2 id="studio-setup-title">Studio setup</h2>
           {state && <p className={styles.progress} role="status">{done} of {STEPS.length} done{saving ? ' · Saving…' : ''}</p>}
+          {state && !expanded && nextStep && <a className={styles.nextInline} href={nextStep.href}>Next: {nextStep.title}</a>}
         </div>
         {state && (
           <div className={styles.headerActions}>
@@ -112,7 +115,9 @@ export default function StudioSetupChecklist() {
         )}
       </div>
       {state && (
-        <div className={styles.meter} aria-hidden="true"><span style={{ width: `${(done / STEPS.length) * 100}%` }} /></div>
+        <div className={styles.meter} aria-hidden="true">
+          {STEPS.map(step => <span key={step.id} data-done={isDone(step) || undefined} data-optional={step.optional || undefined} />)}
+        </div>
       )}
       {loading && <p className={styles.message} role="status">Loading setup progress…</p>}
       {error && <p className={styles.error} role="alert">{error} {!state && <button type="button" disabled={loading} onClick={load}>Try again</button>}</p>}
@@ -122,7 +127,7 @@ export default function StudioSetupChecklist() {
             {STEPS.map(step => {
               const status = state.steps?.[step.id] || 'pending';
               return (
-                <li key={step.id} className={styles.compactStep} data-status={status}>
+                <li key={step.id} className={styles.compactStep} data-status={status} data-next={nextStep?.id === step.id || undefined}>
                   <button
                     type="button"
                     className={styles.completionButton}
@@ -143,6 +148,7 @@ export default function StudioSetupChecklist() {
                   <a className={styles.stepLink} href={step.href} aria-label={`${step.title}: ${step.action}`}>
                     <h3 className={styles.linkedTitle}>{step.title}</h3>
                     {status === 'skipped' ? <span className={styles.optional}>Skipped</span> : step.optional && <span className={styles.optional}>Optional</span>}
+                    {nextStep?.id === step.id && <span className={styles.nextTag}>Next</span>}
                     <span className={styles.stepAction} aria-hidden="true">{status === 'complete' ? 'Review' : step.action}</span>
                     <ArrowIcon />
                   </a>
