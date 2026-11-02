@@ -13,6 +13,9 @@ const savedWindows = [
   { day_of_week: 6, start_time: '09:00', end_time: '12:30' },
 ];
 
+// Studio opening hours served to the booking form; empty means none set (8am–9pm grid).
+let studioHours = [];
+
 async function mockContext(browser, width, availability) {
   const context = await browser.newContext({ viewport: { width, height: 1000 } });
   await context.addInitScript(session => {
@@ -36,6 +39,7 @@ async function mockContext(browser, width, availability) {
     if (path.endsWith('/public')) return route.fulfill({ json: studio });
     if (path.endsWith('/form-config')) return route.fulfill({ json: { fields } });
     if (path.endsWith('/consent-templates')) return route.fulfill({ json: { templates: [] } });
+    if (path.endsWith('/hours')) return route.fulfill({ json: { hours: studioHours } });
     if (path === '/users/me') return route.fulfill({ json: { name: 'Local Client', phone: '0400123456', dob: '1990-01-01' } });
     if (path === '/auth/v1/user') return route.fulfill({ json: user });
     if (path === '/studio/me') return route.fulfill({ json: { status: 'approved', studio_id: studio.id, studio } });
@@ -66,6 +70,41 @@ async function openForm(page) {
       await page.getByRole('heading', { name: "You're on the list!", exact: true }).waitFor();
       assert.deepEqual(writes.find(w => w.path.endsWith('/client-booking')).body.availability_windows, []);
       console.log('PASS availability hidden when the studio has not turned it on');
+      await context.close();
+    }
+
+    // The grid follows the studio's opening hours: Mon–Fri 10–6, Sat 12–4, Sunday closed.
+    {
+      studioHours = [1, 2, 3, 4, 5].map(d => ({ day_of_week: d, open_time: '10:00', close_time: '18:00', is_closed: false }))
+        .concat([{ day_of_week: 6, open_time: '12:00', close_time: '16:00', is_closed: false }, { day_of_week: 0, open_time: '09:00', close_time: '17:00', is_closed: true }]);
+      const { context, writes } = await mockContext(browser, 390, { enabled: true, required: true });
+      const page = await context.newPage();
+      await openForm(page);
+      await page.getByText('Your availability', { exact: true }).waitFor();
+      const labels = await page.locator('[data-day="Monday"]').locator('xpath=..').locator('span').allInnerTexts();
+      assert.equal(labels.filter(Boolean)[0], '10am', 'Grid starts at opening time');
+      assert(!labels.includes('8am') && !labels.includes('7pm'), 'No hours outside opening times');
+      assert.equal(await page.locator('[data-day="Sunday"]').getAttribute('data-closed'), 'true');
+      const drag = async (day, fromSlot, toSlot) => {
+        const box = await page.locator(`[data-day="${day}"]`).boundingBox();
+        const x = box.x + box.width / 2;
+        await page.mouse.move(x, box.y + fromSlot * 15 + 7);
+        await page.mouse.down();
+        await page.mouse.move(x, box.y + toSlot * 15 + 7, { steps: 6 });
+        await page.mouse.up();
+      };
+      await page.locator('[data-day="Saturday"]').scrollIntoViewIfNeeded();
+      await drag('Sunday', 0, 6);       // closed: nothing added
+      await drag('Saturday', 0, 15);    // 10am–6pm drag clipped to 12–4
+      await page.getByRole('list', { name: 'Your selected times' }).waitFor();
+      const picked = await page.getByRole('list', { name: 'Your selected times' }).innerText();
+      assert(/Saturday · 12pm – 4pm/.test(picked) && !/Sunday/.test(picked), `Clipped to opening hours: ${picked}`);
+      if (shots) await page.locator('[data-day="Monday"]').locator('xpath=../..').screenshot({ path: `${shots}/availability-hours.png` });
+      await page.getByRole('button', { name: 'Request booking', exact: true }).click();
+      await page.getByRole('heading', { name: "You're on the list!", exact: true }).waitFor();
+      assert.deepEqual(writes.find(w => w.path.endsWith('/client-booking')).body.availability_windows, [{ day_of_week: 6, start_time: '12:00', end_time: '16:00' }]);
+      console.log('PASS availability grid follows studio opening hours');
+      studioHours = [];
       await context.close();
     }
 

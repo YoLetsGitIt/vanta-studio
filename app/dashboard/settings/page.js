@@ -27,6 +27,7 @@ import { useLanguage, LANGUAGES } from '@/lib/i18n';
 import { requestConfirmation, showError } from '@/lib/feedback';
 
 import DownloadableQR from '@/components/DownloadableQR';
+import WalkInFormSettings from '@/components/WalkInFormSettings';
 
 const DAY_KEYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 
@@ -1387,6 +1388,8 @@ export default function SettingsPage() {
             </form>
           )}
         </section>
+
+        <WalkInFormSettings styles={s} url={bookingSlug ? `${SHORT_LINK_BASE}/w/${bookingSlug}` : studioId ? `${typeof window === 'undefined' ? '' : window.location.origin}/walkin?s=${studioId}` : ''} />
 
         <section style={{ ...s.card, gridColumn: '1 / -1' }}>
           <h2 style={s.sectionTitle}>{t('booking_widget')}</h2>

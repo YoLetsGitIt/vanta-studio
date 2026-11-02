@@ -29,6 +29,7 @@ async function open(browser, { width = 390, signedIn = false, confirmation = fal
     if (request.method() === 'OPTIONS') return route.fulfill({ status: 204, headers });
     if (url.pathname.endsWith('/public')) return route.fulfill({ json: studio, headers });
     if (url.pathname.endsWith('/form-config')) return route.fulfill({ json: { fields: {} }, headers });
+    if (url.pathname.endsWith('/hours')) return route.fulfill({ json: { hours: [] }, headers });
     if (url.pathname.endsWith('/consent-templates')) return route.fulfill({ json: { templates: [] }, headers });
     if (url.pathname === '/auth/v1/token') return route.fulfill({ json: mockSession, headers });
     if (url.pathname === '/auth/v1/logout') {
