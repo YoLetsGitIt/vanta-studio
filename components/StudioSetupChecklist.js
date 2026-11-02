@@ -84,7 +84,8 @@ export default function StudioSetupChecklist() {
     finally { setSaving(false); }
   }
 
-  if (state?.dismissed) return null;
+  // Draw nothing until we know: a dismissed checklist must never flash on screen.
+  if (state?.dismissed || (!state && !error)) return null;
 
   const done = STEPS.filter(step => ['complete', 'skipped'].includes(state?.steps?.[step.id])).length;
   const expanded = state && !state.collapsed;

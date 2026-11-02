@@ -28,6 +28,7 @@ import { requestConfirmation, showError } from '@/lib/feedback';
 
 import DownloadableQR from '@/components/DownloadableQR';
 import WalkInFormSettings from '@/components/WalkInFormSettings';
+import PushNotificationSettings from '@/components/PushNotificationSettings';
 
 const DAY_KEYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 
@@ -749,6 +750,7 @@ export default function SettingsPage() {
         </div>
       </div>
 
+      {tab === 'account' && <PushNotificationSettings />}
       {tab === 'account' && <StudioSetupLinks />}
 
       <div className="studio-feature-grid" style={s.grid}>
