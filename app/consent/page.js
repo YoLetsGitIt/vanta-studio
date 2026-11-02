@@ -7,6 +7,8 @@ import { getStudioPublic, getStudioConsentTemplates } from '@/lib/api';
 import DateOfBirthInput from '@/components/ui/DateOfBirthInput';
 import ClientAccountActions from '@/components/ClientAccountActions';
 import ClientAuthGate from '@/components/ClientAuthGate';
+import PhotoIdField from '@/components/PhotoIdField';
+import { uploadPhotoIdAnswers, signStudioPhotoId } from '@/lib/photoId';
 
 // The studio's reusable consent QR code lands here (/consent?s=<studioId>). Unlike the
 // emailed single-use link on vanta.tattoo, the client must sign in or create an account
@@ -190,7 +192,7 @@ function ConsentForm() {
         if (needsGuardian && guardianSigBlobs[t.id]) guardianSigPath = await uploadSig(guardianSigBlobs[t.id]);
         submissions.push({
           template_id:            t.id,
-          answers:                ts.answers ?? {},
+          answers:                await uploadPhotoIdAnswers(ts.answers ?? {}, file => signStudioPhotoId(BACKEND, info.studio_id, file)),
           is_minor:               isMinor,
           client_signature_path:  clientSigPath,
           guardian_name:          needsGuardian ? guardianName : '',
@@ -228,7 +230,7 @@ function ConsentForm() {
   }
 
   if (!session) {
-    return <ClientAuthGate studioId={studioId} studioName={info.studio_name} logoUrl={info.logo_url} />;
+    return <ClientAuthGate collectMarketing studioId={studioId} studioName={info.studio_name} logoUrl={info.logo_url} />;
   }
 
   if (done) {
@@ -266,7 +268,7 @@ function ConsentForm() {
             </div>
             <div>
               <label htmlFor="consent-email" style={{ ...s.label, marginBottom: '0.3rem' }}>Email</label>
-              <input id="consent-email" style={s.input} type="email" readOnly autoComplete="email" value={session.user?.email || ''} />
+              <input id="consent-email" style={s.input} type="email" readOnly autoComplete="email" value={session.user?.email || ''} />{/@privaterelay\.appleid\.com$/i.test(session.user?.email || '') && <span style={{ display: 'block', marginTop: 6, color: 'var(--text-muted)', fontSize: '0.78rem', lineHeight: 1.5 }}>Your private Apple email. Messages are forwarded to your inbox.</span>}
             </div>
             <div>
               <label htmlFor="consent-phone" style={{ ...s.label, marginBottom: '0.3rem' }}>Phone number <span style={{ color: '#e86f6f' }}>*</span></label>
@@ -399,6 +401,8 @@ const typeBadgeColor = {
 
 function ConsentFormField({ field, value, onChange }) {
   switch (field.type) {
+    case 'photo_id':
+      return <PhotoIdField label={field.label} required={field.required} value={value} onChange={onChange} labelStyle={s.label} accent="#f5ecd9" />;
     case 'heading':
       return <p style={{ fontSize: '0.9rem', fontWeight: 700, color: '#f5f5f5', margin: 0 }}>{field.label}</p>;
     case 'paragraph':

@@ -3,8 +3,9 @@
 import Dialog from '@/components/ui/Dialog';
 import { WidgetPreview, ConsentFormPreview } from '@/components/forms/FormPreviews';
 import StudioLogoUpload from '@/components/StudioLogoUpload';
-import SmartSchedulingSettings from '@/components/SmartSchedulingSettings';
+// import SmartSchedulingSettings from '@/components/SmartSchedulingSettings'; // smart scheduling temporarily hidden
 import SMSSettings from '@/components/SMSSettings';
+import DepositPaymentOptions from '@/components/DepositPaymentOptions';
 import { StudioSetupLinks } from '@/components/StudioSetupChecklist';
 
 import { useEffect, useState, useRef, useCallback } from 'react';
@@ -18,8 +19,7 @@ import {
   listConsentTemplates, createConsentTemplate, updateConsentTemplate, deleteConsentTemplate,
   getStripeStatus, startStripeOnboarding, disconnectStripe,
   getFormConfig, updateFormConfig,
-  startBillingCheckout, getBillingDetails, cancelBillingSubscription, reactivateBillingSubscription, openBillingPortal,
-} from '@/lib/api';
+  startBillingCheckout, getBillingDetails, cancelBillingSubscription, reactivateBillingSubscription, openBillingPortal, getBookingLink, updateBookingLink } from '@/lib/api';
 import { getSupabase } from '@/lib/supabase';
 import { invalidate } from '@/lib/cache';
 import { getTheme, setTheme } from '@/lib/theme';
@@ -198,6 +198,8 @@ function AddressAutocomplete({ value, onChange, onSelect, inputStyle }) {
   );
 }
 
+const SHORT_LINK_BASE = (process.env.NEXT_PUBLIC_MARKETING_URL || 'https://vanta.tattoo').replace(/\/$/, '');
+
 export default function SettingsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -230,7 +232,11 @@ export default function SettingsPage() {
   const [copied, setCopied] = useState(false);
   const [embedCopied, setEmbedCopied] = useState(false);
   const [walkInUrl, setWalkInUrl] = useState('');
-  const consentUrl = walkInUrl.replace('/studio-booking?s=', '/consent?s=');
+  const [bookingSlug, setBookingSlug] = useState('');
+  const [slugDraft, setSlugDraft] = useState('');
+  const [slugSaving, setSlugSaving] = useState(false);
+  const [slugError, setSlugError] = useState('');
+  const consentUrl = bookingSlug ? `${SHORT_LINK_BASE}/c/${bookingSlug}` : walkInUrl.replace('/studio-booking?s=', '/consent?s=');
   const [studioId, setStudioId] = useState('');
   const [theme, setThemeState] = useState('dark');
   const [tab, setTab] = useState('studio');
@@ -323,6 +329,8 @@ export default function SettingsPage() {
         setEmail(session?.user?.email ?? '');
         setStudioId(account.studio_id);
         setWalkInUrl(window.location.origin + '/studio-booking?s=' + account.studio_id);
+        // Swap in the short vanta.tattoo link once it loads; the long link still works.
+        getBookingLink().then(({ slug }) => { setBookingSlug(slug); setSlugDraft(slug); setWalkInUrl(`${SHORT_LINK_BASE}/b/${slug}`); }).catch(() => {});
         if (hoursData.hours?.length === 7) setHours(hoursData.hours);
         setStations(stationsData.stations ?? []);
         setConsentTemplates(templateData.templates ?? []);
@@ -517,7 +525,8 @@ export default function SettingsPage() {
   }
 
   function addField(type) {
-    setTemplateFields(prev => [...prev, { id: `f_${Date.now()}`, type, label: '', required: false }]);
+    // A photo ID field starts labelled and required; studios can change both.
+    setTemplateFields(prev => [...prev, { id: `f_${Date.now()}`, type, label: type === 'photo_id' ? 'Photo ID' : '', required: type === 'photo_id' }]);
   }
 
   function updateField(id, changes) {
@@ -679,6 +688,20 @@ export default function SettingsPage() {
     }
     await getSupabase().auth.signOut();
     window.location.replace('/'); // full load; see dashboard/layout.js
+  }
+
+  async function saveBookingSlug(event) {
+    event.preventDefault();
+    setSlugError('');
+    setSlugSaving(true);
+    try {
+      const { slug } = await updateBookingLink(slugDraft);
+      setBookingSlug(slug); setSlugDraft(slug); setWalkInUrl(`${SHORT_LINK_BASE}/b/${slug}`);
+    } catch (err) {
+      setSlugError(err.message);
+    } finally {
+      setSlugSaving(false);
+    }
   }
 
   function copyLink() {
@@ -958,8 +981,8 @@ export default function SettingsPage() {
         <section style={{ ...s.card, gridColumn: '1 / -1' }}>
           <h2 style={s.sectionTitle}>{t('stripe_connect')}</h2>
           <p style={s.sectionDesc}>
-            Connect your Stripe account to collect deposits from clients when sending selection links.
-            Payments go directly to your Stripe account minus the platform fee.
+            Connect your Stripe account so clients can pay deposits by card.
+            Payments go directly to your Stripe account minus the platform fee. You can also offer PayID or bank transfer below.
           </p>
 
           {stripeStatus === null ? (
@@ -1000,6 +1023,8 @@ export default function SettingsPage() {
             </div>
           )}
         </section>
+
+        <DepositPaymentOptions styles={s} stripeReady={!!(stripeStatus?.connected && stripeStatus?.charges_enabled)} />
 
         </>}
 
@@ -1113,12 +1138,14 @@ export default function SettingsPage() {
 
         <SMSSettings styles={s} />
 
+        {/* Piercing aftercare instructions — temporarily hidden
         <section style={{ ...s.card, gridColumn: '1 / -1' }}>
           <h2 style={s.sectionTitle}>Piercing aftercare instructions</h2>
           <p style={s.sectionDesc}>Your studio’s guidance is attached to completed piercing appointments. Tattoo instructions are kept separate.</p>
           <textarea aria-label="Piercing aftercare instructions" style={{ ...s.input, minHeight: 120, resize: 'vertical', lineHeight: 1.6 }} value={piercingAftercareInstructions} onChange={e => setPiercingAftercareInstructions(e.target.value)} placeholder="Add your studio’s piercing aftercare instructions…" />
           <button onClick={saveProfile} style={s.saveBtn} disabled={saving}>{saving ? t('saving') : saved ? t('saved') : t('save')}</button>
         </section>
+        */}
 
         {/* Aftercare instructions — temporarily hidden
         <section style={{ ...s.card, gridColumn: '1 / -1' }}>
@@ -1218,7 +1245,7 @@ export default function SettingsPage() {
                     <div className="studio-consent-field-toolbar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
                       <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Fields ({templateFields.length})</span>
                       <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-                        {[['heading','Heading'],['paragraph','Paragraph'],['checkbox','Checkbox'],['text','Text'],['textarea','Textarea'],['yesno','Yes/No']].map(([type, label]) => (
+                        {[['heading','Heading'],['paragraph','Paragraph'],['checkbox','Checkbox'],['text','Text'],['textarea','Textarea'],['yesno','Yes/No'],['photo_id','Photo ID']].map(([type, label]) => (
                           <button key={type} style={s.addFieldBtn} onClick={() => addField(type)}>+ {label}</button>
                         ))}
                       </div>
@@ -1231,7 +1258,7 @@ export default function SettingsPage() {
                     {templateFields.map((f, idx) => (
                       <div key={f.id} style={s.fieldEditorRow}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.4rem' }}>
-                          <span style={s.fieldTypeBadge}>{f.type}</span>
+                          <span style={s.fieldTypeBadge}>{f.type === 'photo_id' ? 'photo ID' : f.type}</span>
                           <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.25rem' }}>
                             <button aria-label={`Move field ${idx + 1} up`} style={s.fieldMoveBtn} onClick={() => moveField(f.id, -1)} disabled={idx === 0}>↑</button>
                             <button aria-label={`Move field ${idx + 1} down`} style={s.fieldMoveBtn} onClick={() => moveField(f.id, 1)} disabled={idx === templateFields.length - 1}>↓</button>
@@ -1370,6 +1397,18 @@ export default function SettingsPage() {
             </div>
             <DownloadableQR value={walkInUrl} filename="booking-qr" />
           </div>
+          {bookingSlug && (
+            <form onSubmit={saveBookingSlug} style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '1rem' }}>
+              <label htmlFor="booking-slug" style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text)' }}>Link name</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>vanta.tattoo/b/</span>
+                <input id="booking-slug" className="vanta-input" value={slugDraft} onChange={e => setSlugDraft(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))} maxLength={40} autoCapitalize="none" autoCorrect="off" spellCheck={false} style={{ flex: '1 1 140px', minWidth: 0, background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 8, padding: '0.5rem 0.7rem', fontSize: '16px', color: 'var(--text)' }} />
+                <button type="submit" style={s.copyBtn} disabled={slugSaving || slugDraft === bookingSlug || slugDraft.length < 3}>{slugSaving ? 'Saving…' : 'Save'}</button>
+              </div>
+              {slugError ? <p role="alert" style={{ margin: 0, fontSize: '0.78rem', color: 'var(--color-danger)' }}>{slugError}</p>
+                : <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-ghost)' }}>Changing it stops the old link and QR codes working.</p>}
+            </form>
+          )}
         </section>
 
         <section style={{ ...s.card, gridColumn: '1 / -1' }}>
@@ -1423,6 +1462,7 @@ export default function SettingsPage() {
                       { key: 'skin_tone',      label: 'Skin tone' },
                       { key: 'notes',          label: 'Additional notes' },
                       { key: 'allergies',      label: 'Allergies' },
+                      { key: 'availability_windows', label: 'Weekly availability' },
                       { key: 'image_paths',    label: 'Reference photos' },
                     ].map(({ key, label }) => {
                       const entry = formFields[key] ?? { enabled: false, required: false };
@@ -1517,6 +1557,7 @@ export default function SettingsPage() {
           </div>
         </section>
 
+        {/* Smart scheduling — temporarily hidden
         <section style={{ ...s.card, gridColumn: '1 / -1' }}>
           <h2 style={s.sectionTitle}>Smart scheduling</h2>
           <SmartSchedulingSettings mode={schedulingMode} onChange={setSchedulingMode} disabled={saving} />
@@ -1525,6 +1566,7 @@ export default function SettingsPage() {
             {saving ? t('saving') : saved ? t('saved') : t('save')}
           </button>
         </section>
+        */}
 
         </>}
 

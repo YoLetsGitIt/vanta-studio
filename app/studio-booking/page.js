@@ -9,7 +9,10 @@ import ClientAccountActions from '@/components/ClientAccountActions';
 import DateOfBirthInput from '@/components/ui/DateOfBirthInput';
 import { ensureClientProfile, subscribeClientSession } from '@/lib/client-account';
 import { getSupabase } from '@/lib/supabase';
-import { getStudioPublic, createWalkIn, walkinUploadSign, signatureUploadSign, getStudioConsentTemplates, getFormConfigPublic } from '@/lib/api';
+import WeeklyAvailabilityGrid from '@/components/WeeklyAvailabilityGrid';
+import PhotoIdField from '@/components/PhotoIdField';
+import { uploadPhotoIdAnswers, signStudioPhotoId } from '@/lib/photoId';
+import { getStudioPublic, createWalkIn, createGuestStudioBooking, walkinUploadSign, signatureUploadSign, getStudioConsentTemplates, getFormConfigPublic } from '@/lib/api';
 
 function detectCountry() {
   try {
@@ -100,6 +103,26 @@ function WalkInInner() {
   const [studioErr, setStudioErr] = useState('');
   const [formConfig, setFormConfig] = useState(null); // null = loading
   const [session, setSession] = useState(undefined);
+  // Guests book without an account; a signed-in session always takes precedence.
+  // Guest mode lives in the URL (?guest=1) so the browser Back button returns to the sign-in choice.
+  const guestChosen = params.get('guest') === '1';
+  const pushedGuest = useRef(false);
+  const setGuestChosen = on => {
+    const url = new URL(window.location.href);
+    if (on) url.searchParams.set('guest', '1'); else url.searchParams.delete('guest');
+    window.history.pushState(null, '', url);
+    pushedGuest.current = on;
+  };
+  // Back to the sign-in choice: a real history step when we added one, so the
+  // browser and on-page Back buttons behave the same.
+  const leaveGuest = () => {
+    if (pushedGuest.current) { pushedGuest.current = false; window.history.back(); return; }
+    const url = new URL(window.location.href);
+    url.searchParams.delete('guest');
+    window.history.replaceState(null, '', url);
+  };
+  const guest = guestChosen && !session;
+  const [guestEmail, setGuestEmail] = useState('');
   const [accountReady, setAccountReady] = useState(false);
   const [accountError, setAccountError] = useState('');
   const [accountRetry, setAccountRetry] = useState(0);
@@ -155,6 +178,8 @@ function WalkInInner() {
   const [hasAllergies, setHasAllergies] = useState(false);
   const [allergyDetails, setAllergyDetails] = useState('');
   const [notes, setNotes]           = useState('');
+  // Weekly availability: [{ day_of_week, start_time, end_time }]
+  const [availability, setAvailability] = useState([]);
   const photoInputRef = useRef(null);
   const [photos, setPhotos]         = useState([]);
   const [photoPreviews, setPhotoPreviews] = useState([]);
@@ -174,7 +199,8 @@ function WalkInInner() {
 
   // field(key) returns {enabled, required} from the loaded config, defaulting to enabled/not-required
   function field(key) {
-    return formConfig?.[key] ?? { enabled: true, required: false };
+    // Weekly availability is newer than the other fields, so it stays off unless the studio turned it on.
+    return formConfig?.[key] ?? { enabled: key !== 'availability_windows', required: false };
   }
 
   // Load studio, form config, and consent templates in parallel
@@ -244,17 +270,25 @@ function WalkInInner() {
 
   async function handleSubmit(e) {
     e.preventDefault();
-    const { data: { session: currentSession } } = await getSupabase().auth.getSession();
-    if (!currentSession || currentSession.user.id !== session?.user.id) {
-      setSession(currentSession ?? null);
-      setSubmitError('Please sign in again before requesting your booking.');
-      return;
+    let bookingEmail = guestEmail.trim();
+    if (!guest) {
+      const { data: { session: currentSession } } = await getSupabase().auth.getSession();
+      if (!currentSession || currentSession.user.id !== session?.user.id) {
+        setSession(currentSession ?? null);
+        setSubmitError('Please sign in again before requesting your booking.');
+        return;
+      }
+      bookingEmail = currentSession.user.email?.trim() || '';
+      if (!bookingEmail) { setSubmitError('Please sign in with an account that has an email address.'); return; }
     }
     if (!fullName.trim()) { setSubmitError('Please provide your full name.'); return; }
-    if (!currentSession.user.email?.trim()) { setSubmitError('Please sign in with an account that has an email address.'); return; }
+    if (guest && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(bookingEmail)) { setSubmitError('Please provide a valid email address.'); return; }
     if (!phoneNum.trim()) { setSubmitError('Please provide your phone number.'); return; }
     if (!dob) { setSubmitError('Please provide your date of birth.'); return; }
     if (field('body_location').enabled && placements.length === 0) { setSubmitError('Please select at least one placement.'); return; }
+    if (field('availability_windows').enabled && field('availability_windows').required && availability.length === 0) {
+      setSubmitError('Please add at least one time you’re available.'); return;
+    }
 
     // Validate consent form templates — only enforce required ones
     for (const t of consentTemplates) {
@@ -262,7 +296,7 @@ function WalkInInner() {
       if (!required) continue;
       const ts = templateState[t.id] ?? {};
       for (const f of (t.fields ?? [])) {
-        if (f.required && ['text', 'textarea', 'yesno'].includes(f.type)) {
+        if (f.required && ['text', 'textarea', 'yesno', 'photo_id'].includes(f.type)) {
           if (!ts.answers?.[f.id]) {
             setSubmitError(`Please complete all required fields in "${t.name}".`);
             return;
@@ -330,7 +364,7 @@ function WalkInInner() {
 
         consentSubmissions.push({
           template_id:            t.id,
-          answers:                ts.answers ?? {},
+          answers:                await uploadPhotoIdAnswers(ts.answers ?? {}, file => signStudioPhotoId(process.env.NEXT_PUBLIC_BACKEND_URL, studioId, file)),
           is_minor:               isMinor,
           signer_name:            fullName.trim(),
           client_signature_path:  clientSigPath,
@@ -342,10 +376,10 @@ function WalkInInner() {
         });
       }
 
-      await createWalkIn(studioId, {
+      await (guest ? createGuestStudioBooking : createWalkIn)(studioId, {
         artist_id:            artistId,
         name:                 fullName.trim(),
-        email: currentSession.user.email,
+        email: bookingEmail,
         phone: bookingPhone,
         sms_reminder_opt_in: smsOptIn,
         dob,
@@ -358,12 +392,15 @@ function WalkInInner() {
         color:                isPiercing ? '' : colorStyle,
         notes,
         allergies:            hasAllergies ? (allergyDetails.trim() || 'Yes') : '',
+        availability_windows: field('availability_windows').enabled
+          ? [...availability].sort((a, b) => a.day_of_week - b.day_of_week || a.start_time.localeCompare(b.start_time))
+          : [],
         image_paths:          imagePaths,
         consent_accepted:     consentSubmissions.length > 0,
         consent_submissions:  consentSubmissions,
       });
       // Match consent: remember reviewed details for the next visit.
-      getSupabase().auth.updateUser({ data: { full_name: fullName.trim(), name: fullName.trim(), dob, phone: bookingPhone } }).catch(() => {});
+      if (!guest) getSupabase().auth.updateUser({ data: { full_name: fullName.trim(), name: fullName.trim(), dob, phone: bookingPhone } }).catch(() => {});
       setDone(true);
     } catch (err) {
       setSubmitError(err.message);
@@ -376,9 +413,9 @@ function WalkInInner() {
   if (studioErr) return <p role="alert" style={{ ...s.msg, color: 'var(--color-danger)' }}>{studioErr}</p>;
   if (!studio || formConfig === null) return <p style={s.msg}>Loading…</p>;
   if (session === undefined) return <p style={s.msg}>Checking your account…</p>;
-  if (!session) return <ClientAuthGate studioId={studioId} studioName={studio.name} logoUrl={studio.logo_url} purpose="booking" />;
-  if (accountError) return <div style={s.card}><p role="alert" style={s.error}>{accountError}</p><Button onClick={() => setAccountRetry(value => value + 1)}>Try again</Button></div>;
-  if (!accountReady) return <p style={s.msg}>Loading your details…</p>;
+  if (!session && !guest) return <ClientAuthGate studioId={studioId} studioName={studio.name} logoUrl={studio.logo_url} purpose="booking" onGuest={() => setGuestChosen(true)} />;
+  if (!guest && accountError) return <div style={s.card}><p role="alert" style={s.error}>{accountError}</p><Button onClick={() => setAccountRetry(value => value + 1)}>Try again</Button></div>;
+  if (!guest && !accountReady) return <p style={s.msg}>Loading your details…</p>;
 
   if (done) {
     return (
@@ -392,6 +429,11 @@ function WalkInInner() {
 
   return (
     <div style={s.card}>
+      {guest && (
+        <button type="button" onClick={leaveGuest} style={s.backBtn} aria-label="Back to sign-in options">
+          <span aria-hidden="true" style={{ fontSize: '1.1rem', lineHeight: 1 }}>←</span> Back
+        </button>
+      )}
       <div style={s.studioHeader}>
         {studio.logo_url && <img src={studio.logo_url} alt={`${studio.name} logo`} style={{ maxHeight: 64, maxWidth: 220, objectFit: 'contain', alignSelf: 'flex-start', marginBottom: '0.5rem' }} />}
         <span style={s.studioLabel}>Studio booking</span>
@@ -399,10 +441,10 @@ function WalkInInner() {
       </div>
 
       <form onSubmit={handleSubmit} style={s.form}>
-          <ClientAccountActions email={session.user.email} />
+          {!guest && <ClientAccountActions email={session.user.email} />}
 
           <Section title="Your details" first>
-            <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: 13 }}>Review your details and update anything that has changed.</p>
+            <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: 13 }}>{guest ? `You’re booking as a guest, no account needed. ${studio.name} uses these details to contact you about your booking.` : 'Review your details and update anything that has changed.'}</p>
             <Field label="Full name">
               <input style={s.input} type="text" value={fullName} required autoComplete="name" onChange={e => setFullName(e.target.value)} placeholder="Your name" />
             </Field>
@@ -410,7 +452,9 @@ function WalkInInner() {
               <DateOfBirthInput style={s.input} value={dob} onChange={setDob} />
             </Field>
             <Field label="Email">
-              <input style={s.input} type="email" value={session.user.email || ''} required readOnly autoComplete="email" placeholder="you@example.com" />
+              {guest
+                ? <input style={s.input} type="email" value={guestEmail} required autoComplete="email" inputMode="email" autoCapitalize="none" onChange={e => setGuestEmail(e.target.value)} placeholder="you@example.com" />
+                : <><input style={s.input} type="email" value={session.user.email || ''} required readOnly autoComplete="email" placeholder="you@example.com" />{/@privaterelay\.appleid\.com$/i.test(session.user?.email || '') && <span style={{ display: 'block', marginTop: 6, color: 'var(--text-muted)', fontSize: '0.78rem', lineHeight: 1.5 }}>Your private Apple email. Messages are forwarded to your inbox.</span>}</>}
             </Field>
             <Field label="Phone" id="booking-phone" required>
               <div style={s.phoneRow}>
@@ -553,7 +597,7 @@ function WalkInInner() {
             {!isPiercing && <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
               <label style={s.label}>Colour</label>
               <div style={{ display: 'flex', gap: '0.5rem' }}>
-                {['Black', 'Grey', 'Color'].map(opt => {
+                {[['Black & Grey', 'Black & grey'], ['Color', 'Colour']].map(([opt, label]) => {
                   const active = colorStyle === opt;
                   return (
                     <button
@@ -574,7 +618,7 @@ function WalkInInner() {
                         fontFamily: 'inherit',
                       }}
                     >
-                      {opt}
+                      {label}
                     </button>
                   );
                 })}
@@ -607,6 +651,16 @@ function WalkInInner() {
               </div>
             )}
           </Section>
+
+          {/* ── Weekly availability ── */}
+          {field('availability_windows').enabled && (
+            <Section title="Your availability">
+              <p style={s.sectionHint}>
+                {field('availability_windows').required ? 'Required' : 'Optional'} — which hours usually suit you each week?
+              </p>
+              <WeeklyAvailabilityGrid value={availability} onChange={setAvailability} />
+            </Section>
+          )}
 
           {/* ── Reference photos ── */}
           {field('image_paths').enabled && (
@@ -747,6 +801,8 @@ function ConsentFormField({ field, value, onChange }) {
           </span>
         </label>
       );
+    case 'photo_id':
+      return <PhotoIdField label={field.label} required={field.required} value={value} onChange={onChange} labelStyle={labelStyle} />;
     case 'yesno':
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
@@ -911,6 +967,12 @@ const s = {
     display: 'flex',
     flexDirection: 'column',
     gap: '1.5rem',
+  },
+  backBtn: {
+    display: 'inline-flex', alignItems: 'center', gap: 6, alignSelf: 'flex-start',
+    minHeight: 44, margin: '-0.75rem 0 -0.75rem -0.6rem', padding: '0 0.6rem',
+    background: 'none', border: 'none', borderRadius: 8, cursor: 'pointer',
+    color: 'var(--text)', fontSize: '0.9rem', fontWeight: 600, fontFamily: 'inherit',
   },
   studioHeader: {
     display: 'flex', flexDirection: 'column', gap: '0.25rem',

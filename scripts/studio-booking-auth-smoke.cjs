@@ -9,8 +9,8 @@ const user = { id: '22222222-2222-4222-8222-222222222222', email: 'client@exampl
 const session = { access_token: 'local-access-token', refresh_token: 'local-refresh-token', token_type: 'bearer', expires_in: 3600, expires_at: 4102444800, user };
 const studio = { id: 'test-studio', name: 'Test Tattoo Studio', artists: [] };
 
-async function open(browser, { width = 390, signedIn = false, confirmation = false, profileFailure = false, profileMissing = false, logoutFailure = false, metadata = user.user_metadata, profile = { name: 'Jamie Client', phone: '+61400123456' }, path = '/studio-booking', suffix = '' } = {}) {
-  const mockUser = { ...user, user_metadata: { ...metadata } };
+async function open(browser, { width = 390, signedIn = false, confirmation = false, profileFailure = false, profileMissing = false, logoutFailure = false, metadata = user.user_metadata, profile = { name: 'Jamie Client', phone: '+61400123456' }, path = '/studio-booking', suffix = '', email = user.email } = {}) {
+  const mockUser = { ...user, email, user_metadata: { ...metadata } };
   const mockSession = { ...session, user: mockUser };
   const context = await browser.newContext({ viewport: { width, height: 900 } });
   if (signedIn) await context.addInitScript(({ storageKey, session }) => {
@@ -19,7 +19,7 @@ async function open(browser, { width = 390, signedIn = false, confirmation = fal
       sessionStorage.setItem('test-session-seeded', 'true');
     }
   }, { storageKey, session: mockSession });
-  const calls = { bookings: [], profiles: [], signups: [], providers: [], profileUpdates: [], profileReads: 0, logouts: 0 };
+  const calls = { guestBookings: [], bookings: [], profiles: [], signups: [], providers: [], profileUpdates: [], profileReads: 0, logouts: 0 };
   const errors = [];
   let hasProfile = !profileMissing;
   await context.route('**/*', async route => {
@@ -36,6 +36,10 @@ async function open(browser, { width = 390, signedIn = false, confirmation = fal
       assert.equal(url.searchParams.get('scope'), 'local', 'Logging out only affects this browser');
       if (logoutFailure && calls.logouts === 1) return route.fulfill({ status: 400, json: { msg: 'Could not log out' }, headers });
       return route.fulfill({ status: 204, headers });
+    }
+    if (url.pathname === '/users' && request.method() === 'POST') {
+      calls.signups.push({ body: request.postDataJSON() });
+      return route.fulfill({ status: 201, json: { id: user.id }, headers });
     }
     if (url.pathname === '/auth/v1/signup') {
       calls.signups.push({ body: request.postDataJSON(), redirectTo: url.searchParams.get('redirect_to') });
@@ -55,6 +59,10 @@ async function open(browser, { width = 390, signedIn = false, confirmation = fal
       if (profileFailure && calls.profileReads === 1) return route.fulfill({ status: 503, json: { error: 'Account temporarily unavailable' }, headers });
       return route.fulfill({ status: hasProfile ? 200 : 404, json: hasProfile ? profile : {}, headers });
     }
+    if (url.pathname.endsWith('/studio-booking') && request.method() === 'POST') {
+      calls.guestBookings.push({ body: request.postDataJSON(), authorization: request.headers().authorization });
+      return route.fulfill({ status: 201, json: { id: 'guest-booking' }, headers });
+    }
     if (url.pathname.endsWith('/client-booking')) {
       assert.equal(request.headers().authorization, 'Bearer local-access-token');
       calls.bookings.push(request.postDataJSON());
@@ -73,8 +81,18 @@ async function open(browser, { width = 390, signedIn = false, confirmation = fal
   return { context, page, calls, errors };
 }
 
+// Email sits behind two links so "Continue as guest" leads: one tap to create an account…
+async function showEmailForm(page) {
+  const link = page.getByRole('button', { name: 'Create account', exact: true });
+  if (await link.count()) await link.click();
+}
+
+// …and one tap to sign in.
 async function signIn(page) {
-  await page.getByRole('button', { name: 'Already have an account? Sign in' }).click();
+  const direct = page.getByRole('button', { name: 'Sign in with email', exact: true });
+  if (await direct.count()) await direct.click();
+  else await page.getByRole('button', { name: 'Already have an account? Sign in' }).click();
+  await page.getByRole('button', { name: 'Sign in & continue' }).waitFor();
   await page.getByPlaceholder('Email', { exact: true }).fill(user.email);
   await page.getByPlaceholder('Password', { exact: true }).fill('example-password');
   await page.getByRole('button', { name: 'Sign in & continue' }).click();
@@ -88,12 +106,16 @@ async function signIn(page) {
   try {
     for (const width of [320, 390, 1280]) {
       const { context, page, calls, errors } = await open(browser, { width });
-      await page.getByRole('heading', { name: 'Create an account' }).waitFor();
-      assert.equal(await page.getByRole('button', { name: 'Request booking', exact: true }).count(), 0, 'Anonymous visitors cannot use the booking form');
+      await page.getByRole('heading', { name: `Book with ${studio.name}` }).waitFor();
+      assert.equal(await page.getByRole('button', { name: 'Request booking', exact: true }).count(), 0, 'Visitors choose guest or sign-in first');
       assert.equal(calls.bookings.length, 0);
-      assert(await page.getByText('before requesting a booking.', { exact: false }).isVisible());
-      assert.equal(await page.getByRole('button', { name: 'Continue with Apple' }).count(), 1);
+      const guestBox = await page.getByRole('button', { name: 'Continue as guest' }).boundingBox();
+      const appleBox = await page.getByRole('button', { name: 'Continue with Apple' }).boundingBox();
+      assert(guestBox.y < appleBox.y && guestBox.height >= appleBox.height, 'Guest is the first and largest choice');
       assert.equal(await page.getByRole('button', { name: 'Continue with Google' }).count(), 1);
+      assert.equal(await page.getByPlaceholder('Password').count(), 0, 'Email sign-up is tucked behind a link');
+      await page.screenshot({ path: `${output}/gate-${width}.png`, fullPage: true });
+      await showEmailForm(page);
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
       const dateStyle = await page.locator('input[type="date"]').evaluate(input => {
         const name = document.querySelector('input[autocomplete="name"]');
@@ -134,7 +156,7 @@ async function signIn(page) {
       await page.getByRole('alert').filter({ hasText: 'Could not log out' }).waitFor();
       assert.equal(await page.getByPlaceholder('Your name', { exact: true }).inputValue(), 'Draft Client');
       await page.getByRole('button', { name: 'Log out', exact: true }).click();
-      await page.getByRole('heading', { name: 'Create an account', exact: true }).waitFor();
+      await page.getByRole('heading', { name: `Book with ${studio.name}`, exact: true }).waitFor();
       assert.equal(page.url(), before, 'Logging out retains the studio QR link');
       assert.equal(await page.getByRole('button', { name: 'Log out', exact: true }).count(), 0);
       assert.equal(calls.bookings.length, 0);
@@ -145,6 +167,7 @@ async function signIn(page) {
     }
     {
       const { context, page, calls, errors } = await open(browser, { profileMissing: true });
+      await showEmailForm(page);
       await page.getByPlaceholder('Full name').fill('Jamie Client');
       await page.locator('input[type="date"]').fill('1990-01-01');
       await page.getByPlaceholder('Phone number').fill('+61400123456');
@@ -157,8 +180,8 @@ async function signIn(page) {
       await page.getByRole('button', { name: 'Create account & continue' }).click();
       await page.getByRole('button', { name: 'Request booking', exact: true }).waitFor();
       assert.equal(calls.signups.length, 1);
-      assert.equal(calls.signups[0].redirectTo, `${base}/studio-booking?s=${studio.id}`);
-      assert.equal(calls.signups[0].body.data.dob, '1990-01-01');
+      assert.equal(calls.signups[0].body.email, user.email);
+      assert.equal(calls.profileUpdates.at(-1).data.dob, '1990-01-01');
       assert(calls.profiles.length >= 1, 'New accounts receive a Vanta profile');
       assert.equal(await page.getByPlaceholder('Your name', { exact: true }).inputValue(), 'Jamie Client', 'Signup details remain visible and prefilled');
       assert.equal(await page.locator('input[type="date"]').inputValue(), '1990-01-01');
@@ -166,21 +189,6 @@ async function signIn(page) {
       assert.equal(calls.bookings.length, 0, 'Account creation does not submit a booking');
       assert.deepEqual(errors, []);
       results.push('New account: terms, profile creation and return to the same studio');
-      await context.close();
-    }
-    {
-      const { context, page, calls } = await open(browser, { confirmation: true });
-      await page.getByPlaceholder('Full name').fill('Jamie Client');
-      await page.locator('input[type="date"]').fill('1990-01-01');
-      await page.getByPlaceholder('Phone number').fill('+61400123456');
-      await page.getByPlaceholder('Email', { exact: true }).fill(user.email);
-      await page.getByPlaceholder('Password').fill('example-password');
-      await page.getByRole('checkbox', { name: /I agree/ }).check();
-      await page.getByRole('button', { name: 'Create account & continue' }).click();
-      await page.getByText('Check your email to confirm your account, then return to this page to continue.').waitFor();
-      assert.equal(await page.getByRole('button', { name: 'Request booking', exact: true }).count(), 0);
-      assert.equal(calls.bookings.length, 0);
-      results.push('Email confirmation required: booking stays locked');
       await context.close();
     }
     {
@@ -198,7 +206,7 @@ async function signIn(page) {
         channel.postMessage({ event: 'SIGNED_OUT', session: null });
         channel.close();
       }, storageKey);
-      await page.getByRole('heading', { name: 'Create an account' }).waitFor();
+      await page.getByRole('heading', { name: `Book with ${studio.name}` }).waitFor();
       assert.equal(await page.getByRole('button', { name: 'Request booking', exact: true }).count(), 0);
       await signIn(page);
       assert.equal(await page.getByPlaceholder('Your name', { exact: true }).inputValue(), 'Edited Jamie', 'Same-account reauthentication preserves reviewed details');
@@ -253,6 +261,65 @@ async function signIn(page) {
       }
       assert.deepEqual(errors, []);
       results.push(details.label);
+      await context.close();
+    }
+    for (const width of [320, 390, 1280]) {
+      const { context, page, calls, errors } = await open(browser, { width });
+      await page.getByRole('button', { name: 'Continue as guest' }).click();
+      await page.getByText('booking as a guest', { exact: false }).waitFor();
+      // Browser Back returns to the sign-in choice, and Forward resumes as a guest.
+      await page.goBack();
+      await page.getByRole('heading', { name: `Book with ${studio.name}` }).waitFor();
+      await page.goForward();
+      await page.getByText('booking as a guest', { exact: false }).waitFor();
+      const email = page.getByPlaceholder('you@example.com');
+      assert.equal(await email.evaluate(input => input.readOnly), false, 'Guests type their email');
+      await page.getByPlaceholder('Your name', { exact: true }).fill('Guest Client');
+      await page.locator('input[type="date"]').fill('1992-03-04');
+      await page.getByRole('combobox', { name: 'Phone country code' }).selectOption('AU');
+      await page.getByPlaceholder('555 0100').fill('400999888');
+      await page.getByRole('button', { name: 'Forearm', exact: true }).click();
+      await page.locator('textarea').first().fill('Fine line swallow');
+      await email.fill('not-an-email');
+      await page.getByRole('button', { name: 'Request booking', exact: true }).click();
+      assert.equal(calls.guestBookings.length, 0, 'An invalid email is not submitted');
+      await email.fill('guest@example.test');
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+      await page.screenshot({ path: `${output}/guest-form-${width}.png`, fullPage: true });
+      await page.getByRole('button', { name: 'Request booking', exact: true }).click();
+      await page.getByRole('heading', { name: "You're on the list!" }).waitFor();
+      assert.equal(calls.guestBookings.length, 1);
+      const sent = calls.guestBookings[0];
+      assert.equal(sent.authorization, undefined, 'Guest bookings carry no account');
+      assert.deepEqual([sent.body.name, sent.body.email, sent.body.dob, sent.body.phone.replaceAll(' ', '')], ['Guest Client', 'guest@example.test', '1992-03-04', '+61400999888']);
+      assert.equal(calls.bookings.length + calls.signups.length + calls.profiles.length + calls.profileReads, 0, 'No account is created or read');
+      assert.deepEqual(errors, []);
+      results.push(`Guest booking without an account: ${width}px`);
+      await context.close();
+    }
+    {
+      const { context, page } = await open(browser);
+      await page.getByRole('button', { name: 'Continue as guest' }).click();
+      await page.getByRole('button', { name: 'Back to sign-in options' }).click();
+      await page.getByRole('heading', { name: `Book with ${studio.name}` }).waitFor();
+      results.push('On-page Back returns a guest to the sign-in choice');
+      await context.close();
+    }
+    {
+      const relay = 'w7bfs4pzd7@privaterelay.appleid.com';
+      const { context, page, calls } = await open(browser, { signedIn: true, email: relay });
+      await page.getByRole('button', { name: 'Request booking', exact: true }).waitFor();
+      await page.getByText('Signed in with Apple · private email').waitFor();
+      assert.equal(await page.getByText(`Signed in as ${relay}`).count(), 0, 'Relay address is not the headline');
+      await page.getByText('Your private Apple email. Messages are forwarded to your inbox.').waitFor();
+      assert.equal(await page.getByPlaceholder('you@example.com').inputValue(), relay, 'The forwarding address is still visible in the Email field');
+      await page.screenshot({ path: `${output}/apple-relay.png` });
+      await page.getByRole('button', { name: 'Forearm', exact: true }).click();
+      await page.locator('textarea').first().fill('Botanical piece');
+      await page.getByRole('button', { name: 'Request booking', exact: true }).click();
+      await page.getByRole('heading', { name: "You're on the list!" }).waitFor();
+      assert.equal(calls.bookings[0].email, relay, 'Booking still uses the forwarding address');
+      results.push('Apple private relay shown as private email');
       await context.close();
     }
     for (const path of ['/studio-booking', '/studio-booking.html']) {

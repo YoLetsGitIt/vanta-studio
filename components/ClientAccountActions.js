@@ -7,6 +7,8 @@ import Button from '@/components/ui/Button';
 export default function ClientAccountActions({ email }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  // Apple "Hide My Email" gives a random relay address; show it as Apple sign-in instead.
+  const appleRelay = /@privaterelay\.appleid\.com$/i.test(email || '');
 
   async function logOut() {
     setBusy(true);
@@ -25,7 +27,9 @@ export default function ClientAccountActions({ email }) {
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-        <p style={{ margin: 0, minWidth: 0, overflowWrap: 'anywhere', color: 'var(--text-muted)', fontSize: '0.78rem', lineHeight: 1.5 }}>Signed in as {email}</p>
+        <p style={{ margin: 0, minWidth: 0, overflowWrap: 'anywhere', color: 'var(--text-muted)', fontSize: '0.78rem', lineHeight: 1.5 }}>
+          {appleRelay ? 'Signed in with Apple · private email' : `Signed in as ${email}`}
+        </p>
         <Button variant="ghost" size="sm" loading={busy} loadingLabel="Logging out…" onClick={logOut} style={{ flexShrink: 0 }}>Log out</Button>
       </div>
       {error && <p role="alert" style={{ color: 'var(--color-danger)', fontSize: '0.8rem', marginTop: 8 }}>{error}</p>}

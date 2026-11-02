@@ -43,9 +43,19 @@
   cursor: pointer;
 }
 
+/* Hide "dd / mm / yyyy" (Chrome) and today's date (Safari) behind the "Date of birth"
+   label until the field is used. Each part is coloured separately, so each needs hiding. */
 .dateInput[data-empty='true']:not(:focus)::-webkit-datetime-edit,
+.dateInput[data-empty='true']:not(:focus)::-webkit-datetime-edit-fields-wrapper,
+.dateInput[data-empty='true']:not(:focus)::-webkit-datetime-edit-day-field,
+.dateInput[data-empty='true']:not(:focus)::-webkit-datetime-edit-month-field,
+.dateInput[data-empty='true']:not(:focus)::-webkit-datetime-edit-year-field,
+.dateInput[data-empty='true']:not(:focus)::-webkit-datetime-edit-text,
+.dateInput[data-empty='true']:not(:focus),
 .dateInput[data-empty='true']:not(:focus)::-webkit-date-and-time-value {
   color: transparent;
+  /* Safari paints date text with the fill colour, which overrides color. */
+  -webkit-text-fill-color: transparent;
 }
 
 .datePlaceholder {

@@ -118,7 +118,7 @@ export function WidgetPreview({ bg, accent, studioName, logoUrl, fields, consent
         <div style={fld}>
           <span style={lbl}>Colour</span>
           <div style={{ display: 'flex', gap: 5 }}>
-            {['Black', 'Grey', 'Color'].map((opt, i) => (
+            {['Black & grey', 'Colour'].map((opt, i) => (
               <div key={opt} style={{ flex: 1, padding: '0.35rem 0', borderRadius: 7, fontSize: '0.72rem', fontWeight: i === 0 ? 600 : 500, textAlign: 'center', border: `1px solid ${i === 0 ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.1)'}`, background: i === 0 ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.04)', color: i === 0 ? '#fff' : 'rgba(255,255,255,0.45)' }}>{opt}</div>
             ))}
           </div>
@@ -132,6 +132,22 @@ export function WidgetPreview({ bg, accent, studioName, logoUrl, fields, consent
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0.3rem 0' }}>
             <div style={{ width: 14, height: 14, borderRadius: 3, border: '1px solid rgba(255,255,255,0.25)', background: 'rgba(255,255,255,0.05)', flexShrink: 0 }} />
             <span style={{ ...lbl, margin: 0 }}>I have allergies or sensitivities{f('allergies').required ? '' : ' (optional)'}</span>
+          </div>
+        )}
+
+        {fields?.availability_windows?.enabled && (
+          <div style={fld}>
+            <span style={lbl}>Your availability{fields.availability_windows.required ? ' *' : ' (optional)'}</span>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2 }}>
+              {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d, i) => (
+                <div key={d} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                  <span style={{ fontSize: '0.62rem', fontWeight: 600, textAlign: 'center', color: 'rgba(255,255,255,0.45)' }}>{d}</span>
+                  <div style={{ position: 'relative', height: 64, borderRadius: 3, background: 'rgba(255,255,255,0.06)' }}>
+                    {(i === 1 || i === 5) && <div style={{ position: 'absolute', left: 2, right: 2, top: i === 1 ? 10 : 6, height: i === 1 ? 30 : 20, borderRadius: 3, background: 'rgba(255,255,255,0.85)' }} />}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
@@ -161,6 +177,12 @@ export function WidgetPreview({ bg, accent, studioName, logoUrl, fields, consent
                 <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
                   <div style={{ width: 13, height: 13, borderRadius: 3, border: '1px solid rgba(255,255,255,0.2)', marginTop: 2, flexShrink: 0 }} />
                   <span style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>{f.label}</span>
+                </div>
+              );
+              if (f.type === 'photo_id') return (
+                <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <span style={{ fontSize: '0.65rem', fontWeight: 600, color: 'rgba(255,255,255,0.4)' }}>{f.label || 'Photo ID'}</span>
+                  <div style={{ padding: '0.5rem', borderRadius: 7, border: '1px dashed rgba(255,255,255,0.25)', fontSize: '0.7rem', color: 'rgba(255,255,255,0.5)', textAlign: 'center' }}>Take or choose a photo of your ID</div>
                 </div>
               );
               if (f.type === 'yesno') return (
@@ -221,6 +243,13 @@ export function ConsentFormPreview({ name, fields, requiresSig, requiresGuardian
                 {f.required && <span style={{ color: '#e86f6f', marginLeft: 3 }}>*</span>}
               </span>
             </label>
+          );
+          if (f.type === 'photo_id') return (
+            <div key={f.id} style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+              <span style={lbl}>{f.label || <em>Photo ID</em>}{f.required && ' *'}</span>
+              <span style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.35)', lineHeight: 1.5 }}>A clear photo of your driver’s licence, passport or other photo ID. Only the studio can see it.</span>
+              <div style={{ padding: '0.6rem', borderRadius: 8, border: '1px dashed rgba(255,255,255,0.25)', fontSize: '0.75rem', color: 'rgba(255,255,255,0.55)', textAlign: 'center' }}>Take or choose a photo of your ID</div>
+            </div>
           );
           if (f.type === 'yesno') return (
             <div key={f.id} style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>

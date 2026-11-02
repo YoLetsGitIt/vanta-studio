@@ -11,8 +11,10 @@ import styles from './StudioAuth.module.css';
 const marketing = (process.env.NEXT_PUBLIC_MARKETING_URL || 'https://vanta.tattoo').replace(/\/$/, '');
 
 
-export default function StudioAuth({ initialTab = 'signin' }) {
-  const [tab, setTab] = useState(initialTab);
+export default function StudioAuth({ initialTab = 'signin', mode = initialTab }) {
+  const [tab, setTab] = useState(mode);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -22,6 +24,18 @@ export default function StudioAuth({ initialTab = 'signin' }) {
 
   useEffect(() => {
     async function initialize() {
+      if (mode === 'reset') {
+        // The reset email lands here with the recovery session in the URL hash.
+        const hash = new URLSearchParams(window.location.hash.slice(1));
+        const { data: { session } } = await getSupabase().auth.getSession();
+        if (!session || hash.get('error')) {
+          setTab('forgot');
+          setError('This reset link has expired or was already used. Send yourself a new one.');
+        }
+        window.history.replaceState(null, '', window.location.pathname);
+        setChecking(false);
+        return;
+      }
       const params = new URLSearchParams(window.location.search);
       if (params.get('signup') === 'complete') {
         setTab('signin');
@@ -77,6 +91,31 @@ export default function StudioAuth({ initialTab = 'signin' }) {
     }
   }
 
+  async function handleForgot(e) {
+    e.preventDefault();
+    setError('');
+    setNotice('');
+    setLoading(true);
+    const address = email.trim();
+    const { error: resetError } = await getSupabase().auth.resetPasswordForEmail(address, { redirectTo: `${window.location.origin}/reset-password` });
+    setLoading(false);
+    if (resetError) { setError(resetError.message); return; }
+    setNotice(`If ${address} has a Vanta account, a reset link is on its way. Open it on this computer or phone to choose a new password.`);
+  }
+
+  async function handleReset(e) {
+    e.preventDefault();
+    setError('');
+    if (newPassword.length < 8) { setError('Password must be at least 8 characters'); return; }
+    if (newPassword !== confirmPassword) { setError('Passwords do not match'); return; }
+    setLoading(true);
+    const { error: updateError } = await getSupabase().auth.updateUser({ password: newPassword });
+    if (updateError) { setError(updateError.message); setLoading(false); return; }
+    window.location.replace('/dashboard/home');
+  }
+
+  function showSignIn() { setTab('signin'); setError(''); setNotice(''); }
+
   if (checking) return <StatePanel title="Loading your studio…" busy />;
 
   return (
@@ -100,7 +139,43 @@ export default function StudioAuth({ initialTab = 'signin' }) {
       </header>
       <main className={styles.main}>
       <section className={styles.card} aria-label={tab === 'signup' ? 'Create your Vanta account' : 'Sign in to Vanta'}>
-        {tab === 'signin' ? (
+        {tab === 'forgot' ? (
+          <>
+            <h1 style={s.authHeading}>Reset your password</h1>
+            <p style={s.authSubheading}>Enter your studio email and we'll send you a link to choose a new password.</p>
+            {notice && <p role="status" style={s.noticeBox}>{notice}</p>}
+            <form onSubmit={handleForgot} style={s.form}>
+              <Field label="Email" id="forgot-email" required>
+                <InputWithIcon id="forgot-email" icon={<MailIcon size={15} />} type="email" value={email} onChange={e => setEmail(e.target.value)} required autoComplete="email" placeholder="you@studio.com" />
+              </Field>
+              {error && <p role="alert" style={s.errorBox}>{error}</p>}
+              <Button type="submit" loading={loading} loadingLabel="Sending…" fullWidth>
+                Send reset link
+              </Button>
+            </form>
+            <p style={s.switchLine}>
+              <button type="button" onClick={showSignIn} className="vanta-link" style={s.switchLink}>Back to sign in</button>
+            </p>
+          </>
+        ) : tab === 'reset' ? (
+          <>
+            <h1 style={s.authHeading}>Choose a new password</h1>
+            <p style={s.authSubheading}>You'll use it to sign in to Vanta Studio and the Vanta app.</p>
+            <form onSubmit={handleReset} style={s.form}>
+              <Field label="New password" id="reset-password" required>
+                <InputWithIcon id="reset-password" icon={<LockIcon size={15} />} type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} required autoComplete="new-password" placeholder="Minimum 8 characters" />
+              </Field>
+              <Field label="Confirm password" id="reset-confirm" required>
+                <InputWithIcon id="reset-confirm" icon={<LockIcon size={15} />} type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} required autoComplete="new-password" placeholder="Re-enter password" />
+              </Field>
+              {error && <p role="alert" style={s.errorBox}>{error}</p>}
+              <Button type="submit" loading={loading} loadingLabel="Saving…" fullWidth>
+                Save and sign in
+              </Button>
+            </form>
+          </>
+        ) : tab === 'signin' ? (
+
           <>
             <h1 style={s.authHeading}>Welcome back</h1>
             <p style={s.authSubheading}>Sign in to manage your studio.</p>
@@ -130,6 +205,9 @@ export default function StudioAuth({ initialTab = 'signin' }) {
                   placeholder="••••••••"
                 />
               </Field>
+              <button type="button" onClick={() => { setTab('forgot'); setError(''); setNotice(''); }} className="vanta-link" style={s.forgotLink}>
+                Forgot password?
+              </button>
               {error && <p role="alert" style={s.errorBox}>{error}</p>}
               <Button type="submit" loading={loading} loadingLabel="Signing in…" fullWidth>
                 Sign in
@@ -200,6 +278,18 @@ const s = {
     color: 'var(--text-secondary)',
     display: 'flex',
     pointerEvents: 'none',
+  },
+  forgotLink: {
+    alignSelf: 'flex-end',
+    marginTop: '-0.5rem',
+    background: 'none',
+    border: 'none',
+    color: 'var(--text-muted)',
+    fontSize: '0.8rem',
+    cursor: 'pointer',
+    padding: '0.25rem 0',
+    textDecoration: 'underline',
+    textUnderlineOffset: 3,
   },
   switchLine: {
     fontSize: '0.85rem',

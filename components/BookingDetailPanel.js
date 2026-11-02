@@ -1,6 +1,7 @@
 'use client';
 
 import CancelDepositButton from '@/components/CancelDepositButton';
+import MarkDepositReceivedButton from '@/components/MarkDepositReceivedButton';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { getStations, getClientConsents, getNotes, addNote, deleteNote, getBookingConsentSubmissions, getStudioClients, generateConsentLink, getStudioBookingPayment, listConsentTemplates, downloadConsentPdf } from '@/lib/api';
@@ -15,6 +16,7 @@ import Button, { IconButton } from '@/components/ui/Button';
 import BookingSMS from '@/components/BookingSMS';
 import MarketingConsent from '@/components/MarketingConsent';
 import { Pill, Section, Fact, SkeletonBar, DetailSkeleton, detailStyles } from '@/components/ui/DetailParts';
+import { describeAvailability } from '@/lib/availability';
 
 const PAYMENT_LABELS = { cash: 'Cash', card: 'Card / POS', bank_transfer: 'Bank Transfer' };
 
@@ -96,6 +98,9 @@ export default function BookingDetailPanel({
   // ── Normalise fields from booking (priority) with entry as fallback ────────
   const [cancelledDepositId, setCancelledDepositId] = useState(null);
   const depositCancelled = cancelledDepositId === (booking?.id ?? entry?.bookingId);
+  // Set after "Mark deposit received" so the panel updates before the next refresh.
+  const [receivedDeposit, setReceivedDeposit] = useState(null);
+  const depositReceived = receivedDeposit?.id === (booking?.id ?? entry?.bookingId) ? receivedDeposit : null;
   const b           = booking ?? entry ?? {};
   const bookingId   = booking?.id     ?? entry?.bookingId;
   const clientName  = booking?.requester_name    ?? entry?.clientName    ?? '—';
@@ -113,17 +118,18 @@ export default function BookingDetailPanel({
   const color       = booking?.color             ?? null;
   const design      = booking?.design_details    ?? entry?.designDetails  ?? null;
   const notes       = booking?.additional_notes  ?? entry?.notes          ?? null;
+  const availability = describeAvailability(booking?.availability_windows);
   const refImages   = booking?.reference_images  ?? [];
   const quote       = booking?.estimated_quote   ?? entry?.estimatedQuote ?? null;
   const duration    = booking?.proposed_duration_minutes ?? entry?.durationMins ?? null;
   const chosenTime  = booking?.chosen_time       ?? entry?.chosenTime     ?? null;
   const proposedTime = booking?.proposed_time_primary    ?? null;
   const rawStatus   = booking?.status ?? entry?.status ?? null;
-  const status      = depositCancelled && rawStatus === 'awaiting_payment' ? 'confirmed' : rawStatus;
+  const status      = (depositCancelled && rawStatus === 'awaiting_payment') || (depositReceived?.status === 'confirmed') ? 'confirmed' : rawStatus;
   const depositRequired   = !depositCancelled && (booking?.deposit_required ?? false);
   const depositAmount     = depositCancelled ? null : booking?.deposit_amount ?? null;
-  const depositPaidAt     = booking?.deposit_paid_at     ?? null;
-  const depositConfirmedAt = booking?.deposit_confirmed_at ?? null;
+  const depositPaidAt     = booking?.deposit_paid_at     ?? depositReceived?.at ?? null;
+  const depositConfirmedAt = booking?.deposit_confirmed_at ?? depositReceived?.at ?? null;
   const depositPaid       = !!depositPaidAt || !!(entry?.depositPaid);
   const finalPrice        = booking?.final_price         ?? null;
   const paymentMethod     = booking?.payment_method      ?? null;
@@ -429,9 +435,14 @@ export default function BookingDetailPanel({
             {sessionType && <Fact label={t('bdp_session')}>{cap(sessionType.replace(/_/g, ' '))}</Fact>}
             {placement   && <Fact label={t('bdp_placement')}>{placement}</Fact>}
             {size        && <Fact label={t('bdp_size')}>{size}</Fact>}
-            {color       && <Fact label={t('bdp_style')}>{color}</Fact>}
+            {color       && <Fact label={t('bdp_style')}>{color.replace(/^Color\b/, 'Colour')}</Fact>}
             {design      && <Fact label={t('bdp_design')} block>{design}</Fact>}
             {notes       && <Fact label={t('bdp_notes')} block>{notes}</Fact>}
+            {availability.length > 0 && (
+              <Fact label="Weekly availability" block>
+                {availability.map(a => <span key={a.day} style={{ display: 'block' }}><span style={{ fontWeight: 600 }}>{a.day}</span> · {a.times}</span>)}
+              </Fact>
+            )}
             {refImages.length > 0 && (
               <div>
                 <span style={p.factLabel}>{t('bdp_ref_photos')}</span>
@@ -475,8 +486,14 @@ export default function BookingDetailPanel({
                     </div>
                   );
                 })()}
-                {depositRequired && !depositPaid && !depositConfirmedAt && chosenTime && ['confirmed', 'awaiting_payment', 'requires_confirmation'].includes(status) && (
-                  <CancelDepositButton bookingId={bookingId} onCancelled={() => setCancelledDepositId(bookingId)} disabled={actionLoading} />
+                {depositRequired && !depositPaid && !depositConfirmedAt && ['confirmed', 'awaiting_payment', 'requires_confirmation', 'deposit_expired'].includes(status) && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                    <MarkDepositReceivedButton bookingId={bookingId} disabled={actionLoading}
+                      onReceived={result => setReceivedDeposit({ id: bookingId, at: new Date().toISOString(), status: result?.status })} />
+                    {chosenTime && status !== 'deposit_expired' && (
+                      <CancelDepositButton bookingId={bookingId} onCancelled={() => setCancelledDepositId(bookingId)} disabled={actionLoading} />
+                    )}
+                  </div>
                 )}
                 {depositPaidAt && (
                   <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
@@ -634,9 +651,20 @@ export default function BookingDetailPanel({
                     {sub.answers && Object.entries(sub.answers).length > 0 && (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                         {Object.entries(sub.answers).map(([k, v]) => v && v !== true && v !== 'true' && k !== '__agreed__' && (
+                          sub.photo_id_urls?.[k] ? (
+                            <div key={k}>
+                              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '0 0 0.3rem' }}>Photo ID</p>
+                              <a href={sub.photo_id_urls[k]} target="_blank" rel="noopener noreferrer" title="Open full size">
+                                <img src={sub.photo_id_urls[k]} alt="Client photo ID" style={{ maxWidth: '100%', maxHeight: 220, borderRadius: 8, border: '1px solid var(--border)', display: 'block' }} />
+                              </a>
+                            </div>
+                          ) : String(v).startsWith('ids/') ? (
+                            <div key={k} style={{ fontSize: '0.875rem', color: 'var(--text-dim)' }}>Photo ID provided</div>
+                          ) : (
                           <div key={k} style={{ fontSize: '0.875rem', color: 'var(--text-dim)', lineHeight: 1.5 }}>
                             <span style={{ color: 'var(--text-muted)' }}>{k}: </span>{v}
                           </div>
+                          )
                         ))}
                       </div>
                     )}
