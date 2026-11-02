@@ -1,13 +1,14 @@
 import './globals.css';
 import './mobile.css';
 import { getThemeInitScript } from '@/lib/theme';
-import { Space_Grotesk } from 'next/font/google';
+import localFont from 'next/font/local';
 import ContactEmailSignupGate from '../components/ContactEmailSignupGate';
 
-const spaceGrotesk = Space_Grotesk({
-  subsets: ['latin'],
+const spaceGrotesk = localFont({
+  src: './fonts/space-grotesk-latin.woff2',
   variable: '--font-body',
-  weight: ['400', '500', '600', '700'],
+  weight: '300 700',
+  display: 'swap',
 });
 
 export const viewport = { width: 'device-width', initialScale: 1, viewportFit: 'cover', interactiveWidget: 'resizes-content' };
