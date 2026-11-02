@@ -59,6 +59,9 @@ function needsDepositPayment(booking) {
   return hasScheduledDate && depositRequired && !depositPaid && !inactive;
 }
 
+// Today's money cards on Home are hidden for now.
+const SHOW_DAILY_MONEY = false;
+
 export default function HomePage() {
   const [artists, setArtists] = useState([]);
   const [todayEntries, setTodayEntries] = useState([]);
@@ -544,8 +547,9 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* ── DAILY MONEY ───────────────────────────────────────── */}
-        {!loading && !loadError && !isEmptyDashboard && (
+        {/* ── DAILY MONEY ─────────────────────────────────────────
+            Hidden for now (2026-11-03). Set SHOW_DAILY_MONEY to bring it back. */}
+        {SHOW_DAILY_MONEY && !loading && !loadError && !isEmptyDashboard && (
           <div style={s.section}>
             <div style={s.sectionHeadingRow}>
               <span style={s.sectionLabel}>Today’s money</span>

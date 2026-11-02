@@ -97,8 +97,7 @@ async function contained(page, label) {
           await page.getByRole('button', { name: /Pending bookings/ }).click();
           const header = await page.locator('.studio-home-header').boundingBox();
           assert.ok(header.height <= 56, `Dashboard header too tall: ${header.height}`);
-          const moneyColumns = await page.locator('.studio-home-four-col').evaluate(el => getComputedStyle(el).gridTemplateColumns.split(' ').length);
-          assert.equal(moneyColumns, width >= 600 ? 4 : 2, `Money cards at ${width}px`);
+          assert.equal(await page.locator('.studio-home-four-col').count(), 0, `Today's money is hidden at ${width}px`);
           await page.getByRole('button', { name: 'Open studio navigation' }).click();
           await page.getByRole('dialog', { name: 'More', exact: true }).waitFor();
           await page.keyboard.press('Escape');

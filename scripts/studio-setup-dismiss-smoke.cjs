@@ -41,6 +41,28 @@ const shots = process.env.STUDIO_QA_OUTPUT;
       assert.deepEqual(errors, []);
       console.log(`PASS dismiss and reopen setup checklist at ${width}px`);
       await context.close();
+
+      // When every step is done, the checklist offers one clear "Remove checklist" button.
+      const doneState = { steps: { profile: 'complete', hours: 'complete', artists: 'complete', bookings: 'complete', payments: 'complete', import: 'complete' }, collapsed: false, dismissed: false };
+      const doneContext = await browser.newContext({ viewport: { width, height: 1000 } });
+      await setup(doneContext);
+      await doneContext.route('**/studio/me/onboarding', route => {
+        if (route.request().method() === 'PATCH') Object.assign(doneState, route.request().postDataJSON());
+        return route.fulfill({ json: doneState });
+      });
+      const donePage = await doneContext.newPage();
+      await donePage.goto(`${base}/dashboard/home`, { waitUntil: 'networkidle' });
+      const doneList = donePage.locator('#studio-setup');
+      await doneList.getByText('Your studio is set up.').waitFor();
+      const remove = doneList.getByRole('button', { name: 'Dismiss setup checklist' });
+      assert.equal(await remove.count(), 1, 'Only one dismiss button when complete');
+      assert.equal((await remove.innerText()).trim(), 'Remove checklist');
+      if (shots) await donePage.screenshot({ path: `${shots}/setup-done-${width}.png` });
+      await remove.click();
+      await doneList.waitFor({ state: 'detached' });
+      assert.equal(doneState.dismissed, true);
+      console.log(`PASS complete checklist offers Remove checklist at ${width}px`);
+      await doneContext.close();
     }
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

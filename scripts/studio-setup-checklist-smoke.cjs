@@ -62,7 +62,7 @@ const output = process.env.STUDIO_QA_OUTPUT || path.resolve(__dirname, '../../ar
       // Each action must open its actual existing screen without raw static-export data.
       for (const [name, destination] of [
         ['Review studio', '/dashboard/settings?tab=studio'], ['Set hours and stations', '/dashboard/settings?tab=studio'],
-        ['Add artists', '/dashboard/artists?onboarding=1'], ['Set up bookings', '/dashboard/settings?tab=bookings'],
+        ['Add artists', '/dashboard/artists?onboarding=1'], ['Set up bookings', '/dashboard/settings?tab=requests'],
         ['Set up payments', '/dashboard/settings?tab=payments'], ['Open importer', '/dashboard/import'],
       ]) {
         await checklist().getByRole('link', { name }).click();
@@ -111,9 +111,9 @@ const output = process.env.STUDIO_QA_OUTPUT || path.resolve(__dirname, '../../ar
       assert.equal(await completion('Import clients').getAttribute('aria-pressed'), 'true');
       await page.goto(`${base}/dashboard/settings`, { waitUntil: 'networkidle' });
       const shortcuts = page.getByRole('complementary', { name: 'Studio setup shortcuts' });
-      for (const tab of ['Studio', 'Bookings', 'Payments', 'Account']) {
-        await page.locator('.studio-settings-tabs').getByRole('button', { name: tab, exact: true }).click();
-        if (tab === 'Account') {
+      for (const tab of ['studio', 'requests', 'payments', 'account']) {
+        await page.goto(`${base}/dashboard/settings?tab=${tab}`, { waitUntil: 'networkidle' });
+        if (tab === 'account') {
           await shortcuts.waitFor();
           assert.equal(await shortcuts.getByRole('link', { name: 'Import data', exact: true }).getAttribute('href'), '/dashboard/import');
         } else {
@@ -123,7 +123,7 @@ const output = process.env.STUDIO_QA_OUTPUT || path.resolve(__dirname, '../../ar
       }
       await page.goto(`${base}/dashboard/settings?tab=account`, { waitUntil: 'networkidle' });
       await shortcuts.waitFor();
-      assert.equal(await shortcuts.getByRole('link', { name: 'Setup checklist', exact: true }).getAttribute('href'), '/dashboard/home#studio-setup');
+      assert.equal(await shortcuts.getByRole('link', { name: 'Setup checklist', exact: true }).getAttribute('href'), '/dashboard/home?setup=1#studio-setup');
       await page.screenshot({ path: path.join(output, `settings-shortcuts-${width}.png`), fullPage: true });
       await shortcuts.getByRole('link', { name: 'Setup checklist' }).click();
       await page.waitForURL(`${base}/dashboard/home#studio-setup`); await progress(5);

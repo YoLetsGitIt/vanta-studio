@@ -89,15 +89,31 @@ export default function StudioSetupChecklist() {
 
   const done = STEPS.filter(step => ['complete', 'skipped'].includes(state?.steps?.[step.id])).length;
   const expanded = state && !state.collapsed;
+  const allDone = done === STEPS.length;
+  const dismiss = (
+    <button type="button" className={allDone ? styles.dismissPrimary : styles.dismiss} aria-label="Dismiss setup checklist" title="Remove this checklist. You can bring it back from Settings → Account." disabled={saving || loading} onClick={() => update({ dismissed: true })}>
+      {allDone ? 'Remove checklist' : 'Dismiss'}
+      {!allDone && <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="m6 6 8 8m0-8-8 8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>}
+    </button>
+  );
 
   return (
-    <section id="studio-setup" className={styles.card} aria-labelledby="studio-setup-title" aria-busy={loading || saving}>
+    <section id="studio-setup" className={styles.card} data-complete={allDone || undefined} aria-labelledby="studio-setup-title" aria-busy={loading || saving}>
       <div className={styles.compactHeader}>
-        <h2 id="studio-setup-title">Studio setup</h2>
-        {state && <p className={styles.progress} role="status">{done} of {STEPS.length} done{saving ? ' · Saving…' : ''}</p>}
-        {state && <button type="button" className={styles.collapse} aria-label={expanded ? 'Hide checklist' : 'Show checklist'} aria-expanded={!!expanded} aria-controls="studio-setup-steps" disabled={saving || loading} onClick={() => update({ collapsed: !state.collapsed })}>{expanded ? 'Hide' : 'Show'}<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="m6 8 4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg></button>}
-        {state && <button type="button" className={styles.collapse} aria-label="Dismiss setup checklist" title="Remove this checklist. You can bring it back from Settings → Account." disabled={saving || loading} onClick={() => update({ dismissed: true })}>Dismiss<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="m6 6 8 8m0-8-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg></button>}
+        <div className={styles.headingGroup}>
+          <h2 id="studio-setup-title">Studio setup</h2>
+          {state && <p className={styles.progress} role="status">{done} of {STEPS.length} done{saving ? ' · Saving…' : ''}</p>}
+        </div>
+        {state && (
+          <div className={styles.headerActions}>
+            <button type="button" className={styles.collapse} aria-label={expanded ? 'Hide checklist' : 'Show checklist'} aria-expanded={!!expanded} aria-controls="studio-setup-steps" disabled={saving || loading} onClick={() => update({ collapsed: !state.collapsed })}>{expanded ? 'Hide' : 'Show'}<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="m6 8 4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg></button>
+            {(!allDone || !expanded) && dismiss}
+          </div>
+        )}
       </div>
+      {state && (
+        <div className={styles.meter} aria-hidden="true"><span style={{ width: `${(done / STEPS.length) * 100}%` }} /></div>
+      )}
       {loading && <p className={styles.message} role="status">Loading setup progress…</p>}
       {error && <p className={styles.error} role="alert">{error} {!state && <button type="button" disabled={loading} onClick={load}>Try again</button>}</p>}
       {state && (
@@ -127,12 +143,19 @@ export default function StudioSetupChecklist() {
                   <a className={styles.stepLink} href={step.href} aria-label={`${step.title}: ${step.action}`}>
                     <h3 className={styles.linkedTitle}>{step.title}</h3>
                     {status === 'skipped' ? <span className={styles.optional}>Skipped</span> : step.optional && <span className={styles.optional}>Optional</span>}
+                    <span className={styles.stepAction} aria-hidden="true">{status === 'complete' ? 'Review' : step.action}</span>
                     <ArrowIcon />
                   </a>
                 </li>
               );
             })}
           </ul>
+          {allDone && (
+            <div className={styles.doneBar}>
+              <p><strong>Your studio is set up.</strong> Remove this checklist from Home. You can bring it back from Settings → Account.</p>
+              {dismiss}
+            </div>
+          )}
         </div>
       )}
     </section>

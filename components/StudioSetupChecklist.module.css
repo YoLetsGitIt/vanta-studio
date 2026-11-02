@@ -2,21 +2,43 @@
 :global(html:root) .card, :global(html:root) .shortcuts { min-width: 0; border: 1px solid var(--border); background: var(--bg-card); border-radius: 16px; padding: 1.5rem; color: var(--text); }
 :global(html:root) .card { container: studio-setup / inline-size; scroll-margin-top: 1rem; }
 :global(html:root) .compactHeader { display: flex; align-items: center; gap: .75rem; }
+:global(html:root) .headingGroup { flex: 1; min-width: 0; display: flex; align-items: baseline; flex-wrap: wrap; gap: .15rem .75rem; }
 :global(html:root) .compactHeader h2 { margin: 0; font-size: 1rem; font-weight: 600; letter-spacing: -.02em; line-height: 1.4; }
-:global(html:root) .progress { margin: 0 0 0 auto; color: var(--text-dim); font-size: .78rem; line-height: 1.4; }
-:global(html:root) .collapse { display: inline-flex; align-items: center; justify-content: center; gap: .25rem; min-height: 44px; padding: .35rem .4rem; border: 0; border-radius: 6px; background: transparent; color: var(--text-dim); font: inherit; font-size: .78rem; cursor: pointer; }
-:global(html:root) .collapse:hover { background: var(--accent-tint); color: var(--text); }
-:global(html:root) .collapse svg { width: 14px; height: 14px; flex-shrink: 0; }
+:global(html:root) .progress { margin: 0; color: var(--text-dim); font-size: .8rem; line-height: 1.4; font-variant-numeric: tabular-nums; }
+:global(html:root) .headerActions { flex-shrink: 0; display: flex; align-items: center; gap: .5rem; }
+:global(html:root) .collapse, :global(html:root) .dismiss, :global(html:root) .dismissPrimary { display: inline-flex; align-items: center; justify-content: center; gap: .35rem; min-height: 36px; padding: 0 .75rem; border-radius: 8px; font: inherit; font-size: .8rem; font-weight: 500; line-height: 1; white-space: nowrap; cursor: pointer; transition: background 150ms, border-color 150ms, color 150ms; }
+:global(html:root) .collapse { border: 0; background: transparent; color: var(--text-dim); }
+:global(html:root) .dismiss { border: 1px solid var(--border); background: color-mix(in srgb, var(--text) 4%, transparent); color: var(--text); }
+:global(html:root) .dismissPrimary { border: 1px solid var(--text); background: var(--text); color: var(--bg-base); font-weight: 600; }
+@media (hover: hover) and (pointer: fine) {
+  :global(html:root) .collapse:hover { background: var(--accent-tint); color: var(--text); }
+  :global(html:root) .dismiss:hover { border-color: color-mix(in srgb, var(--text) 35%, transparent); background: color-mix(in srgb, var(--text) 9%, transparent); }
+  :global(html:root) .dismissPrimary:hover { background: color-mix(in srgb, var(--text) 85%, transparent); }
+}
+:global(html:root) :is(.collapse, .dismiss, .dismissPrimary):active { transform: scale(.97); }
+:global(html:root) :is(.collapse, .dismiss) svg { width: 14px; height: 14px; flex-shrink: 0; }
+:global(html:root) .meter { height: 3px; margin: 1rem 0 .25rem; border-radius: 3px; background: var(--border-faint); overflow: hidden; }
+:global(html:root) .meter span { display: block; height: 100%; border-radius: inherit; background: var(--text); transition: width 300ms ease-out; }
+:global(html:root) .stepAction { flex-shrink: 0; margin-left: auto; color: var(--text-dim); font-size: .8rem; line-height: 1.4; opacity: 0; transition: opacity 150ms; }
+:global(html:root) .stepLink:focus-visible .stepAction { opacity: 1; }
+:global(html:root) .stepAction + svg { margin-left: 0 !important; }
+:global(html:root) .doneBar { display: flex; align-items: center; gap: 1rem; margin-top: .75rem; padding: .85rem 1rem; border: 1px solid var(--border); border-radius: 10px; background: color-mix(in srgb, var(--text) 4%, transparent); }
+:global(html:root) .doneBar p { flex: 1; min-width: 0; margin: 0; color: var(--text-dim); font-size: .85rem; line-height: 1.5; }
+:global(html:root) .doneBar strong { color: var(--text); font-weight: 600; }
+:global(html:root) .doneBar .dismissPrimary { flex-shrink: 0; min-height: 40px; padding: 0 1rem; }
 :global(html:root) .collapse[aria-expanded="true"] svg { transform: rotate(180deg); }
-:global(html:root) .compactSteps { list-style: none; padding: 0; margin: .5rem 0 0; border-top: 1px solid var(--border-faint); }
+:global(html:root) .compactSteps { list-style: none; padding: 0; margin: .25rem 0 0; }
 :global(html:root) .compactStep { min-width: 0; display: flex; align-items: center; gap: .25rem; border-bottom: 1px solid var(--border-faint); }
 :global(html:root) .compactStep:last-child { border-bottom: 0; }
 :global(html:root) .stepLink { flex: 1; min-width: 0; display: flex; align-items: center; gap: .65rem; min-height: 48px; padding: .4rem 0; color: var(--text); text-decoration: none; border-radius: 5px; }
 :global(html:root) .stepLink > svg { flex-shrink: 0; width: 15px; height: 15px; color: var(--text-dim); margin-left: auto; transition: transform 150ms; }
-:global(html:root) .stepLink:hover > svg { transform: translateX(3px); color: var(--text); }
-:global(html:root) .stepLink:hover .linkedTitle { text-decoration: underline; text-underline-offset: 4px; }
+@media (hover: hover) and (pointer: fine) {
+  :global(html:root) .stepLink:hover > svg { transform: translateX(3px); color: var(--text); }
+  :global(html:root) .stepLink:hover .linkedTitle { text-decoration: underline; text-underline-offset: 4px; }
+  :global(html:root) .stepLink:hover .stepAction { opacity: 1; }
+}
 :global(html:root) .linkedTitle { min-width: 0; margin: 0; font-size: .875rem; font-weight: 500; line-height: 1.4; }
-:global(html:root) .optional { flex-shrink: 0; color: var(--text-dim); font-size: .7rem; line-height: 1.4; }
+:global(html:root) .optional { flex-shrink: 0; padding: .15rem .45rem; border: 1px solid var(--border-faint); border-radius: 999px; color: var(--text-dim); font-size: .72rem; line-height: 1.3; }
 :global(html:root) .compactStep[data-status="complete"] .linkedTitle { color: var(--text-muted); }
 :global(html:root) .completionButton { flex: 0 0 44px; display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; min-width: 44px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--text); cursor: pointer; }
 :global(html:root) .completionMark { box-sizing: border-box; display: grid; place-items: center; width: 20px; height: 20px; border: 1px solid var(--text-ghost); border-radius: 5px; transition: background 150ms, border-color 150ms, color 150ms; }
@@ -55,14 +77,18 @@
 @container studio-setup (max-width: 360px) {
   :global(html:root) .compactHeader { flex-wrap: wrap; gap: 0 .5rem; }
   :global(html:root) .compactHeader h2 { flex: 1; }
-  :global(html:root) .progress { order: 3; flex-basis: 100%; margin: 0 0 .35rem; }
   :global(html:root) .stepLink { gap: .4rem; }
 }
 @media (max-width: 700px) {
   :global(html:root) .card, :global(html:root) .shortcuts { padding: 1rem; border-radius: 12px; }
   :global(html:root) .compactHeader { gap: .85rem; }
   :global(html:root) .compactHeader h2 { font-size: 1rem; }
+  :global(html:root) .headingGroup { flex-direction: column; align-items: flex-start; }
+  :global(html:root) .stepAction { display: none; }
+  :global(html:root) .stepAction + svg { margin-left: auto !important; }
+  :global(html:root) .doneBar { flex-direction: column; align-items: stretch; gap: .75rem; }
+  :global(html:root) .doneBar .dismissPrimary { min-height: 44px; }
 
 }
 @media (prefers-reduced-motion: reduce) { :global(html:root) .card *, :global(html:root) .shortcuts * { transition: none !important; animation: none !important; } }
-@media (any-pointer: coarse) { :global(html:root) .card a, :global(html:root) .completionButton { min-height: 44px; } }
+@media (any-pointer: coarse) { :global(html:root) .card a, :global(html:root) .completionButton, :global(html:root) .card :is(.collapse, .dismiss, .dismissPrimary) { min-height: 44px; } }
