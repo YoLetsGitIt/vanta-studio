@@ -16,7 +16,11 @@ export const viewport = { width: 'device-width', initialScale: 1, viewportFit: '
 export const metadata = {
   title: 'Vanta Studio',
   description: 'Studio management platform for Vanta artists.',
-  icons: { icon: '/favicon.ico' },
+  icons: { icon: '/favicon.ico', apple: '/app/apple-touch-icon.png' },
+  // Installable from the browser (Add to Home Screen). On iPhone this is required
+  // for new-booking notifications.
+  manifest: '/manifest.webmanifest',
+  appleWebApp: { capable: true, title: 'Vanta Studio', statusBarStyle: 'black' },
 };
 
 export default function RootLayout({ children }) {

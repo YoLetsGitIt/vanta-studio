@@ -12,6 +12,7 @@ import { useLanguage, LanguageProvider } from '@/lib/i18n';
 import NewAppointmentPanel from '@/components/NewAppointmentPanel';
 import FeedbackHost from '@/components/FeedbackHost';
 import Dialog from '@/components/ui/Dialog';
+import { registerServiceWorker } from '@/lib/push';
 
 const NAV = [
   { href: '/dashboard/home',         tKey: 'nav_dashboard', icon: HomeIcon },
@@ -145,6 +146,8 @@ function DashboardShell({ children }) {
   }, []);
 
   useEffect(() => { setMoreOpen(false); }, [pathname]);
+  // Lets the studio be added to the Home Screen and receive booking notifications.
+  useEffect(() => { registerServiceWorker(); }, []);
   useEffect(() => {
     const media = window.matchMedia(MOBILE_MEDIA);
     const closeOnDesktop = () => { if (!media.matches) setMoreOpen(false); };
