@@ -630,6 +630,9 @@ export default function HomePage() {
           onComplete={reviewBooking.status === 'confirmed' ? () => setCompleteBooking(reviewBooking) : undefined}
           onSendLink={reviewBooking.status === 'pending' || reviewBooking.status === 'awaiting_payment' ? openSendLink : undefined}
           onReject={reviewBooking.status === 'pending' || reviewBooking.status === 'awaiting_payment' ? () => setRejectBooking(reviewBooking) : undefined}
+          bookTimeArtists={artists}
+          depositsReady={stripeConnected}
+          onBooked={async id => { await handleSelectionLinkSent(id); setReviewBooking(null); }}
           actionLoading={attentionAction === reviewBooking.id}
         />
       )}

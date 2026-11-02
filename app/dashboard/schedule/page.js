@@ -253,7 +253,7 @@ function useBookingActions(afterChange) {
     cancelTarget, sendLinkTarget, sendLinkHours, sendLinkDuration, sendLinkDeposit, sendLinkAmount, sendLinkQuote, sendLinkArtistId, sendLinkSaving,
     reassignTarget, reassignArtistId, reassignResend, reassignSaving, studioArtists, stripeConnected,
     rescheduleTarget, rescheduleDate, rescheduleStart, rescheduleEnd, rescheduleMsg, rescheduleSaving,
-    openDetail, closeDetail, handleAction,
+    openDetail, closeDetail, handleAction, afterChange,
     confirmComplete, confirmNoShow, confirmReject, confirmCancel, confirmSendLink, confirmReassign,
     openReschedule, confirmReschedule,
     setRescheduleStart, setRescheduleEnd, setRescheduleMsg, setRescheduleTarget,
@@ -283,6 +283,9 @@ function BookingOverlays({ actions: a }) {
           onConfirm={() => a.handleAction('confirm')}
           onReassign={() => a.handleAction('reassign')}
           onReschedule={a.openReschedule}
+          bookTimeArtists={a.studioArtists}
+          depositsReady={a.stripeConnected}
+          onBooked={() => { a.closeDetail(); a.afterChange(); }}
         />
       )}
       {a.completeTarget && (

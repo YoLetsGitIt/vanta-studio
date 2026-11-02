@@ -525,6 +525,9 @@ function AppointmentsInner() {
           onConfirm={selectedBooking ? () => handleConfirm(selectedBooking.id) : undefined}
           onReassign={selectedBooking ? () => openReassign(selectedBooking.id) : undefined}
           onReschedule={selectedBooking ? () => openReschedule(selectedBooking) : undefined}
+          bookTimeArtists={studioArtists}
+          depositsReady={stripeConnected}
+          onBooked={async () => { setSelected(null); await load(true); }}
           actionLoading={actionLoading}
         />
       )}

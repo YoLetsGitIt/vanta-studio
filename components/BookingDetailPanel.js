@@ -2,6 +2,7 @@
 
 import CancelDepositButton from '@/components/CancelDepositButton';
 import MarkDepositReceivedButton from '@/components/MarkDepositReceivedButton';
+import BookTimeModal from '@/components/BookTimeModal';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { getStations, getClientConsents, getNotes, addNote, deleteNote, getBookingConsentSubmissions, getStudioClients, generateConsentLink, getStudioBookingPayment, listConsentTemplates, downloadConsentPdf } from '@/lib/api';
@@ -61,6 +62,9 @@ export default function BookingDetailPanel({
   onConfirm,    // optional fn() — for requires_confirmation bookings
   onReassign,   // optional fn() — for requires_confirmation bookings
   onReschedule, // optional fn() — edit booking time
+  bookTimeArtists, // optional: studio artists — shows "Book a time" on requests
+  depositsReady = false, // the studio can collect deposits (Stripe, PayID or bank)
+  onBooked,     // optional fn(bookingId) — after "Book a time"
 }) {
   const router = useRouter();
   const { t } = useLanguage();
@@ -68,6 +72,7 @@ export default function BookingDetailPanel({
   // ── Station picker state ───────────────────────────────────────────────────
   const [stationStep,  setStationStep]  = useState(false);
   const [stationError, setStationError] = useState('');
+  const [bookTimeOpen, setBookTimeOpen] = useState(false);
 
   // ── Payment recording status ───────────────────────────────────────────────
   const [paymentSplits, setPaymentSplits] = useState(null); // null = not loaded
@@ -159,6 +164,8 @@ export default function BookingDetailPanel({
   const canAcceptReject   = canAccept || canReject; // kept for layout gate
   const canConfirm        = status === 'requires_confirmation';
   const canReschedule     = status === 'confirmed' && chosenDate && chosenDate > today;
+  // The studio can book any open request straight into a time, without the artist.
+  const canBookTime       = Boolean(bookTimeArtists) && ['pending', 'awaiting_payment', 'requires_confirmation'].includes(status) && !booking?.deposit_paid_at && !booking?.deposit_confirmed_at;
 
   const displayStatus = isNoShow ? 'no_show' : status;
   const sc = statusColors(displayStatus);
@@ -752,8 +759,15 @@ export default function BookingDetailPanel({
       </div>
 
       {/* ── Actions ── */}
-      {!stationStep && (canAcceptReject || canComplete || isFutureConfirmed || canSendLink || canConfirm || canReschedule) && (
+      {bookTimeOpen && booking && (
+        <BookTimeModal booking={booking} artists={bookTimeArtists} depositsReady={depositsReady} onClose={() => setBookTimeOpen(false)}
+          onBooked={async id => { showFeedback('Booked in', 'success'); await onBooked?.(id); }} />
+      )}
+      {!stationStep && (canAcceptReject || canComplete || isFutureConfirmed || canSendLink || canConfirm || canReschedule || canBookTime) && (
         <div style={p.actions}>
+          {canBookTime && (
+            <Btn onClick={() => setBookTimeOpen(true)} disabled={actionLoading} variant={canSendLink ? 'neutral' : 'primary'}>Book a time</Btn>
+          )}
           {canSendLink && onSendLink && (
             <Btn onClick={onSendLink} disabled={actionLoading} variant="primary">
               {status === 'awaiting_payment' ? t('bdp_resend_link') : t('bdp_send_link')}
