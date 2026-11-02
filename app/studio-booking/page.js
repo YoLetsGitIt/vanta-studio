@@ -10,6 +10,8 @@ import DateOfBirthInput from '@/components/ui/DateOfBirthInput';
 import { ensureClientProfile, subscribeClientSession } from '@/lib/client-account';
 import { getSupabase } from '@/lib/supabase';
 import WeeklyAvailabilityGrid from '@/components/WeeklyAvailabilityGrid';
+import PhotoIdField from '@/components/PhotoIdField';
+import { uploadPhotoIdAnswers, signStudioPhotoId } from '@/lib/photoId';
 import { getStudioPublic, createWalkIn, createGuestStudioBooking, walkinUploadSign, signatureUploadSign, getStudioConsentTemplates, getFormConfigPublic } from '@/lib/api';
 
 function detectCountry() {
@@ -294,7 +296,7 @@ function WalkInInner() {
       if (!required) continue;
       const ts = templateState[t.id] ?? {};
       for (const f of (t.fields ?? [])) {
-        if (f.required && ['text', 'textarea', 'yesno'].includes(f.type)) {
+        if (f.required && ['text', 'textarea', 'yesno', 'photo_id'].includes(f.type)) {
           if (!ts.answers?.[f.id]) {
             setSubmitError(`Please complete all required fields in "${t.name}".`);
             return;
@@ -362,7 +364,7 @@ function WalkInInner() {
 
         consentSubmissions.push({
           template_id:            t.id,
-          answers:                ts.answers ?? {},
+          answers:                await uploadPhotoIdAnswers(ts.answers ?? {}, file => signStudioPhotoId(process.env.NEXT_PUBLIC_BACKEND_URL, studioId, file)),
           is_minor:               isMinor,
           signer_name:            fullName.trim(),
           client_signature_path:  clientSigPath,
@@ -799,6 +801,8 @@ function ConsentFormField({ field, value, onChange }) {
           </span>
         </label>
       );
+    case 'photo_id':
+      return <PhotoIdField label={field.label} required={field.required} value={value} onChange={onChange} labelStyle={labelStyle} />;
     case 'yesno':
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>

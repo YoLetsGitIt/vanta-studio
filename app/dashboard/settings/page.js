@@ -514,7 +514,8 @@ export default function SettingsPage() {
   }
 
   function addField(type) {
-    setTemplateFields(prev => [...prev, { id: `f_${Date.now()}`, type, label: '', required: false }]);
+    // A photo ID field starts labelled and required; studios can change both.
+    setTemplateFields(prev => [...prev, { id: `f_${Date.now()}`, type, label: type === 'photo_id' ? 'Photo ID' : '', required: type === 'photo_id' }]);
   }
 
   function updateField(id, changes) {
@@ -1215,7 +1216,7 @@ export default function SettingsPage() {
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
                       <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Fields ({templateFields.length})</span>
                       <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-                        {[['heading','Heading'],['paragraph','Paragraph'],['checkbox','Checkbox'],['text','Text'],['textarea','Textarea'],['yesno','Yes/No']].map(([type, label]) => (
+                        {[['heading','Heading'],['paragraph','Paragraph'],['checkbox','Checkbox'],['text','Text'],['textarea','Textarea'],['yesno','Yes/No'],['photo_id','Photo ID']].map(([type, label]) => (
                           <button key={type} style={s.addFieldBtn} onClick={() => addField(type)}>+ {label}</button>
                         ))}
                       </div>
@@ -1228,7 +1229,7 @@ export default function SettingsPage() {
                     {templateFields.map((f, idx) => (
                       <div key={f.id} style={s.fieldEditorRow}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.4rem' }}>
-                          <span style={s.fieldTypeBadge}>{f.type}</span>
+                          <span style={s.fieldTypeBadge}>{f.type === 'photo_id' ? 'photo ID' : f.type}</span>
                           <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.25rem' }}>
                             <button aria-label={`Move field ${idx + 1} up`} style={s.fieldMoveBtn} onClick={() => moveField(f.id, -1)} disabled={idx === 0}>↑</button>
                             <button aria-label={`Move field ${idx + 1} down`} style={s.fieldMoveBtn} onClick={() => moveField(f.id, 1)} disabled={idx === templateFields.length - 1}>↓</button>

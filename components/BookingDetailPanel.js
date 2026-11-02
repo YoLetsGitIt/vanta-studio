@@ -651,9 +651,20 @@ export default function BookingDetailPanel({
                     {sub.answers && Object.entries(sub.answers).length > 0 && (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                         {Object.entries(sub.answers).map(([k, v]) => v && v !== true && v !== 'true' && k !== '__agreed__' && (
+                          sub.photo_id_urls?.[k] ? (
+                            <div key={k}>
+                              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '0 0 0.3rem' }}>Photo ID</p>
+                              <a href={sub.photo_id_urls[k]} target="_blank" rel="noopener noreferrer" title="Open full size">
+                                <img src={sub.photo_id_urls[k]} alt="Client photo ID" style={{ maxWidth: '100%', maxHeight: 220, borderRadius: 8, border: '1px solid var(--border)', display: 'block' }} />
+                              </a>
+                            </div>
+                          ) : String(v).startsWith('ids/') ? (
+                            <div key={k} style={{ fontSize: '0.875rem', color: 'var(--text-dim)' }}>Photo ID provided</div>
+                          ) : (
                           <div key={k} style={{ fontSize: '0.875rem', color: 'var(--text-dim)', lineHeight: 1.5 }}>
                             <span style={{ color: 'var(--text-muted)' }}>{k}: </span>{v}
                           </div>
+                          )
                         ))}
                       </div>
                     )}
