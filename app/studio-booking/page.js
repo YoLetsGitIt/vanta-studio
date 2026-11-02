@@ -452,7 +452,7 @@ function WalkInInner() {
             <Field label="Email">
               {guest
                 ? <input style={s.input} type="email" value={guestEmail} required autoComplete="email" inputMode="email" autoCapitalize="none" onChange={e => setGuestEmail(e.target.value)} placeholder="you@example.com" />
-                : <input style={s.input} type="email" value={session.user.email || ''} required readOnly autoComplete="email" placeholder="you@example.com" />}
+                : <><input style={s.input} type="email" value={session.user.email || ''} required readOnly autoComplete="email" placeholder="you@example.com" />{/@privaterelay\.appleid\.com$/i.test(session.user?.email || '') && <span style={{ display: 'block', marginTop: 6, color: 'var(--text-muted)', fontSize: '0.78rem', lineHeight: 1.5 }}>Your private Apple email. Messages are forwarded to your inbox.</span>}</>}
             </Field>
             <Field label="Phone" id="booking-phone" required>
               <div style={s.phoneRow}>

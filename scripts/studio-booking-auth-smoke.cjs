@@ -9,8 +9,8 @@ const user = { id: '22222222-2222-4222-8222-222222222222', email: 'client@exampl
 const session = { access_token: 'local-access-token', refresh_token: 'local-refresh-token', token_type: 'bearer', expires_in: 3600, expires_at: 4102444800, user };
 const studio = { id: 'test-studio', name: 'Test Tattoo Studio', artists: [] };
 
-async function open(browser, { width = 390, signedIn = false, confirmation = false, profileFailure = false, profileMissing = false, logoutFailure = false, metadata = user.user_metadata, profile = { name: 'Jamie Client', phone: '+61400123456' }, path = '/studio-booking', suffix = '' } = {}) {
-  const mockUser = { ...user, user_metadata: { ...metadata } };
+async function open(browser, { width = 390, signedIn = false, confirmation = false, profileFailure = false, profileMissing = false, logoutFailure = false, metadata = user.user_metadata, profile = { name: 'Jamie Client', phone: '+61400123456' }, path = '/studio-booking', suffix = '', email = user.email } = {}) {
+  const mockUser = { ...user, email, user_metadata: { ...metadata } };
   const mockSession = { ...session, user: mockUser };
   const context = await browser.newContext({ viewport: { width, height: 900 } });
   if (signedIn) await context.addInitScript(({ storageKey, session }) => {
@@ -303,6 +303,23 @@ async function signIn(page) {
       await page.getByRole('button', { name: 'Back to sign-in options' }).click();
       await page.getByRole('heading', { name: `Book with ${studio.name}` }).waitFor();
       results.push('On-page Back returns a guest to the sign-in choice');
+      await context.close();
+    }
+    {
+      const relay = 'w7bfs4pzd7@privaterelay.appleid.com';
+      const { context, page, calls } = await open(browser, { signedIn: true, email: relay });
+      await page.getByRole('button', { name: 'Request booking', exact: true }).waitFor();
+      await page.getByText('Signed in with Apple · private email').waitFor();
+      assert.equal(await page.getByText(`Signed in as ${relay}`).count(), 0, 'Relay address is not the headline');
+      await page.getByText('Your private Apple email. Messages are forwarded to your inbox.').waitFor();
+      assert.equal(await page.getByPlaceholder('you@example.com').inputValue(), relay, 'The forwarding address is still visible in the Email field');
+      await page.screenshot({ path: `${output}/apple-relay.png` });
+      await page.getByRole('button', { name: 'Forearm', exact: true }).click();
+      await page.locator('textarea').first().fill('Botanical piece');
+      await page.getByRole('button', { name: 'Request booking', exact: true }).click();
+      await page.getByRole('heading', { name: "You're on the list!" }).waitFor();
+      assert.equal(calls.bookings[0].email, relay, 'Booking still uses the forwarding address');
+      results.push('Apple private relay shown as private email');
       await context.close();
     }
     for (const path of ['/studio-booking', '/studio-booking.html']) {

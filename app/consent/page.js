@@ -264,7 +264,7 @@ function ConsentForm() {
             </div>
             <div>
               <label htmlFor="consent-email" style={{ ...s.label, marginBottom: '0.3rem' }}>Email</label>
-              <input id="consent-email" style={s.input} type="email" readOnly autoComplete="email" value={session.user?.email || ''} />
+              <input id="consent-email" style={s.input} type="email" readOnly autoComplete="email" value={session.user?.email || ''} />{/@privaterelay\.appleid\.com$/i.test(session.user?.email || '') && <span style={{ display: 'block', marginTop: 6, color: 'var(--text-muted)', fontSize: '0.78rem', lineHeight: 1.5 }}>Your private Apple email. Messages are forwarded to your inbox.</span>}
             </div>
             <div>
               <label htmlFor="consent-phone" style={{ ...s.label, marginBottom: '0.3rem' }}>Phone number <span style={{ color: '#e86f6f' }}>*</span></label>
