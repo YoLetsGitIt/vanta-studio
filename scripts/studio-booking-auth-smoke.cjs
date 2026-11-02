@@ -81,15 +81,18 @@ async function open(browser, { width = 390, signedIn = false, confirmation = fal
   return { context, page, calls, errors };
 }
 
-// Email sign-up sits behind a link so "Continue as guest" leads.
+// Email sits behind two links so "Continue as guest" leads: one tap to create an account…
 async function showEmailForm(page) {
-  const link = page.getByRole('button', { name: 'Sign up or sign in with email' });
+  const link = page.getByRole('button', { name: 'Create account', exact: true });
   if (await link.count()) await link.click();
 }
 
+// …and one tap to sign in.
 async function signIn(page) {
-  await showEmailForm(page);
-  await page.getByRole('button', { name: 'Already have an account? Sign in' }).click();
+  const direct = page.getByRole('button', { name: 'Sign in with email', exact: true });
+  if (await direct.count()) await direct.click();
+  else await page.getByRole('button', { name: 'Already have an account? Sign in' }).click();
+  await page.getByRole('button', { name: 'Sign in & continue' }).waitFor();
   await page.getByPlaceholder('Email', { exact: true }).fill(user.email);
   await page.getByPlaceholder('Password', { exact: true }).fill('example-password');
   await page.getByRole('button', { name: 'Sign in & continue' }).click();
@@ -263,6 +266,11 @@ async function signIn(page) {
     for (const width of [320, 390, 1280]) {
       const { context, page, calls, errors } = await open(browser, { width });
       await page.getByRole('button', { name: 'Continue as guest' }).click();
+      await page.getByText('Booking as a guest', { exact: true }).waitFor();
+      // Browser Back returns to the sign-in choice, and Forward resumes as a guest.
+      await page.goBack();
+      await page.getByRole('heading', { name: `Book with ${studio.name}` }).waitFor();
+      await page.goForward();
       await page.getByText('Booking as a guest', { exact: true }).waitFor();
       const email = page.getByPlaceholder('you@example.com');
       assert.equal(await email.evaluate(input => input.readOnly), false, 'Guests type their email');

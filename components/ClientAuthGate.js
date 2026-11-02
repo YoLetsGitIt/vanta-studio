@@ -77,7 +77,12 @@ export default function ClientAuthGate({ studioId, studioName, logoUrl, purpose 
       </>}
       <ConsentSocialSignIn returnPath={purpose === 'booking' ? '/studio-booking' : '/consent'} studioId={studioId} disabled={busy} onBusyChange={setBusy} dividerLabel={showEmail ? (onGuest ? 'or use email' : undefined) : null} />
       {!showEmail && (
-        <button type="button" disabled={busy} onClick={() => setShowEmail(true)} style={s.linkBtn}>Sign up or sign in with email</button>
+        // One tap each: returning clients go straight to sign-in, new ones to sign-up.
+        <div style={s.linkRow}>
+          <button type="button" disabled={busy} onClick={() => { setMode('signin'); setShowEmail(true); }} style={s.linkBtn}>Sign in with email</button>
+          <span aria-hidden="true" style={{ color: 'rgba(255,255,255,0.3)' }}>·</span>
+          <button type="button" disabled={busy} onClick={() => { setMode('signup'); setShowEmail(true); }} style={s.linkBtn}>Create account</button>
+        </div>
       )}
       {showEmail && <form onSubmit={submit} style={s.form}>
         {mode === 'signup' && (
@@ -176,6 +181,9 @@ const s = {
   linkBtn: {
     background: 'none', border: 'none', color: 'rgba(255,255,255,0.7)', cursor: 'pointer',
     fontSize: '0.82rem', fontFamily: 'inherit', textDecoration: 'underline', textUnderlineOffset: 3,
-    minHeight: 44, alignSelf: 'center',
+    minHeight: 44, padding: '0 4px',
+  },
+  linkRow: {
+    display: 'flex', justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap', gap: 8,
   },
 };

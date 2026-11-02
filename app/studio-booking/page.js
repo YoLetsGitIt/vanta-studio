@@ -102,7 +102,13 @@ function WalkInInner() {
   const [formConfig, setFormConfig] = useState(null); // null = loading
   const [session, setSession] = useState(undefined);
   // Guests book without an account; a signed-in session always takes precedence.
-  const [guestChosen, setGuestChosen] = useState(false);
+  // Guest mode lives in the URL (?guest=1) so the browser Back button returns to the sign-in choice.
+  const guestChosen = params.get('guest') === '1';
+  const setGuestChosen = on => {
+    const url = new URL(window.location.href);
+    if (on) url.searchParams.set('guest', '1'); else url.searchParams.delete('guest');
+    window.history.pushState(null, '', url);
+  };
   const guest = guestChosen && !session;
   const [guestEmail, setGuestEmail] = useState('');
   const [accountReady, setAccountReady] = useState(false);
