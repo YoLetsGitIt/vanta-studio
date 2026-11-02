@@ -266,12 +266,12 @@ async function signIn(page) {
     for (const width of [320, 390, 1280]) {
       const { context, page, calls, errors } = await open(browser, { width });
       await page.getByRole('button', { name: 'Continue as guest' }).click();
-      await page.getByText('Booking as a guest', { exact: true }).waitFor();
+      await page.getByText('booking as a guest', { exact: false }).waitFor();
       // Browser Back returns to the sign-in choice, and Forward resumes as a guest.
       await page.goBack();
       await page.getByRole('heading', { name: `Book with ${studio.name}` }).waitFor();
       await page.goForward();
-      await page.getByText('Booking as a guest', { exact: true }).waitFor();
+      await page.getByText('booking as a guest', { exact: false }).waitFor();
       const email = page.getByPlaceholder('you@example.com');
       assert.equal(await email.evaluate(input => input.readOnly), false, 'Guests type their email');
       await page.getByPlaceholder('Your name', { exact: true }).fill('Guest Client');
@@ -300,9 +300,9 @@ async function signIn(page) {
     {
       const { context, page } = await open(browser);
       await page.getByRole('button', { name: 'Continue as guest' }).click();
-      await page.getByRole('button', { name: 'Sign in instead' }).click();
+      await page.getByRole('button', { name: 'Back to sign-in options' }).click();
       await page.getByRole('heading', { name: `Book with ${studio.name}` }).waitFor();
-      results.push('Guest can switch back to sign-in');
+      results.push('On-page Back returns a guest to the sign-in choice');
       await context.close();
     }
     for (const path of ['/studio-booking', '/studio-booking.html']) {

@@ -104,10 +104,20 @@ function WalkInInner() {
   // Guests book without an account; a signed-in session always takes precedence.
   // Guest mode lives in the URL (?guest=1) so the browser Back button returns to the sign-in choice.
   const guestChosen = params.get('guest') === '1';
+  const pushedGuest = useRef(false);
   const setGuestChosen = on => {
     const url = new URL(window.location.href);
     if (on) url.searchParams.set('guest', '1'); else url.searchParams.delete('guest');
     window.history.pushState(null, '', url);
+    pushedGuest.current = on;
+  };
+  // Back to the sign-in choice: a real history step when we added one, so the
+  // browser and on-page Back buttons behave the same.
+  const leaveGuest = () => {
+    if (pushedGuest.current) { pushedGuest.current = false; window.history.back(); return; }
+    const url = new URL(window.location.href);
+    url.searchParams.delete('guest');
+    window.history.replaceState(null, '', url);
   };
   const guest = guestChosen && !session;
   const [guestEmail, setGuestEmail] = useState('');
@@ -417,6 +427,11 @@ function WalkInInner() {
 
   return (
     <div style={s.card}>
+      {guest && (
+        <button type="button" onClick={leaveGuest} style={s.backBtn} aria-label="Back to sign-in options">
+          <span aria-hidden="true" style={{ fontSize: '1.1rem', lineHeight: 1 }}>←</span> Back
+        </button>
+      )}
       <div style={s.studioHeader}>
         {studio.logo_url && <img src={studio.logo_url} alt={`${studio.name} logo`} style={{ maxHeight: 64, maxWidth: 220, objectFit: 'contain', alignSelf: 'flex-start', marginBottom: '0.5rem' }} />}
         <span style={s.studioLabel}>Studio booking</span>
@@ -424,15 +439,10 @@ function WalkInInner() {
       </div>
 
       <form onSubmit={handleSubmit} style={s.form}>
-          {guest ? (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-              <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.78rem', lineHeight: 1.5 }}>Booking as a guest</p>
-              <Button variant="ghost" size="sm" onClick={() => setGuestChosen(false)} style={{ flexShrink: 0 }}>Sign in instead</Button>
-            </div>
-          ) : <ClientAccountActions email={session.user.email} />}
+          {!guest && <ClientAccountActions email={session.user.email} />}
 
           <Section title="Your details" first>
-            <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: 13 }}>{guest ? `${studio.name} uses these to contact you about your booking.` : 'Review your details and update anything that has changed.'}</p>
+            <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: 13 }}>{guest ? `You’re booking as a guest, no account needed. ${studio.name} uses these details to contact you about your booking.` : 'Review your details and update anything that has changed.'}</p>
             <Field label="Full name">
               <input style={s.input} type="text" value={fullName} required autoComplete="name" onChange={e => setFullName(e.target.value)} placeholder="Your name" />
             </Field>
@@ -953,6 +963,12 @@ const s = {
     display: 'flex',
     flexDirection: 'column',
     gap: '1.5rem',
+  },
+  backBtn: {
+    display: 'inline-flex', alignItems: 'center', gap: 6, alignSelf: 'flex-start',
+    minHeight: 44, margin: '-0.75rem 0 -0.75rem -0.6rem', padding: '0 0.6rem',
+    background: 'none', border: 'none', borderRadius: 8, cursor: 'pointer',
+    color: 'var(--text)', fontSize: '0.9rem', fontWeight: 600, fontFamily: 'inherit',
   },
   studioHeader: {
     display: 'flex', flexDirection: 'column', gap: '0.25rem',
