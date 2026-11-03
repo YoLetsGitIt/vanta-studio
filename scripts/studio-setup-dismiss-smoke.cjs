@@ -53,7 +53,7 @@ const shots = process.env.STUDIO_QA_OUTPUT;
       const donePage = await doneContext.newPage();
       await donePage.goto(`${base}/dashboard/home`, { waitUntil: 'networkidle' });
       const doneList = donePage.locator('#studio-setup');
-      await doneList.getByText('Your studio is set up.').waitFor();
+      await doneList.getByText(/Your studio is set up\./).waitFor();
       const remove = doneList.getByRole('button', { name: 'Dismiss setup checklist' });
       assert.equal(await remove.count(), 1, 'Only one dismiss button when complete');
       assert.equal((await remove.innerText()).trim(), 'Remove checklist');

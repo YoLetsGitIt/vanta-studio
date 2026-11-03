@@ -110,10 +110,11 @@ export default function StudioSetupChecklist() {
         {state && (
           <div className={styles.headerActions}>
             <button type="button" className={styles.collapse} aria-label={expanded ? 'Hide checklist' : 'Show checklist'} aria-expanded={!!expanded} aria-controls="studio-setup-steps" disabled={saving || loading} onClick={() => update({ collapsed: !state.collapsed })}>{expanded ? 'Hide' : 'Show'}<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="m6 8 4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg></button>
-            {(!allDone || !expanded) && dismiss}
+            {dismiss}
           </div>
         )}
       </div>
+      {allDone && <p className={styles.doneNote}>Your studio is set up. You can remove this checklist and bring it back any time from Settings → Account.</p>}
       {state && (
         <div className={styles.meter} aria-hidden="true">
           {STEPS.map(step => <span key={step.id} data-done={isDone(step) || undefined} data-optional={step.optional || undefined} />)}
@@ -156,12 +157,6 @@ export default function StudioSetupChecklist() {
               );
             })}
           </ul>
-          {allDone && (
-            <div className={styles.doneBar}>
-              <p><strong>Your studio is set up.</strong> Remove this checklist from Home. You can bring it back from Settings → Account.</p>
-              {dismiss}
-            </div>
-          )}
         </div>
       )}
     </section>

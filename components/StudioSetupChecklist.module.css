@@ -21,6 +21,7 @@
 :global(html:root) .meter span { height: 4px; border-radius: 2px; background: var(--border); transition: background 200ms ease-out; }
 :global(html:root) .meter span[data-optional] { background: var(--border-faint); }
 :global(html:root) .meter span[data-done] { background: var(--text); }
+:global(html:root) .card[data-complete] .meter span { background: var(--color-success, #6fbf8a); }
 :global(html:root) .nextInline { flex-basis: 100%; color: var(--text-dim); font-size: .8rem; line-height: 1.4; text-decoration: underline; text-decoration-color: var(--text-ghost); text-underline-offset: 3px; }
 :global(html:root) .nextTag { flex-shrink: 0; padding: .15rem .45rem; border-radius: 999px; background: var(--text); color: var(--bg-base); font-size: .68rem; font-weight: 600; line-height: 1.3; letter-spacing: .01em; }
 :global(html:root) .stepAction { flex-shrink: 0; margin-left: auto; color: var(--text-dim); font-size: .8rem; line-height: 1.4; opacity: 0; transition: opacity 150ms; }
@@ -29,10 +30,7 @@
 :global(html:root) .compactStep[data-next] .stepLink > svg { color: var(--text); }
 :global(html:root) .compactStep[data-next] .completionMark { border-color: var(--text-dim); }
 :global(html:root) .stepAction + svg { margin-left: 0 !important; }
-:global(html:root) .doneBar { display: flex; align-items: center; gap: 1rem; margin-top: .75rem; padding: .85rem 1rem; border: 1px solid var(--border); border-radius: 10px; background: color-mix(in srgb, var(--text) 4%, transparent); }
-:global(html:root) .doneBar p { flex: 1; min-width: 0; margin: 0; color: var(--text-dim); font-size: .85rem; line-height: 1.5; }
-:global(html:root) .doneBar strong { color: var(--text); font-weight: 600; }
-:global(html:root) .doneBar .dismissPrimary { flex-shrink: 0; min-height: 40px; padding: 0 1rem; }
+:global(html:root) .doneNote { margin: .25rem 0 0; color: var(--text-dim); font-size: .8rem; line-height: 1.5; }
 :global(html:root) .collapse[aria-expanded="true"] svg { transform: rotate(180deg); }
 :global(html:root) .compactSteps { list-style: none; padding: 0; margin: .25rem 0 0; }
 :global(html:root) .compactStep { min-width: 0; display: flex; align-items: center; gap: .25rem; border-bottom: 1px solid var(--border-faint); }
@@ -94,8 +92,6 @@
   :global(html:root) .headingGroup { flex-direction: column; align-items: flex-start; }
   :global(html:root) .stepAction { display: none; }
   :global(html:root) .stepAction + svg { margin-left: auto !important; }
-  :global(html:root) .doneBar { flex-direction: column; align-items: stretch; gap: .75rem; }
-  :global(html:root) .doneBar .dismissPrimary { min-height: 44px; }
 
 }
 @media (prefers-reduced-motion: reduce) { :global(html:root) .card *, :global(html:root) .shortcuts * { transition: none !important; animation: none !important; } }
