@@ -44,9 +44,9 @@ const results=[];
    await p.goto(studio+'/dashboard/appointments.html?booking=booking-1',{waitUntil:'networkidle'});
    await p.getByRole('heading',{name:'Piercing',exact:true}).waitFor();await p.getByRole('button',{name:'Copy email',exact:true}).waitFor();
   });
-  for(const [lang,title,newTemplate,settings] of [['en','Marketing','New template','Settings'],['zh-Hans','营销','新模板','设置'],['ko','마케팅','새 템플릿','설정']])await run('marketing-'+lang,async(p)=>{
+  for(const [lang,title,newTemplate,settings] of [['en','Marketing','New email campaign','Settings'],['zh-Hans','营销','新邮件活动','设置'],['ko','마케팅','새 이메일 캠페인','설정']])await run('marketing-'+lang,async(p)=>{
    await p.goto(studio+'/dashboard/marketing.html',{waitUntil:'networkidle'});await p.getByRole('heading',{name:title,exact:true}).waitFor();await p.getByRole('heading',{name:newTemplate,exact:true}).waitFor();
-   const picker=p.getByRole('button',{name:lang==='en'?'Choose a saved template or example':lang==='ko'?'저장한 템플릿 또는 예시 선택':'选择已保存的模板或示例',exact:true});await picker.click();assert.equal(await picker.getAttribute('aria-expanded'),'true');
+   const picker=p.getByRole('button',{name:lang==='en'?'Choose a saved email campaign or example':lang==='ko'?'저장한 이메일 캠페인 또는 예시 선택':'选择已保存的邮件活动或示例',exact:true});await picker.click();assert.equal(await picker.getAttribute('aria-expanded'),'true');
    await p.getByRole('tab',{name:settings,exact:true}).click();
   },{lang});
   await run('financial-data-table',async(p)=>{

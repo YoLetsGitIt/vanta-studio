@@ -13,7 +13,7 @@ import styles from '@/components/marketing/marketing.module.css';
 
 const SECTIONS = ['templates', 'history', 'settings'];
 const SECTION_COPY = {
-  templates: ['Create and send', 'Write a template and choose your clients.'],
+  templates: ['Create and send', 'Write an email campaign and choose your clients.'],
   history: ['Sent emails', 'See past emails and their delivery status.'],
   settings: ['Settings', 'Manage your sending email and connections.'],
 };
@@ -81,7 +81,7 @@ export default function MarketingPage() {
         <div className={styles.marketingIntro}>
           <p className={styles.marketingEyebrow}>{mt('Marketing')}</p>
           <h1 className={styles.title}>{mt(SECTION_COPY[tab][0])}</h1>
-          <p className={styles.subtitle}>{mt(tab === 'templates' ? 'Create email templates and send them to your clients.' : SECTION_COPY[tab][1])}</p>
+          <p className={styles.subtitle}>{mt(tab === 'templates' ? 'Create email campaigns and send them to your clients.' : SECTION_COPY[tab][1])}</p>
           {tab !== 'templates' && <Button id="tab-templates" size="sm" className={styles.returnToCreate} aria-controls="panel-templates" onClick={() => selectTab('templates')}><span aria-hidden="true">←</span>{mt('Create and send')}</Button>}
         </div>
         <nav aria-label={mt('Marketing sections')} className={styles.marketingUtilities}>

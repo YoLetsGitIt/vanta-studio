@@ -4,12 +4,13 @@ import { useLanguage } from '@/lib/i18n';
 
 import { useEffect, useRef, useState } from 'react';
 import Button from '@/components/ui/Button';
-import Field, { Input, Textarea } from '@/components/ui/Field';
+import Field, { Input } from '@/components/ui/Field';
 import { listMarketingTemplates, saveMarketingTemplate, deleteMarketingTemplate } from '@/lib/api';
 import { showError, showFeedback, requestConfirmation } from '@/lib/feedback';
 import PreviewDialog from './PreviewDialog';
 import TestSendButton from './TestSendButton';
 import Campaigns from './Campaigns';
+import MessageEditor from './MessageEditor';
 import styles from './marketing.module.css';
 
 const BLANK = { name: '', subject: '', body: 'Hi {{client_name}},\n\nWrite your message here.\n\nThanks,\n{{studio_name}}' };
@@ -73,7 +74,7 @@ export default function Templates({ available, ready, preset, onSent, onNeedSetu
     if (!libraryInitialised.current) { setExamplesOpen(data.templates.length === 0); libraryInitialised.current = true; }
     return data.templates;
   }
-  useEffect(() => { load().catch(err => setLoadError(err.message || mt('Couldn’t load templates.'))); }, []);
+  useEffect(() => { load().catch(err => setLoadError(err.message || mt('Couldn’t load email campaigns.'))); }, []);
 
   const hasSavedTemplates = (templates?.length ?? 0) > 0;
   const examplesHeading = <h3 id="example-template-heading" className={styles.libraryHeading}>{mt("Start from an example")}</h3>;
@@ -89,7 +90,7 @@ export default function Templates({ available, ready, preset, onSent, onNeedSetu
   async function open(next) {
     // Re-selecting the current saved template keeps its draft in place.
     if (!next.id || next.id !== form.id) {
-      if (dirty && !await requestConfirmation({ title: mt("Discard changes"), message: mt("You have unsaved changes to this template."), confirmLabel: mt("Discard"), danger: true })) return;
+      if (dirty && !await requestConfirmation({ title: mt("Discard changes"), message: mt("You have unsaved changes to this email campaign."), confirmLabel: mt("Discard"), danger: true })) return;
       // Loading an example is a starting point, not an edit made by the user.
       setForm(next); setBaseline(next);
     }
@@ -106,14 +107,14 @@ export default function Templates({ available, ready, preset, onSent, onNeedSetu
       const saved = await saveMarketingTemplate(form);
       setForm(saved); setBaseline(saved);
       setTemplates(prev => [saved, ...(prev || []).filter(t => t.id !== saved.id)]);
-      if (notify) showFeedback(mt("Template saved."), 'success');
+      if (notify) showFeedback(mt("Email campaign saved."), 'success');
       return saved;
     }
     catch (err) { showError(err); return null; } finally { setBusy(false); }
   }
   async function remove(template) {
     if (busy || !template?.id) return;
-    if (!await requestConfirmation({ title: mt("Delete template"), message: mt('Delete “{name}”? Emails already queued keep their message.', { name: template.name }), confirmLabel: mt("Delete"), danger: true })) return;
+    if (!await requestConfirmation({ title: mt("Delete email campaign"), message: mt('Delete “{name}”? Emails already queued keep their message.', { name: template.name }), confirmLabel: mt("Delete"), danger: true })) return;
     setBusy(true);
     try {
       await deleteMarketingTemplate(template.id);
@@ -124,7 +125,7 @@ export default function Templates({ available, ready, preset, onSent, onNeedSetu
         setSavedOpen(true); setExamplesOpen(remaining.length === 0); setFlowKey(value => value + 1); goStep('write');
         requestAnimationFrame(() => newTemplateButton.current?.focus());
       } else requestAnimationFrame(() => savedSummary.current?.focus());
-      showFeedback(mt("Template deleted."), 'success');
+      showFeedback(mt("Email campaign deleted."), 'success');
     } catch (err) { showError(err); } finally { setBusy(false); }
   }
   async function use() {
@@ -139,7 +140,7 @@ export default function Templates({ available, ready, preset, onSent, onNeedSetu
   }
   async function backToTemplates() {
     if (busy) return;
-    if (dirty && !await requestConfirmation({ title: mt("Discard changes"), message: mt("You have unsaved changes to this template."), confirmLabel: mt("Discard"), danger: true })) return;
+    if (dirty && !await requestConfirmation({ title: mt("Discard changes"), message: mt("You have unsaved changes to this email campaign."), confirmLabel: mt("Discard"), danger: true })) return;
     const fromExample = example;
     startAgain();
     setExamplesOpen(fromExample || !hasSavedTemplates);
@@ -150,6 +151,7 @@ export default function Templates({ available, ready, preset, onSent, onNeedSetu
   }
   // Drops the placeholder where the cursor was in whichever of subject or message was used last.
   function insert(token) {
+    if (focused.current === 'body') { fields.body.current?.insertText(token); return; }
     const key = focused.current, el = fields[key].current, value = form[key];
     const start = el?.selectionStart ?? value.length, end = el?.selectionEnd ?? value.length;
     set({ [key]: value.slice(0, start) + token + value.slice(end) });
@@ -158,28 +160,28 @@ export default function Templates({ available, ready, preset, onSent, onNeedSetu
 
   return (
     <div className={styles.panel}>
-      <h2 className="sr-only" tabIndex={-1} ref={flowHead}>{mt(step === 'write' ? 'Write your template' : 'Choose clients and send')}</h2>
+      <h2 className="sr-only" tabIndex={-1} ref={flowHead}>{mt(step === 'write' ? 'Write your email campaign' : 'Choose clients and send')}</h2>
       <ol className={styles.flowSteps} aria-label={mt("Create and send")}>
-        <li aria-current={step === 'write' ? 'step' : undefined}><span className={styles.stepNum} aria-hidden="true">{step === 'clients' ? '✓' : '1'}</span>{mt("Write your template")}</li>
+        <li aria-current={step === 'write' ? 'step' : undefined}><span className={styles.stepNum} aria-hidden="true">{step === 'clients' ? '✓' : '1'}</span>{mt("Write your email campaign")}</li>
         <li aria-current={step === 'clients' ? 'step' : undefined}><span className={styles.stepNum} aria-hidden="true">2</span>{mt("Choose clients and send")}</li>
       </ol>
       {loadError && <div role="alert" className={`${styles.card} ${styles.workspaceError}`}><p>{loadError}</p><Button onClick={() => load().catch(err => setLoadError(err.message))}>{mt("Try again")}</Button></div>}
       <div hidden={step !== 'write'} data-stage={editorOpen ? 'editing' : 'choosing'} className={`${styles.templateWorkspace} ${styles.flowPanel} ${!editorOpen ? styles.templateChooser : ''}`}>
         {editorOpen && <div ref={templateNavigation} className={styles.templateNavigation}>
-          <Button variant="ghost" disabled={busy} onClick={backToTemplates}><span aria-hidden="true">←</span>{mt("Back to templates")}</Button>
-          <button type="button" disabled={busy} className={`${styles.chip} ${styles.libraryToggle}`} aria-expanded={showChoices} aria-controls="marketing-template-library" onClick={() => setShowChoices(value => !value)}>{mt("Choose a saved template or example")}<span aria-hidden="true">{showChoices ? '⌃' : '⌄'}</span></button>
+          <Button variant="ghost" disabled={busy} onClick={backToTemplates}><span aria-hidden="true">←</span>{mt("Back to email campaigns")}</Button>
+          <button type="button" disabled={busy} className={`${styles.chip} ${styles.libraryToggle}`} aria-expanded={showChoices} aria-controls="marketing-template-library" onClick={() => setShowChoices(value => !value)}>{mt("Choose a saved email campaign or example")}<span aria-hidden="true">{showChoices ? '⌃' : '⌄'}</span></button>
         </div>}
         <div className={styles.templateChooser} hidden={editorOpen && !showChoices}>
-        <nav id="marketing-template-library" data-expanded={!editorOpen || showChoices} className={`${styles.card} ${styles.tplNav} ${styles.templateLibrary}`} aria-label={mt("Templates")} data-has-saved={hasSavedTemplates}>
+        <nav id="marketing-template-library" data-expanded={!editorOpen || showChoices} className={`${styles.card} ${styles.tplNav} ${styles.templateLibrary}`} aria-label={mt("Email campaigns")} data-has-saved={hasSavedTemplates}>
           <div className={styles.libraryIntro}>
             <div className={styles.libraryIntroText}>
-              <p className={styles.hint}>{mt(hasSavedTemplates ? "Choose one of your saved templates to edit or send." : "Reuse a saved message, or start from an example.")}</p>
+              <p className={styles.hint}>{mt(hasSavedTemplates ? "Choose one of your saved email campaigns to edit or send." : "Reuse a saved message, or start from an example.")}</p>
             </div>
-            <Button ref={newTemplateButton} fullWidth variant={editorOpen ? 'secondary' : 'primary'} disabled={busy} onClick={() => open(BLANK)}><span aria-hidden="true">＋</span>{mt("New template")}</Button>
+            <Button ref={newTemplateButton} fullWidth variant={editorOpen ? 'secondary' : 'primary'} disabled={busy} onClick={() => open(BLANK)}><span aria-hidden="true">＋</span>{mt("New email campaign")}</Button>
           </div>
           <details open={savedOpen} onToggle={event => setSavedOpen(event.currentTarget.open)} className={`${styles.libraryGroup} ${styles.savedTemplateGroup} ${styles.libraryDisclosure}`} aria-labelledby="saved-template-heading">
             <summary ref={savedSummary} className={styles.exampleSummary}>
-              <h2 id="saved-template-heading" className={styles.libraryHeading}>{mt("Your templates")}</h2>
+              <h2 id="saved-template-heading" className={styles.libraryHeading}>{mt("Your email campaigns")}</h2>
               {templates && <span className={styles.libraryCount}>{templates.length}</span>}
               <span className={styles.disclosureArrow} aria-hidden="true">⌄</span>
             </summary>
@@ -198,7 +200,7 @@ export default function Templates({ available, ready, preset, onSent, onNeedSetu
                         </span>
                         <span className={styles.savedTemplateArrow} aria-hidden="true">→</span>
                       </button>
-                      <button type="button" disabled={busy} className={styles.templateDelete} aria-label={mt('Delete template: {name}', { name: t.name })} title={mt("Delete template")} onClick={() => remove(t)}><TrashIcon /></button>
+                      <button type="button" disabled={busy} className={styles.templateDelete} aria-label={mt('Delete email campaign: {name}', { name: t.name })} title={mt("Delete email campaign")} onClick={() => remove(t)}><TrashIcon /></button>
                     </li>
                   ))}
                 </ul>
@@ -231,27 +233,27 @@ export default function Templates({ available, ready, preset, onSent, onNeedSetu
         </nav>
         </div>
 
-        {editorOpen && <section className={`${styles.card} ${styles.templateEditor} ${styles.revealEditor}`} aria-label={mt("Template editor")}>
+        {editorOpen && <section className={`${styles.card} ${styles.templateEditor} ${styles.revealEditor}`} aria-label={mt("Email campaign editor")}>
           <div className={styles.editorHead}>
             <div>
-              <h2 className={styles.cardTitle} tabIndex={-1} ref={editorHead}>{form.id ? mt("Edit template") : mt("New template")}</h2>
+              <h2 className={styles.cardTitle} tabIndex={-1} ref={editorHead}>{form.id ? mt("Edit email campaign") : mt("New email campaign")}</h2>
               <p className={styles.desc}>{mt("Write once, personalise for each client.")}</p>
             </div>
             <div className={styles.editorTools}>
             {dirty ? <span className={`${styles.pill} ${styles.statusDirty}`}>{mt("Unsaved changes")}</span>
-              : form.id ? <span className={`${styles.pill} ${styles.pillOn}`}>{mt("Saved template")}</span>
+              : form.id ? <span className={`${styles.pill} ${styles.pillOn}`}>{mt("Saved email campaign")}</span>
                 : example && <span className={`${styles.pill} ${styles.pillBusy}`}>{mt("Example")}</span>}
-            {form.id && <Button size="sm" variant="ghost" className={styles.templateDelete} disabled={busy} aria-label={mt("Delete template")} onClick={() => remove(form)}><TrashIcon />{mt("Delete")}</Button>}
+            {form.id && <Button size="sm" variant="ghost" className={styles.templateDelete} disabled={busy} aria-label={mt("Delete email campaign")} onClick={() => remove(form)}><TrashIcon />{mt("Delete")}</Button>}
             </div>
           </div>
           <div className={styles.editorGroup}>
-            <h3 className={styles.editorGroupTitle}>{mt("Template details")}</h3>
-            <Field label={mt("Template name")} hint={mt("Only you see this.")}><Input disabled={busy} value={form.name} maxLength={200} placeholder={mt("For example, Flash day")} onChange={e => set({ name: e.target.value })} /></Field>
+            <h3 className={styles.editorGroupTitle}>{mt("Email campaign details")}</h3>
+            <Field label={mt("Email campaign name")} hint={mt("Only you see this.")}><Input disabled={busy} value={form.name} maxLength={200} placeholder={mt("For example, Flash day")} onChange={e => set({ name: e.target.value })} /></Field>
           </div>
           <div className={styles.editorGroup}>
             <div><h3 className={styles.editorGroupTitle}>{mt("Email content")}</h3><p className={styles.desc}>{mt("This is what your clients will receive.")}</p></div>
             <Field label={mt("Subject")}><Input disabled={busy} ref={fields.subject} value={form.subject} maxLength={200} onFocus={() => { focused.current = 'subject'; }} onChange={e => set({ subject: e.target.value })} /></Field>
-            <Field label={mt("Message")}><Textarea disabled={busy} ref={fields.body} rows={10} value={form.body} maxLength={50000} onFocus={() => { focused.current = 'body'; }} onChange={e => set({ body: e.target.value })} /></Field>
+            <MessageEditor ref={fields.body} label={mt("Message")} disabled={busy} value={form.body} onFocus={() => { focused.current = 'body'; }} onChange={next => setForm(prev => ({ ...prev, body: typeof next === 'function' ? next(prev.body) : next }))} />
           </div>
           <div className={`${styles.editorGroup} ${styles.personaliseGroup}`}>
             <div><h3 className={styles.editorGroupTitle}>{mt("Personalisation")}</h3><p className={styles.desc}>{mt("These details are filled in for each client.")}</p></div>
@@ -265,12 +267,12 @@ export default function Templates({ available, ready, preset, onSent, onNeedSetu
           </div>
         </section>}
 
-        {editorOpen && <aside className={`${styles.card} ${styles.templateActions} ${styles.revealActions}`} aria-label={mt("Template actions")}>
+        {editorOpen && <aside className={`${styles.card} ${styles.templateActions} ${styles.revealActions}`} aria-label={mt("Email campaign actions")}>
           <div className={styles.actionGroup}>
             <h2 className={styles.cardTitle}>{mt("Next steps")}</h2>
             <p className={styles.desc}>{mt("Finish your message, then choose who receives it.")}</p>
             <Button fullWidth onClick={use} loading={busy} loadingLabel={mt("Saving…")} disabled={!complete}>{mt("Continue to clients")}<span aria-hidden="true">→</span></Button>
-            <p className={styles.hint}>{mt("Your template is saved when you continue. Nothing is sent until you confirm.")}</p>
+            <p className={styles.hint}>{mt("Your email campaign is saved when you continue. Nothing is sent until you confirm.")}</p>
           </div>
           <div className={styles.actionGroup}>
             <h3 className={styles.editorGroupTitle}>{mt("Check your email")}</h3>
@@ -280,10 +282,10 @@ export default function Templates({ available, ready, preset, onSent, onNeedSetu
           </div>
           <div className={styles.actionGroup}>
             <h3 className={styles.editorGroupTitle}>{mt("Save for later")}</h3>
-            <Button fullWidth variant="secondary" onClick={() => save()} disabled={!complete || (form.id && !dirty) || busy}>{form.id ? mt("Save changes") : mt("Save template")}</Button>
+            <Button fullWidth variant="secondary" onClick={() => save()} disabled={!complete || (form.id && !dirty) || busy}>{form.id ? mt("Save changes") : mt("Save email campaign")}</Button>
           </div>
           {form.id && <details className={styles.manageTemplate}>
-            <summary>{mt("Manage template")}</summary>
+            <summary>{mt("Manage email campaign")}</summary>
             <div className={styles.manageActions}>
               <Button fullWidth size="sm" variant="ghost" disabled={busy} onClick={() => { setForm({ name: `${form.name} (copy)`, subject: form.subject, body: form.body }); setBaseline(BLANK); }}>{mt("Make a copy")}</Button>
             </div>

@@ -35,12 +35,12 @@ export default function ClientTemplateSend({ clientKey, email, marketing }) {
  }
  return <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
   {error && <p role="alert">{error}</p>}
-  {!data && !error && <p role="status">{mt("Loading templates…")}</p>}
+  {!data && !error && <p role="status">{mt("Loading email campaigns…")}</p>}
   {data && <>
-   <Field label={mt("Email template")}><Select value={id} onChange={e => setId(e.target.value)} disabled={busy}>
-    <option value="">{mt("Choose a template")}</option>{templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+   <Field label={mt("Email campaign")}><Select value={id} onChange={e => setId(e.target.value)} disabled={busy}>
+    <option value="">{mt("Choose an email campaign")}</option>{templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
    </Select></Field>
-   {templates.length === 0 && <Link href="/dashboard/marketing?tab=templates">{mt("Create an email template")}</Link>}
+   {templates.length === 0 && <Link href="/dashboard/marketing?tab=templates">{mt("Create an email campaign")}</Link>}
    {!eligible && <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{marketing?.unsubscribed ? mt("This client has unsubscribed.") : mt("This client needs an email address and marketing consent before sending.")}</p>}
    {!data.available && <p>{mt("Sending isn’t switched on yet.")}</p>}
    {data.available && !data.ready && <Link href="/dashboard/marketing?tab=settings">{mt("Set up your sending email")}</Link>}

@@ -86,10 +86,10 @@ const selected = async (page, section) => {
 const noOverflow = async page => assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'Page should fit the viewport');
 
 async function writeTemplate(page, { name = 'Local promotion', subject = 'Local offer' } = {}) {
-  if (!await page.getByRole('region', { name: 'Template editor', exact: true }).isVisible()) {
-    await page.getByRole('navigation', { name: 'Templates', exact: true }).getByRole('button', { name: 'New template', exact: true }).click();
+  if (!await page.getByRole('region', { name: 'Email campaign editor', exact: true }).isVisible()) {
+    await page.getByRole('navigation', { name: 'Email campaigns', exact: true }).getByRole('button', { name: 'New email campaign', exact: true }).click();
   }
-  await page.getByRole('textbox', { name: 'Template name', exact: true }).fill(name);
+  await page.getByRole('textbox', { name: 'Email campaign name', exact: true }).fill(name);
   await page.getByRole('textbox', { name: 'Subject', exact: true }).fill(subject);
   await page.getByRole('textbox', { name: 'Message', exact: true }).fill('Hi {{client_name}}, local test message.');
 }
@@ -124,13 +124,13 @@ async function screenshot(page, name) {
       ];
       const { context, page, writes, unexpected, errors } = await setup(browser, width, { initialTemplates });
       await page.goto(`${base}/dashboard/marketing.html`, { waitUntil: 'networkidle' });
-      const library = page.getByRole('navigation', { name: 'Templates', exact: true });
-      const editor = page.getByRole('region', { name: 'Template editor', exact: true });
-      const back = page.getByRole('button', { name: 'Back to templates', exact: true });
+      const library = page.getByRole('navigation', { name: 'Email campaigns', exact: true });
+      const editor = page.getByRole('region', { name: 'Email campaign editor', exact: true });
+      const back = page.getByRole('button', { name: 'Back to email campaigns', exact: true });
       const discard = page.getByRole('alertdialog', { name: 'Discard changes', exact: true });
       const subject = page.getByRole('textbox', { name: 'Subject', exact: true });
       await library.getByRole('button', { name: /^Saved one/ }).click();
-      await page.waitForFunction(() => document.activeElement?.textContent === 'Edit template');
+      await page.waitForFunction(() => document.activeElement?.textContent === 'Edit email campaign');
       assert.ok(await back.evaluate(el => {
         const rect = el.getBoundingClientRect();
         return el.contains(document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2));
@@ -154,12 +154,12 @@ async function screenshot(page, name) {
       assert.equal(await subject.inputValue(), 'Second subject', 'Discarded edits must not persist');
       await continueFlow(page);
       await page.getByRole('checkbox', { name: /Alice Local/ }).check();
-      await page.getByRole('button', { name: 'Back to template', exact: true }).click();
+      await page.getByRole('button', { name: 'Back to email campaign', exact: true }).click();
       await back.click();
       await library.getByRole('button', { name: /^Saved one/ }).click();
       await continueFlow(page);
       assert.equal(await page.getByRole('checkbox', { name: /Alice Local/ }).isChecked(), false, 'A newly selected template should start with a fresh audience');
-      await page.getByRole('button', { name: 'Back to template', exact: true }).click();
+      await page.getByRole('button', { name: 'Back to email campaign', exact: true }).click();
       await back.click();
       const examples = library.locator('details[aria-labelledby="example-template-heading"]');
       await examples.locator('summary').click();
@@ -168,12 +168,12 @@ async function screenshot(page, name) {
       await library.getByRole('button', { name: 'We miss you', exact: true }).waitFor();
       assert.equal(await discard.count(), 0, 'Choosing an example alone is not an unsaved edit');
       await library.getByRole('button', { name: 'We miss you', exact: true }).click();
-      await page.waitForFunction(() => document.activeElement?.textContent === 'New template');
+      await page.waitForFunction(() => document.activeElement?.textContent === 'New email campaign');
       assert.ok(await back.evaluate(el => {
         const rect = el.getBoundingClientRect();
         return el.contains(document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2));
       }), 'Back must stay visible after choosing another example');
-      assert.equal(await page.getByRole('textbox', { name: 'Template name', exact: true }).inputValue(), 'We miss you');
+      assert.equal(await page.getByRole('textbox', { name: 'Email campaign name', exact: true }).inputValue(), 'We miss you');
       assert.equal(writes.filter(w => !w.path.endsWith('/marketing/preview')).length, 0, 'Going back must not save, delete or send anything');
       await noOverflow(page); await screenshot(page, `back-to-templates-${width}`);
       assert.deepEqual(unexpected, []); assert.deepEqual(errors, []);
@@ -187,12 +187,12 @@ async function screenshot(page, name) {
       ];
       const { context, page, writes, unexpected, errors } = await setup(browser, width, { initialTemplates, deleteFailures: 1 });
       await page.goto(`${base}/dashboard/marketing.html`, { waitUntil: 'networkidle' });
-      const library = page.getByRole('navigation', { name: 'Templates', exact: true });
+      const library = page.getByRole('navigation', { name: 'Email campaigns', exact: true });
       const saved = library.locator('details[aria-labelledby="saved-template-heading"]');
       const examples = library.locator('details[aria-labelledby="example-template-heading"]');
-      const toggle = page.getByRole('button', { name: 'Choose a saved template or example', exact: true });
-      const editor = page.getByRole('region', { name: 'Template editor', exact: true });
-      const dialog = page.getByRole('alertdialog', { name: 'Delete template', exact: true });
+      const toggle = page.getByRole('button', { name: 'Choose a saved email campaign or example', exact: true });
+      const editor = page.getByRole('region', { name: 'Email campaign editor', exact: true });
+      const dialog = page.getByRole('alertdialog', { name: 'Delete email campaign', exact: true });
       const subject = page.getByRole('textbox', { name: 'Subject', exact: true });
       const deletions = () => writes.filter(w => w.method === 'DELETE');
       await saved.getByRole('button', { name: /^Saved one/ }).waitFor();
@@ -206,25 +206,25 @@ async function screenshot(page, name) {
       assert.equal(await toggle.getAttribute('aria-expanded'), 'false');
       await subject.fill('My unsaved draft');
       await toggle.click();
-      await saved.getByRole('button', { name: 'Delete template: Saved two', exact: true }).click();
+      await saved.getByRole('button', { name: 'Delete email campaign: Saved two', exact: true }).click();
       await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
       assert.equal(deletions().length, 0);
       assert.equal(await subject.inputValue(), 'My unsaved draft');
-      await saved.getByRole('button', { name: 'Delete template: Saved two', exact: true }).click();
+      await saved.getByRole('button', { name: 'Delete email campaign: Saved two', exact: true }).click();
       await dialog.getByRole('button', { name: 'Delete', exact: true }).click();
       await page.getByText('Local template delete unavailable', { exact: true }).waitFor();
       assert.equal(await saved.getByRole('button', { name: /^Saved two/ }).isVisible(), true);
       assert.equal(await subject.inputValue(), 'My unsaved draft');
-      await saved.getByRole('button', { name: 'Delete template: Saved two', exact: true }).click();
+      await saved.getByRole('button', { name: 'Delete email campaign: Saved two', exact: true }).click();
       await dialog.getByRole('button', { name: 'Delete', exact: true }).click();
       await saved.getByRole('button', { name: /^Saved two/ }).waitFor({ state: 'detached' });
       assert.equal(await subject.inputValue(), 'My unsaved draft', 'Deleting another template must retain the current draft');
       assert.equal(await saved.getByRole('button', { name: /^Saved one/ }).getAttribute('aria-current'), 'true');
       await toggle.click();
-      await editor.getByRole('button', { name: 'Delete template', exact: true }).click();
+      await editor.getByRole('button', { name: 'Delete email campaign', exact: true }).click();
       await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
       assert.equal(deletions().length, 2);
-      await editor.getByRole('button', { name: 'Delete template', exact: true }).click();
+      await editor.getByRole('button', { name: 'Delete email campaign', exact: true }).click();
       await dialog.getByRole('button', { name: 'Delete', exact: true }).click();
       await saved.getByText('None saved yet. Write one, or start from an example below.', { exact: true }).waitFor();
       assert.equal(await editor.count(), 0);
@@ -238,7 +238,7 @@ async function screenshot(page, name) {
       await examples.locator('summary').focus(); await page.keyboard.press('Enter');
       await examples.getByRole('button', { name: 'We miss you', exact: true }).click();
       assert.equal(await library.isVisible(), false);
-      assert.equal(await page.getByRole('textbox', { name: 'Template name', exact: true }).inputValue(), 'We miss you');
+      assert.equal(await page.getByRole('textbox', { name: 'Email campaign name', exact: true }).inputValue(), 'We miss you');
       assert.equal(writes.filter(w => w.path.endsWith('/marketing/campaigns') || w.path.endsWith('/marketing/test')).length, 0);
       assert.deepEqual(deletions().map(w => w.path.split('/').at(-1)), ['saved-two', 'saved-two', 'saved-one']);
       await noOverflow(page); await screenshot(page, `simplified-editor-${width}`);
@@ -250,7 +250,7 @@ async function screenshot(page, name) {
       const { context, page, writes, unexpected, errors } = await setup(browser, width);
       await page.goto(`${base}/dashboard/marketing.html`, { waitUntil: 'networkidle' });
       await writeTemplate(page);
-      const editor = page.getByRole('region', { name: 'Template editor', exact: true });
+      const editor = page.getByRole('region', { name: 'Email campaign editor', exact: true });
       const message = page.getByRole('textbox', { name: 'Message', exact: true });
       const subject = page.getByRole('textbox', { name: 'Subject', exact: true });
       for (const label of ['Client details', 'Visits and appointments', 'Studio details']) await editor.getByRole('heading', { name: label, exact: true }).waitFor();
@@ -269,7 +269,7 @@ async function screenshot(page, name) {
       assert.equal(await subject.inputValue(), 'Hello {{client_full_name}}');
       await message.fill(tokens.map(token => `{{${token}}}`).join(' | '));
       await noOverflow(page); await screenshot(page, `personalisation-${width}`);
-      await page.getByRole('complementary', { name: 'Template actions', exact: true }).getByRole('button', { name: 'Preview', exact: true }).click();
+      await page.getByRole('complementary', { name: 'Email campaign actions', exact: true }).getByRole('button', { name: 'Preview', exact: true }).click();
       const dialog = page.getByRole('dialog', { name: 'Email preview', exact: true });
       await dialog.getByText('Shown with sample client details.', { exact: true }).waitFor();
       await dialog.locator('iframe').waitFor();
@@ -324,7 +324,7 @@ async function screenshot(page, name) {
     for (const width of cases('flow') ? (process.env.STUDIO_MOBILE_TOUCH ? [320, 390, 844] : [390, 834, 1280]) : []) {
       const { context, page, writes, unexpected, errors, reads } = await setup(browser, width);
       await page.goto(`${base}/dashboard/marketing.html`, { waitUntil: 'networkidle' });
-      await page.getByRole('heading', { name: 'Your templates', exact: true }).waitFor();
+      await page.getByRole('heading', { name: 'Your email campaigns', exact: true }).waitFor();
       await selected(page, 'templates');
       assert.equal(await page.getByRole('tab').count(), 0);
       assert.equal(await sectionAction(page, 'settings').isVisible(), true);
@@ -345,7 +345,7 @@ async function screenshot(page, name) {
       await sectionAction(page, 'history').click();
       await page.getByRole('heading', { name: 'Nothing sent yet', exact: true }).waitFor();
       await sectionAction(page, 'templates').click();
-      assert.equal(await page.getByRole('textbox', { name: 'Template name', exact: true }).inputValue(), 'Local promotion');
+      assert.equal(await page.getByRole('textbox', { name: 'Email campaign name', exact: true }).inputValue(), 'Local promotion');
       assert.equal(await page.getByRole('textbox', { name: 'Message', exact: true }).inputValue(), 'Hi {{client_name}}, local test message.');
       await continueFlow(page);
       await selected(page, 'templates');
@@ -355,7 +355,7 @@ async function screenshot(page, name) {
       await sectionAction(page, 'settings').click();
       await sectionAction(page, 'templates').click();
       assert.equal(await page.getByRole('checkbox', { name: /Alice Local/ }).isChecked(), true);
-      await page.getByRole('button', { name: 'Back to template', exact: true }).click();
+      await page.getByRole('button', { name: 'Back to email campaign', exact: true }).click();
       await page.getByRole('textbox', { name: 'Subject', exact: true }).fill('Updated local offer');
       await continueFlow(page);
       await page.locator('aside').getByText('Updated local offer', { exact: false }).waitFor();
@@ -378,13 +378,13 @@ async function screenshot(page, name) {
       await noOverflow(page); await screenshot(page, `settings-history-${width}`);
       await sectionAction(page, 'templates').click();
       await page.getByRole('button', { name: 'Create another email', exact: true }).click();
-      await page.getByRole('heading', { name: 'Your templates', exact: true }).waitFor();
-      assert.equal(await page.getByRole('region', { name: 'Template editor', exact: true }).count(), 0);
-      assert.equal(await page.getByRole('complementary', { name: 'Template actions', exact: true }).count(), 0);
+      await page.getByRole('heading', { name: 'Your email campaigns', exact: true }).waitFor();
+      assert.equal(await page.getByRole('region', { name: 'Email campaign editor', exact: true }).count(), 0);
+      assert.equal(await page.getByRole('complementary', { name: 'Email campaign actions', exact: true }).count(), 0);
       // Saving for later stays in the editor; continuing reuses that saved template.
       await writeTemplate(page, { name: 'Saved for later' });
-      await page.getByRole('button', { name: 'Save template', exact: true }).click();
-      await page.getByRole('heading', { name: 'Edit template', exact: true }).waitFor();
+      await page.getByRole('button', { name: 'Save email campaign', exact: true }).click();
+      await page.getByRole('heading', { name: 'Edit email campaign', exact: true }).waitFor();
       const savedCount = writes.filter(w => w.path.endsWith('/marketing/templates')).length;
       await continueFlow(page);
       assert.equal(writes.filter(w => w.path.endsWith('/marketing/templates')).length, savedCount);
@@ -400,33 +400,33 @@ async function screenshot(page, name) {
       ];
       const { context, page, writes, unexpected, errors, reads } = await setup(browser, width, { initialTemplates: saved });
       await page.goto(`${base}/dashboard/marketing.html`, { waitUntil: 'networkidle' });
-      try { await page.getByRole('heading', { name: 'Your templates', exact: true }).waitFor(); }
+      try { await page.getByRole('heading', { name: 'Your email campaigns', exact: true }).waitFor(); }
       catch (error) { await screenshot(page, `switching-load-failure-${width}`); console.error({ url: page.url(), errors, body: await page.locator('body').innerText(), reads }); throw error; }
-      const nav = page.getByRole('navigation', { name: 'Templates', exact: true });
+      const nav = page.getByRole('navigation', { name: 'Email campaigns', exact: true });
       async function choose(label) {
-        if (!await nav.isVisible()) await page.getByRole('button', { name: 'Choose a saved template or example', exact: true }).click();
+        if (!await nav.isVisible()) await page.getByRole('button', { name: 'Choose a saved email campaign or example', exact: true }).click();
         const choice = nav.getByRole('button', { name: label, includeHidden: true });
         if (!await choice.isVisible()) await choice.locator('xpath=ancestor::details').locator('summary').click();
         await choice.click();
       }
       const dialog = page.getByRole('alertdialog', { name: 'Discard changes', exact: true });
       const subject = page.getByRole('textbox', { name: 'Subject', exact: true });
-      const name = page.getByRole('textbox', { name: 'Template name', exact: true });
+      const name = page.getByRole('textbox', { name: 'Email campaign name', exact: true });
       // Merely loading an example is not a user edit, but it can still be saved.
       for (const starter of ['Flash day', 'We miss you', 'Piercing check-in', 'Books open']) {
         await choose(new RegExp('^' + starter + '$'));
         assert.equal(await name.inputValue(), starter);
         assert.equal(await dialog.count(), 0);
         assert.equal(await page.getByText('Unsaved changes', { exact: true }).count(), 0);
-        assert.equal(await page.getByRole('button', { name: 'Save template', exact: true }).isEnabled(), true);
+        assert.equal(await page.getByRole('button', { name: 'Save email campaign', exact: true }).isEnabled(), true);
       }
-      await page.getByRole('button', { name: 'Save template', exact: true }).click();
-      await page.getByRole('heading', { name: 'Edit template', exact: true }).waitFor();
+      await page.getByRole('button', { name: 'Save email campaign', exact: true }).click();
+      await page.getByRole('heading', { name: 'Edit email campaign', exact: true }).waitFor();
       assert.equal(writes.filter(w => w.path.endsWith('/marketing/templates')).length, 1);
       await choose(/^Flash day$/);
       await continueFlow(page);
       assert.equal(writes.filter(w => w.path.endsWith('/marketing/templates')).length, 2);
-      await page.getByRole('button', { name: 'Back to template', exact: true }).click();
+      await page.getByRole('button', { name: 'Back to email campaign', exact: true }).click();
       await choose(/^Saved one/);
       await choose(/^Saved two/);
       assert.equal(await subject.inputValue(), 'Second subject');
@@ -438,7 +438,7 @@ async function screenshot(page, name) {
       assert.equal(await dialog.count(), 0);
       assert.equal(await subject.inputValue(), 'Draft subject');
       await subject.fill('First subject');
-      for (const [field, original] of [['Template name', 'Saved one'], ['Subject', 'First subject'], ['Message', 'First message']]) {
+      for (const [field, original] of [['Email campaign name', 'Saved one'], ['Subject', 'First subject'], ['Message', 'First message']]) {
         const control = page.getByRole('textbox', { name: field, exact: true });
         await control.fill('Edited ' + original);
         await choose(/^Saved two/);
@@ -474,15 +474,15 @@ async function screenshot(page, name) {
         ];
         const { context, page, writes, unexpected, errors } = await setup(browser, width, { initialTemplates: theme === 'light' ? seed.slice(0, 1) : seed, theme });
         await page.goto(`${base}/dashboard/marketing.html`, { waitUntil: 'networkidle' });
-        await page.getByRole('heading', { name: 'Your templates', exact: true }).waitFor();
-        const library = page.getByRole('navigation', { name: 'Templates', exact: true });
-        const editor = page.getByRole('region', { name: 'Template editor', exact: true });
-        const actions = page.getByRole('complementary', { name: 'Template actions', exact: true });
+        await page.getByRole('heading', { name: 'Your email campaigns', exact: true }).waitFor();
+        const library = page.getByRole('navigation', { name: 'Email campaigns', exact: true });
+        const editor = page.getByRole('region', { name: 'Email campaign editor', exact: true });
+        const actions = page.getByRole('complementary', { name: 'Email campaign actions', exact: true });
         assert.equal(await editor.count(), 0);
         assert.equal(await actions.count(), 0);
         assert.equal(await library.isVisible(), true);
-        await library.getByRole('heading', { name: 'Your templates', exact: true }).waitFor();
-        assert.equal(await library.getByRole('button', { name: 'New template', exact: true }).isEnabled(), true);
+        await library.getByRole('heading', { name: 'Your email campaigns', exact: true }).waitFor();
+        assert.equal(await library.getByRole('button', { name: 'New email campaign', exact: true }).isEnabled(), true);
         const titleBox = await page.getByRole('heading', { name: 'Create and send', exact: true, level: 1 }).boundingBox();
         const settingsBox = await sectionAction(page, 'settings').boundingBox();
         assert.ok(settingsBox.height <= 48, 'Settings should be a compact utility');
@@ -511,15 +511,15 @@ async function screenshot(page, name) {
           assert.ok((await button.boundingBox()).height >= 44, 'Template choices should have comfortable touch targets');
         }
         await noOverflow(page); await screenshot(page, `chooser-${width}-${theme}`);
-        await library.getByRole('heading', { name: 'Your templates', exact: true }).waitFor();
+        await library.getByRole('heading', { name: 'Your email campaigns', exact: true }).waitFor();
         await library.getByRole('heading', { name: 'Promotions', exact: true }).waitFor();
         await library.getByRole('heading', { name: 'Client care', exact: true }).waitFor();
         await library.getByRole('button', { name: /^Studio flash day/ }).click();
-        assert.equal(await page.getByRole('textbox', { name: 'Template name', exact: true }).inputValue(), 'Studio flash day');
+        assert.equal(await page.getByRole('textbox', { name: 'Email campaign name', exact: true }).inputValue(), 'Studio flash day');
         assert.equal(await actions.getByRole('button', { name: 'Continue to clients', exact: true }).isEnabled(), true);
         assert.equal(await actions.getByRole('button', { name: 'Save changes', exact: true }).isDisabled(), true);
         assert.equal(await editor.getByRole('button', { name: 'Preview', exact: true }).count(), 0);
-        await editor.getByRole('heading', { name: 'Template details', exact: true }).waitFor();
+        await editor.getByRole('heading', { name: 'Email campaign details', exact: true }).waitFor();
         await editor.getByRole('heading', { name: 'Email content', exact: true }).waitFor();
         await editor.getByRole('heading', { name: 'Personalisation', exact: true }).waitFor();
         await settleTemplatePanels(page);
@@ -543,7 +543,7 @@ async function screenshot(page, name) {
         await preview.getByRole('button', { name: 'Close', exact: true }).click();
         await actions.locator('summary').click();
         await actions.getByRole('button', { name: 'Make a copy', exact: true }).waitFor();
-        await editor.getByRole('button', { name: 'Delete template', exact: true }).waitFor();
+        await editor.getByRole('button', { name: 'Delete email campaign', exact: true }).waitFor();
         await actions.locator('summary').click();
         await actions.scrollIntoViewIfNeeded();
         await screenshot(page, `actions-${width}-${theme}`);
@@ -557,19 +557,19 @@ async function screenshot(page, name) {
       for (const reducedMotion of ['no-preference', 'reduce']) {
         const { context, page, writes, unexpected, errors } = await setup(browser, width, { reducedMotion });
         await page.goto(`${base}/dashboard/marketing.html`, { waitUntil: 'networkidle' });
-        const library = page.getByRole('navigation', { name: 'Templates', exact: true });
-        await library.getByRole('heading', { name: 'Your templates', exact: true }).waitFor();
+        const library = page.getByRole('navigation', { name: 'Email campaigns', exact: true });
+        await library.getByRole('heading', { name: 'Your email campaigns', exact: true }).waitFor();
         assert.equal(await page.getByRole('textbox').count(), 0, 'Editor fields must not be present before choosing');
-        assert.equal(await page.getByRole('complementary', { name: 'Template actions', exact: true }).count(), 0);
-        assert.equal(await page.getByRole('button', { name: 'Choose a saved template or example', exact: true }).count(), 0);
+        assert.equal(await page.getByRole('complementary', { name: 'Email campaign actions', exact: true }).count(), 0);
+        assert.equal(await page.getByRole('button', { name: 'Choose a saved email campaign or example', exact: true }).count(), 0);
         assert.equal(await library.locator('details[aria-labelledby="example-template-heading"]').getAttribute('open'), '', 'Examples start expanded before any templates are saved');
         await library.getByRole('button',{name:'Flash day',exact:true}).waitFor();
-        const newButton = library.getByRole('button', { name: 'New template', exact: true });
+        const newButton = library.getByRole('button', { name: 'New email campaign', exact: true });
         await newButton.focus(); await page.keyboard.press('Enter');
-        const editor = page.getByRole('region', { name: 'Template editor', exact: true });
-        const actions = page.getByRole('complementary', { name: 'Template actions', exact: true });
+        const editor = page.getByRole('region', { name: 'Email campaign editor', exact: true });
+        const actions = page.getByRole('complementary', { name: 'Email campaign actions', exact: true });
         await editor.waitFor(); await actions.waitFor();
-        await page.waitForFunction(() => document.activeElement?.textContent === 'New template');
+        await page.waitForFunction(() => document.activeElement?.textContent === 'New email campaign');
         const animations = await Promise.all([editor, actions].map(el => el.evaluate(node => {
           const style = getComputedStyle(node);
           return { name: style.animationName, delay: style.animationDelay };
@@ -582,8 +582,8 @@ async function screenshot(page, name) {
         }
         assert.equal(await actions.getByRole('button', { name: 'Continue to clients', exact: true }).isDisabled(), true);
         await writeTemplate(page); await continueFlow(page);
-        await page.getByRole('button', { name: 'Back to template', exact: true }).click();
-        assert.equal(await page.getByRole('textbox', { name: 'Template name', exact: true }).inputValue(), 'Local promotion');
+        await page.getByRole('button', { name: 'Back to email campaign', exact: true }).click();
+        assert.equal(await page.getByRole('textbox', { name: 'Email campaign name', exact: true }).inputValue(), 'Local promotion');
         await noOverflow(page);
         assert.equal(writes.filter(w => w.path.endsWith('/marketing/campaigns') || w.path.endsWith('/marketing/test')).length, 0);
         assert.deepEqual(unexpected, []); assert.deepEqual(errors, []);

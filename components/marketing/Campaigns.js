@@ -77,7 +77,7 @@ export default function Campaigns({ template, available, ready, preset, onSent, 
     <section className={`${styles.card} ${styles.blank}`}>
       <h2 className={styles.cardTitle}>{mt("Emails queued")}</h2>
       <p className={styles.desc} role="status">{mt(queued.count === 1 ? '“{subject}” is queued for {count} client.' : '“{subject}” is queued for {count} clients.', { subject: queued.subject, count: queued.count })}</p>
-      <p className={styles.hint}>{mt("Emails go out over the next few minutes. Your template is saved for next time.")}</p>
+      <p className={styles.hint}>{mt("Emails go out over the next few minutes. Your email campaign is saved for next time.")}</p>
       <Button onClick={onStartAgain}>{mt("Create another email")}</Button>
     </section>
   );
@@ -94,7 +94,7 @@ export default function Campaigns({ template, available, ready, preset, onSent, 
       <aside className={`${styles.card} ${styles.aside}`} aria-label={mt("Email and send")}>
         <div className={styles.sectionHead}>
           <h2 className={styles.cardTitle}>{mt("Review and send")}</h2>
-          <Button size="sm" variant="secondary" disabled={sending} onClick={onEditTemplates}>{mt("Back to template")}</Button>
+          <Button size="sm" variant="secondary" disabled={sending} onClick={onEditTemplates}>{mt("Back to email campaign")}</Button>
         </div>
         {template && <>
           <EmailPreview subject={template.subject} body={template.body} clientName={firstClient?.name} clientId={firstClient?.id} />

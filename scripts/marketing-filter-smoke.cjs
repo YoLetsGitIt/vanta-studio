@@ -30,7 +30,7 @@ const clients=[client('alice','Alice Recent',3,5,7,100),client('bob','Bob Lapsed
    });
    const page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));await page.clock.setFixedTime(new Date(fixed));
    await page.goto(`${base}/dashboard/marketing.html`,{waitUntil:'networkidle'});
-   await page.getByRole('navigation',{name:'Templates',exact:true}).getByRole('button',{name:/^Filter test/}).click();
+   await page.getByRole('navigation',{name:'Email campaigns',exact:true}).getByRole('button',{name:/^Filter test/}).click();
    await page.getByRole('button',{name:'Continue to clients',exact:true}).click();
    await page.getByRole('heading',{name:'Review and send',exact:true}).waitFor();
    const group=page.getByRole('combobox',{name:'Show',exact:true}),search=page.getByRole('searchbox',{name:'Search',exact:true});

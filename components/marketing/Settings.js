@@ -16,7 +16,7 @@ export default function MarketingSettings({ data, onReload, onTemplates, onHisto
   const steps = [
     { done: ready, title: mt("Set up your sending email"), hint: mt("So client replies reach you."), action: <Link href={SENDER_SETTINGS} className="studio-button studio-button--primary studio-button--sm">{mt("Add it")}</Link> },
     { done: stats.consented_clients > 0, title: mt("Choose who can be emailed"), hint: mt("Tick “agreed to marketing emails” on a client."), action: <Link href="/dashboard/clients" className="studio-button studio-button--secondary studio-button--sm">{mt("Go to clients")}</Link> },
-    { done: stats.sent_this_month > 0, title: mt("Create a template and send an email"), action: <Button size="sm" variant="secondary" onClick={onTemplates}>{mt("Create a template")}</Button> },
+    { done: stats.sent_this_month > 0, title: mt("Create an email campaign and send it"), action: <Button size="sm" variant="secondary" onClick={onTemplates}>{mt("Create an email campaign")}</Button> },
   ];
 
   return (
@@ -34,7 +34,7 @@ export default function MarketingSettings({ data, onReload, onTemplates, onHisto
           <li><strong>{stats.unsubscribed}</strong> {mt("unsubscribed")}</li>
           {stats.failed_this_month > 0 && <li><button type="button" className={styles.statBad} onClick={onHistory}><strong>{stats.failed_this_month}</strong> {mt("failed this month")}</button></li>}
         </ul>
-        {!available && <p className={styles.notice} role="status">{mt("Sending is off for now. You can create templates and finish setup here.")}</p>}
+        {!available && <p className={styles.notice} role="status">{mt("Sending is off for now. You can create email campaigns and finish setup here.")}</p>}
       </section>
 
       {steps.some(step => !step.done) && (
