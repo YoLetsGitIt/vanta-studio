@@ -362,20 +362,7 @@
 .exampleDisclosure[open] .disclosureArrow { transform: rotate(180deg); }
 .exampleDisclosure .exampleGroups { padding: 0.25rem 1rem 1rem; }
 
-/* Message editor: text with photos shown in place */
-.messageEditor { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-2) var(--space-3); border: 1px solid var(--control-border); border-radius: var(--radius-md); background: var(--bg-input); }
-.messageEditor:hover:not([data-disabled]) { border-color: var(--text-muted); }
-.messageEditor:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-tint); }
-.messageText { display: block; width: 100%; min-height: 1.6em; padding: 0; border: 0; outline: none; resize: none; overflow: hidden; background: transparent; color: var(--text); font-family: inherit; font-size: var(--font-size-md); line-height: var(--line-height-body); }
-.messageText[data-only] { min-height: 12rem; }
-.messageText::placeholder { color: var(--text-ghost); }
-/* The editor box shows focus (focus-within), so the text box inside does not. */
-.messageText:focus-visible { outline: none !important; }
-.messagePhoto { position: relative; margin: 0; width: 100%; max-width: 496px; }
-.messagePhoto img { display: block; width: 100%; height: auto; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-panel); }
-.photosHead { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin-top: var(--space-2); }
+/* Message box with the Add photo button under it */
+.messageField { display: flex; flex-direction: column; gap: var(--space-2); }
+.photosHead { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
 .photosHead .hint { flex: 1; min-width: 12rem; }
-.photoRemove { position: absolute; top: 8px; right: 8px; width: 32px; height: 32px; border-radius: 999px; border: none; background: rgba(0,0,0,0.7); color: #fff; font-size: 20px; line-height: 1; cursor: pointer; display: grid; place-items: center; }
-.photoRemove:hover { background: rgba(0,0,0,0.88); }
-.photoRemove:disabled { cursor: default; opacity: 0.5; }
-.photoRemove:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
