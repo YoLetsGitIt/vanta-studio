@@ -101,6 +101,11 @@ const pending = { id: 'req-1', requester_name: 'Minseo Park', requester_email: '
       await page.getByRole('button', { name: 'Edit times', exact: true }).waitFor();
       assert.equal(await page.locator('.studio-bdp-actions').getByRole('button', { name: /link/i }).count(), 0, 'No resend link for an offer');
       assert.deepEqual(errors, []);
+      // A request that was already sent a "choose a time" link offers times too, not "Resend Link".
+      offer = null; current = { ...pending, status: 'awaiting_payment' };
+      await page.reload({ waitUntil: 'networkidle' });
+      await page.getByRole('button', { name: 'Offer times', exact: true }).waitFor();
+      assert.equal(await page.locator('.studio-bdp-actions').getByRole('button', { name: /link/i }).count(), 0, 'No resend link once availability is known');
       console.log(`PASS offer times ${withDeposit ? 'with deposit' : 'without deposit'} at ${width}px`);
       await context.close();
     }

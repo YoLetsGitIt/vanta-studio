@@ -7,7 +7,7 @@ import OfferTimesModal from '@/components/OfferTimesModal';
 import { useBookingManagement } from '@/lib/bookingManagement';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { getStations, getClientConsents, getNotes, addNote, deleteNote, getBookingConsentSubmissions, getStudioClients, generateConsentLink, getStudioBookingPayment, getDepositReceipt, getOfferedTimes, listConsentTemplates, downloadConsentPdf } from '@/lib/api';
+import { getStations, getClientConsents, getNotes, addNote, deleteNote, getBookingConsentSubmissions, getStudioClients, generateConsentLink, getStudioBookingPayment, getDepositReceipt, getDepositStatus, getOfferedTimes, listConsentTemplates, downloadConsentPdf } from '@/lib/api';
 import { useStationAvailability } from '@/lib/useStationAvailability';
 import { statusColors, statusLabel, capitalise as cap } from '@/lib/status';
 import { formatDob as fmtDob, hasArtist } from '@/lib/format';
@@ -192,8 +192,9 @@ export default function BookingDetailPanel({
   // sending a "choose a time" link.
   const hasAvailabilityWindows = Array.isArray(booking?.availability_windows) && booking.availability_windows.length > 0;
   const currentOffer      = offer?.booking === bookingId ? offer.data : null;
+  // Also replaces an unanswered "choose a time" link (awaiting payment, no time yet).
   const canOfferTimes     = bookingManagement === 'studio' && Boolean(bookTimeArtists) && hasAvailabilityWindows
-    && (status === 'pending' || (status === 'awaiting_payment' && Boolean(currentOffer)));
+    && (status === 'pending' || (status === 'awaiting_payment' && !chosenTime));
 
   const displayStatus = isNoShow ? 'no_show' : status;
   const sc = statusColors(displayStatus);
@@ -240,6 +241,18 @@ export default function BookingDetailPanel({
     return () => { live = false; };
   }, [bookingId, depositPaidAt, depositReceived?.method]);
   const depositPaidVia = depositReceipt?.booking === bookingId ? depositMethodLabel(depositReceipt.method) : null;
+
+  // The client says they paid by PayID / bank transfer: the studio checks it arrived.
+  const [depositClaim, setDepositClaim] = useState(null);
+  useEffect(() => {
+    if (!bookingId || !depositRequired || depositConfirmedAt) { setDepositClaim(null); return; }
+    let live = true;
+    getDepositStatus(bookingId)
+      .then(d => { if (live) setDepositClaim(d.client_claim ? { booking: bookingId, ...d.client_claim } : null); })
+      .catch(() => { if (live) setDepositClaim(null); });
+    return () => { live = false; };
+  }, [bookingId, depositRequired, depositConfirmedAt]);
+  const clientSaysPaid = depositClaim?.booking === bookingId && !depositConfirmedAt ? depositClaim : null;
 
   // ── Load studio notes for this booking ─────────────────────────────────────
   useEffect(() => {
@@ -576,6 +589,12 @@ export default function BookingDetailPanel({
                     </div>
                   );
                 })()}
+                {clientSaysPaid && (
+                  <p role="status" style={{ margin: 0, padding: '0.6rem 0.75rem', borderRadius: 10, background: 'var(--color-warning-surface, rgba(224,168,79,0.12))', border: '1px solid var(--color-warning-border, rgba(224,168,79,0.4))', color: 'var(--text)', fontSize: '0.9rem', lineHeight: 1.45 }}>
+                    {clientName !== '—' ? clientName.split(' ')[0] : 'The client'} says they paid by {clientSaysPaid.method === 'payid' ? 'PayID' : 'bank transfer'} on{' '}
+                    {new Date(clientSaysPaid.recorded_at).toLocaleString('en-AU', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}. Check it’s arrived, then mark it received.
+                  </p>
+                )}
                 {depositRequired && !depositPaid && !depositConfirmedAt && ['confirmed', 'awaiting_payment', 'requires_confirmation', 'deposit_expired'].includes(status) && (
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
                     <MarkDepositReceivedButton bookingId={bookingId} clientName={clientName !== '—' ? clientName : undefined} disabled={actionLoading}

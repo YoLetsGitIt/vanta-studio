@@ -15,7 +15,7 @@ const base = process.env.STUDIO_TEST_URL || 'http://127.0.0.1:3019';
       const posts = [];
       await context.route('**/studio/me/dashboard-attention', route => route.fulfill({ json: { bookings: current.deposit_paid_at ? [] : [current], pending_artists: [], pending_reimbursements: [] } }));
       await context.route(/\/studio\/me\/bookings\/booking-1$/, route => route.fulfill({ json: current }));
-      await context.route(/\/studio\/me\/bookings\/booking-1\/deposit-receipt/, route => route.fulfill({ json: { receipt } }));
+      await context.route(/\/studio\/me\/bookings\/booking-1\/deposit-receipt/, route => route.fulfill({ json: { receipt, client_claim: receipt ? null : { method: 'payid', recorded_at: new Date().toISOString() } } }));
       await context.route(/\/studio\/me\/bookings\/booking-1\/deposit-received/, route => {
         const body = route.request().postDataJSON();
         posts.push(body);
@@ -26,6 +26,11 @@ const base = process.env.STUDIO_TEST_URL || 'http://127.0.0.1:3019';
       });
       const page = await context.newPage();
       const errors = []; page.on('pageerror', e => errors.push(e.message));
+      // The client said they paid by PayID: the panel asks the studio to check it arrived.
+      await page.goto(base + '/dashboard/appointments?booking=booking-1', { waitUntil: 'networkidle' });
+      await page.getByRole('status').filter({ hasText: /says they paid by PayID on .*Check it’s arrived, then mark it received\./ }).waitFor();
+      await page.getByRole('button', { name: 'Mark deposit received' }).waitFor();
+
       await page.goto(base + '/dashboard/home', { waitUntil: 'networkidle' });
       await page.getByRole('button', { name: /Unpaid deposits/ }).click();
 
