@@ -47,6 +47,7 @@ const pending = { id: 'req-1', requester_name: 'Minseo Park', requester_email: '
       assert.equal(await dialog.getByLabel('Option 1 start time').inputValue(), new Date(`${firstDate}T00:00:00`).getDay() === 1 ? '09:30' : '10:30');
       const send = dialog.getByRole('button', { name: /^Send / });
       assert(await send.isDisabled(), 'An artist is required');
+      await dialog.getByRole('status').filter({ hasText: 'Choose an artist to send these times.' }).waitFor();
       await page.waitForFunction(() => document.querySelectorAll('[role="dialog"] select[aria-label="Artist"] option').length > 1);
       await dialog.getByLabel('Artist').selectOption({ index: 1 });
       await dialog.getByLabel('Duration').selectOption('120');
@@ -62,6 +63,7 @@ const pending = { id: 'req-1', requester_name: 'Minseo Park', requester_email: '
       await dialog.getByLabel('Option 2 start time').fill(await dialog.getByLabel('Option 1 start time').inputValue());
       await dialog.getByText('Same as another option.').waitFor();
       assert(await send.isDisabled(), 'Duplicates block sending');
+      await dialog.getByRole('status').filter({ hasText: 'Two options are the same time.' }).waitFor();
       await dialog.getByRole('button', { name: 'Remove option 2' }).click();
       assert.equal(await dialog.getByLabel('Option 3 date').count(), 0);
 

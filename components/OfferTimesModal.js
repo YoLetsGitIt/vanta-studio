@@ -66,7 +66,9 @@ export default function OfferTimesModal({ booking, offer = null, artists: givenA
 
   useEffect(() => {
     const known = hasArtist(bookingArtistId) && artists.some(a => String(a.artistId ?? a.artist_id ?? a.id) === String(bookingArtistId));
-    setArtistId(known ? String(bookingArtistId) : '');
+    // The request's artist, or the only artist at the studio.
+    const only = artists.length === 1 ? String(artists[0].artistId ?? artists[0].artist_id ?? artists[0].id) : '';
+    setArtistId(current => current || (known ? String(bookingArtistId) : only));
   }, [bookingArtistId, artists]);
   useEffect(() => {
     setDuration(offer?.duration_minutes ?? booking?.proposed_duration_minutes ?? booking?.duration_minutes ?? 60);
@@ -93,7 +95,14 @@ export default function OfferTimesModal({ booking, offer = null, artists: givenA
   const keys = slots.map(d => d?.getTime());
   const duplicate = i => keys[i] != null && keys.indexOf(keys[i]) !== i;
   const past = i => slots[i] && slots[i].getTime() <= Date.now();
-  const ready = artistId && slots.every(Boolean) && !slots.some((_, i) => duplicate(i) || past(i)) && !depositInvalid;
+  // Say what's stopping the send instead of leaving the button greyed out unexplained.
+  const blocker = !artistId ? 'Choose an artist to send these times.'
+    : !slots.every(Boolean) ? 'Add a date and start time for each option.'
+    : slots.some((_, i) => duplicate(i)) ? 'Two options are the same time.'
+    : slots.some((_, i) => past(i)) ? 'One of the times has already passed.'
+    : depositInvalid ? (quoteNum > 0 && depositNum > quoteNum ? 'The deposit can’t be more than the quote.' : 'Enter the deposit amount.')
+    : '';
+  const ready = !blocker;
 
   async function submit() {
     if (saving || !ready) return;
@@ -199,6 +208,7 @@ export default function OfferTimesModal({ booking, offer = null, artists: givenA
           <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-ghost)' }}>To ask for a deposit, add Stripe, PayID or bank transfer in Settings → Payments.</p>
         )}
       </fieldset>
+      {blocker && <p role="status" style={{ margin: 'var(--space-3) 0 0', color: 'var(--color-warning, #e0a84f)', fontSize: '0.875rem' }}>{blocker}</p>}
       {errorMessage && <p role="alert" style={{ margin: 'var(--space-3) 0 0', color: 'var(--color-danger)', fontSize: '0.875rem' }}>{errorMessage}</p>}
     </Dialog>
   );
