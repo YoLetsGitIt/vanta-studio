@@ -29,6 +29,7 @@ import { requestConfirmation, showError } from '@/lib/feedback';
 import DownloadableQR from '@/components/DownloadableQR';
 import WalkInFormSettings from '@/components/WalkInFormSettings';
 import BookingManagementSettings from '@/components/BookingManagementSettings';
+import EmailSenderSettings from '@/components/EmailSenderSettings';
 import PushNotificationSettings from '@/components/PushNotificationSettings';
 import ArtistCommissionOverrides from '@/components/ArtistCommissionOverrides';
 import { useBookingManagement } from '@/lib/bookingManagement';
@@ -1545,6 +1546,7 @@ export default function SettingsPage() {
         </>}
 
         {tab === 'messages' && <>
+        <div id="email-sender" className="settings-span-12 settings-cell"><EmailSenderSettings /></div>
         <section className="settings-span-6" style={s.card}>
           <h2 style={s.sectionTitle}>Emails</h2>
           <p style={s.sectionDesc}>Booking confirmation is always sent. Choose up to 2 reminder emails for your clients.</p>

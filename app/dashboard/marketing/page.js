@@ -52,10 +52,15 @@ export default function MarketingPage() {
     catch (err) { setError(err.message); }
   }, []);
   useEffect(() => {
-    load();
     const params = new URLSearchParams(window.location.search);
+    // The email sender lives in Settings → Client messages; older mailbox sign-ins land here.
+    if (params.has('mailbox')) {
+      window.location.replace(`/dashboard/settings?tab=messages&mailbox=${encodeURIComponent(params.get('mailbox'))}#email-sender`);
+      return;
+    }
+    load();
     const legacyTab = params.get('tab');
-    const requested = params.has('mailbox') || legacyTab === 'sender' ? 'settings'
+    const requested = legacyTab === 'sender' ? 'settings'
       : legacyTab === 'campaigns' ? 'templates' : legacyTab;
     if (SECTIONS.includes(requested)) selectTab(requested);
   }, [load, selectTab]);

@@ -19,7 +19,7 @@ const base=process.env.STUDIO_TEST_URL||'http://127.0.0.1:3036',out=process.env.
     return route.fulfill({json:{status:'approved',studio_id:'test-studio',studio}});
    });
    const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
-   await page.goto(`${base}/dashboard/settings?tab=bookings`,{waitUntil:'networkidle'});
+   await page.goto(`${base}/dashboard/settings?tab=messages`,{waitUntil:'networkidle'});
    const card=page.locator('section').filter({has:page.getByRole('heading',{name:'Emails',exact:true})});await card.waitFor();
    const seven=card.getByRole('switch',{name:'7-day reminder',exact:true}),day=card.getByRole('switch',{name:'24-hour reminder',exact:true});
    async function shape(control){

@@ -336,7 +336,10 @@ async function screenshot(page, name) {
       await sectionAction(page, 'settings').click();
       await page.getByRole('heading', { name: 'Marketing settings', exact: true }).waitFor();
       await page.getByRole('heading', { name: 'Sending overview', exact: true }).waitFor();
-      await page.getByRole('heading', { name: 'Sender details', exact: true }).waitFor();
+      // The sender itself is set once in Settings → Client messages; marketing shows what it is.
+      await page.getByRole('heading', { name: 'Sending email', exact: true }).waitFor();
+      assert.match(await page.getByRole('link', { name: 'Change in Settings', exact: true }).getAttribute('href'), /\/dashboard\/settings\?tab=messages#email-sender$/);
+      assert.equal(await page.getByRole('heading', { name: 'Sender details', exact: true }).count(), 0);
       assert.equal(await page.locator('#panel-history').isVisible(), false);
       assert.equal(reads.filter(p => p.endsWith('/marketing/campaigns')).length, 0);
       await sectionAction(page, 'history').click();
@@ -591,13 +594,22 @@ async function screenshot(page, name) {
     for (const query of cases('links') ? ['?tab=settings', '?tab=sender', '?mailbox=connected', '?tab=history', '?tab=campaigns'] : []) {
       const { context, page, writes, errors } = await setup(browser, 390);
       await page.goto(`${base}/dashboard/marketing.html${query}`, { waitUntil: 'networkidle' });
+      if (query.includes('mailbox')) {
+        // A mailbox sign-in that lands on Marketing goes on to the email sender in Settings.
+        await page.waitForURL(/\/dashboard\/settings/);
+        const url = new URL(page.url());
+        assert.equal(url.searchParams.get('tab'), 'messages');
+        // Opens on the mailbox method, then drops ?mailbox once it has shown the result.
+        await page.getByRole('heading', { name: 'Connect an email account', exact: true }).waitFor();
+        await page.waitForFunction(() => !new URL(location.href).searchParams.has('mailbox'));
+        assert.deepEqual(writes, []);
+        console.log(`PASS existing deep link ${query} forwards to Settings`);
+        await context.close();
+        continue;
+      }
       const isCompose = query.includes('campaigns');
       await selected(page, isCompose ? 'templates' : query.includes('history') ? 'history' : 'settings');
       if (query.includes('history')) await page.getByRole('heading', { name: 'Nothing sent yet', exact: true }).waitFor();
-      if (query.includes('mailbox')) {
-        await page.getByRole('heading', { name: 'Connect an email account', exact: true }).waitFor();
-        assert.equal(new URL(page.url()).searchParams.has('mailbox'), false);
-      }
       assert.deepEqual(writes, []); assert.deepEqual(errors, []);
       console.log(`PASS existing deep link ${query}`);
       await context.close();

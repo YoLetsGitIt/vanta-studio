@@ -4,14 +4,17 @@ import { useLanguage } from '@/lib/i18n';
 
 import Link from 'next/link';
 import Button from '@/components/ui/Button';
-import SenderSettings from './SenderSettings';
+import { senderSummary } from './SenderSettings';
 import styles from './marketing.module.css';
+
+// The sender lives in Settings → Client messages, shared with booking emails.
+const SENDER_SETTINGS = '/dashboard/settings?tab=messages#email-sender';
 
 export default function MarketingSettings({ data, onReload, onTemplates, onHistory }) {
   const { t: mt } = useLanguage();
   const { stats, settings, available, ready } = data;
   const steps = [
-    { done: ready, title: mt("Set up your sending email"), hint: mt("So client replies reach you."), action: <Button size="sm" onClick={() => document.getElementById('marketing-sender-settings')?.scrollIntoView({ behavior: 'smooth' })}>{mt("Add it")}</Button> },
+    { done: ready, title: mt("Set up your sending email"), hint: mt("So client replies reach you."), action: <Link href={SENDER_SETTINGS} className="studio-button studio-button--primary studio-button--sm">{mt("Add it")}</Link> },
     { done: stats.consented_clients > 0, title: mt("Choose who can be emailed"), hint: mt("Tick “agreed to marketing emails” on a client."), action: <Link href="/dashboard/clients" className="studio-button studio-button--secondary studio-button--sm">{mt("Go to clients")}</Link> },
     { done: stats.sent_this_month > 0, title: mt("Create a template and send an email"), action: <Button size="sm" variant="secondary" onClick={onTemplates}>{mt("Create a template")}</Button> },
   ];
@@ -20,7 +23,7 @@ export default function MarketingSettings({ data, onReload, onTemplates, onHisto
     <>
       <div>
         <h2 className={styles.cardTitle}>{mt("Marketing settings")}</h2>
-        <p className={styles.desc}>{mt("Manage your sending email, account connections and setup.")}</p>
+        <p className={styles.desc}>{mt("Your sending overview and setup.")}</p>
       </div>
 
       <section className={styles.card} aria-labelledby="marketing-overview-title">
@@ -52,9 +55,18 @@ export default function MarketingSettings({ data, onReload, onTemplates, onHisto
         </section>
       )}
 
-      <div id="marketing-sender-settings" className={styles.panel}>
-        <SenderSettings settings={settings} available={available} domainAvailable={data.domain_available ?? available} onSaved={onReload} onReload={onReload} />
-      </div>
+      <section id="marketing-sender-settings" className={styles.card} aria-labelledby="marketing-sender-title">
+        <div className={styles.sectionHead}>
+          <h3 className={styles.cardTitle} id="marketing-sender-title">{mt("Sending email")}</h3>
+          <Link href={SENDER_SETTINGS} className="studio-button studio-button--secondary studio-button--sm">{mt("Change in Settings")}</Link>
+        </div>
+        <p className={styles.desc}>
+          {senderSummary(settings, mt)
+            ? <>{mt("Emails send from")} <strong>{senderSummary(settings, mt)}</strong>. {mt("Your booking emails and reminders use the same sender.")}</>
+            : mt("Not set up yet. Your studio has one sender for marketing and booking emails, set in Settings → Client messages.")}
+        </p>
+        {data.sender_error && <p className={styles.notice} role="alert">{data.sender_error}</p>}
+      </section>
     </>
   );
 }

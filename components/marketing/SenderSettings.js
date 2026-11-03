@@ -18,6 +18,13 @@ function statusBadge(status, mt) {
   return <span className={`${styles.pill} ${styles.pillBusy}`}>{mt('Waiting for DNS')}</span>;
 }
 
+// The address the studio's emails go out from, in words, or null when not set up.
+export function senderSummary(settings, mt) {
+  if (['gmail', 'outlook'].includes(settings.sender_provider)) return settings.mailbox_email || null;
+  if (settings.domain_status === 'verified') return `${settings.from_local || 'hello'}@${settings.domain}`;
+  return settings.reply_to ? mt('Vanta’s shared address, with replies going to {email}', { email: settings.reply_to }) : null;
+}
+
 export default function SenderSettings({ settings, available, domainAvailable = available, onSaved, onReload }) {
   const { t: mt } = useLanguage();
   const [form, setForm] = useState(settings);
@@ -88,10 +95,7 @@ export default function SenderSettings({ settings, available, domainAvailable = 
   });
 
   const verified = settings.domain_status === 'verified';
-  const savedMailbox = ['gmail', 'outlook'].includes(settings.sender_provider);
-  const current = savedMailbox ? (settings.mailbox_email || null)
-    : verified ? `${settings.from_local || 'hello'}@${settings.domain}`
-      : settings.reply_to ? mt('Vanta’s shared address, with replies going to {email}', { email: settings.reply_to }) : null;
+  const current = senderSummary(settings, mt);
   const METHODS = [
     ['mailbox', 'Your Gmail or Outlook', 'Emails come from your own address. Best for small sends, up to 100 a day.'],
     ['resend', 'Your studio domain or Vanta', 'Send from your own domain once verified, or from Vanta’s address with replies going to you. Best for larger sends, with open and click tracking.'],
@@ -133,7 +137,7 @@ export default function SenderSettings({ settings, available, domainAvailable = 
           <Field label={mt("Sender name")} hint={mt("Defaults to your studio name.")}><Input value={form.from_name} maxLength={100} onChange={e => set({ from_name: e.target.value })} /></Field>
           <Field label={mt("Reply-to email")} required={!mailbox} hint={mailbox ? mt("Optional. Replies go to your connected account when left blank.") : mt("Where client replies land.")}><Input type="email" value={form.reply_to} onChange={e => set({ reply_to: e.target.value })} /></Field>
         </div>
-        <Field label={mt("Postal address for the email footer")} hint={mt("Shown at the bottom of every email. Recommended.")}>
+        <Field label={mt("Postal address for the email footer")} hint={mt("Shown at the bottom of marketing emails. Recommended.")}>
           <Textarea rows={2} value={form.footer_address} maxLength={300} onChange={e => set({ footer_address: e.target.value })} />
         </Field>
         {verified && !mailbox && (
