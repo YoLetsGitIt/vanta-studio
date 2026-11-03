@@ -8,7 +8,7 @@ import { createStudioReimbursement, getStudioClient, getStudioClients } from '@/
 import { formatDob, initials } from '@/lib/format';
 import { showError, showFeedback } from '@/lib/feedback';
 
-export default function DashboardQuickActions({ artists = [] }) {
+export default function DashboardQuickActions({ artists = [], className = '' }) {
   const [dialog, setDialog] = useState(null);
 
   const actions = [
@@ -18,7 +18,7 @@ export default function DashboardQuickActions({ artists = [] }) {
 
   return (
     <>
-      <div style={styles.grid} className="studio-home-quick-actions">
+      <div style={styles.grid} className={`studio-home-quick-actions ${className}`.trim()}>
         {actions.map(action => (
           <button key={action.label} type="button" style={styles.action} aria-label={action.label} title={action.label} onClick={action.action}>
             <span style={styles.icon(action.tone)} aria-hidden="true">{action.icon}</span>

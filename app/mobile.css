@@ -363,3 +363,15 @@
   .settings-bento { grid-template-columns: minmax(0, 1fr); gap: 12px; }
   .settings-bento > [class*="settings-span-"], .settings-bento > * { grid-column: auto !important; }
 }
+
+/* Dashboard quick actions: in the header by default; on portrait phones they move into
+   the scrolling content so the pinned header stays slim. */
+.studio-home-quick-actions.studio-home-quick-actions--body { display: none !important; }
+@media (max-width: 760px) and (orientation: portrait) {
+  .studio-home-quick-actions.studio-home-quick-actions--header { display: none !important; }
+  .studio-home-quick-actions.studio-home-quick-actions--body { display: grid !important; }
+  .studio-home-header { padding: 10px 16px !important; flex-direction: row !important; align-items: baseline !important; gap: 10px !important; }
+  .studio-home-header h1 { font-size: 1.35rem !important; margin: 0 !important; }
+  .studio-home-header > div:first-of-type { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+  .studio-home-header p { font-size: 0.9rem !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+}

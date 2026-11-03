@@ -409,11 +409,13 @@ export default function HomePage() {
       <header className={`${styles.header} studio-home-header`}>
         <button className="studio-home-landscape-control" type="button" aria-label="Open studio navigation" onClick={() => window.dispatchEvent(new Event('vanta:open-navigation'))}>☰</button>
         <div><h1 className={styles.title}>Today</h1><p className={styles.date}>{dateLabel}</p></div>
-        {!loading && !loadError && !isEmptyDashboard && <DashboardQuickActions artists={artists} />}
+        {!loading && !loadError && !isEmptyDashboard && <DashboardQuickActions artists={artists} className="studio-home-quick-actions--header" />}
         <button className="studio-home-landscape-control studio-home-add" type="button" aria-label="New Appointment" onClick={() => window.dispatchEvent(new Event('vanta:open-new-appointment'))}>+</button>
       </header>
 
       <div style={s.body} className="studio-home-body">
+        {/* Phones: the quick actions scroll with the page instead of sitting in the pinned header. */}
+        {!loading && !loadError && !isEmptyDashboard && <DashboardQuickActions artists={artists} className="studio-home-quick-actions--body" />}
         {loading && <StatePanel title="Loading your dashboard…" busy compact />}
 
         {!loading && loadError && (
