@@ -148,7 +148,7 @@ export default function StudioSetupChecklist() {
                   </button>
                   <a className={styles.stepLink} href={step.href} aria-label={`${step.title}: ${step.action}`}>
                     <h3 className={styles.linkedTitle}>{step.title}</h3>
-                    {status === 'skipped' ? <span className={styles.optional}>Skipped</span> : step.optional && <span className={styles.optional}>Optional</span>}
+                    {status === 'skipped' && <span className={styles.optional}>Skipped</span>}
                     {nextStep?.id === step.id && <span className={styles.nextTag}>Next</span>}
                     <span className={styles.stepAction} aria-hidden="true">{status === 'complete' ? 'Review' : step.action}</span>
                     <ArrowIcon />
