@@ -248,13 +248,14 @@ function ConsentForm() {
   const templates = info.templates ?? [];
 
   return (
-    <div style={{ width: '100%', maxWidth: 540 }}>
+    <div style={s.card}>
       {info.logo_url && <img src={info.logo_url} alt={`${info.studio_name} logo`} style={{ maxHeight: 56, maxWidth: 200, objectFit: 'contain', display: 'block', marginBottom: '0.6rem' }} />}
-      <p style={{ ...s.studioTag, marginBottom: '0.75rem' }}>{info.studio_name}</p>
+      <p style={s.studioTag}>{info.studio_name}</p>
+      <h2 style={s.heading}>Consent form</h2>
 
       <form onSubmit={handleSubmit} style={s.form}>
         <ClientAccountActions email={session.user?.email} />
-        <div style={s.templateBox}>
+        <div style={s.detailsSection}>
           <p style={s.templateTitle}>Your details</p>
           <p style={{ ...s.hint, margin: '0.25rem 0 0.85rem' }}>Review your details and update anything that has changed.</p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
@@ -478,9 +479,6 @@ function ConsentFormField({ field, value, onChange }) {
 
 function SignaturePad({ onCapture }) {
   const canvasRef = useRef(null);
-  const [signatureMode, setSignatureMode] = useState('draw');
-  const [typedName, setTypedName] = useState('');
-  const [signatureStatus, setSignatureStatus] = useState('');
   const [drawing, setDrawing] = useState(false);
   const [hasDrawn, setHasDrawn] = useState(false);
 
@@ -531,50 +529,21 @@ function SignaturePad({ onCapture }) {
     const canvas = canvasRef.current;
     canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
     setHasDrawn(false);
-    setSignatureStatus('');
     onCapture(null);
-  }
-
-  function captureTyped() {
-    const name = typedName.trim();
-    if (!name) return;
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = '#ffffff';
-    ctx.font = '28px serif';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(name, 20, canvas.height / 2, canvas.width - 40);
-    canvas.toBlob(blob => {
-      onCapture(blob);
-      setSignatureStatus(blob ? 'Signature added.' : 'Unable to add signature. Please try again.');
-    }, 'image/png');
   }
 
   return (
     <div style={s.sigWrap}>
-      <div style={{ display: 'flex', gap: 8, padding: 8 }} role="group" aria-label="Signature method">
-        <button type="button" aria-pressed={signatureMode === 'draw'} onClick={() => { clear(); setSignatureMode('draw'); }} style={{ minHeight: 44 }}>Draw signature</button>
-        <button type="button" aria-pressed={signatureMode === 'type'} onClick={() => { clear(); setSignatureMode('type'); }} style={{ minHeight: 44 }}>Type signature</button>
-      </div>
-      {signatureMode === 'type' && <div style={{ padding: 12 }}>
-        <label style={{ display: 'block' }}>Full name for your electronic signature
-          <input value={typedName} maxLength={120} autoComplete="name" onChange={event => { clear(); setTypedName(event.target.value); }} style={{ ...s.input, width: '100%', minWidth: 0, boxSizing: 'border-box', minHeight: 44, marginTop: 8, padding: 10 }} />
-        </label>
-        <button type="button" disabled={!typedName.trim()} onClick={captureTyped} style={{ minHeight: 44, marginTop: 8 }}>Use typed signature</button>
-        <p role="status">{signatureStatus}</p>
-      </div>}
-
       <canvas
         ref={canvasRef}
-        aria-label="Draw your signature, or choose Type signature for keyboard entry"
+        aria-label="Draw your signature"
         width={440}
         height={140}
-        style={{ ...s.sigCanvas, display: signatureMode === 'draw' ? 'block' : 'none' }}
+        style={{ ...s.sigCanvas, display: 'block' }}
         onMouseDown={startDraw} onMouseMove={draw} onMouseUp={endDraw} onMouseLeave={endDraw}
         onTouchStart={startDraw} onTouchMove={draw} onTouchEnd={endDraw}
       />
-      <div style={{ ...s.sigFooter, display: signatureMode === 'draw' ? 'flex' : 'none' }}>
+      <div style={s.sigFooter}>
         <span style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.3)' }}>Draw your signature above</span>
         <button type="button" onClick={clear} style={s.sigClear}>Clear</button>
       </div>
@@ -666,11 +635,14 @@ const s = {
     width: '100%', minWidth: 0, minHeight: 44, boxSizing: 'border-box',
     fontFamily: 'inherit',
   },
+  // Sections of the one consent card: the client's details, then each studio form,
+  // split by a divider rather than boxed separately.
   templateBox: {
-    background: 'rgba(255,255,255,0.025)',
-    border: '1px solid rgba(255,255,255,0.07)',
-    borderRadius: 12,
-    padding: '1.25rem 1.25rem 1.5rem',
+    borderTop: '1px solid rgba(255,255,255,0.08)',
+    paddingTop: '1.5rem',
+    display: 'flex', flexDirection: 'column',
+  },
+  detailsSection: {
     display: 'flex', flexDirection: 'column',
   },
   templateHeader: {

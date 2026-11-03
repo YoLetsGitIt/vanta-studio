@@ -52,14 +52,14 @@ const results=[];
   await run('financial-data-table',async(p)=>{
    await p.goto(studio+'/dashboard/financial.html',{waitUntil:'networkidle'});await p.getByText('View chart data',{exact:true}).click();await p.getByRole('table').first().waitFor();assert((await p.locator('tbody tr').count())>0);
   },{width:1440});
-  for(const site of ['studio','web'])await run('typed-signature-'+site,async(p,c)=>{
+  for(const site of ['studio','web'])await run('drawn-signature-'+site,async(p,c)=>{
    if(site==='studio'){
     await c.route('**/studios/local-studio/public',r=>r.fulfill({json:{id:'local-studio',name:'Local Studio'}}));
     await c.route('**/studios/local-studio/consent-templates?**',r=>r.fulfill({json:{templates:[consent]}}));
    }else await c.route('**/public/consent/local-token',r=>r.fulfill({json:{studio_id:'local-studio',studio_name:'Local Studio',templates:[consent],dob:'1990-01-01'}}));
    await p.goto((site==='studio'?studio+'/consent.html?s=local-studio':web+'/consent.html?token=local-token'),{waitUntil:'networkidle'});
-   await p.getByRole('button',{name:'Type signature',exact:true}).click();await p.getByLabel('Full name for your electronic signature').fill('Local Client');await p.getByRole('button',{name:'Use typed signature',exact:true}).press('Enter');await p.getByText('Signature added.',{exact:true}).waitFor();
-   const inputRect=await p.getByLabel('Full name for your electronic signature').boundingBox();const labelRect=await p.getByLabel('Full name for your electronic signature').locator('..').boundingBox();assert(inputRect.x+inputRect.width<=labelRect.x+labelRect.width+1);await p.getByLabel('Full name for your electronic signature').fill('Edited Client');assert(!await p.getByText('Signature added.',{exact:true}).count());
+   // Signatures are always drawn; there is no typed option.
+   assert.equal(await p.getByRole('button',{name:'Type signature',exact:true}).count(),0);const pad=await p.getByLabel('Draw your signature').first().boundingBox();assert(pad&&pad.width>100,'Signature pad is shown');
   },{site});
   for(const type of ['confirm','confirmed'])await run('pending-'+type,async(p)=>{
    await p.goto(web+`/bookings/_/${type}.html?id=local-booking`,{waitUntil:'networkidle'});
