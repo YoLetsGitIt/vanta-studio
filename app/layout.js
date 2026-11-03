@@ -1,6 +1,7 @@
 import './globals.css';
 import './mobile.css';
 import { getThemeInitScript } from '@/lib/theme';
+import { getRscNavigationGuardScript } from '@/lib/rscNavigationGuard';
 import localFont from 'next/font/local';
 import ContactEmailSignupGate from '../components/ContactEmailSignupGate';
 
@@ -26,6 +27,9 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: getRscNavigationGuardScript() }} />
+      </head>
       <body className={spaceGrotesk.variable}>
         <script dangerouslySetInnerHTML={{ __html: getThemeInitScript() }} />
         {children}

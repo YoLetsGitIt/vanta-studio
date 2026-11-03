@@ -1,5 +1,6 @@
 'use client';
 
+import { normalizeBookingSource } from '@/lib/bookingType';
 import Button from '@/components/ui/Button';
 import styles from './home.module.css';
 import StatePanel from '@/components/ui/StatePanel';
@@ -169,6 +170,8 @@ export default function HomePage() {
           const now = Date.now();
           const overdue = allBookings.filter(booking => {
             if (booking.status !== 'confirmed' || !booking.chosen_time) return false;
+            // Imported bookings are history from another system; no outcome needed.
+            if (normalizeBookingSource(booking.source) === 'import') return false;
             const duration = booking.proposed_duration_minutes ?? booking.duration_minutes ?? 60;
             const end = new Date(booking.chosen_time).getTime() + duration * 60000;
             return Number.isFinite(end) && end < now;
