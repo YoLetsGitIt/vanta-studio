@@ -200,6 +200,8 @@ function IntakeInner({ mode }) {
   const [guardianPhone, setGuardianPhone] = useState('');
 
   const [submitting, setSubmitting] = useState(false);
+  const formRef = useRef(null);
+  const [, setValidityTick] = useState(0);
   const [submitError, setSubmitError] = useState('');
   const [done, setDone]             = useState(false);
   const bookingPhone = phoneNum.trim().startsWith('+') ? phoneNum.trim() : `${COUNTRIES.find(c => c.id === phoneCode)?.dial ?? ''} ${phoneNum}`.trim();
@@ -283,6 +285,49 @@ function IntakeInner({ mode }) {
     }));
   }
 
+  // The first required thing still missing from the booking or consent forms, or ''.
+  // Drives both the disabled submit button and the message on submit.
+  function missingRequirement(bookingEmail = guest ? guestEmail.trim() : session?.user?.email?.trim() || '') {
+    if (!fullName.trim()) return 'Please provide your full name.';
+    if (guest && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(bookingEmail)) return 'Please provide a valid email address.';
+    if (!phoneNum.trim()) return 'Please provide your phone number.';
+    if (!dob) return 'Please provide your date of birth.';
+    if (field('body_location').enabled && placements.length === 0) return 'Please select at least one placement.';
+    if (field('availability_windows').enabled && field('availability_windows').required && availability.length === 0) {
+      return 'Please add at least one time you’re available.';
+    }
+
+    // Validate consent form templates — only enforce required ones
+    for (const t of consentTemplates) {
+      const required = t.is_required ?? true;
+      if (!required) continue;
+      const ts = templateState[t.id] ?? {};
+      for (const f of (t.fields ?? [])) {
+        if (f.required && ['text', 'textarea', 'yesno', 'photo_id'].includes(f.type)) {
+          if (!ts.answers?.[f.id]) {
+            return `Please complete all required fields in "${t.name}".`;
+          }
+        }
+        if (f.required && f.type === 'checkbox' && !ts.answers?.[f.id]) {
+          return `Please check all required boxes in "${t.name}".`;
+        }
+      }
+      if (!ts.answers?.__agreed__) {
+        return `Please confirm you have read and agreed to "${t.name}".`;
+      }
+      if (t.requires_signature && !ts.sigBlob) {
+        return `Please sign "${t.name}".`;
+      }
+      if (isMinor) {
+        if (!guardianName.trim()) return 'Please provide the guardian\'s name.';
+        if (!ts.guardianSigBlob) return `Guardian signature required for "${t.name}".`;
+      }
+    }
+    const form = formRef.current;
+    if (form && !form.checkValidity()) return 'Please fill in everything marked *.';
+    return '';
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
     let bookingEmail = guestEmail.trim();
@@ -296,45 +341,8 @@ function IntakeInner({ mode }) {
       bookingEmail = currentSession.user.email?.trim() || '';
       if (!bookingEmail) { setSubmitError('Please sign in with an account that has an email address.'); return; }
     }
-    if (!fullName.trim()) { setSubmitError('Please provide your full name.'); return; }
-    if (guest && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(bookingEmail)) { setSubmitError('Please provide a valid email address.'); return; }
-    if (!phoneNum.trim()) { setSubmitError('Please provide your phone number.'); return; }
-    if (!dob) { setSubmitError('Please provide your date of birth.'); return; }
-    if (field('body_location').enabled && placements.length === 0) { setSubmitError('Please select at least one placement.'); return; }
-    if (field('availability_windows').enabled && field('availability_windows').required && availability.length === 0) {
-      setSubmitError('Please add at least one time you’re available.'); return;
-    }
-
-    // Validate consent form templates — only enforce required ones
-    for (const t of consentTemplates) {
-      const required = t.is_required ?? true;
-      if (!required) continue;
-      const ts = templateState[t.id] ?? {};
-      for (const f of (t.fields ?? [])) {
-        if (f.required && ['text', 'textarea', 'yesno', 'photo_id'].includes(f.type)) {
-          if (!ts.answers?.[f.id]) {
-            setSubmitError(`Please complete all required fields in "${t.name}".`);
-            return;
-          }
-        }
-        if (f.required && f.type === 'checkbox' && !ts.answers?.[f.id]) {
-          setSubmitError(`Please check all required boxes in "${t.name}".`);
-          return;
-        }
-      }
-      if (!ts.answers?.__agreed__) {
-        setSubmitError(`Please confirm you have read and agreed to "${t.name}".`);
-        return;
-      }
-      if (t.requires_signature && !ts.sigBlob) {
-        setSubmitError(`Please sign "${t.name}".`);
-        return;
-      }
-      if (isMinor) {
-        if (!guardianName.trim()) { setSubmitError('Please provide the guardian\'s name.'); return; }
-        if (!ts.guardianSigBlob) { setSubmitError(`Guardian signature required for "${t.name}".`); return; }
-      }
-    }
+    const missing = missingRequirement(bookingEmail);
+    if (missing) { setSubmitError(missing); return; }
 
     setSubmitError('');
     setSubmitting(true);
@@ -428,6 +436,8 @@ function IntakeInner({ mode }) {
   if (!studioId) return <p style={s.msg}>Invalid link — no studio ID.</p>;
   if (studioErr) return <p role="alert" style={{ ...s.msg, color: 'var(--color-danger)' }}>{studioErr}</p>;
   if (!studio || formConfig === null) return <p style={s.msg}>Loading…</p>;
+  const blocker = studio && !done ? missingRequirement() : '';
+
   if (!walkIn && session === undefined) return <p style={s.msg}>Checking your account…</p>;
   if (!session && !guest) return <ClientAuthGate studioId={studioId} studioName={studio.name} logoUrl={studio.logo_url} purpose="booking" onGuest={() => setGuestChosen(true)} />;
   if (!guest && accountError) return <div style={s.card}><p role="alert" style={s.error}>{accountError}</p><Button onClick={() => setAccountRetry(value => value + 1)}>Try again</Button></div>;
@@ -468,7 +478,7 @@ function IntakeInner({ mode }) {
         <h1 style={s.studioName}>{studio.name}</h1>
       </div>
 
-      <form onSubmit={handleSubmit} style={s.form}>
+      <form ref={formRef} onSubmit={handleSubmit} onInput={() => setValidityTick(n => n + 1)} onChange={() => setValidityTick(n => n + 1)} style={s.form}>
           {!guest && <ClientAccountActions email={session.user.email} />}
 
           <Section title="Your details" first>
@@ -476,7 +486,7 @@ function IntakeInner({ mode }) {
             <Field label="Full name">
               <input style={s.input} type="text" value={fullName} required autoComplete="name" onChange={e => setFullName(e.target.value)} placeholder="Your name" />
             </Field>
-            <Field label="Date of birth">
+            <Field label="Date of birth" required>
               <DateOfBirthInput style={s.input} value={dob} onChange={setDob} />
             </Field>
             <Field label="Email">
@@ -710,13 +720,10 @@ function IntakeInner({ mode }) {
           )}
 
           {/* ── Consent forms ── */}
-          {consentTemplates.length > 0 && (
-            <Section title="Consent forms">
-              {consentTemplates.map(t => {
+          {consentTemplates.map(t => {
                 const ts = templateState[t.id] ?? {};
                 return (
-                  <div key={t.id} style={s.consentBox}>
-                    <span style={s.consentFormTitle}>{t.name}</span>
+                  <Section key={t.id} title={t.name}>
 
                     {(t.fields ?? []).map(field => (
                       <ConsentFormField
@@ -787,11 +794,9 @@ function IntakeInner({ mode }) {
                         <SignaturePad onCapture={blob => setTemplateSigBlob(t.id, blob)} />
                       </div>
                     )}
-                  </div>
+                  </Section>
                 );
               })}
-            </Section>
-          )}
 
           {/* ── Submit ── */}
           <div style={s.submitSection}>
@@ -800,7 +805,8 @@ function IntakeInner({ mode }) {
               Send me one SMS reminder before this appointment. Optional; I can stop SMS reminders using the link in the message.
             </label>}
             {submitError && <p role="alert" style={s.error}>{submitError}</p>}
-            <Button type="submit" loading={submitting} loadingLabel="Submitting…" fullWidth>{walkIn ? 'Book me in' : 'Request booking'}</Button>
+            <Button type="submit" loading={submitting} loadingLabel="Submitting…" fullWidth disabled={!!blocker} aria-describedby={blocker ? 'booking-blocker' : undefined}>{walkIn ? 'Book me in' : 'Request booking'}</Button>
+            {blocker && !submitError && <p id="booking-blocker" style={s.blocker}>{blocker}</p>}
           </div>
 
         </form>
@@ -1089,7 +1095,7 @@ const s = {
   photoThumb: { position: 'relative', width: 72, height: 72, borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)' },
   thumbImg: { width: '100%', height: '100%', objectFit: 'cover' },
   thumbRemove: { position: 'absolute', top: 2, right: 2, width: 18, height: 18, borderRadius: '50%', background: 'rgba(0,0,0,0.65)', border: 'none', color: '#fff', fontSize: '0.65rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 },
-  consentBox: { background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' },
+  blocker: { margin: '0.6rem 0 0', fontSize: '0.8rem', color: 'var(--text-muted)', textAlign: 'center' },
   sigWrap: { display: 'flex', flexDirection: 'column', gap: '0.4rem' },
   sigCanvas: { width: '100%', height: 140, borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.12)', display: 'block', touchAction: 'none', cursor: 'crosshair' },
   sigFooter: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
@@ -1097,7 +1103,6 @@ const s = {
   sigClear: { background: 'none', border: 'none', fontSize: '0.72rem', color: 'var(--text-muted)', cursor: 'pointer', padding: '0.15rem 0', fontFamily: 'inherit' },
   consentText: { fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0, lineHeight: 1.65, maxHeight: 160, overflowY: 'auto' },
   consentCheck: { display: 'flex', alignItems: 'flex-start', gap: '0.6rem', fontSize: '0.8rem', color: 'var(--text-dim)', cursor: 'pointer' },
-  consentFormTitle: { fontSize: '0.9rem', fontWeight: 700, color: '#d5d0c7' },
   formTypeBadge: { fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', padding: '0.15rem 0.5rem', borderRadius: 4 },
   formTypeBadgeColors: {
     consent: { background: 'rgba(213,208,199,0.1)', color: '#d5d0c7' },

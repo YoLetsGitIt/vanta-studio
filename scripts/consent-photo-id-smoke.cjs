@@ -39,8 +39,8 @@ const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
       await page.locator('textarea').first().fill('Fine line swallow');
       await page.getByText('I have read and agreed', { exact: false }).first().click();
       // Required: submitting without the photo is blocked.
-      await page.getByRole('button', { name: 'Request booking', exact: true }).click();
-      await page.getByRole('alert').filter({ hasText: 'required fields' }).waitFor();
+      assert.equal(await page.getByRole('button', { name: 'Request booking', exact: true }).isDisabled(), true);
+      await page.locator('#booking-blocker').filter({ hasText: 'required fields' }).waitFor();
       assert.equal(calls.bookings.length, 0);
       await page.getByLabel('Photo ID').setInputFiles({ name: 'licence.png', mimeType: 'image/png', buffer: png });
       await page.getByRole('img', { name: 'Your photo ID' }).waitFor();

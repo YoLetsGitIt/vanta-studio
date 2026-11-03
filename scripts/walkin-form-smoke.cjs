@@ -42,17 +42,26 @@ const template = { id: 'tmpl-1', name: 'Walk-in consent', requires_signature: fa
         assert.equal(await page.getByText(absent, { exact: true }).count(), 0, `${absent} is not on the walk-in form`);
       }
       assert.equal(await page.getByText('Send me one SMS reminder', { exact: false }).count(), 0);
+      // The consent form sits straight in the page: no "Consent forms" header or box, titled with its own name.
+      assert.equal(await page.getByText('Consent forms', { exact: true }).count(), 0);
+      await page.getByText('Walk-in consent', { exact: true }).waitFor();
+      const book = page.getByRole('button', { name: 'Book me in', exact: true });
+      assert.equal(await book.isDisabled(), true, 'Book me in is disabled on an empty form');
       await page.getByPlaceholder('Your name', { exact: true }).fill('Walk In Client');
       await page.locator('input[type="date"]').fill('1994-05-06');
       await page.getByPlaceholder('you@example.com').fill('walkin@example.test');
       await page.getByPlaceholder('555 0100').fill('400111222');
       await page.getByRole('button', { name: 'Forearm', exact: true }).click();
       await page.getByRole('button', { name: 'Yes', exact: true }).click();
+      assert.equal(await book.isDisabled(), true, 'still disabled before agreeing to the consent form');
+      await page.getByText('Please confirm you have read and agreed to "Walk-in consent".').waitFor();
       await page.getByText('I have read and agreed', { exact: false }).first().click();
+      assert.equal(await book.isDisabled(), true, 'still disabled until the artist is chosen');
       // The artist is required.
       const artist = page.locator('select').filter({ has: page.locator('option', { hasText: 'Choose your artist' }) });
       assert.equal(await artist.evaluate(el => el.required), true);
       await artist.selectOption(artistId);
+      assert.equal(await book.isDisabled(), false, 'enabled once everything required is filled in');
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
       if (shots) await page.screenshot({ path: `${shots}/walkin-${width}.png`, fullPage: true });
       await page.getByRole('button', { name: 'Book me in', exact: true }).click();
