@@ -16,15 +16,17 @@ const pending = { id: 'req-1', requester_name: 'Minseo Park', requester_email: '
     for (const [width, withDeposit] of [[390, true], [1280, false]]) {
       const context = await browser.newContext({ viewport: { width, height: 900 }, isMobile: width < 800, hasTouch: width < 800 });
       await setup(context);
-      let sent; let offer = null;
-      await context.route(/\/studio\/me\/bookings(\?|$)/, r => r.fulfill({ json: { bookings: [pending] } }));
-      await context.route(/\/studio\/me\/bookings\/req-1$/, r => r.fulfill({ json: pending }));
+      let sent; let offer = null; let current = { ...pending };
+      await context.route(/\/studio\/me\/bookings(\?|$)/, r => r.fulfill({ json: { bookings: [current] } }));
+      await context.route(/\/studio\/me\/bookings\/req-1$/, r => r.fulfill({ json: current }));
       await context.route(/\/stripe\/status/, r => r.fulfill({ json: { charges_enabled: false, manual_deposits_ready: true } }));
       await context.route(/\/studio\/me\/booking-management$/, r => r.fulfill({ json: { mode: 'studio' } }));
       await context.route(/\/studio\/me\/bookings\/req-1\/offered-times$/, r => r.fulfill({ json: { offer } }));
       await context.route(/\/studio\/me\/bookings\/req-1\/offer-times$/, r => {
         sent = r.request().postDataJSON();
-        offer = { artist_id: sent.artist_id, artist_name: 'Sam Anderson', duration_minutes: sent.duration_minutes, deposit_amount: sent.deposit_amount, times: [...sent.times].sort() };
+        offer = { artist_id: sent.artist_id, artist_name: 'Sam Anderson', duration_minutes: sent.duration_minutes, deposit_amount: sent.deposit_amount, times: [...sent.times].sort(),
+          email_to: 'minseo@example.test', ...(withDeposit ? { email_error: 'The to address is on the suppression list' } : { email_sent_at: new Date().toISOString() }) };
+        current = { ...current, status: 'awaiting_payment' }; // waiting on the client, like a sent link
         return r.fulfill({ json: { offer } });
       });
       const page = await context.newPage();
@@ -86,7 +88,18 @@ const pending = { id: 'req-1', requester_name: 'Minseo Park', requester_email: '
       await page.getByText(/Times offered · waiting for Minseo to choose/).waitFor();
       await page.getByText(withDeposit ? '2 hrs · Sam Anderson · $80.00 deposit to confirm' : '2 hrs · Sam Anderson', { exact: true }).waitFor();
       await page.getByRole('button', { name: 'Edit times', exact: true }).waitFor();
+      // The studio can see whether the email went out.
+      if (withDeposit) {
+        await page.getByText('Times saved, but the email didn’t send: The to address is on the suppression list').waitFor();
+        await page.getByRole('alert').filter({ hasText: 'Use Edit times to send it again' }).waitFor();
+      }
+      else await page.getByText(/^Emailed to minseo@example\.test · /).waitFor();
       if (shots) await page.screenshot({ path: `${shots}/offer-times-panel-${width}.png` });
+      // Reopened later in Awaiting payment: still shows the offer and can be edited, no "Resend link".
+      await page.reload({ waitUntil: 'networkidle' });
+      await page.getByRole('list', { name: 'Offered times' }).waitFor();
+      await page.getByRole('button', { name: 'Edit times', exact: true }).waitFor();
+      assert.equal(await page.locator('.studio-bdp-actions').getByRole('button', { name: /link/i }).count(), 0, 'No resend link for an offer');
       assert.deepEqual(errors, []);
       console.log(`PASS offer times ${withDeposit ? 'with deposit' : 'without deposit'} at ${width}px`);
       await context.close();

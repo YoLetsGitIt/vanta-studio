@@ -176,8 +176,9 @@ export default function BookingDetailPanel({
   // When the client gave weekly availability, the studio offers up to three times instead of
   // sending a "choose a time" link.
   const hasAvailabilityWindows = Array.isArray(booking?.availability_windows) && booking.availability_windows.length > 0;
-  const canOfferTimes     = bookingManagement === 'studio' && Boolean(bookTimeArtists) && status === 'pending' && hasAvailabilityWindows;
   const currentOffer      = offer?.booking === bookingId ? offer.data : null;
+  const canOfferTimes     = bookingManagement === 'studio' && Boolean(bookTimeArtists) && hasAvailabilityWindows
+    && (status === 'pending' || (status === 'awaiting_payment' && Boolean(currentOffer)));
 
   const displayStatus = isNoShow ? 'no_show' : status;
   const sc = statusColors(displayStatus);
@@ -202,13 +203,15 @@ export default function BookingDetailPanel({
 
   // ── Times the studio offered, while the client chooses ─────────────────────
   useEffect(() => {
-    if (!bookingId || status !== 'pending' || bookingManagement !== 'studio') { setOffer(null); return; }
+    // Offered times wait in Awaiting payment until the client picks one.
+    const waiting = status === 'pending' || (status === 'awaiting_payment' && !chosenTime);
+    if (!bookingId || !waiting || bookingManagement !== 'studio') { setOffer(null); return; }
     let live = true;
     getOfferedTimes(bookingId)
       .then(data => { if (live) setOffer({ booking: bookingId, data }); })
       .catch(() => { if (live) setOffer(null); });
     return () => { live = false; };
-  }, [bookingId, status, bookingManagement]);
+  }, [bookingId, status, chosenTime, bookingManagement]);
 
   // ── How a manually recorded deposit was paid (PayID, bank transfer, cash) ──
   const [depositReceipt, setDepositReceipt] = useState(null);
@@ -424,6 +427,15 @@ export default function BookingDetailPanel({
           ) : (
             <span style={p.heroTime}>{heroTime ? fmtDate(heroTime) : '—'}</span>
           )}
+          {offeredTimes && (currentOffer?.email_error ? (
+            <span role="alert" style={p.heroNote}>
+              The email to {currentOffer.email_to || 'the client'} didn’t send: {currentOffer.email_error}. Use Edit times to send it again.
+            </span>
+          ) : currentOffer?.email_sent_at ? (
+            <span style={{ ...p.heroMeta, fontSize: '0.85rem' }}>
+              Emailed to {currentOffer.email_to} · {new Date(currentOffer.email_sent_at).toLocaleString('en-AU', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}
+            </span>
+          ) : null)}
           {heroMeta && <span style={p.heroMeta}>{heroMeta}</span>}
           {cancelReason && <span style={p.heroNote}>{t('bdp_cancelled_reason')}: {cancelReason}</span>}
         </div>
@@ -814,7 +826,12 @@ export default function BookingDetailPanel({
       {/* ── Actions ── */}
       {offerOpen && booking && (
         <OfferTimesModal booking={booking} offer={currentOffer} artists={bookTimeArtists} depositsReady={depositsReady} onClose={() => setOfferOpen(false)}
-          onOffered={async (id, data) => { setOffer({ booking: id, data }); showFeedback(`Times sent to ${clientName !== '—' ? clientName : 'the client'}`, 'success'); await onBooked?.(id); }} />
+          onOffered={async (id, data) => {
+            setOffer({ booking: id, data });
+            if (data?.email_error) showFeedback(`Times saved, but the email didn’t send: ${data.email_error}`, 'error');
+            else showFeedback(`Times sent to ${clientName !== '—' ? clientName : 'the client'}`, 'success');
+            await onBooked?.(id);
+          }} />
       )}
       {bookTimeOpen && booking && (
         <BookTimeModal booking={booking} artists={bookTimeArtists} depositsReady={depositsReady} onClose={() => setBookTimeOpen(false)}
