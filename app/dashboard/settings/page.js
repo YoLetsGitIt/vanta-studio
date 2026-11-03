@@ -267,22 +267,13 @@ export default function SettingsPage() {
   const [slugDraft, setSlugDraft] = useState('');
   const [slugSaving, setSlugSaving] = useState(false);
   const [slugError, setSlugError] = useState('');
-  // Live check while typing: null, or { slug, state: 'short' | 'checking' | 'available' | 'taken', message }.
+  // Result of the "Check" button for the link name: null, or
+  // { slug, state: 'short' | 'yours' | 'checking' | 'available' | 'taken' | 'error', message }.
   const [slugCheck, setSlugCheck] = useState(null);
-  useEffect(() => {
-    setSlugError('');
-    if (!bookingSlug || slugDraft === bookingSlug) { setSlugCheck(null); return undefined; }
-    if (slugDraft.length < 3) { setSlugCheck({ slug: slugDraft, state: 'short' }); return undefined; }
-    setSlugCheck({ slug: slugDraft, state: 'checking' });
-    let active = true;
-    const timer = setTimeout(() => {
-      checkBookingLink(slugDraft)
-        .then(result => { if (active) setSlugCheck({ slug: result.slug || slugDraft, state: result.available ? 'available' : 'taken', message: result.message }); })
-        // If the check itself fails, saving still checks.
-        .catch(() => { if (active) setSlugCheck(null); });
-    }, 350);
-    return () => { active = false; clearTimeout(timer); };
-  }, [slugDraft, bookingSlug]);
+  const latestSlugDraft = useRef(slugDraft);
+  latestSlugDraft.current = slugDraft;
+  // Editing the name clears the last result.
+  useEffect(() => { setSlugError(''); setSlugCheck(null); }, [slugDraft]);
   const consentUrl = bookingSlug ? `${SHORT_LINK_BASE}/c/${bookingSlug}` : walkInUrl.replace('/studio-booking?s=', '/consent?s=');
   const [studioId, setStudioId] = useState('');
   const [theme, setThemeState] = useState('dark');
@@ -755,6 +746,21 @@ export default function SettingsPage() {
     window.location.replace('/'); // full load; see dashboard/layout.js
   }
 
+  async function checkBookingSlug() {
+    const draft = slugDraft;
+    if (draft.length < 3) { setSlugCheck({ slug: draft, state: 'short' }); return; }
+    if (draft === bookingSlug) { setSlugCheck({ slug: draft, state: 'yours' }); return; }
+    setSlugCheck({ slug: draft, state: 'checking' });
+    try {
+      const result = await checkBookingLink(draft);
+      // Ignore the answer if the name changed while checking.
+      if (latestSlugDraft.current !== draft) return;
+      setSlugCheck({ slug: result.slug || draft, state: result.available ? 'available' : 'taken', message: result.message });
+    } catch {
+      if (latestSlugDraft.current === draft) setSlugCheck({ slug: draft, state: 'error' });
+    }
+  }
+
   async function saveBookingSlug(event) {
     event.preventDefault();
     setSlugError('');
@@ -764,7 +770,7 @@ export default function SettingsPage() {
       const { slug } = await updateBookingLink(slugDraft);
       setBookingSlug(slug); setSlugDraft(slug); setWalkInUrl(`${SHORT_LINK_BASE}/b/${slug}`);
     } catch (err) {
-      setSlugError(err.message);
+      setSlugError(err.message === 'that link is already taken' ? `Another studio already uses vanta.tattoo/b/${slugDraft}. Try a different name.` : err.message);
     } finally {
       setSlugSaving(false);
     }
@@ -1387,12 +1393,14 @@ export default function SettingsPage() {
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                 <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>vanta.tattoo/b/</span>
                 <input id="booking-slug" className="vanta-input" value={slugDraft} onChange={e => setSlugDraft(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))} maxLength={40} autoCapitalize="none" autoCorrect="off" spellCheck={false} style={{ flex: '1 1 140px', minWidth: 0, background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 8, padding: '0.5rem 0.7rem', fontSize: '16px', color: 'var(--text)' }} />
-                <button type="submit" style={s.copyBtn} disabled={slugSaving || slugDraft === bookingSlug || slugDraft.length < 3 || (slugCheck && slugCheck.state !== 'available')}>{slugSaving ? 'Saving…' : 'Save'}</button>
+                <button type="button" style={s.copyBtn} onClick={checkBookingSlug} disabled={slugSaving || slugCheck?.state === 'checking'}>{slugCheck?.state === 'checking' ? 'Checking…' : 'Check'}</button>
+                <button type="submit" style={s.copyBtn} disabled={slugSaving || slugDraft === bookingSlug || slugDraft.length < 3 || slugCheck?.state === 'taken'}>{slugSaving ? 'Saving…' : 'Save'}</button>
               </div>
               <div aria-live="polite">
                 {slugError ? <p role="alert" style={{ margin: 0, fontSize: '0.85rem', color: 'var(--color-danger)' }}>{slugError}</p>
                   : slugCheck?.state === 'short' ? <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-muted)' }}>Use at least 3 letters or numbers.</p>
-                  : slugCheck?.state === 'checking' ? <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-muted)' }}>Checking…</p>
+                  : slugCheck?.state === 'yours' ? <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-muted)' }}>This is your current link.</p>
+                  : slugCheck?.state === 'error' ? <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--color-danger)' }}>Couldn’t check right now. Try again.</p>
                   : slugCheck?.state === 'available' ? <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--color-success)' }}>✓ vanta.tattoo/b/{slugCheck.slug} is available</p>
                   : slugCheck?.state === 'taken' ? <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--color-danger)' }}>{slugCheck.message === 'that link is already taken' ? `Another studio already uses vanta.tattoo/b/${slugCheck.slug}. Try a different name.` : `${slugCheck.message.charAt(0).toUpperCase()}${slugCheck.message.slice(1)}.`}</p>
                   : null}

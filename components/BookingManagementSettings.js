@@ -7,43 +7,43 @@ import { useState } from 'react';
 import { saveBookingManagement, useBookingManagement } from '@/lib/bookingManagement';
 import styles from './BookingManagementSettings.module.css';
 
-// What happens to a booking request in each mode. Either way the client has
-// the last word: they confirm by picking one of the offered times (and paying
-// any deposit). "Book a time" (studio mode only) skips the client step.
+// Who acts on a booking request, in order (mirrors the backend). Artist mode:
+// the studio sends times, the client picks, the artist confirms. Studio mode:
+// the booking is confirmed as soon as the client picks.
 const OPTIONS = [
   {
     value: 'artist',
     title: 'Artists confirm',
-    summary: 'Artists choose which times to offer. Good when artists manage their own diaries.',
+    summary: 'The artist confirms each time the client picks. Good when artists manage their own diaries.',
     steps: [
-      { who: 'Client', text: 'Sends a booking request from your booking link or website.' },
-      { who: 'Artist', text: 'Reviews the request in the Vanta app and sends the client some times.', key: true },
-      { who: 'Client', text: 'Confirms by picking a time from the email, and pays any deposit.' },
-      { who: 'Booked', text: 'The booking is confirmed and on the artist’s schedule.', done: true },
+      { who: 'Client', does: 'Requests' },
+      { who: 'Studio', does: 'Sends times' },
+      { who: 'Client', does: 'Picks a time' },
+      { who: 'Artist', does: 'Confirms', key: true },
+      { who: 'Client', does: 'Booked', done: true },
     ],
   },
   {
     value: 'studio',
     title: 'The studio confirms',
-    summary: 'The front desk offers times. Artists don’t need to accept. Good when the studio runs the diary.',
+    summary: 'Booked as soon as the client picks a time. Artists don’t need to accept. Good when the studio runs the diary.',
     steps: [
-      { who: 'Client', text: 'Sends a booking request from your booking link or website.' },
-      { who: 'Studio', text: 'Offers the client some times from Bookings.', key: true },
-      { who: 'Client', text: 'Confirms by picking a time from the email, and pays any deposit.' },
-      { who: 'Booked', text: 'The booking is confirmed and on the artist’s schedule.', done: true },
+      { who: 'Client', does: 'Requests' },
+      { who: 'Studio', does: 'Sends times', key: true },
+      { who: 'Client', does: 'Picks a time' },
+      { who: 'Client', does: 'Booked', done: true },
     ],
-    note: 'Already agreed a time with the client? Use “Book a time” to book it straight in without the client confirming.',
+    note: 'Already agreed a time with the client? Use “Book a time” to book it straight in.',
   },
 ];
 
 function Flow({ steps, label }) {
   return (
-    <ol className={styles.flow} aria-label={label}>
+    <ol className={styles.flow} aria-label={label} style={{ '--steps': steps.length }}>
       {steps.map((step, index) => (
         <li key={index} className={styles.step} data-key={step.key || undefined} data-done={step.done || undefined}>
-          <span className={styles.marker} aria-hidden="true">{step.done ? '✓' : index + 1}</span>
-          <span className={styles.who}>{step.who}</span>
-          <span className={styles.text}>{step.text}</span>
+          <span className={styles.who}>{step.done ? '✓ ' : ''}{step.who}</span>
+          <span className={styles.does}>{step.does}</span>
         </li>
       ))}
     </ol>
@@ -68,7 +68,7 @@ export default function BookingManagementSettings({ styles: s }) {
     <section style={s.card} aria-labelledby="booking-management-title">
       <h2 id="booking-management-title" style={s.sectionTitle}>Who confirms booking times</h2>
       <p style={s.sectionDesc}>
-        When a client sends a booking request, someone offers them times and the client confirms one. Choose whether the artist or the studio offers the times. Requests always arrive in Bookings and on your Dashboard either way.
+        When a client sends a booking request, the studio sends them times and the client picks one. Choose whether the artist then confirms that time, or it’s booked straight away.
       </p>
       {mode === null ? <div style={s.loadingDot} /> : (
         <div role="radiogroup" aria-labelledby="booking-management-title" className={styles.options}>
@@ -84,8 +84,7 @@ export default function BookingManagementSettings({ styles: s }) {
                   </span>
                 </button>
                 <div id={`booking-flow-${o.value}`} className={styles.flowWrap}>
-                  <p className={styles.flowHeading}>How a booking works</p>
-                  <Flow steps={o.steps} label={`How a booking works when ${o.title.toLowerCase()}`} />
+                                    <Flow steps={o.steps} label={`How a booking works when ${o.title.toLowerCase()}`} />
                   {o.note && <p className={styles.note}>{o.note}</p>}
                 </div>
               </div>

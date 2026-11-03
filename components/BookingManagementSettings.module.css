@@ -13,24 +13,23 @@
 .summary { font-size: 0.85rem; line-height: 1.5; color: var(--text-secondary); }
 
 .flowWrap { padding: 0 0.9rem 0.9rem 2.65rem; }
-.flowHeading { margin: 0 0 0.6rem; font-size: 0.72rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-ghost); }
 
-/* A vertical timeline: numbered markers joined by a line. */
-.flow { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
-.step { position: relative; display: grid; grid-template-columns: 24px 1fr; column-gap: 0.65rem; padding-bottom: 0.8rem; }
-.step:last-child { padding-bottom: 0; }
-.step:not(:last-child)::after { content: ''; position: absolute; left: 11px; top: 26px; bottom: 2px; width: 2px; border-radius: 1px; background: var(--border-strong); }
-.marker { grid-row: span 2; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-size: 0.72rem; font-weight: 700; background: var(--bg-chip); border: 1px solid var(--border-strong); color: var(--text-secondary); }
-.who { font-size: 0.82rem; font-weight: 600; color: var(--text); line-height: 24px; }
-.text { font-size: 0.82rem; line-height: 1.45; color: var(--text-secondary); }
-
-/* The step that differs between the two options. */
-.step[data-key] .marker { background: var(--accent); border-color: var(--accent); color: var(--accent-contrast); }
-.step[data-key] .who { color: var(--accent); }
-.step[data-done] .marker { background: var(--color-success-surface); border-color: var(--color-success-border); color: var(--color-success); }
+/* A simple left-to-right flow (top-to-bottom on phones): who acts, then what they do. */
+.flow { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(var(--steps), minmax(0, 1fr)); column-gap: 1.1rem; }
+.step { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.1rem; padding: 0.45rem 0.3rem; border-radius: 8px; border: 1px solid var(--border-strong); background: var(--bg-chip); text-align: center; }
+.step:not(:last-child)::after { content: '→'; position: absolute; right: -0.95rem; top: 50%; transform: translateY(-50%); font-size: 0.8rem; color: var(--text-ghost); }
+.who { font-size: 0.8rem; font-weight: 600; color: var(--text); }
+.does { font-size: 0.72rem; line-height: 1.25; color: var(--text-secondary); }
+.step[data-key] { background: var(--accent); border-color: var(--accent); }
+.step[data-key] .who, .step[data-key] .does { color: var(--accent-contrast); }
+.step[data-done] { background: var(--color-success-surface); border-color: var(--color-success-border); }
+.step[data-done] .who { color: var(--color-success); }
 
 .note { margin: 0.75rem 0 0; font-size: 0.8rem; line-height: 1.45; color: var(--text-muted); }
 
 @media (max-width: 480px) {
   .flowWrap { padding-left: 0.9rem; }
+  .flow { display: flex; flex-direction: column; gap: 1.1rem; }
+  .step { flex-direction: row; justify-content: space-between; padding: 0.45rem 0.75rem; }
+  .step:not(:last-child)::after { content: '↓'; right: auto; left: 50%; top: auto; bottom: -1.05rem; transform: translateX(-50%); }
 }
