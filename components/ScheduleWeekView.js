@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { getStudioArtists, getStudioScheduleRange, getStations } from '@/lib/api';
 import { getCached, setCached, invalidatePrefix } from '@/lib/cache';
 import { getBookingStyle } from '@/lib/bookingType';
@@ -9,6 +10,20 @@ import { useLanguage } from '@/lib/i18n';
 import { calendarDayAfter, layoutDayLanes, localDateKey, weekHourRange, weekStartFor, weekSchedule } from '@/lib/scheduleWeek.mjs';
 import styles from './ScheduleWeekView.module.css';
 import { ScheduleControls } from './ScheduleScrollFrame';
+
+// A rotated phone: the schedule's one-row toolbar has a slot for the week filter.
+const PHONE_LANDSCAPE = '(max-width: 1100px) and (max-height: 550px) and (orientation: landscape) and (any-pointer: coarse)';
+function useToolbarSlot() {
+  const [slot, setSlot] = useState(null);
+  useEffect(() => {
+    const query = window.matchMedia(PHONE_LANDSCAPE);
+    const update = () => setSlot(query.matches ? document.querySelector('.studio-calendar-toolbar-slot') : null);
+    update();
+    query.addEventListener('change', update);
+    return () => query.removeEventListener('change', update);
+  }, []);
+  return slot;
+}
 
 const LOCALES = { en: 'en-AU', 'zh-Hans': 'zh-CN', ko: 'ko-KR' };
 const resourceId = (entry, lens) => (lens === 'artist' ? (hasArtist(entry.artistId) ? entry.artistId : null) : entry.stationId) || '__unassigned__';
@@ -24,6 +39,7 @@ export default function ScheduleWeekView({ date, lens, refreshKey, selectedBooki
   const [filter, setFilter] = useState('all');
   const [retry, setRetry] = useState(0);
   const scrollRef = useRef(null);
+  const toolbarSlot = useToolbarSlot();
 
   useEffect(() => { setFilter('all'); }, [lens]);
 
@@ -77,20 +93,26 @@ export default function ScheduleWeekView({ date, lens, refreshKey, selectedBooki
   if (loading) return <p className={styles.message} role="status">{t('loading')}</p>;
   if (error) return <div className={styles.message} role="alert"><p>{error}</p><button type="button" className={styles.retry} onClick={() => { invalidatePrefix('schedule:'); setRetry(value => value + 1); }}>{t('sched_retry')}</button></div>;
 
+  const filterSelect = (
+    <select aria-label={t('sched_week_filter')} value={activeFilter} onChange={event => setFilter(event.target.value)}>
+      <option value="all">{t(lens === 'artist' ? 'sched_all_artists' : 'sched_all_stations')}</option>
+      {[...options.entries()].sort((a, b) => String(a[1]).localeCompare(String(b[1]))).map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+    </select>
+  );
+
   return (
     <div className={styles.view}>
-      <ScheduleControls>
-      <div className={styles.summary}>
-        <span role="status">{t(count === 1 ? 'sched_week_one_booking' : 'sched_week_bookings', { count })}</span>
-        <label className={styles.filter}>
-          <span>{t(lens === 'artist' ? 'bdp_artist' : 'bdp_station')}</span>
-          <select aria-label={t('sched_week_filter')} value={activeFilter} onChange={event => setFilter(event.target.value)}>
-            <option value="all">{t(lens === 'artist' ? 'sched_all_artists' : 'sched_all_stations')}</option>
-            {[...options.entries()].sort((a, b) => String(a[1]).localeCompare(String(b[1]))).map(([id, name]) => <option key={id} value={id}>{name}</option>)}
-          </select>
-        </label>
-      </div>
-      </ScheduleControls>
+      {toolbarSlot ? createPortal(filterSelect, toolbarSlot) : (
+        <ScheduleControls>
+          <div className={styles.summary}>
+            <span role="status">{t(count === 1 ? 'sched_week_one_booking' : 'sched_week_bookings', { count })}</span>
+            <label className={styles.filter}>
+              <span>{t(lens === 'artist' ? 'bdp_artist' : 'bdp_station')}</span>
+              {filterSelect}
+            </label>
+          </div>
+        </ScheduleControls>
+      )}
       <div ref={scrollRef} className={`studio-calendar-scroll ${styles.scroll}`} tabIndex={0} role="region" aria-label={t('sched_week_schedule')}>
         <div className={styles.days} style={{ '--hours': hours.length }}>
           <div className={styles.gutter} aria-hidden="true">
@@ -104,7 +126,7 @@ export default function ScheduleWeekView({ date, lens, refreshKey, selectedBooki
               <button type="button" className={styles.dayHeading} onClick={() => onDayClick(day.date)} aria-current={day.key === today ? 'date' : undefined}>
                 <span className={styles.dayName}>{day.date.toLocaleDateString(locale, { weekday: 'short' })}</span>
                 <span className={styles.date}>{day.date.getDate()} <span>{day.date.toLocaleDateString(locale, { month: 'short' })}</span></span>
-                <span className={styles.dayCount}>{day.bookings.length}</span>
+                <span className={styles.dayCount} data-empty={day.bookings.length === 0 || undefined}>{day.bookings.length}</span>
               </button>
               <div className={styles.column}>
                 {hours.map(hour => <div key={hour} className={styles.hourLine} style={{ top: `${(hour - startHour) / hours.length * 100}%` }} />)}
@@ -121,7 +143,7 @@ export default function ScheduleWeekView({ date, lens, refreshKey, selectedBooki
                   return (
                     <button
                       key={entry.bookingId} type="button" data-booking-id={entry.bookingId} aria-label={label} title={label}
-                      className={`${styles.booking} ${pending ? styles.pending : ''} ${selectedBookingId === entry.bookingId ? styles.selected : ''} ${minutes < 45 ? styles.short : ''} ${booking.lanes >= 3 ? styles.narrow : ''}`}
+                      className={`${styles.booking} ${pending ? styles.pending : ''} ${selectedBookingId === entry.bookingId ? styles.selected : ''} ${minutes < 45 ? styles.short : minutes < 75 ? styles.compact : ''} ${booking.lanes >= 3 ? styles.narrow : ''}`}
                       style={{ '--booking-color': source.border, top: `${top}%`, height: `${height}%`, left: `calc(${booking.lane / booking.lanes * 100}% + 2px)`, width: `calc(${100 / booking.lanes}% - 4px)` }}
                       onClick={() => onOpenDetail(entry)}
                     >

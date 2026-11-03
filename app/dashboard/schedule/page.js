@@ -1282,6 +1282,7 @@ export default function SchedulePage() {
           <option value="month:artist">{t('sched_month')} · {t('bdp_artist')}</option>
           <option value="month:station">{t('sched_month')} · {t('bdp_station')}</option>
         </select>
+        {view === 'week' && <div className="studio-calendar-toolbar-slot" />}
         <button type="button" aria-label={`Previous ${period}`} onClick={() => navigate(-1)}>←</button>
         <span className="studio-calendar-toolbar-date" aria-live="polite">{view === 'day' ? dayDate.toLocaleDateString(locale, { weekday: 'short', day: 'numeric', month: 'short' }) : periodLabel}</span>
         <button type="button" aria-label={`Next ${period}`} onClick={() => navigate(1)}>→</button>

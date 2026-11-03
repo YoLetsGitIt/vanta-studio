@@ -360,8 +360,8 @@ export default function BookingDetailPanel({
 
   return (
     <aside className="studio-booking-detail" aria-label={`${clientName} booking details`} style={p.panel}>
-      <div style={p.header}>
-        <div style={p.headerText}>
+      <div className="studio-bdp-header" style={p.header}>
+        <div className="studio-bdp-headtext" style={p.headerText}>
           <span style={p.title}>{clientName}</span>
           <div style={p.headerPills}>
             {status && <Pill colors={sc}>{statusLabel(displayStatus)}</Pill>}
@@ -372,15 +372,17 @@ export default function BookingDetailPanel({
         <IconButton onClick={onClose} aria-label="Close booking details">✕</IconButton>
       </div>
 
-      <div style={p.body}>
+      <div className="studio-bdp-body" style={p.body}>
         {/* ── When / who summary ── */}
-        <div style={{ ...p.hero, background: sc.bg, borderColor: sc.border }}>
+        <div className="studio-bdp-hero" style={{ ...p.hero, background: sc.bg, borderColor: sc.border }}>
           <span style={{ ...p.heroCaption, color: sc.text }}>{heroCaption}</span>
           <span style={p.heroTime}>{heroTime ? fmtDate(heroTime) : '—'}</span>
           {heroMeta && <span style={p.heroMeta}>{heroMeta}</span>}
           {cancelReason && <span style={p.heroNote}>{t('bdp_cancelled_reason')}: {cancelReason}</span>}
         </div>
 
+        {/* Cards: one column normally; two balanced columns on a rotated phone. */}
+        <div className="studio-bdp-cards">
         {/* ── Outcome (completed / no-show) ── */}
         {isCompleted && (
           <div style={{
@@ -759,6 +761,7 @@ export default function BookingDetailPanel({
             ))}
           </Section>
         )}
+        </div>
       </div>
 
       {/* ── Actions ── */}
@@ -767,7 +770,7 @@ export default function BookingDetailPanel({
           onBooked={async id => { showFeedback('Booked in', 'success'); await onBooked?.(id); }} />
       )}
       {!stationStep && (canAcceptReject || canComplete || isFutureConfirmed || canSendLink || canConfirm || canReschedule || canBookTime) && (
-        <div style={p.actions}>
+        <div className="studio-bdp-actions" style={p.actions}>
           {canBookTime && (
             <Btn onClick={() => setBookTimeOpen(true)} disabled={actionLoading} variant={canSendLink ? 'neutral' : 'primary'}>Book a time</Btn>
           )}

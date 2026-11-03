@@ -54,4 +54,19 @@
   .dayHeading { padding: 0 10px; grid-template-columns: auto 1fr auto; align-items: center; }
   .dayName { grid-column: auto; }
   .date { font-size: 16px; }
+  /* One line per day heading: "Mon 2 Nov  1". */
+  /* The whole week fits the screen width: no sideways scrolling to reach Sunday. */
+  .days { --heading-h: 34px; grid-template-columns: 40px repeat(7, minmax(0, 1fr)); min-width: 0; }
+  .hourLabel { right: 5px; }
+  .dayHeading { padding: 0 6px; }
+  .dayCount[data-empty] { visibility: hidden; }
+  .dayHeading { gap: 6px; }
+  .dayName { font-size: 12px; }
+  .date { font-size: 15px; letter-spacing: -0.02em; }
+  .date { white-space: nowrap; }
+  .date > span { display: none; } /* the toolbar already names the month */
+  .dayCount { padding: 1px 6px; font-size: 10px; }
+  /* At 40px an hour, cards keep the name and time; artist and status move to the details. */
+  .booking { padding: 3px 6px; gap: 1px; }
+  .compact .resource, .compact .status, .compact .pendingTag { display: none; }
 }
