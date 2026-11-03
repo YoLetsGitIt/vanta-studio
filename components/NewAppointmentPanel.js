@@ -1,5 +1,6 @@
 'use client';
 
+import DateOfBirthInput from '@/components/ui/DateOfBirthInput';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { createManualBooking, generateConsentLink, getStudioSchedule } from '@/lib/api';
@@ -578,12 +579,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
                     </div>
                     <div style={bd.field}>
                       <label htmlFor="new-appointment-dob" style={bd.label}>{t('clients_dob')}</label>
-                      <input
-                        style={bd.input}
-                        type="date"
-                        id="new-appointment-dob" value={clientDob}
-                        onChange={e => setClientDob(e.target.value)}
-                      />
+                      <DateOfBirthInput style={bd.input} id="new-appointment-dob" required={false} value={clientDob} onChange={setClientDob} />
                     </div>
                     <div className={styles.fieldRow}>
                       <div style={bd.field}>

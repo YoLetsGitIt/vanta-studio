@@ -1,5 +1,7 @@
 // Only local HTML is loaded. Identity, profile and booking endpoints are mocked.
 const assert = require('node:assert/strict');
+// Date of birth is three dropdowns (day, month, year).
+const fillDob = async (page, iso) => { const [y, m, d] = iso.split('-'); const g = page.getByRole('group', { name: 'Date of birth' }).first(); await g.getByLabel('Day of birth').selectOption(String(+d)); await g.getByLabel('Month of birth').selectOption(String(+m)); await g.getByLabel('Year of birth').selectOption(y); };
 const fs = require('node:fs');
 const { chromium } = require(process.env.STUDIO_PLAYWRIGHT_PATH || 'playwright');
 const base = process.env.STUDIO_TEST_URL || 'http://127.0.0.1:3056';
@@ -118,21 +120,22 @@ async function signIn(page) {
       await page.screenshot({ path: `${output}/gate-${width}.png`, fullPage: true });
       await showEmailForm(page);
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
-      const dateStyle = await page.locator('input[type="date"]').evaluate(input => {
+      // Padding differs on purpose: the dropdowns leave room for their arrow.
+      const dateStyle = await page.locator('select[autocomplete="bday-day"]').evaluate(input => {
         const name = document.querySelector('input[autocomplete="name"]');
         const own = getComputedStyle(input), other = getComputedStyle(name);
-        return { sameHeight: input.offsetHeight === name.offsetHeight, sameFont: own.font === other.font, sameBorder: own.border === other.border, samePadding: own.padding === other.padding };
+        return { sameHeight: input.offsetHeight === name.offsetHeight, sameFont: own.font === other.font, sameBorder: own.border === other.border };
       });
       assert(Object.values(dateStyle).every(Boolean), `Signup date field matches other controls at ${width}px: ${JSON.stringify(dateStyle)}`);
       await page.screenshot({ path: `${output}/signup-${width}.png`, fullPage: true });
       await signIn(page);
       assert(await page.getByText('Your details', { exact: true }).isVisible());
       assert.equal(await page.getByPlaceholder('Your name', { exact: true }).inputValue(), 'Jamie Client');
-      assert.equal(await page.locator('input[type="date"]').inputValue(), '1990-01-01');
+      assert.deepEqual(await page.locator('select[autocomplete^="bday-"]').evaluateAll(s => s.map(x => x.value)), ['1', '1', '1990']);
       assert.equal(await page.getByPlaceholder('you@example.com').inputValue(), user.email);
       assert(await page.getByPlaceholder('you@example.com').evaluate(input => input.readOnly));
       assert.equal(await page.locator('input[type="tel"]').inputValue(), '400123456');
-      assert.equal(await page.locator('input[type="date"]').evaluate(input => input.offsetHeight === document.querySelector('input[autocomplete="name"]').offsetHeight), true, 'Prefilled date and name fields have matching heights');
+      assert.equal(await page.locator('select[autocomplete="bday-day"]').evaluate(input => input.offsetHeight === document.querySelector('input[autocomplete="name"]').offsetHeight), true, 'Prefilled date and name fields have matching heights');
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
       await page.screenshot({ path: `${output}/booking-${width}.png`, fullPage: true });
       await page.getByRole('button', { name: 'Forearm', exact: true }).click();
@@ -170,7 +173,7 @@ async function signIn(page) {
       const { context, page, calls, errors } = await open(browser, { profileMissing: true });
       await showEmailForm(page);
       await page.getByPlaceholder('Full name').fill('Jamie Client');
-      await page.locator('input[type="date"]').fill('1990-01-01');
+      await fillDob(page, '1990-01-01');
       await page.getByPlaceholder('Phone number').fill('+61400123456');
       await page.getByPlaceholder('Email', { exact: true }).fill(user.email);
       await page.getByPlaceholder('Password').fill('example-password');
@@ -185,7 +188,7 @@ async function signIn(page) {
       assert.equal(calls.profileUpdates.at(-1).data.dob, '1990-01-01');
       assert(calls.profiles.length >= 1, 'New accounts receive a Vanta profile');
       assert.equal(await page.getByPlaceholder('Your name', { exact: true }).inputValue(), 'Jamie Client', 'Signup details remain visible and prefilled');
-      assert.equal(await page.locator('input[type="date"]').inputValue(), '1990-01-01');
+      assert.deepEqual(await page.locator('select[autocomplete^="bday-"]').evaluateAll(s => s.map(x => x.value)), ['1', '1', '1990']);
       assert.equal(await page.locator('input[type="tel"]').inputValue(), '400123456');
       assert.equal(calls.bookings.length, 0, 'Account creation does not submit a booking');
       assert.deepEqual(errors, []);
@@ -229,11 +232,11 @@ async function signIn(page) {
         assert(await page.getByLabel(label, { exact: false }).first().isVisible(), `${details.label}: ${label} is visible`);
       }
       assert.equal(await page.getByPlaceholder('Your name', { exact: true }).inputValue(), details.missing.includes('Full name') ? '' : details.name);
-      assert.equal(await page.locator('input[type="date"]').inputValue(), details.missing.includes('Date of birth') ? '' : '1990-01-01');
+      assert.equal(await (await page.locator('select[autocomplete^="bday-"]').evaluateAll(s => s.map(x => x.value)).then(([d, m, y]) => d && m && y ? `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}` : '')), details.missing.includes('Date of birth') ? '' : '1990-01-01');
       assert.equal(await page.locator('input[type="tel"]').inputValue(), details.missing.includes('Phone') ? '' : details.phone.startsWith('+61') ? '400123456' : details.phone);
       assert.equal(await page.locator('input[type="email"]').inputValue(), user.email);
       if (details.missing.includes('Full name')) await page.getByPlaceholder('Your name', { exact: true }).fill(details.name);
-      if (details.missing.includes('Date of birth')) await page.locator('input[type="date"]').fill('1990-01-01');
+      if (details.missing.includes('Date of birth')) await fillDob(page, '1990-01-01');
       if (details.missing.includes('Phone')) {
         await page.getByRole('combobox', { name: 'Phone country code' }).selectOption('AU');
         await page.getByPlaceholder('555 0100').fill('400123456');
@@ -257,7 +260,7 @@ async function signIn(page) {
         await page.reload({ waitUntil: 'networkidle' });
         await page.getByRole('button', { name: 'Request booking', exact: true }).waitFor();
         assert.equal(await page.getByPlaceholder('Your name', { exact: true }).inputValue(), details.name, 'A later visit prefills the saved name');
-        assert.equal(await page.locator('input[type="date"]').inputValue(), '1990-01-01', 'A later visit prefills the saved date of birth');
+        assert.equal(await (await page.locator('select[autocomplete^="bday-"]').evaluateAll(s => s.map(x => x.value)).then(([d, m, y]) => d && m && y ? `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}` : '')), '1990-01-01', 'A later visit prefills the saved date of birth');
         assert.equal(await page.locator('input[type="tel"]').inputValue(), '400123456', 'A later visit prefills the saved phone');
       }
       assert.deepEqual(errors, []);
@@ -276,7 +279,7 @@ async function signIn(page) {
       const email = page.getByPlaceholder('you@example.com');
       assert.equal(await email.evaluate(input => input.readOnly), false, 'Guests type their email');
       await page.getByPlaceholder('Your name', { exact: true }).fill('Guest Client');
-      await page.locator('input[type="date"]').fill('1992-03-04');
+      await fillDob(page, '1992-03-04');
       await page.getByRole('combobox', { name: 'Phone country code' }).selectOption('AU');
       await page.getByPlaceholder('555 0100').fill('400999888');
       await page.getByRole('button', { name: 'Forearm', exact: true }).click();

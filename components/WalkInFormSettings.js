@@ -6,6 +6,7 @@
 import { useEffect, useState } from 'react';
 import DownloadableQR from '@/components/DownloadableQR';
 import { getMyWalkInFormConfig, updateMyWalkInFormConfig } from '@/lib/api';
+import { WalkInPreview } from '@/components/forms/FormPreviews';
 
 const FIELDS = [
   { key: 'body_location', label: 'Placement' },
@@ -16,7 +17,7 @@ const FIELDS = [
   { key: 'notes', label: 'Additional notes' },
 ];
 
-export default function WalkInFormSettings({ styles: s, url }) {
+export default function WalkInFormSettings({ styles: s, url, studioName, logoUrl, consentTemplates }) {
   const [fields, setFields] = useState(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -57,7 +58,8 @@ export default function WalkInFormSettings({ styles: s, url }) {
           <DownloadableQR value={url} filename="walk-in-qr" />
         </div>
       )}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '1rem' }}>
+      <div className="studio-feature-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', alignItems: 'start', marginTop: '1rem' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
         <span style={s.label}>Extra fields</span>
         <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '0 0 0.35rem' }}>
           Name, date of birth, email, phone and artist are always asked, and your consent forms are always included.
@@ -88,6 +90,9 @@ export default function WalkInFormSettings({ styles: s, url }) {
           );
         })}
         {error && <p role="alert" style={{ margin: 0, fontSize: '0.85rem', color: 'var(--color-danger)' }}>{error}</p>}
+      </div>
+      {/* The walk-in page uses Studio's own colours, not the website widget's. */}
+      <WalkInPreview bg="#111111" accent="#d5d0c7" studioName={studioName || 'Your Studio'} logoUrl={logoUrl} fields={fields} consentTemplates={consentTemplates} />
       </div>
     </section>
   );

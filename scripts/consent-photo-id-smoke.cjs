@@ -2,6 +2,8 @@
 // it uploads privately and its path is sent as the answer. All services are mocked.
 // Serve out/ with clean URLs first.
 const assert = require('node:assert/strict');
+// Date of birth is three dropdowns (day, month, year).
+const fillDob = async (page, iso) => { const [y, m, d] = iso.split('-'); const g = page.getByRole('group', { name: 'Date of birth' }).first(); await g.getByLabel('Day of birth').selectOption(String(+d)); await g.getByLabel('Month of birth').selectOption(String(+m)); await g.getByLabel('Year of birth').selectOption(y); };
 const { chromium } = require(process.env.STUDIO_PLAYWRIGHT_PATH || 'playwright');
 const base = process.env.STUDIO_TEST_URL || 'http://127.0.0.1:3056';
 const shots = process.env.STUDIO_REVIEW_OUTPUT;
@@ -32,7 +34,7 @@ const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
       const errors = []; page.on('pageerror', e => errors.push(e.message));
       await page.goto(`${base}/studio-booking?s=${studio.id}&guest=1`, { waitUntil: 'networkidle' });
       await page.getByPlaceholder('Your name', { exact: true }).fill('Guest Client');
-      await page.locator('input[type="date"]').fill('1992-03-04');
+      await fillDob(page, '1992-03-04');
       await page.getByPlaceholder('you@example.com').fill('guest@example.test');
       await page.getByPlaceholder('555 0100').fill('400999888');
       await page.getByRole('button', { name: 'Forearm', exact: true }).click();

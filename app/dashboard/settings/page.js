@@ -1425,7 +1425,7 @@ export default function SettingsPage() {
         </>}
 
         {tab === 'walkins' && <>
-        <div className="settings-span-12 settings-cell"><WalkInFormSettings styles={s} url={bookingSlug ? `${SHORT_LINK_BASE}/w/${bookingSlug}` : studioId ? `${typeof window === 'undefined' ? '' : window.location.origin}/walkin?s=${studioId}` : ''} /></div>
+        <div className="settings-span-12 settings-cell"><WalkInFormSettings styles={s} studioName={name} logoUrl={logoUrl} consentTemplates={consentTemplates} url={bookingSlug ? `${SHORT_LINK_BASE}/w/${bookingSlug}` : studioId ? `${typeof window === 'undefined' ? '' : window.location.origin}/walkin?s=${studioId}` : ''} /></div>
 
         </>}
 

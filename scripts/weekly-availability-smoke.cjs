@@ -2,6 +2,8 @@
 //   python3 -m http.server 3029 --directory out
 // Every remote request is intercepted; no real accounts or bookings are used.
 const assert = require('node:assert/strict');
+// Date of birth is three dropdowns (day, month, year).
+const fillDob = async (page, iso) => { const [y, m, d] = iso.split('-'); const g = page.getByRole('group', { name: 'Date of birth' }).first(); await g.getByLabel('Day of birth').selectOption(String(+d)); await g.getByLabel('Month of birth').selectOption(String(+m)); await g.getByLabel('Year of birth').selectOption(y); };
 const { chromium } = require(process.env.VANTA_PLAYWRIGHT_PATH || 'playwright');
 const studioBase = process.env.VANTA_STUDIO_TEST_URL || 'http://127.0.0.1:3029';
 const shots = process.env.VANTA_SCREENSHOT_DIR;
@@ -52,7 +54,7 @@ async function openForm(page) {
   await page.goto(`${studioBase}/studio-booking.html?s=test-studio`, { waitUntil: 'networkidle' });
   await page.getByRole('heading', { name: studio.name, exact: true }).waitFor({ timeout: 15000 }).catch(async e => { console.log((await page.locator('body').innerText()).slice(0, 400)); throw e; });
   await page.waitForTimeout(500);
-  if (!(await page.locator('input[type="date"]').inputValue())) await page.locator('input[type="date"]').fill('1990-01-01');
+  if (!(await page.getByLabel('Year of birth').first().inputValue())) await fillDob(page, '1990-01-01');
   const tel = page.locator('input[type="tel"]');
   if (!(await tel.inputValue())) await tel.fill('0400123456');
 }

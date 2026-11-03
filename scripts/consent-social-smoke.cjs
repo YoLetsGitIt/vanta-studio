@@ -1,5 +1,7 @@
 // Isolated browser checks: every external request is mocked, including OAuth.
 const assert = require('node:assert/strict');
+// Date of birth is three dropdowns (day, month, year).
+const fillDob = async (page, iso) => { const [y, m, d] = iso.split('-'); const g = page.getByRole('group', { name: 'Date of birth' }).first(); await g.getByLabel('Day of birth').selectOption(String(+d)); await g.getByLabel('Month of birth').selectOption(String(+m)); await g.getByLabel('Year of birth').selectOption(y); };
 const fs = require('node:fs');
 const { chromium } = require(process.env.STUDIO_PLAYWRIGHT_PATH || 'playwright');
 
@@ -130,7 +132,7 @@ async function open(browser, { width = 390, signedIn = false, newProfile = false
       assert.equal(await page.getByPlaceholder('Your name', { exact: true }).inputValue(), 'Local Client');
       assert.equal(await dob.isVisible(), true);
       assert.equal(await page.getByPlaceholder('Your phone number', { exact: true }).isVisible(), true);
-      await dob.fill('1995-06-15');
+      await fillDob(page, '1995-06-15');
       await page.getByPlaceholder('Your phone number', { exact: true }).fill('+61412345678');
       assert.equal(calls.profiles.length, newProfile ? 1 : 0);
       if (newProfile) assert.deepEqual(calls.profiles[0], { name: 'Local Client', accountType: 'user', termsAcceptedVersion: '1.0' });
@@ -150,11 +152,12 @@ async function open(browser, { width = 390, signedIn = false, newProfile = false
       const email = page.getByLabel('Email', { exact: true });
       for (const field of [name, dob, phone, email]) assert(await field.isVisible(), 'Known details remain visible');
       assert.equal(await name.inputValue(), 'Local Client');
-      assert.equal(await dob.inputValue(), '1990-01-01');
-      const matchingDateStyle = await dob.evaluate(input => {
+      assert.deepEqual(await dob.locator('select').evaluateAll(s => s.map(x => x.value)), ['1', '1', '1990']);
+      // Padding differs on purpose: the dropdowns leave room for their arrow.
+      const matchingDateStyle = await dob.locator('select').first().evaluate(input => {
         const name = document.querySelector('input[autocomplete="name"]');
         const own = getComputedStyle(input), other = getComputedStyle(name);
-        return input.offsetHeight === name.offsetHeight && own.font === other.font && own.border === other.border && own.padding === other.padding;
+        return input.offsetHeight === name.offsetHeight && own.font === other.font && own.border === other.border;
       });
       assert(matchingDateStyle, 'Date field matches the name field on mobile and desktop');
       assert.equal(await phone.inputValue(), '+61412345678');
@@ -163,7 +166,7 @@ async function open(browser, { width = 390, signedIn = false, newProfile = false
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
       await page.screenshot({ path: `${output}/prefilled-consent-${width}.png`, fullPage: true });
       await name.fill('Reviewed Client');
-      await dob.fill('1991-02-03');
+      await fillDob(page, '1991-02-03');
       await phone.fill('+61498765432');
       await page.getByRole('button', { name: 'Submit consent', exact: true }).click();
       await page.getByRole('heading', { name: 'Consent recorded', exact: true }).waitFor();

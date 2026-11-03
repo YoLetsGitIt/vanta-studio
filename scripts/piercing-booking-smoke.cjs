@@ -1,6 +1,8 @@
 // Build both web repositories and serve their out/ folders locally before running.
 // Every remote request is intercepted; no real accounts, bookings or messages are used.
 const assert = require('node:assert/strict');
+// Date of birth is three dropdowns (day, month, year).
+const fillDob = async (page, iso) => { const [y, m, d] = iso.split('-'); const g = page.getByRole('group', { name: 'Date of birth' }).first(); await g.getByLabel('Day of birth').selectOption(String(+d)); await g.getByLabel('Month of birth').selectOption(String(+m)); await g.getByLabel('Year of birth').selectOption(y); };
 const { chromium } = require(process.env.VANTA_PLAYWRIGHT_PATH || 'playwright');
 const studioBase = process.env.VANTA_STUDIO_TEST_URL || 'http://127.0.0.1:3029';
 const publicBase = process.env.VANTA_PUBLIC_TEST_URL || 'http://127.0.0.1:3030';
@@ -60,7 +62,7 @@ async function mockContext(browser, width, { studioClosed = false } = {}) {
       assert.equal(await page.getByRole('button',{name:'Nostril',exact:true}).count(),1);
       await page.getByPlaceholder('First',{exact:true}).fill('Local');
       await page.getByPlaceholder('Last',{exact:true}).fill('Client');
-      await page.locator('input[type="date"]').fill('1990-01-01');
+      await fillDob(page, '1990-01-01');
       await page.locator('input[type="email"]').fill('client@example.test');
       await page.locator('input[type="tel"]').fill('0400123456');
       await page.getByRole('button',{name:'Nostril',exact:true}).click();

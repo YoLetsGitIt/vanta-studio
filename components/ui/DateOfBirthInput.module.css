@@ -1,77 +1,31 @@
-.dateField {
-  position: relative;
+/* Day / Month / Year side by side; month gets a little more room. */
+.dob {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.1fr) minmax(0, 1fr);
+  gap: 0.5rem;
   min-width: 0;
 }
 
-.dateInput {
+.part {
   display: block;
   width: 100%;
   min-width: 0;
   height: 44px;
+  padding-right: 1.6rem !important;
   appearance: none;
   -webkit-appearance: none;
   color-scheme: dark;
-  text-align: left;
-}
-
-.dateInput::-webkit-datetime-edit,
-.dateInput::-webkit-datetime-edit-fields-wrapper {
-  padding: 0;
-  font: inherit;
-}
-
-.dateInput::-webkit-datetime-edit-day-field,
-.dateInput::-webkit-datetime-edit-month-field,
-.dateInput::-webkit-datetime-edit-year-field,
-.dateInput::-webkit-datetime-edit-text {
-  padding: 0;
-  font: inherit;
-}
-
-.dateInput::-webkit-date-and-time-value {
-  min-height: 1em;
-  font: inherit;
-  text-align: left;
-}
-
-.dateInput::-webkit-calendar-picker-indicator {
-  width: 1em;
-  height: 1em;
-  margin: 0;
-  padding: 0;
-  opacity: 0.55;
   cursor: pointer;
+  /* Chevron, so each box reads as a dropdown. */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23999' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 0.65rem center !important;
 }
 
-/* Hide "dd / mm / yyyy" (Chrome) and today's date (Safari) behind the "Date of birth"
-   label until the field is used. Each part is coloured separately, so each needs hiding. */
-.dateInput[data-empty='true']:not(:focus)::-webkit-datetime-edit,
-.dateInput[data-empty='true']:not(:focus)::-webkit-datetime-edit-fields-wrapper,
-.dateInput[data-empty='true']:not(:focus)::-webkit-datetime-edit-day-field,
-.dateInput[data-empty='true']:not(:focus)::-webkit-datetime-edit-month-field,
-.dateInput[data-empty='true']:not(:focus)::-webkit-datetime-edit-year-field,
-.dateInput[data-empty='true']:not(:focus)::-webkit-datetime-edit-text,
-.dateInput[data-empty='true']:not(:focus),
-.dateInput[data-empty='true']:not(:focus)::-webkit-date-and-time-value {
-  color: transparent;
-  /* Safari paints date text with the fill colour, which overrides color. */
-  -webkit-text-fill-color: transparent;
-}
-
-.datePlaceholder {
-  position: absolute;
-  inset: 0 2.75rem 0 0.85rem;
-  display: flex;
-  align-items: center;
-  color: var(--text-ghost);
-  font: inherit;
-  pointer-events: none;
-}
-
-.dateField:focus-within .datePlaceholder {
-  display: none;
-}
+/* Unpicked parts show their name ("Day") in the placeholder colour. */
+.part[data-empty] { color: var(--text-ghost); }
+.part option { color: CanvasText; }
 
 @media (any-pointer: coarse) {
-  .dateField { font-size: 16px !important; }
+  .dob, .part { font-size: 16px !important; }
 }
