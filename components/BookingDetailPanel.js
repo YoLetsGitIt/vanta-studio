@@ -7,7 +7,7 @@ import OfferTimesModal from '@/components/OfferTimesModal';
 import { useBookingManagement } from '@/lib/bookingManagement';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { getStations, getClientConsents, getNotes, addNote, deleteNote, getBookingConsentSubmissions, getStudioClients, generateConsentLink, getStudioBookingPayment, getDepositReceipt, getDepositStatus, getOfferedTimes, listConsentTemplates, downloadConsentPdf } from '@/lib/api';
+import { getStations, getClientConsents, getNotes, addNote, deleteNote, getBookingConsentSubmissions, getStudioClients, generateConsentLink, getStudioBookingPayment, getDepositReceipt, getDepositStatus, getOfferedTimes, listConsentTemplates } from '@/lib/api';
 import { useStationAvailability } from '@/lib/useStationAvailability';
 import { statusColors, statusLabel, capitalise as cap } from '@/lib/status';
 import { formatDob as fmtDob, hasArtist } from '@/lib/format';
@@ -19,6 +19,7 @@ import Button, { IconButton } from '@/components/ui/Button';
 import BookingSMS from '@/components/BookingSMS';
 import MarketingConsent from '@/components/MarketingConsent';
 import { Pill, Section, Fact, SkeletonBar, DetailSkeleton, detailStyles } from '@/components/ui/DetailParts';
+import ConsentSubmissionCard from '@/components/ConsentSubmissionCard';
 import { describeAvailability } from '@/lib/availability';
 
 const PAYMENT_LABELS = { cash: 'Cash', card: 'Card / POS', bank_transfer: 'Bank Transfer' };
@@ -750,58 +751,7 @@ export default function BookingDetailPanel({
             </button>
             {submissionsExpanded && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-                {consentSubmissions.map(sub => (
-                  <div key={sub.id} style={p.subCard}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text)' }}>{sub.template_name}</span>
-                      {sub.is_minor && <Pill tone="warning">{t('bdp_minor')}</Pill>}
-                    </div>
-                    {sub.signer_name && <Fact label={t('bdp_signed_by')}>{sub.signer_name}</Fact>}
-                    {sub.answers && Object.entries(sub.answers).length > 0 && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                        {Object.entries(sub.answers).map(([k, v]) => v && v !== true && v !== 'true' && k !== '__agreed__' && (
-                          sub.photo_id_urls?.[k] ? (
-                            <div key={k}>
-                              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '0 0 0.3rem' }}>Photo ID</p>
-                              <a href={sub.photo_id_urls[k]} target="_blank" rel="noopener noreferrer" title="Open full size">
-                                <img src={sub.photo_id_urls[k]} alt="Client photo ID" style={{ maxWidth: '100%', maxHeight: 220, borderRadius: 8, border: '1px solid var(--border)', display: 'block' }} />
-                              </a>
-                            </div>
-                          ) : String(v).startsWith('ids/') ? (
-                            <div key={k} style={{ fontSize: '0.875rem', color: 'var(--text-dim)' }}>Photo ID provided</div>
-                          ) : (
-                          <div key={k} style={{ fontSize: '0.875rem', color: 'var(--text-dim)', lineHeight: 1.5 }}>
-                            <span style={{ color: 'var(--text-muted)' }}>{k}: </span>{v}
-                          </div>
-                          )
-                        ))}
-                      </div>
-                    )}
-                    {sub.client_signature_url && (
-                      <div>
-                        <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '0 0 0.3rem' }}>{t('bdp_client_signature')}</p>
-                        <img src={sub.client_signature_url} alt="Client signature" style={p.signature} />
-                      </div>
-                    )}
-                    {sub.guardian_name && (
-                      <div style={{ borderTop: '1px solid var(--border)', paddingTop: '0.6rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-                        <span style={p.subLabel}>{t('bdp_guardian')}</span>
-                        <Fact label={sub.guardian_relationship ?? 'Guardian'}>{sub.guardian_name}</Fact>
-                        {sub.guardian_email && <span style={p.hint}>{sub.guardian_email}</span>}
-                        {sub.guardian_phone && <span style={p.hint}>{sub.guardian_phone}</span>}
-                        {sub.guardian_signature_url && <img src={sub.guardian_signature_url} alt="Guardian signature" style={p.signature} />}
-                      </div>
-                    )}
-                    <span style={p.hint}>
-                      {new Date(sub.submitted_at).toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' })}
-                    </span>
-                    <div>
-                      <Button variant="secondary" size="sm" onClick={() => downloadConsentPdf(sub.id, `consent-${(sub.signer_name || 'form').replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.pdf`).catch(showError)}>
-                        Download PDF
-                      </Button>
-                    </div>
-                  </div>
-                ))}
+                {consentSubmissions.map(sub => <ConsentSubmissionCard key={sub.id} sub={sub} templates={consentTemplates} />)}
               </div>
             )}
           </section>
@@ -973,7 +923,6 @@ const p = {
   allergyLabel: { fontSize: '0.85rem', fontWeight: 700, color: 'var(--color-danger)' },
   holdBox: { background: 'var(--color-info-surface)', border: '1px solid var(--color-info-border)', borderRadius: 10, padding: '0.7rem 0.85rem', display: 'flex', flexDirection: 'column', gap: '0.2rem' },
   holdLabel: { fontSize: '0.85rem', fontWeight: 700, color: 'var(--color-info)' },
-  signature: { maxWidth: '100%', height: 64, objectFit: 'contain', borderRadius: 6, background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', display: 'block' },
   actions: {
     display: 'flex', gap: '0.6rem', flexWrap: 'wrap',
     padding: '1rem 1.25rem', borderTop: '1px solid var(--border)', flexShrink: 0, background: 'var(--bg-panel)',

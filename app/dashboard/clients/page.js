@@ -15,6 +15,7 @@ import { useLanguage } from '@/lib/i18n';
 import { showError } from '@/lib/feedback';
 import Button from '@/components/ui/Button';
 import MarketingConsent from '@/components/MarketingConsent';
+import ConsentSubmissionCard from '@/components/ConsentSubmissionCard';
 import ClientTemplateSend from '@/components/marketing/ClientTemplateSend';
 import { Pill, Section, Fact, SkeletonBar, DetailSkeleton, detailStyles } from '@/components/ui/DetailParts';
 
@@ -306,6 +307,8 @@ function ClientsInner() {
             clientKey={selected}
             onClose={() => setSelected(null)}
             consentTemplates={consentTemplates}
+            legacyConsent={selectedClient.email ? consents[selectedClient.email] : null}
+            consentVersion={consentVersion}
             onSendConsentLink={handleSendConsentLink}
           />
         )}
@@ -356,7 +359,7 @@ function MarketingBadge({ marketing }) {
   return null;
 }
 
-function ClientDetail({ client, marketing, onMarketingChange, clientKey, onClose, consentTemplates = [], onSendConsentLink }) {
+function ClientDetail({ client, marketing, onMarketingChange, clientKey, onClose, consentTemplates = [], legacyConsent = null, consentVersion, onSendConsentLink }) {
   const { t } = useLanguage();
   const [linkGeneratingId, setLinkGeneratingId] = useState(null);
   const [linkSentId,       setLinkSentId]       = useState(null);
@@ -466,11 +469,9 @@ function ClientDetail({ client, marketing, onMarketingChange, clientKey, onClose
     }
   }
 
-  const firstTemplate = consentTemplates[0] ?? null;
-  const firstSub = firstTemplate ? submissions.find(x => x.template_id === firstTemplate.id) : null;
-  const consentState = !firstTemplate ? null
-    : !firstSub ? 'none'
-    : new Date(firstSub.submitted_at) < new Date(firstTemplate.updated_at) ? 'outdated' : 'current';
+  // Same rule as the client list, so the row and this panel always agree.
+  const consentState = consentTemplates.length === 0 && submissions.length === 0 && !legacyConsent ? null
+    : getConsentStatus(legacyConsent, consentVersion, submissions, consentTemplates);
   const consentTone = { current: 'success', outdated: 'warning', none: 'danger' }[consentState];
   const consentLabelText = { current: 'Consented', outdated: 'Consent outdated', none: 'Not consented' }[consentState];
   const router = useRouter();
@@ -511,6 +512,9 @@ function ClientDetail({ client, marketing, onMarketingChange, clientKey, onClose
 
         {(consentTemplates.length > 0 || (marketing && (client.email || client.phone))) && (
           <Section title="Consent">
+            {consentTemplates.length === 0 && consentState && (
+              <Fact label="Consent form"><Pill tone={consentTone}>{consentLabelText}</Pill></Fact>
+            )}
             {consentTemplates.slice(0, 1).map(ct => {
               const sentId = linkSentId === ct.id;
               const loadingId = linkGeneratingId === ct.id;
@@ -531,6 +535,12 @@ function ClientDetail({ client, marketing, onMarketingChange, clientKey, onClose
               );
             })}
             <MarketingConsent email={client.email} phone={client.phone} clientKey={clientKey} marketing={marketing} onChange={onMarketingChange} />
+          </Section>
+        )}
+
+        {submissions.length > 0 && (
+          <Section title={`Signed consent forms (${submissions.length})`}>
+            {submissions.map(sub => <ConsentSubmissionCard key={sub.id} sub={sub} templates={consentTemplates} />)}
           </Section>
         )}
 
