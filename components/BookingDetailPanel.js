@@ -23,6 +23,21 @@ import { describeAvailability } from '@/lib/availability';
 
 const PAYMENT_LABELS = { cash: 'Cash', card: 'Card / POS', bank_transfer: 'Bank Transfer' };
 
+// What the email provider says happened to the offer email.
+const OFFER_EMAIL_STATUS = {
+  queued: { label: 'Sending' },
+  scheduled: { label: 'Sending' },
+  sent: { label: 'Sent, not yet delivered' },
+  delivered: { label: 'Delivered' },
+  opened: { label: 'Opened' },
+  clicked: { label: 'Opened' },
+  delivery_delayed: { label: 'Delivery delayed', problem: true },
+  bounced: { label: 'Bounced: check the email address', problem: true },
+  complained: { label: 'Marked as spam by the client', problem: true },
+  suppressed: { label: 'Not delivered: this address previously bounced or reported spam', problem: true },
+  failed: { label: 'Failed to send', problem: true },
+};
+
 function fmtDate(iso) {
   if (!iso) return null;
   return new Date(iso).toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' });
@@ -431,11 +446,15 @@ export default function BookingDetailPanel({
             <span role="alert" style={p.heroNote}>
               The email to {currentOffer.email_to || 'the client'} didn’t send: {currentOffer.email_error}. Use Edit times to send it again.
             </span>
-          ) : currentOffer?.email_sent_at ? (
-            <span style={{ ...p.heroMeta, fontSize: '0.85rem' }}>
-              Emailed to {currentOffer.email_to} · {new Date(currentOffer.email_sent_at).toLocaleString('en-AU', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}
-            </span>
-          ) : null)}
+          ) : currentOffer?.email_sent_at ? (() => {
+            const delivery = OFFER_EMAIL_STATUS[currentOffer.email_status];
+            const sentAt = new Date(currentOffer.email_sent_at).toLocaleString('en-AU', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
+            return delivery?.problem ? (
+              <span role="alert" style={p.heroNote}>Emailed to {currentOffer.email_to} · {sentAt} — {delivery.label}</span>
+            ) : (
+              <span style={{ ...p.heroMeta, fontSize: '0.85rem' }}>Emailed to {currentOffer.email_to} · {sentAt}{delivery ? ` · ${delivery.label}` : ''}</span>
+            );
+          })() : null)}
           {heroMeta && <span style={p.heroMeta}>{heroMeta}</span>}
           {cancelReason && <span style={p.heroNote}>{t('bdp_cancelled_reason')}: {cancelReason}</span>}
         </div>

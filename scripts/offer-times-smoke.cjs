@@ -25,7 +25,7 @@ const pending = { id: 'req-1', requester_name: 'Minseo Park', requester_email: '
       await context.route(/\/studio\/me\/bookings\/req-1\/offer-times$/, r => {
         sent = r.request().postDataJSON();
         offer = { artist_id: sent.artist_id, artist_name: 'Sam Anderson', duration_minutes: sent.duration_minutes, deposit_amount: sent.deposit_amount, times: [...sent.times].sort(),
-          email_to: 'minseo@example.test', ...(withDeposit ? { email_error: 'The to address is on the suppression list' } : { email_sent_at: new Date().toISOString() }) };
+          email_to: 'minseo@example.test', ...(withDeposit ? { email_error: 'The to address is on the suppression list' } : { email_sent_at: new Date().toISOString(), email_status: 'delivered' }) };
         current = { ...current, status: 'awaiting_payment' }; // waiting on the client, like a sent link
         return r.fulfill({ json: { offer } });
       });
@@ -93,7 +93,7 @@ const pending = { id: 'req-1', requester_name: 'Minseo Park', requester_email: '
         await page.getByText('Times saved, but the email didn’t send: The to address is on the suppression list').waitFor();
         await page.getByRole('alert').filter({ hasText: 'Use Edit times to send it again' }).waitFor();
       }
-      else await page.getByText(/^Emailed to minseo@example\.test · /).waitFor();
+      else await page.getByText(/^Emailed to minseo@example\.test · .* · Delivered$/).waitFor();
       if (shots) await page.screenshot({ path: `${shots}/offer-times-panel-${width}.png` });
       // Reopened later in Awaiting payment: still shows the offer and can be edited, no "Resend link".
       await page.reload({ waitUntil: 'networkidle' });
