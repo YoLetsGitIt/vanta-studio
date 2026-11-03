@@ -47,7 +47,12 @@ const template = { id: 'tmpl-1', name: 'Walk-in consent', requires_signature: fa
       await page.getByText('Walk-in consent', { exact: true }).waitFor();
       const book = page.getByRole('button', { name: 'Book me in', exact: true });
       assert.equal(await book.isDisabled(), true, 'Book me in is disabled on an empty form');
-      await page.getByPlaceholder('Your name', { exact: true }).fill('Walk In Client');
+      // Walk-ins give first and last name separately.
+      assert.equal(await page.getByPlaceholder('Your name', { exact: true }).count(), 0);
+      await page.getByPlaceholder('First name', { exact: true }).fill('Walk In');
+      assert.equal(await book.isDisabled(), true, 'disabled until the last name is given');
+      await page.getByText('Please provide your last name.').waitFor();
+      await page.getByPlaceholder('Last name', { exact: true }).fill('Client');
       await page.locator('input[type="date"]').fill('1994-05-06');
       await page.getByPlaceholder('you@example.com').fill('walkin@example.test');
       await page.getByPlaceholder('555 0100').fill('400111222');
@@ -76,8 +81,9 @@ const template = { id: 'tmpl-1', name: 'Walk-in consent', requires_signature: fa
       assert.equal(sent.consent_submissions[0].answers.healthy, 'Yes');
       // Shared iPad: start fresh for the next client.
       await page.getByRole('button', { name: 'Start a new walk-in' }).click();
-      await page.getByPlaceholder('Your name', { exact: true }).waitFor();
-      assert.equal(await page.getByPlaceholder('Your name', { exact: true }).inputValue(), '');
+      await page.getByPlaceholder('First name', { exact: true }).waitFor();
+      assert.equal(await page.getByPlaceholder('First name', { exact: true }).inputValue(), '');
+      assert.equal(await page.getByPlaceholder('Last name', { exact: true }).inputValue(), '');
       assert.deepEqual(errors, []);
       console.log(`PASS walk-in form at ${width}px`);
       await context.close();

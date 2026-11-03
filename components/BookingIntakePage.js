@@ -167,6 +167,10 @@ function IntakeInner({ mode }) {
 
   // Form state
   const [fullName, setFullName]     = useState('');
+  // Walk-ins give first and last name separately; everything else uses one name field.
+  const [firstName, setFirstName]   = useState('');
+  const [lastName, setLastName]     = useState('');
+  const clientName = walkIn ? `${firstName.trim()} ${lastName.trim()}`.trim() : fullName.trim();
   const [phoneCode, setPhoneCode]   = useState(() => detectCountry());
   const [phoneNum,  setPhoneNum]    = useState('');
   const [smsOptIn, setSMSOptIn] = useState(false);
@@ -288,7 +292,9 @@ function IntakeInner({ mode }) {
   // The first required thing still missing from the booking or consent forms, or ''.
   // Drives both the disabled submit button and the message on submit.
   function missingRequirement(bookingEmail = guest ? guestEmail.trim() : session?.user?.email?.trim() || '') {
-    if (!fullName.trim()) return 'Please provide your full name.';
+    if (walkIn && !firstName.trim()) return 'Please provide your first name.';
+    if (walkIn && !lastName.trim()) return 'Please provide your last name.';
+    if (!clientName) return 'Please provide your full name.';
     if (guest && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(bookingEmail)) return 'Please provide a valid email address.';
     if (!phoneNum.trim()) return 'Please provide your phone number.';
     if (!dob) return 'Please provide your date of birth.';
@@ -389,7 +395,7 @@ function IntakeInner({ mode }) {
           template_id:            t.id,
           answers:                await uploadPhotoIdAnswers(ts.answers ?? {}, file => signStudioPhotoId(process.env.NEXT_PUBLIC_BACKEND_URL, studioId, file)),
           is_minor:               isMinor,
-          signer_name:            fullName.trim(),
+          signer_name:            clientName,
           client_signature_path:  clientSigPath,
           guardian_name:          isMinor ? guardianName : '',
           guardian_relationship:  isMinor ? guardianRelationship : '',
@@ -401,7 +407,7 @@ function IntakeInner({ mode }) {
 
       await (walkIn ? createWalkInBooking : guest ? createGuestStudioBooking : createWalkIn)(studioId, {
         artist_id:            artistId,
-        name:                 fullName.trim(),
+        name:                 clientName,
         email: bookingEmail,
         phone: bookingPhone,
         sms_reminder_opt_in: smsOptIn,
@@ -483,9 +489,20 @@ function IntakeInner({ mode }) {
 
           <Section title="Your details" first>
             <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: 13 }}>{walkIn ? `${studio.name} uses these details to contact you about your appointment.` : guest ? `You’re booking as a guest, no account needed. ${studio.name} uses these details to contact you about your booking.` : 'Review your details and update anything that has changed.'}</p>
-            <Field label="Full name">
-              <input style={s.input} type="text" value={fullName} required autoComplete="name" onChange={e => setFullName(e.target.value)} placeholder="Your name" />
-            </Field>
+            {walkIn ? (
+              <div style={s.nameRow}>
+                <Field label="First name">
+                  <input style={s.input} type="text" value={firstName} required autoComplete="given-name" onChange={e => setFirstName(e.target.value)} placeholder="First name" />
+                </Field>
+                <Field label="Last name">
+                  <input style={s.input} type="text" value={lastName} required autoComplete="family-name" onChange={e => setLastName(e.target.value)} placeholder="Last name" />
+                </Field>
+              </div>
+            ) : (
+              <Field label="Full name">
+                <input style={s.input} type="text" value={fullName} required autoComplete="name" onChange={e => setFullName(e.target.value)} placeholder="Your name" />
+              </Field>
+            )}
             <Field label="Date of birth" required>
               <DateOfBirthInput style={s.input} value={dob} onChange={setDob} />
             </Field>
@@ -1095,6 +1112,7 @@ const s = {
   photoThumb: { position: 'relative', width: 72, height: 72, borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)' },
   thumbImg: { width: '100%', height: '100%', objectFit: 'cover' },
   thumbRemove: { position: 'absolute', top: 2, right: 2, width: 18, height: 18, borderRadius: '50%', background: 'rgba(0,0,0,0.65)', border: 'none', color: '#fff', fontSize: '0.65rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 },
+  nameRow: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.9rem' },
   blocker: { margin: '0.6rem 0 0', fontSize: '0.8rem', color: 'var(--text-muted)', textAlign: 'center' },
   sigWrap: { display: 'flex', flexDirection: 'column', gap: '0.4rem' },
   sigCanvas: { width: '100%', height: 140, borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.12)', display: 'block', touchAction: 'none', cursor: 'crosshair' },
