@@ -34,7 +34,6 @@ export default function SMSReminderPage() {
       })}</strong><br />{appointment.timezone}</p>}
       {appointment.address && <p>{appointment.address}</p>}
       {appointment.status === 'confirmed' && <p style={{ display: 'flex', gap: 20 }}>
-        {data.reschedule_url && <a href={data.reschedule_url} referrerPolicy="no-referrer">Reschedule</a>}
         {data.cancel_url && <a href={data.cancel_url} referrerPolicy="no-referrer">Cancel appointment</a>}
       </p>}
       <hr style={{ margin: '28px 0', border: 0, borderTop: '1px solid var(--border)' }} />

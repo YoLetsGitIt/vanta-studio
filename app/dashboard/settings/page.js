@@ -253,7 +253,6 @@ export default function SettingsPage() {
   const [personalCut, setPersonalCut] = useState('0');
   const [paymentRecordingReq, setPaymentRecordingReq] = useState('studio_only');
   const [payForfeitedDeposits, setPayForfeitedDeposits] = useState(false);
-  const [rescheduleWindow, setRescheduleWindow] = useState(null);
   const [sendReminder7d, setSendReminder7d] = useState(true);
   const [sendReminder3d, setSendReminder3d] = useState(false);
   const [sendReminder24h, setSendReminder24h] = useState(true);
@@ -372,7 +371,6 @@ export default function SettingsPage() {
         setPersonalCut(String(account.studio?.personal_cut_percent ?? account.studio?.studio_cut_percent ?? 0));
         setPaymentRecordingReq(account.studio?.payment_recording_requirement ?? 'studio_only');
         setPayForfeitedDeposits(account.studio?.pay_artist_on_forfeited_deposits ?? false);
-        setRescheduleWindow(account.studio?.reschedule_window_hours ?? null);
         setSendReminder7d(account.studio?.send_reminder_7d ?? true);
         setSendReminder3d(account.studio?.send_reminder_3d ?? false);
         setSendReminder24h(account.studio?.send_reminder_24h ?? true);
@@ -450,7 +448,7 @@ export default function SettingsPage() {
     try {
       const wc = parseFloat(walkinCut);
       const pc = parseFloat(personalCut);
-      await updateStudioProfile(name.trim(), address.trim(), widgetBgColor, widgetAccentColor, isNaN(wc) ? 0 : wc, isNaN(pc) ? 0 : pc, aftercareInstructions, timezone, addressLat, addressLng, paymentRecordingReq, rescheduleWindow, widgetConsentTemplateId || null, sendReminder7d, sendReminder24h, payForfeitedDeposits, schedulingMode, piercingAftercareInstructions, sendReminder3d);
+      await updateStudioProfile(name.trim(), address.trim(), widgetBgColor, widgetAccentColor, isNaN(wc) ? 0 : wc, isNaN(pc) ? 0 : pc, aftercareInstructions, timezone, addressLat, addressLng, paymentRecordingReq, undefined, widgetConsentTemplateId || null, sendReminder7d, sendReminder24h, payForfeitedDeposits, schedulingMode, piercingAftercareInstructions, sendReminder3d);
       invalidate('studio-account');
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
@@ -1338,7 +1336,7 @@ export default function SettingsPage() {
           )}
         </section>
 
-        <section className="settings-span-7" style={s.card} aria-labelledby="website-widget-title">
+        <section className="settings-span-12" style={s.card} aria-labelledby="website-widget-title">
           <h2 id="website-widget-title" style={s.sectionTitle}>{t('booking_widget')}</h2>
           <p style={s.sectionDesc}>Embed the booking form on your website. Customise the colours to match your brand.</p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -1381,24 +1379,6 @@ export default function SettingsPage() {
           </div>
         </section>
 
-        <section className="settings-span-5" style={s.card}>
-          <h2 style={s.sectionTitle}>{t('reschedule_window')}</h2>
-          <p style={s.sectionDesc}>{t('reschedule_window_desc')}</p>
-          <select
-            style={{ ...s.input, cursor: 'pointer', colorScheme: 'dark' }}
-            value={rescheduleWindow ?? ''}
-            onChange={e => setRescheduleWindow(e.target.value === '' ? null : Number(e.target.value))}
-          >
-            <option value="">{t('reschedule_window_none')}</option>
-            <option value="24">{t('reschedule_window_24h')}</option>
-            <option value="48">{t('reschedule_window_48h')}</option>
-            <option value="72">{t('reschedule_window_72h')}</option>
-            <option value="168">{t('reschedule_window_1w')}</option>
-          </select>
-          <button onClick={saveProfile} style={s.saveBtn} disabled={saving}>
-            {saving ? t('saving') : saved ? t('saved') : t('save')}
-          </button>
-        </section>
 
         {/* Smart scheduling — temporarily hidden
         <section className="settings-span-12" style={s.card}>

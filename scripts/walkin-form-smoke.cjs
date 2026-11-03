@@ -23,7 +23,8 @@ const template = { id: 'tmpl-1', name: 'Walk-in consent', requires_signature: fa
         if (url.pathname.endsWith('/public')) return route.fulfill({ json: studio, headers });
         if (url.pathname.endsWith('/walkin-form-config')) return route.fulfill({ json: { fields: { body_location: { enabled: true, required: true }, design_details: { enabled: false, required: false } } }, headers });
         if (url.pathname.endsWith('/form-config')) throw new Error('Walk-in must not use the booking form config');
-        if (url.pathname.endsWith('/consent-templates')) return route.fulfill({ json: { templates: [template] }, headers });
+        // Walk-ins get every studio consent form (?all=1), not only the booking-widget one, which this studio never chose.
+        if (url.pathname.endsWith('/consent-templates')) return route.fulfill({ json: { templates: url.searchParams.get('all') === '1' ? [template] : [] }, headers });
         if (url.pathname.endsWith('/hours')) return route.fulfill({ json: { hours: [] }, headers });
         if (url.pathname.endsWith('/walk-in') && req.method() === 'POST') {
           posts.push(req.postDataJSON());

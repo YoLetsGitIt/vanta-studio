@@ -221,7 +221,8 @@ function IntakeInner({ mode }) {
     Promise.all([
       getStudioPublic(studioId),
       (walkIn ? getWalkInFormConfigPublic(studioId) : getFormConfigPublic(studioId)).catch(() => ({ fields: {} })),
-      getStudioConsentTemplates(studioId).catch(() => ({ templates: [] })),
+      // Walk-ins sign every studio consent form; online requests use the one chosen for the booking widget.
+      getStudioConsentTemplates(studioId, walkIn).catch(() => ({ templates: [] })),
       getStudioHoursPublic(studioId).catch(() => ({ hours: [] })),
     ]).then(([studioData, configData, consentData, hoursData]) => {
       setStudioHours(hoursData.hours ?? []);
