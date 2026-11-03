@@ -515,7 +515,7 @@ function IntakeInner({ mode }) {
               <div style={s.phoneRow}>
                 <select
                   aria-label="Phone country code"
-                  style={{ ...s.input, ...s.phoneCodeSelect }}
+                  style={{ ...s.input, ...s.select, ...s.phoneCodeSelect }}
                   value={phoneCode}
                   onChange={e => setPhoneCode(e.target.value)}
                 >
@@ -539,14 +539,14 @@ function IntakeInner({ mode }) {
           {/* ── Your tattoo ── */}
           <Section title="Your appointment">
             {!walkIn && <Field label="Appointment type">
-              <select style={s.input} value={appointmentType} onChange={e => { setAppointmentType(e.target.value); setPlacements([]); }}>
+              <select style={{ ...s.input, ...s.select }} value={appointmentType} onChange={e => { setAppointmentType(e.target.value); setPlacements([]); }}>
                 <option value="tattoo">Tattoo</option>
                 <option value="piercing">Piercing</option>
               </select>
             </Field>}
             {field('artist_id').enabled && (
               <Field label={<>{walkIn ? 'Artist' : 'Artist preference'}{field('artist_id').required ? null : <Optional />}</>}>
-                <select style={s.input} value={artistId} required={field('artist_id').required} onChange={e => setArtistId(e.target.value)}>
+                <select style={{ ...s.input, ...s.select }} value={artistId} required={field('artist_id').required} onChange={e => setArtistId(e.target.value)}>
                   <option value="">{walkIn ? 'Choose your artist' : 'No preference — studio will assign'}</option>
                   {studio.artists.map(a => (
                     <option key={a.artistId} value={a.artistId}>
@@ -599,7 +599,7 @@ function IntakeInner({ mode }) {
 
             {!isPiercing && field('skin_tone').enabled && (
               <Field label={<>Skin tone{field('skin_tone').required ? null : <Optional />}</>}>
-                <select style={s.input} value={skinTone} required={field('skin_tone').required} onChange={e => setSkinTone(e.target.value)}>
+                <select style={{ ...s.input, ...s.select }} value={skinTone} required={field('skin_tone').required} onChange={e => setSkinTone(e.target.value)}>
                   <option value="">Select skin tone…</option>
                   {['Very light', 'Light', 'Medium', 'Olive', 'Brown', 'Dark'].map(t => (
                     <option key={t} value={t}>{t}</option>
@@ -779,7 +779,7 @@ function IntakeInner({ mode }) {
                             </div>
                             <div>
                               <label htmlFor={`guardian-relationship-${t.id}`} style={s.label}>Relationship</label>
-                              <select id={`guardian-relationship-${t.id}`} style={s.input} value={guardianRelationship} onChange={e => setGuardianRelationship(e.target.value)}>
+                              <select id={`guardian-relationship-${t.id}`} style={{ ...s.input, ...s.select }} value={guardianRelationship} onChange={e => setGuardianRelationship(e.target.value)}>
                                 <option>Parent</option>
                                 <option>Legal Guardian</option>
                                 <option>Other</option>
@@ -1079,6 +1079,14 @@ const s = {
   },
   phoneCodeSelect: {
     width: 'auto', flexShrink: 0,
+  },
+  // Dropdowns drop Safari's native look (on iPhone it ignores the field's height and
+  // colours and draws a small grey control) and use the same box plus a chevron.
+  select: {
+    WebkitAppearance: 'none', appearance: 'none', colorScheme: 'dark',
+    paddingRight: '2rem', cursor: 'pointer',
+    backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23999' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E\")",
+    backgroundRepeat: 'no-repeat', backgroundPosition: 'right 0.85rem center',
   },
   textarea: {
     minHeight: 90,
