@@ -28,12 +28,12 @@ async function chrome(p,title){
 async function point(p,l,click=false){await l.scrollIntoViewIfNeeded();const b=await l.boundingBox();await p.evaluate(({x,y})=>document.querySelector('#demo-cursor').style.transform=`translate(${x-11}px,${y-11}px)`,{x:b.x+b.width/2,y:b.y+b.height/2});await pause(450);if(click){await p.evaluate(()=>document.querySelector('#demo-cursor').dataset.click='true');await l.click();await pause(200);await p.evaluate(()=>document.querySelector('#demo-cursor').dataset.click='false');}}
 async function caption(p,index,text){await p.evaluate(({index,text})=>{document.querySelector('#demo-step').textContent=String(index+1).padStart(2,'0');document.querySelector('#demo-caption-text').textContent=text;},{index,text});}
 const demos=[
- {id:'forms',title:'Your booking form',route:'settings.html?tab=bookings',setup:async p=>section(p,'Booking Widget'),steps:[
+ {id:'forms',title:'Your booking form',route:'settings.html?tab=bookings',setup:async p=>section(p,'Booking form'),steps:[
   ['Choose the fields your studio needs.',async p=>{await point(p,p.getByRole('switch',{name:'Artist preference field',exact:true}),true)}],
   ['Make important answers required.',async p=>{await point(p,p.getByRole('checkbox',{name:'Artist preference required',exact:true}),true)}],
   ['Your chosen fields appear in the live preview.',async p=>{await point(p,p.getByRole('switch',{name:'Reference photos field',exact:true}));await p.locator('[data-demo-focus]').evaluate(e=>e.scrollTo({top:0,behavior:'smooth'}))}],
  ]},
- {id:'branding',title:'Make it your studio',route:'settings.html?tab=bookings',setup:async p=>section(p,'Booking Widget'),steps:[
+ {id:'branding',title:'Make it your studio',route:'settings.html?tab=bookings',setup:async p=>section(p,'Booking form'),steps:[
   ['Match the background to your website.',async p=>{const l=p.getByLabel('Widget background hex colour');await point(p,l);await l.fill('#20271F');}],
   ['Choose an accent. See it change live.',async p=>{const l=p.getByLabel('Widget highlight hex colour');await point(p,l);await l.fill('#D9B978');}],
   ['Copy the embed snippet for your own website.',async p=>{await point(p,p.getByRole('button',{name:'Copy snippet',exact:true}),true)}],

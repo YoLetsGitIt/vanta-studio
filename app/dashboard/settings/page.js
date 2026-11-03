@@ -19,7 +19,7 @@ import {
   listConsentTemplates, createConsentTemplate, updateConsentTemplate, deleteConsentTemplate,
   getStripeStatus, startStripeOnboarding, disconnectStripe,
   getFormConfig, updateFormConfig,
-  startBillingCheckout, getBillingDetails, cancelBillingSubscription, reactivateBillingSubscription, openBillingPortal, getBookingLink, updateBookingLink } from '@/lib/api';
+  startBillingCheckout, getBillingDetails, cancelBillingSubscription, reactivateBillingSubscription, openBillingPortal, getBookingLink, updateBookingLink, checkBookingLink } from '@/lib/api';
 import { getSupabase } from '@/lib/supabase';
 import { invalidate } from '@/lib/cache';
 import { getTheme, setTheme } from '@/lib/theme';
@@ -267,6 +267,22 @@ export default function SettingsPage() {
   const [slugDraft, setSlugDraft] = useState('');
   const [slugSaving, setSlugSaving] = useState(false);
   const [slugError, setSlugError] = useState('');
+  // Live check while typing: null, or { slug, state: 'short' | 'checking' | 'available' | 'taken', message }.
+  const [slugCheck, setSlugCheck] = useState(null);
+  useEffect(() => {
+    setSlugError('');
+    if (!bookingSlug || slugDraft === bookingSlug) { setSlugCheck(null); return undefined; }
+    if (slugDraft.length < 3) { setSlugCheck({ slug: slugDraft, state: 'short' }); return undefined; }
+    setSlugCheck({ slug: slugDraft, state: 'checking' });
+    let active = true;
+    const timer = setTimeout(() => {
+      checkBookingLink(slugDraft)
+        .then(result => { if (active) setSlugCheck({ slug: result.slug || slugDraft, state: result.available ? 'available' : 'taken', message: result.message }); })
+        // If the check itself fails, saving still checks.
+        .catch(() => { if (active) setSlugCheck(null); });
+    }, 350);
+    return () => { active = false; clearTimeout(timer); };
+  }, [slugDraft, bookingSlug]);
   const consentUrl = bookingSlug ? `${SHORT_LINK_BASE}/c/${bookingSlug}` : walkInUrl.replace('/studio-booking?s=', '/consent?s=');
   const [studioId, setStudioId] = useState('');
   const [theme, setThemeState] = useState('dark');
@@ -742,6 +758,7 @@ export default function SettingsPage() {
   async function saveBookingSlug(event) {
     event.preventDefault();
     setSlugError('');
+    setSlugCheck(null);
     setSlugSaving(true);
     try {
       const { slug } = await updateBookingLink(slugDraft);
@@ -1205,7 +1222,7 @@ export default function SettingsPage() {
 
         <section className="settings-span-12" style={s.card} aria-labelledby="booking-form-title">
           <h2 id="booking-form-title" style={s.sectionTitle}>Booking form</h2>
-          <p style={s.sectionDesc}>Choose what clients fill in on your booking link and website widget. Field switches save straight away.</p>
+          <p style={s.sectionDesc}>Choose what clients fill in on your booking link and website widget, and how the widget looks. Field switches save straight away.</p>
           <div className="studio-feature-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', alignItems: 'start' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
@@ -1303,6 +1320,41 @@ export default function SettingsPage() {
                 )}
               </div>
 
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>
+                <div>
+                  <h3 style={{ ...s.label, margin: 0 }}>Website widget colours</h3>
+                  <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '0.25rem 0 0' }}>Match the widget to your website. The preview updates as you go.</p>
+                </div>
+                <div className="studio-form-row" style={s.colorRow}>
+                  <div style={s.colorField}>
+                    <label style={s.label}>Background</label>
+                    <div style={s.colorInputWrap}>
+                      <input aria-label="Widget background colour" type="color" value={widgetBgColor} onChange={e => setWidgetBgColor(e.target.value)} style={s.colorSwatch} />
+                      <input
+                        aria-label="Widget background hex colour"
+                        style={{ ...s.input, fontFamily: 'ui-monospace,monospace', fontSize: '0.82rem' }}
+                        value={widgetBgColor}
+                        onChange={e => setWidgetBgColor(e.target.value)}
+                        maxLength={7}
+                      />
+                    </div>
+                  </div>
+                  <div style={s.colorField}>
+                    <label style={s.label}>Highlight</label>
+                    <div style={s.colorInputWrap}>
+                      <input aria-label="Widget highlight colour" type="color" value={widgetAccentColor} onChange={e => setWidgetAccentColor(e.target.value)} style={s.colorSwatch} />
+                      <input
+                        aria-label="Widget highlight hex colour"
+                        style={{ ...s.input, fontFamily: 'ui-monospace,monospace', fontSize: '0.82rem' }}
+                        value={widgetAccentColor}
+                        onChange={e => setWidgetAccentColor(e.target.value)}
+                        maxLength={7}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <button onClick={saveProfile} style={s.saveBtn} disabled={saving}>
                 {saving ? t('saving') : saved ? t('saved') : t('save')}
               </button>
@@ -1310,6 +1362,12 @@ export default function SettingsPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <WidgetPreview bg={widgetBgColor} accent={widgetAccentColor} logoUrl={logoUrl} studioName={name || 'Your Studio'} fields={formFields} consentTemplate={widgetConsentTemplateId ? consentTemplates.find(t => t.id === widgetConsentTemplateId) : null} />
             </div>
+          </div>
+          <div style={{ ...s.embedCard, borderTop: '1px solid var(--border)', paddingTop: '1.25rem', marginTop: '1.5rem' }}>
+            <h3 style={{ ...s.label, margin: 0 }}>Add it to your website</h3>
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: 0 }}>Paste this code where you want the booking form to appear on your site.</p>
+            <pre style={s.codeBlock}>{embedSnippet}</pre>
+            <button onClick={copyEmbed} style={s.copyBtn}>{embedCopied ? t('copied') : t('copy_snippet')}</button>
           </div>
         </section>
 
@@ -1329,55 +1387,19 @@ export default function SettingsPage() {
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                 <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>vanta.tattoo/b/</span>
                 <input id="booking-slug" className="vanta-input" value={slugDraft} onChange={e => setSlugDraft(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))} maxLength={40} autoCapitalize="none" autoCorrect="off" spellCheck={false} style={{ flex: '1 1 140px', minWidth: 0, background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 8, padding: '0.5rem 0.7rem', fontSize: '16px', color: 'var(--text)' }} />
-                <button type="submit" style={s.copyBtn} disabled={slugSaving || slugDraft === bookingSlug || slugDraft.length < 3}>{slugSaving ? 'Saving…' : 'Save'}</button>
+                <button type="submit" style={s.copyBtn} disabled={slugSaving || slugDraft === bookingSlug || slugDraft.length < 3 || (slugCheck && slugCheck.state !== 'available')}>{slugSaving ? 'Saving…' : 'Save'}</button>
               </div>
-              {slugError ? <p role="alert" style={{ margin: 0, fontSize: '0.85rem', color: 'var(--color-danger)' }}>{slugError}</p>
-                : <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-ghost)' }}>Changing it stops the old link and QR codes working.</p>}
+              <div aria-live="polite">
+                {slugError ? <p role="alert" style={{ margin: 0, fontSize: '0.85rem', color: 'var(--color-danger)' }}>{slugError}</p>
+                  : slugCheck?.state === 'short' ? <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-muted)' }}>Use at least 3 letters or numbers.</p>
+                  : slugCheck?.state === 'checking' ? <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-muted)' }}>Checking…</p>
+                  : slugCheck?.state === 'available' ? <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--color-success)' }}>✓ vanta.tattoo/b/{slugCheck.slug} is available</p>
+                  : slugCheck?.state === 'taken' ? <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--color-danger)' }}>{slugCheck.message === 'that link is already taken' ? `Another studio already uses vanta.tattoo/b/${slugCheck.slug}. Try a different name.` : `${slugCheck.message.charAt(0).toUpperCase()}${slugCheck.message.slice(1)}.`}</p>
+                  : null}
+              </div>
+              {slugCheck?.state !== 'taken' && <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-ghost)' }}>Changing it stops the old link and QR codes working.</p>}
             </form>
           )}
-        </section>
-
-        <section className="settings-span-12" style={s.card} aria-labelledby="website-widget-title">
-          <h2 id="website-widget-title" style={s.sectionTitle}>{t('booking_widget')}</h2>
-          <p style={s.sectionDesc}>Embed the booking form on your website. Customise the colours to match your brand.</p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div className="studio-form-row" style={s.colorRow}>
-                <div style={s.colorField}>
-                  <label style={s.label}>Background</label>
-                  <div style={s.colorInputWrap}>
-                    <input aria-label="Widget background colour" type="color" value={widgetBgColor} onChange={e => setWidgetBgColor(e.target.value)} style={s.colorSwatch} />
-                    <input
-                      aria-label="Widget background hex colour"
-                      style={{ ...s.input, fontFamily: 'ui-monospace,monospace', fontSize: '0.82rem' }}
-                      value={widgetBgColor}
-                      onChange={e => setWidgetBgColor(e.target.value)}
-                      maxLength={7}
-                    />
-                  </div>
-                </div>
-                <div style={s.colorField}>
-                  <label style={s.label}>Highlight</label>
-                  <div style={s.colorInputWrap}>
-                    <input aria-label="Widget highlight colour" type="color" value={widgetAccentColor} onChange={e => setWidgetAccentColor(e.target.value)} style={s.colorSwatch} />
-                    <input
-                      aria-label="Widget highlight hex colour"
-                      style={{ ...s.input, fontFamily: 'ui-monospace,monospace', fontSize: '0.82rem' }}
-                      value={widgetAccentColor}
-                      onChange={e => setWidgetAccentColor(e.target.value)}
-                      maxLength={7}
-                    />
-                  </div>
-                </div>
-              </div>
-              <button onClick={saveProfile} style={s.saveBtn} disabled={saving}>
-                {saving ? t('saving') : saved ? t('saved') : t('save')}
-              </button>
-              <div style={s.embedCard}>
-                <label style={s.label}>Embed snippet</label>
-                <pre style={s.codeBlock}>{embedSnippet}</pre>
-                <button onClick={copyEmbed} style={s.copyBtn}>{embedCopied ? t('copied') : t('copy_snippet')}</button>
-              </div>
-          </div>
         </section>
 
 

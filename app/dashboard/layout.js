@@ -21,9 +21,9 @@ const NAV = [
   { href: '/dashboard/artists',      tKey: 'nav_artists',   icon: UsersIcon },
   { href: '/dashboard/clients',      tKey: 'nav_clients',   icon: PersonIcon },
   { href: '/dashboard/appointments', tKey: 'nav_bookings',  icon: CalendarIcon },
+  { href: '/dashboard/marketing',    tKey: 'nav_marketing', icon: MegaphoneIcon },
   { href: '/dashboard/analytics',    tKey: 'nav_analytics', icon: ChartIcon },
   { href: '/dashboard/financial',    tKey: 'revenue_financial', icon: RevenueIcon },
-  { href: '/dashboard/marketing',    tKey: 'nav_marketing', icon: MegaphoneIcon },
 ];
 
 const MOBILE_NAV = [NAV[0], NAV[1], NAV[4], NAV[3]];

@@ -12,8 +12,7 @@ import styles from './marketing.module.css';
 const MAX_GIF_BYTES = 5 * 1024 * 1024;
 
 /**
- * The message box. Photos show as [Photo 1], [Photo 2]…; Preview shows the
- * real photos. Saved as plain text (see lib/marketingPhotos.mjs).
+ * The message box. Photos show as [file name]; Preview shows the real photos. Saved as plain text (see lib/marketingPhotos.mjs).
  * Ref: insertText(text) puts text at the cursor.
  */
 const MessageEditor = forwardRef(function MessageEditor({ label, value, onChange, disabled, onFocus }, ref) {
@@ -21,7 +20,7 @@ const MessageEditor = forwardRef(function MessageEditor({ label, value, onChange
   const box = useRef(null);
   const fileInput = useRef(null);
   const [uploading, setUploading] = useState(false);
-  const { text, urls } = toDisplay(value);
+  const { text, photos } = toDisplay(value);
   const latest = useRef(value);
   latest.current = value;
 
@@ -33,7 +32,7 @@ const MessageEditor = forwardRef(function MessageEditor({ label, value, onChange
     insertText(insert) {
       const el = box.current;
       const start = el?.selectionStart ?? text.length, end = el?.selectionEnd ?? text.length;
-      onChange(fromDisplay(text.slice(0, start) + insert + text.slice(end), urls));
+      onChange(fromDisplay(text.slice(0, start) + insert + text.slice(end), photos));
       placeCursor(start + insert.length);
     },
   }));
@@ -48,7 +47,7 @@ const MessageEditor = forwardRef(function MessageEditor({ label, value, onChange
       const url = await uploadMarketingPhoto(file);
       // Use the latest message: the studio may have kept typing during the upload.
       const current = latest.current;
-      const { body, cursor } = insertPhoto(current, Math.min(at, toDisplay(current).text.length), url);
+      const { body, cursor } = insertPhoto(current, Math.min(at, toDisplay(current).text.length), url, file.name);
       onChange(body);
       placeCursor(cursor);
     } catch (err) { showError(err); } finally { setUploading(false); }
@@ -66,7 +65,7 @@ const MessageEditor = forwardRef(function MessageEditor({ label, value, onChange
           disabled={disabled}
           value={text}
           onFocus={onFocus}
-          onChange={event => onChange(fromDisplay(event.target.value, urls))}
+          onChange={event => onChange(fromDisplay(event.target.value, photos))}
           onPaste={event => { const file = photoIn(event); if (file) { event.preventDefault(); addPhoto(file); } }}
           onDragOver={event => { if ([...(event.dataTransfer?.types ?? [])].includes('Files')) event.preventDefault(); }}
           onDrop={event => { const file = photoIn(event); if (file && !disabled) { event.preventDefault(); addPhoto(file); } }}
@@ -77,7 +76,7 @@ const MessageEditor = forwardRef(function MessageEditor({ label, value, onChange
         <Button size="sm" variant="secondary" disabled={disabled || uploading} loading={uploading} loadingLabel={mt('Uploading photo…')} onClick={() => fileInput.current?.click()}>
           <span aria-hidden="true">＋</span>{mt('Add photo')}
         </Button>
-        <p className={styles.hint}>{mt('Photos show as [Photo 1] here. Use Preview to see them. Delete the marker to remove a photo.')}</p>
+        <p className={styles.hint}>{mt('Photos show here by file name, like [flash-sheet.jpg]. Use Preview to see them. Delete the name to remove a photo.')}</p>
       </div>
     </div>
   );

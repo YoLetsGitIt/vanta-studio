@@ -1,13 +1,52 @@
 'use client';
 
 // Settings → Booking requests: who confirms the time of a studio booking.
+// Each option shows how a booking moves from request to booked, so the
+// difference is visible before choosing (choosing saves straight away).
 import { useState } from 'react';
 import { saveBookingManagement, useBookingManagement } from '@/lib/bookingManagement';
+import styles from './BookingManagementSettings.module.css';
 
+// Steps mirror the backend: artist mode puts a picked time in "requires
+// confirmation" for the artist (or studio); studio mode books it straight in.
 const OPTIONS = [
-  { value: 'artist', title: 'Artists', text: 'When a client picks a time from your link, it waits for the artist (or the studio) to confirm it.' },
-  { value: 'studio', title: 'The studio', text: 'The studio books times itself with “Book a time”, and times clients pick from your link are booked straight in. Artists don’t need to accept.' },
+  {
+    value: 'artist',
+    title: 'Artists confirm',
+    summary: 'Every booking time is checked by the artist before it’s final. Good when artists manage their own diaries.',
+    steps: [
+      { who: 'Client', text: 'Sends a request from your booking link or website.' },
+      { who: 'Studio or artist', text: 'Assigns an artist and a time, or sends the client times to choose from.' },
+      { who: 'Artist', text: 'Confirms the time in the Vanta app. The studio can confirm it too.', key: true },
+      { who: 'Booked', text: 'The client gets a confirmation email.', done: true },
+    ],
+  },
+  {
+    value: 'studio',
+    title: 'The studio confirms',
+    summary: 'The front desk books times directly. Artists don’t need to accept. Good when the studio runs the diary.',
+    steps: [
+      { who: 'Client', text: 'Sends a request from your booking link or website.' },
+      { who: 'Studio', text: 'Books a time with “Book a time”, or sends the client times to choose from.', key: true },
+      { who: 'Booked', text: 'Booked as soon as the time is set or picked. The artist sees it on their schedule.', done: true },
+    ],
+    note: 'If a PayID or bank transfer deposit is owed, the booking is confirmed once you mark the deposit received.',
+  },
 ];
+
+function Flow({ steps, label }) {
+  return (
+    <ol className={styles.flow} aria-label={label}>
+      {steps.map((step, index) => (
+        <li key={step.who} className={styles.step} data-key={step.key || undefined} data-done={step.done || undefined}>
+          <span className={styles.marker} aria-hidden="true">{step.done ? '✓' : index + 1}</span>
+          <span className={styles.who}>{step.who}</span>
+          <span className={styles.text}>{step.text}</span>
+        </li>
+      ))}
+    </ol>
+  );
+}
 
 export default function BookingManagementSettings({ styles: s }) {
   const mode = useBookingManagement();
@@ -26,25 +65,28 @@ export default function BookingManagementSettings({ styles: s }) {
   return (
     <section style={s.card} aria-labelledby="booking-management-title">
       <h2 id="booking-management-title" style={s.sectionTitle}>Who confirms booking times</h2>
-      <p style={s.sectionDesc}>Choose whether artists take part in confirming studio bookings, or the studio handles everything.</p>
+      <p style={s.sectionDesc}>
+        When a client asks for a booking, someone has to settle the time before it’s final. Choose whether that’s the artist or the studio. Requests always arrive in Bookings and on your Dashboard either way.
+      </p>
       {mode === null ? <div style={s.loadingDot} /> : (
-        <div role="radiogroup" aria-labelledby="booking-management-title" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+        <div role="radiogroup" aria-labelledby="booking-management-title" className={styles.options}>
           {OPTIONS.map(o => {
             const on = mode === o.value;
             return (
-              <button key={o.value} type="button" role="radio" aria-checked={on} disabled={saving} onClick={() => choose(o.value)}
-                style={{
-                  display: 'flex', gap: '0.75rem', alignItems: 'flex-start', textAlign: 'left', width: '100%', minHeight: 44,
-                  padding: '0.8rem 0.9rem', borderRadius: 10, cursor: saving ? 'wait' : 'pointer', fontFamily: 'inherit',
-                  background: on ? 'var(--accent-tint)' : 'var(--bg-base)',
-                  border: `1px solid ${on ? 'var(--accent-tint-border)' : 'var(--border)'}`,
-                }}>
-                <span aria-hidden="true" style={{ flexShrink: 0, marginTop: 2, width: 16, height: 16, borderRadius: '50%', border: `2px solid ${on ? 'var(--accent)' : 'var(--text-ghost)'}`, boxShadow: on ? 'inset 0 0 0 3px var(--bg-card)' : 'none', background: on ? 'var(--accent)' : 'transparent' }} />
-                <span style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-                  <span style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--text)' }}>{o.title}</span>
-                  <span style={{ fontSize: '0.85rem', lineHeight: 1.5, color: 'var(--text-secondary)' }}>{o.text}</span>
-                </span>
-              </button>
+              <div key={o.value} className={styles.option} data-on={on || undefined}>
+                <button type="button" role="radio" aria-checked={on} aria-describedby={`booking-flow-${o.value}`} disabled={saving} onClick={() => choose(o.value)} className={styles.choice}>
+                  <span aria-hidden="true" className={styles.radio} />
+                  <span className={styles.choiceText}>
+                    <span className={styles.title}>{o.title}{on && <span className={styles.current}>Current</span>}</span>
+                    <span className={styles.summary}>{o.summary}</span>
+                  </span>
+                </button>
+                <div id={`booking-flow-${o.value}`} className={styles.flowWrap}>
+                  <p className={styles.flowHeading}>How a booking works</p>
+                  <Flow steps={o.steps} label={`How a booking works when ${o.title.toLowerCase()}`} />
+                  {o.note && <p className={styles.note}>{o.note}</p>}
+                </div>
+              </div>
             );
           })}
         </div>
