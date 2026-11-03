@@ -26,6 +26,7 @@ import { useRouter } from 'next/navigation';
 import { initials, toISODate } from '@/lib/format';
 import BookingDetailPanel from '@/components/BookingDetailPanel';
 import CancelDepositButton from '@/components/CancelDepositButton';
+import MarkDepositReceivedButton from '@/components/MarkDepositReceivedButton';
 import CompleteBookingModal from '@/components/CompleteBookingModal';
 import RejectBookingModal from '@/components/RejectBookingModal';
 import SendSelectionLinkModal from '@/components/SendSelectionLinkModal';
@@ -464,6 +465,7 @@ export default function HomePage() {
                   {unpaidDepositBookings.map(booking => (
                     <AttentionItem key={booking.id} title={booking.requester_name ?? 'Client'} subtitle={bookingSubtitle(booking)} onClick={() => openBookingReview(booking)}>
                       <CancelDepositButton bookingId={booking.id} disabled={attentionAction === `deposit-${booking.id}`} />
+                      <MarkDepositReceivedButton bookingId={booking.id} clientName={booking.requester_name} variant="secondary" label="Mark as paid" disabled={attentionAction === `deposit-${booking.id}`} />
                       <button
                         style={s.inlinePrimary}
                         disabled={attentionAction === `deposit-${booking.id}` || !booking.requester_email}

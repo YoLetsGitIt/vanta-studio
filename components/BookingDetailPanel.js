@@ -1,12 +1,12 @@
 'use client';
 
 import CancelDepositButton from '@/components/CancelDepositButton';
-import MarkDepositReceivedButton from '@/components/MarkDepositReceivedButton';
+import MarkDepositReceivedButton, { depositMethodLabel } from '@/components/MarkDepositReceivedButton';
 import BookTimeModal from '@/components/BookTimeModal';
 import { useBookingManagement } from '@/lib/bookingManagement';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { getStations, getClientConsents, getNotes, addNote, deleteNote, getBookingConsentSubmissions, getStudioClients, generateConsentLink, getStudioBookingPayment, listConsentTemplates, downloadConsentPdf } from '@/lib/api';
+import { getStations, getClientConsents, getNotes, addNote, deleteNote, getBookingConsentSubmissions, getStudioClients, generateConsentLink, getStudioBookingPayment, getDepositReceipt, listConsentTemplates, downloadConsentPdf } from '@/lib/api';
 import { useStationAvailability } from '@/lib/useStationAvailability';
 import { statusColors, statusLabel, capitalise as cap } from '@/lib/status';
 import { formatDob as fmtDob, hasArtist } from '@/lib/format';
@@ -190,6 +190,19 @@ export default function BookingDetailPanel({
       .then(d => setPaymentSplits(d.splits ?? []))
       .catch(() => setPaymentSplits([]));
   }, [bookingId, isCompleted]);
+
+  // ── How a manually recorded deposit was paid (PayID, bank transfer, cash) ──
+  const [depositReceipt, setDepositReceipt] = useState(null);
+  useEffect(() => {
+    if (!bookingId || !depositPaidAt) { setDepositReceipt(null); return; }
+    if (depositReceived?.method) { setDepositReceipt({ booking: bookingId, method: depositReceived.method }); return; }
+    let live = true;
+    getDepositReceipt(bookingId)
+      .then(r => { if (live) setDepositReceipt(r ? { booking: bookingId, method: r.method } : null); })
+      .catch(() => { if (live) setDepositReceipt(null); });
+    return () => { live = false; };
+  }, [bookingId, depositPaidAt, depositReceived?.method]);
+  const depositPaidVia = depositReceipt?.booking === bookingId ? depositMethodLabel(depositReceipt.method) : null;
 
   // ── Load studio notes for this booking ─────────────────────────────────────
   useEffect(() => {
@@ -500,8 +513,8 @@ export default function BookingDetailPanel({
                 })()}
                 {depositRequired && !depositPaid && !depositConfirmedAt && ['confirmed', 'awaiting_payment', 'requires_confirmation', 'deposit_expired'].includes(status) && (
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                    <MarkDepositReceivedButton bookingId={bookingId} disabled={actionLoading}
-                      onReceived={result => setReceivedDeposit({ id: bookingId, at: new Date().toISOString(), status: result?.status })} />
+                    <MarkDepositReceivedButton bookingId={bookingId} clientName={clientName !== '—' ? clientName : undefined} disabled={actionLoading}
+                      onReceived={result => setReceivedDeposit({ id: bookingId, at: new Date().toISOString(), status: result?.status, method: result?.method })} />
                     {chosenTime && status !== 'deposit_expired' && (
                       <CancelDepositButton bookingId={bookingId} onCancelled={() => setCancelledDepositId(bookingId)} disabled={actionLoading} />
                     )}
@@ -509,7 +522,7 @@ export default function BookingDetailPanel({
                 )}
                 {depositPaidAt && (
                   <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                    Paid {new Date(depositPaidAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    Paid {depositPaidVia ? `by ${depositPaidVia} · ` : ''}{new Date(depositPaidAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
                   </span>
                 )}
               </div>

@@ -30,6 +30,7 @@ async function setup(context) {
     else if (path === '/studio/me/marketing') json = {available:true,ready:true,domain_available:true,stats:{consented_clients:1,sent_this_month:0,unsubscribed:0,failed_this_month:0},settings:{from_name:'Northside Studio',reply_to:'studio@example.test',sender_provider:'resend',footer_address:'Local test address',domain:'',domain_status:''}};
     else if (path === '/studio/me') json = { status: 'approved', studio_id: 'test-studio', studio: { name: 'Northside Tattoo Studio', timezone: 'Australia/Melbourne', subscription_status: 'active', payment_recording_requirement: 'studio_only' } };
     else if (path === '/studio/me/artists') json = { artists: url.searchParams.get('status') === 'approved' ? artists : [] };
+    else if (path.startsWith('/studio/me/commission-overrides')) json = { overrides: [{ artist_id: 'artist-1', artist_name: 'Jamie Lee', studio_cut_percent: 25, personal_cut_percent: null }] };
     else if (path === '/studio/me/dashboard-attention') json = { bookings: [{ ...booking, id: 'pending-1', status: 'pending' }, { ...booking, id: 'confirmation-1', status: 'requires_confirmation' }], pending_artists: [], pending_reimbursements: [] };
     else if (path === '/studio/me/schedule') json = { entries };
     else if (path === '/studio/me/clients') json = { clients: [client] };

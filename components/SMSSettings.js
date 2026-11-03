@@ -19,7 +19,7 @@ export default function SMSSettings({ styles: s }) {
     finally { setSaving(false); }
   }
   return (
-    <section style={{ ...s.card, gridColumn: '1 / -1' }}>
+    <section style={s.card}>
       <h2 style={s.sectionTitle}>SMS reminders</h2>
       <p style={s.sectionDesc}>One included SMS reminder per appointment, sent 24 hours ahead to clients who opt in.</p>
       {error && <p role="alert">{error}</p>}

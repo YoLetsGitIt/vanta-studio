@@ -344,3 +344,22 @@
 @media (prefers-reduced-motion: reduce) {
   .studio-mobile-header { transition: none; }
 }
+
+/* Settings: a bento grid. Cards sit side by side by size and stretch to equal
+   heights in a row; on narrower screens they pair up, then stack. */
+.settings-bento { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); grid-auto-flow: row dense; gap: 16px; align-items: stretch; }
+.settings-bento > * { grid-column: span 12; min-width: 0; }
+.settings-bento > .settings-span-4 { grid-column: span 4; }
+.settings-bento > .settings-span-5 { grid-column: span 5; }
+.settings-bento > .settings-span-6 { grid-column: span 6; }
+.settings-bento > .settings-span-7 { grid-column: span 7; }
+.settings-bento > .settings-span-8 { grid-column: span 8; }
+.settings-cell { display: grid; }
+.settings-cell > * { min-width: 0; margin: 0 !important; }
+@media (max-width: 1180px) {
+  .settings-bento > .settings-span-5, .settings-bento > .settings-span-7, .settings-bento > .settings-span-8 { grid-column: span 6; }
+}
+@media (max-width: 900px) {
+  .settings-bento { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .settings-bento > [class*="settings-span-"], .settings-bento > * { grid-column: auto !important; }
+}

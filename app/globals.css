@@ -254,6 +254,14 @@ option { color: var(--text); background: var(--bg-modal); }
     width: 100%;
   }
 
+  /* Three actions (unpaid deposits): the main one full width on top, the other two side by side. */
+  .studio-attention-actions:has(> :nth-child(3)) {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr;
+  }
+  .studio-attention-actions:has(> :nth-child(3)) > * { width: 100%; justify-content: center; }
+  .studio-attention-actions:has(> :nth-child(3)) > :last-child { grid-column: 1 / -1; order: -1; }
+
   .studio-payment-setting {
     align-items: stretch !important;
     flex-direction: column !important;

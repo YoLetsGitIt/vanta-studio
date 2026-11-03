@@ -30,6 +30,7 @@ import DownloadableQR from '@/components/DownloadableQR';
 import WalkInFormSettings from '@/components/WalkInFormSettings';
 import BookingManagementSettings from '@/components/BookingManagementSettings';
 import PushNotificationSettings from '@/components/PushNotificationSettings';
+import ArtistCommissionOverrides from '@/components/ArtistCommissionOverrides';
 import { useBookingManagement } from '@/lib/bookingManagement';
 import { MOBILE_MEDIA } from '@/lib/responsive';
 
@@ -841,14 +842,14 @@ export default function SettingsPage() {
         </div>
       )}
 
-      {tab === 'account' && <PushNotificationSettings />}
-      {tab === 'account' && <StudioSetupLinks />}
 
-      <div className="studio-feature-grid" style={s.grid}>
+      <div className="settings-bento">
+        {tab === 'account' && <div className="settings-span-6 settings-cell"><PushNotificationSettings /></div>}
+        {tab === 'account' && <div className="settings-span-6 settings-cell"><StudioSetupLinks /></div>}
 
         {tab === 'studio' && <>
 
-        <section style={s.card}>
+        <section className="settings-span-7" style={s.card}>
           <h2 style={s.sectionTitle}>{t('profile')}</h2>
           <form onSubmit={handleSaveProfile} style={s.form}>
             <div style={s.field}>
@@ -910,13 +911,13 @@ export default function SettingsPage() {
           </form>
         </section>
 
-        <section style={s.card}>
+        <section className="settings-span-5" style={s.card}>
           <h2 style={s.sectionTitle}>Studio logo</h2>
           <p style={s.sectionDesc}>Shown at the top of your booking and consent forms.</p>
           <StudioLogoUpload logoUrl={logoUrl} studioName={name} onChange={setLogoUrl} />
         </section>
 
-        <section style={s.card}>
+        <section className="settings-span-7" style={s.card}>
           <h2 style={s.sectionTitle}>{t('hours')}</h2>
           <div style={s.hoursGrid}>
             {hours.map((day, i) => (
@@ -965,7 +966,7 @@ export default function SettingsPage() {
 
         {tab === 'payments' && <>
 
-        <section style={{ ...s.card, gridColumn: '1 / -1' }}>
+        <section className="settings-span-12" style={s.card}>
           <div style={s.settingsSectionHeader}>
             <h2 style={s.sectionTitle}>Commission</h2>
             <p style={s.sectionDesc}>Set the studio share for each booking source. The remainder is paid to the artist.</p>
@@ -1061,7 +1062,8 @@ export default function SettingsPage() {
           </form>
         </section>
 
-        <section style={{ ...s.card, gridColumn: '1 / -1' }}>
+        <div className="settings-span-7 settings-cell"><ArtistCommissionOverrides styles={s} defaults={{ studio: walkinCut, personal: personalCut }} /></div>
+        <section className="settings-span-5" style={s.card}>
           <h2 style={s.sectionTitle}>{t('stripe_connect')}</h2>
           <p style={s.sectionDesc}>
             Connect your Stripe account so clients can pay deposits by card.
@@ -1107,12 +1109,12 @@ export default function SettingsPage() {
           )}
         </section>
 
-        <DepositPaymentOptions styles={s} stripeReady={!!(stripeStatus?.connected && stripeStatus?.charges_enabled)} />
+        <div className="settings-span-12 settings-cell"><DepositPaymentOptions styles={s} stripeReady={!!(stripeStatus?.connected && stripeStatus?.charges_enabled)} /></div>
 
         </>}
 
         {tab === 'studio' && <>
-        <section style={s.card}>
+        <section className="settings-span-5" style={s.card}>
           <h2 style={s.sectionTitle}>{t('stations')}</h2>
           <p style={s.sectionDesc}>Artists are assigned to a free station when a booking is accepted. Every studio must keep at least one active station.</p>
           {stationLastDayTarget && (
@@ -1200,9 +1202,9 @@ export default function SettingsPage() {
 
 
 
-        <BookingManagementSettings styles={s} />
+        <div className="settings-span-6 settings-cell"><BookingManagementSettings styles={s} /></div>
 
-        <section style={{ ...s.card, gridColumn: '1 / -1' }} aria-labelledby="booking-form-title">
+        <section className="settings-span-12" style={s.card} aria-labelledby="booking-form-title">
           <h2 id="booking-form-title" style={s.sectionTitle}>Booking form</h2>
           <p style={s.sectionDesc}>Choose what clients fill in on your booking link and website widget. Field switches save straight away.</p>
           <div className="studio-feature-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', alignItems: 'start' }}>
@@ -1231,7 +1233,7 @@ export default function SettingsPage() {
                       const entry = formFields[key] ?? { enabled: false, required: false };
                       return (
                         <div key={key} style={s.formFieldRow}>
-                          <span style={{ flex: 1, fontSize: '0.83rem', fontWeight: 500, color: entry.enabled ? 'var(--text)' : 'var(--text-ghost)' }}>
+                          <span style={{ flex: 1, fontSize: '0.95rem', fontWeight: 500, color: entry.enabled ? 'var(--text)' : 'var(--text-secondary)' }}>
                             {label}
                           </span>
                           {entry.enabled && (
@@ -1253,14 +1255,11 @@ export default function SettingsPage() {
                             aria-checked={entry.enabled}
                             onClick={() => handleFormFieldToggle(key, 'enabled', !entry.enabled)}
                             disabled={formFieldsSaving}
-                            style={{
-                              ...s.fieldToggleBtn,
-                              background: entry.enabled ? 'var(--accent-tint)' : 'var(--bg-chip)',
-                              borderColor: entry.enabled ? 'var(--accent-tint-border)' : 'var(--border)',
-                              color: entry.enabled ? 'var(--accent)' : 'var(--text-ghost)',
-                            }}
+                            style={s.switchBtn}
                           >
-                            {entry.enabled ? 'On' : 'Off'}
+                            <span aria-hidden="true" style={{ ...s.switchTrack, background: entry.enabled ? 'var(--switch-on)' : 'var(--switch-off)' }}>
+                              <span style={{ ...s.switchThumb, transform: entry.enabled ? 'translateX(16px)' : 'none' }} />
+                            </span>
                           </button>
                         </div>
                       );
@@ -1315,7 +1314,7 @@ export default function SettingsPage() {
           </div>
         </section>
 
-        <section style={s.card}>
+        <section className="settings-span-6" style={s.card}>
           <h2 style={s.sectionTitle}>{t('booking_link')}</h2>
           <p style={s.sectionDesc}>Share this link or QR code so clients can submit booking requests.</p>
           <div className="studio-wrap-row" style={s.walkInCard}>
@@ -1339,7 +1338,7 @@ export default function SettingsPage() {
           )}
         </section>
 
-        <section style={s.card} aria-labelledby="website-widget-title">
+        <section className="settings-span-7" style={s.card} aria-labelledby="website-widget-title">
           <h2 id="website-widget-title" style={s.sectionTitle}>{t('booking_widget')}</h2>
           <p style={s.sectionDesc}>Embed the booking form on your website. Customise the colours to match your brand.</p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -1382,7 +1381,7 @@ export default function SettingsPage() {
           </div>
         </section>
 
-        <section style={{ ...s.card, gridColumn: '1 / -1' }}>
+        <section className="settings-span-5" style={s.card}>
           <h2 style={s.sectionTitle}>{t('reschedule_window')}</h2>
           <p style={s.sectionDesc}>{t('reschedule_window_desc')}</p>
           <select
@@ -1402,7 +1401,7 @@ export default function SettingsPage() {
         </section>
 
         {/* Smart scheduling — temporarily hidden
-        <section style={{ ...s.card, gridColumn: '1 / -1' }}>
+        <section className="settings-span-12" style={s.card}>
           <h2 style={s.sectionTitle}>Smart scheduling</h2>
           <SmartSchedulingSettings mode={schedulingMode} onChange={setSchedulingMode} disabled={saving} />
           {profileError && <p role="alert" style={s.errorText}>{profileError}</p>}
@@ -1415,12 +1414,12 @@ export default function SettingsPage() {
         </>}
 
         {tab === 'walkins' && <>
-        <WalkInFormSettings styles={s} url={bookingSlug ? `${SHORT_LINK_BASE}/w/${bookingSlug}` : studioId ? `${typeof window === 'undefined' ? '' : window.location.origin}/walkin?s=${studioId}` : ''} />
+        <div className="settings-span-12 settings-cell"><WalkInFormSettings styles={s} url={bookingSlug ? `${SHORT_LINK_BASE}/w/${bookingSlug}` : studioId ? `${typeof window === 'undefined' ? '' : window.location.origin}/walkin?s=${studioId}` : ''} /></div>
 
         </>}
 
         {tab === 'consent' && <>
-        <section style={{ ...s.card, gridColumn: '1 / -1' }}>
+        <section className="settings-span-12" style={s.card}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
             <div style={{ flex: '1 1 260px', minWidth: 0 }}>
               <h2 style={s.sectionTitle}>{t('consent_forms')}</h2>
@@ -1566,7 +1565,7 @@ export default function SettingsPage() {
         </>}
 
         {tab === 'messages' && <>
-        <section style={{ ...s.card, gridColumn: '1 / -1' }}>
+        <section className="settings-span-6" style={s.card}>
           <h2 style={s.sectionTitle}>Emails</h2>
           <p style={s.sectionDesc}>Booking confirmation is always sent. Choose up to 2 reminder emails for your clients.</p>
           <p id="email-reminder-limit" role="status" style={{ fontSize: '0.8rem', color: selectedReminderCount > 2 ? 'var(--color-danger)' : 'var(--text-muted)', margin: 0 }}>
@@ -1650,10 +1649,10 @@ export default function SettingsPage() {
           </button>
         </section>
 
-        <SMSSettings styles={s} />
+        <div className="settings-span-6 settings-cell"><SMSSettings styles={s} /></div>
 
         {/* Piercing aftercare instructions — temporarily hidden
-        <section style={{ ...s.card, gridColumn: '1 / -1' }}>
+        <section className="settings-span-12" style={s.card}>
           <h2 style={s.sectionTitle}>Piercing aftercare instructions</h2>
           <p style={s.sectionDesc}>Your studio’s guidance is attached to completed piercing appointments. Tattoo instructions are kept separate.</p>
           <textarea aria-label="Piercing aftercare instructions" style={{ ...s.input, minHeight: 120, resize: 'vertical', lineHeight: 1.6 }} value={piercingAftercareInstructions} onChange={e => setPiercingAftercareInstructions(e.target.value)} placeholder="Add your studio’s piercing aftercare instructions…" />
@@ -1662,7 +1661,7 @@ export default function SettingsPage() {
         */}
 
         {/* Aftercare instructions — temporarily hidden
-        <section style={{ ...s.card, gridColumn: '1 / -1' }}>
+        <section className="settings-span-12" style={s.card}>
           <h2 style={s.sectionTitle}>{t('aftercare_instructions')}</h2>
           <p style={s.sectionDesc}>Aftercare guidance that gets attached to every completed booking. Clients can see this on their booking record after their session.</p>
           <textarea
@@ -1681,7 +1680,7 @@ export default function SettingsPage() {
 
         {tab === 'account' && <>
 
-        <section style={s.card}>
+        <section className="settings-span-4" style={s.card}>
           <h2 style={s.sectionTitle}>{t('account')}</h2>
           <div style={s.field}>
             <label htmlFor="studio-account-email" style={s.label}>Email</label>
@@ -1690,7 +1689,7 @@ export default function SettingsPage() {
           <button onClick={handleSignOut} style={s.signOutBtn}>{t('sign_out')}</button>
         </section>
 
-        <section style={{ ...s.card, gridColumn: '1 / -1' }}>
+        <section className="settings-span-12" style={s.card}>
           <h2 style={s.sectionTitle}>Billing</h2>
           {isBillingExempt ? <div>
             <p style={s.sectionDesc}>This demo studio has complimentary access.</p>
@@ -1788,7 +1787,7 @@ export default function SettingsPage() {
           />
         )}
 
-        <section style={s.card}>
+        <section className="settings-span-4" style={s.card}>
           <h2 style={s.sectionTitle}>{t('appearance')}</h2>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
@@ -1807,9 +1806,9 @@ export default function SettingsPage() {
           </div>
         </section>
 
-        <section style={s.card}>
+        <section className="settings-span-4" style={s.card}>
           <h2 style={s.sectionTitle}>{t('language')}</h2>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
             {LANGUAGES.map(l => (
               <button
                 key={l.id}
@@ -1817,14 +1816,13 @@ export default function SettingsPage() {
                 onClick={() => switchLanguage(l.id)}
                 style={{
                   display: 'flex', alignItems: 'center', gap: '0.75rem',
-                  padding: '0.65rem 0.9rem',
-                  background: lang === l.id ? 'var(--accent-tint)' : 'var(--bg-base)',
-                  border: `1px solid ${lang === l.id ? 'var(--accent-tint-border)' : 'var(--border-faint)'}`,
-                  borderRadius: 10, cursor: 'pointer', textAlign: 'left',
+                  minHeight: 48, padding: '0 0.25rem',
+                  background: 'transparent', border: 0, borderBottom: '1px solid var(--border-faint)',
+                  cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit',
                 }}
               >
                 <span style={{ fontSize: '1.1rem' }}>{l.flag}</span>
-                <span style={{ fontSize: '0.87rem', fontWeight: 500, color: lang === l.id ? 'var(--accent)' : 'var(--text-dim)' }}>
+                <span style={{ fontSize: '0.95rem', fontWeight: lang === l.id ? 650 : 500, color: lang === l.id ? 'var(--text)' : 'var(--text-dim)' }}>
                   {l.name}
                 </span>
                 {lang === l.id && (
@@ -1846,7 +1844,7 @@ export default function SettingsPage() {
 
 const s = {
   // One readable column, capped in width, rather than a ragged two-column grid.
-  page: { padding: '2rem 2.5rem 4rem', display: 'flex', flexDirection: 'column', gap: '1.25rem', minHeight: '100%', boxSizing: 'border-box', width: '100%', maxWidth: 1080 },
+  page: { padding: '2rem 2.5rem 4rem', display: 'flex', flexDirection: 'column', gap: '1.25rem', minHeight: '100%', boxSizing: 'border-box', width: '100%', maxWidth: 1320 },
   tabIntroWrap: { display: 'flex', flexDirection: 'column', gap: '0.3rem', marginTop: '0.5rem' },
   tabIntroTitle: { margin: 0, fontSize: '1.2rem', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.01em' },
   tabIntro: { margin: 0, fontSize: '0.95rem', lineHeight: 1.5, color: 'var(--text-secondary)' },
@@ -1860,20 +1858,23 @@ const s = {
   tabBtnActive: { background: 'var(--accent)', border: '1px solid var(--accent)', color: 'var(--accent-contrast)', fontWeight: 700 },
   grid: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: '1rem', alignItems: 'start' },
   groupLabel: { gridColumn: '1 / -1', margin: '0.5rem 0 -0.25rem', fontSize: '1.05rem', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.01em' },
-  card: { display: 'flex', flexDirection: 'column', gap: '1.1rem', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 14, padding: '1.5rem 1.6rem' },
+  card: { display: 'flex', flexDirection: 'column', gap: '1.1rem', minWidth: 0, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 16, padding: '1.5rem 1.6rem' },
+  switchBtn: { width: 52, height: 44, padding: 0, border: 0, background: 'transparent', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  switchTrack: { display: 'block', boxSizing: 'border-box', width: 38, height: 22, borderRadius: 999, border: '1px solid var(--switch-edge)', position: 'relative', transition: 'background 0.2s' },
+  switchThumb: { position: 'absolute', top: 2, left: 2, width: 16, height: 16, borderRadius: '50%', background: 'var(--switch-thumb)', boxShadow: '0 1px 3px rgba(0,0,0,0.5)', transition: 'transform 0.2s' },
   loadingDot: { width: 8, height: 8, borderRadius: '50%', background: 'var(--border)', margin: '4rem auto' },
   section: { display: 'flex', flexDirection: 'column', gap: '1rem' },
   sectionTitle: { fontSize: '1.1rem', fontWeight: 700, color: 'var(--text)', margin: '0 0 0.1rem', letterSpacing: '-0.01em' },
   sectionDesc: { fontSize: '0.95rem', color: 'var(--text-dim)', margin: 0, lineHeight: 1.55, maxWidth: '72ch' },
   settingsSectionHeader: { display: 'flex', flexDirection: 'column', gap: '0.25rem', paddingBottom: '0.15rem' },
-  form: { display: 'flex', flexDirection: 'column', gap: '1rem' },
+  form: { display: 'flex', flexDirection: 'column', gap: '1rem', flex: 1 },
   paymentsForm: { display: 'flex', flexDirection: 'column', gap: '1rem', maxWidth: 1120 },
   field: { display: 'flex', flexDirection: 'column', gap: '0.4rem' },
   label: { fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-dim)' },
   input: { background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 8, padding: '0.7rem 0.95rem', fontSize: '0.95rem', color: 'var(--text)', outline: 'none', width: '100%', boxSizing: 'border-box' },
   inputReadonly: { color: 'var(--text-faint)', cursor: 'default' },
   errorText: { fontSize: '0.875rem', color: 'var(--color-danger)', margin: 0 },
-  saveBtn: { alignSelf: 'flex-start', background: 'var(--accent)', border: '1px solid var(--accent)', borderRadius: 9, padding: '0.65rem 1.4rem', fontSize: '0.925rem', fontWeight: 700, color: 'var(--accent-contrast)', cursor: 'pointer' },
+  saveBtn: { alignSelf: 'flex-start', marginTop: 'auto', background: 'var(--accent)', border: '1px solid var(--accent)', borderRadius: 9, padding: '0.65rem 1.4rem', fontSize: '0.925rem', fontWeight: 700, color: 'var(--accent-contrast)', cursor: 'pointer' },
   commissionGrid: { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '0.75rem' },
   commissionTile: { display: 'flex', flexDirection: 'column', gap: '0.85rem', minWidth: 0, padding: '1rem', background: 'var(--bg-input)', border: '1px solid var(--border-faint)', borderRadius: 10 },
   commissionTileHeader: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem' },
@@ -1887,7 +1888,7 @@ const s = {
   commissionSplitValue: { color: 'var(--text)', fontSize: '0.9rem', fontWeight: 650 },
   sourceChips: { display: 'flex', flexWrap: 'wrap', gap: '0.35rem' },
   sourceChip: { padding: '0.22rem 0.48rem', borderRadius: 999, background: 'var(--bg-chip)', border: '1px solid var(--border-faint)', color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 600 },
-  paymentSetting: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '2rem', padding: '1rem', background: 'var(--bg-base)', border: '1px solid var(--border-faint)', borderRadius: 10 },
+  paymentSetting: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '2rem', padding: '1rem 0', borderTop: '1px solid var(--border-faint)' },
   paymentSettingCopy: { display: 'flex', flexDirection: 'column', gap: '0.3rem', minWidth: 0 },
   paymentSettingTitle: { fontSize: '0.95rem', fontWeight: 700, color: 'var(--text)' },
   paymentSettingDescription: { maxWidth: 680, margin: 0, color: 'var(--text-muted)', fontSize: '0.9rem', lineHeight: 1.5 },
@@ -1914,7 +1915,7 @@ const s = {
   billingActionsRow: { display: 'flex', alignItems: 'center', gap: '1.1rem', marginLeft: 'auto' },
   updateCardBtn: { background: 'var(--bg-card)', border: '1px solid var(--border-faint)', borderRadius: 8, padding: '0.45rem 0.8rem', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-dim)', cursor: 'pointer', fontFamily: 'inherit' },
   // Hours
-  hoursGrid: { display: 'flex', flexDirection: 'column', gap: 0, maxWidth: 640 },
+  hoursGrid: { display: 'flex', flexDirection: 'column', gap: 0 },
   hoursRow: { display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.55rem 0', borderBottom: '1px solid var(--border-faint)' },
   dayLabel: { fontSize: '0.95rem', fontWeight: 500, color: 'var(--text)', width: 110, flexShrink: 0 },
   closedToggle: { display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', flexShrink: 0 },
@@ -1922,9 +1923,9 @@ const s = {
   timeSep: { color: 'var(--text-secondary)', fontSize: '0.9rem' },
   timeInput: { background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 8, padding: '0.45rem 0.6rem', fontSize: '0.9rem', color: 'var(--text)', outline: 'none', colorScheme: 'auto' },
   // Stations
-  stationList: { display: 'flex', flexDirection: 'column', gap: '6px' },
-  stationRow: { background: 'var(--bg-card)', border: '1px solid var(--border-faint)', borderRadius: 8, overflow: 'hidden' },
-  stationTop: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.65rem 0.85rem' },
+  stationList: { display: 'flex', flexDirection: 'column' },
+  stationRow: { borderBottom: '1px solid var(--border-faint)' },
+  stationTop: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', minHeight: 52, padding: '0 0.1rem' },
   stationName: { fontSize: '0.95rem', fontWeight: 500, color: 'var(--text)' },
   stationActions: { display: 'flex', gap: '0.5rem' },
   stationToggleBtn: { background: 'var(--bg-chip)', border: '1px solid var(--border)', borderRadius: 8, padding: '0.4rem 0.75rem', fontSize: '0.85rem', color: 'var(--text-dim)', cursor: 'pointer' },
@@ -1975,7 +1976,7 @@ const s = {
   fieldTypeBadge: { fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', padding: '0.1rem 0.45rem', borderRadius: 4, background: 'var(--bg-chip)', color: 'var(--text-ghost)' },
   fieldMoveBtn: { background: 'var(--bg-chip)', border: '1px solid var(--border)', borderRadius: 4, padding: '0.1rem 0.35rem', fontSize: '0.8rem', color: 'var(--text-muted)', cursor: 'pointer' },
   cancelBtn: { flex: 1, background: 'var(--bg-chip)', border: '1px solid var(--border)', borderRadius: 8, padding: '0.6rem 1rem', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', cursor: 'pointer' },
-  formFieldRow: { display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.6rem 0.85rem', background: 'var(--bg-base)', borderRadius: 8 },
+  formFieldRow: { display: 'flex', alignItems: 'center', gap: '1rem', minHeight: 48, padding: '0 0 0 0.1rem', borderBottom: '1px solid var(--border-faint)' },
   fieldToggleBtn: { border: '1px solid', borderRadius: 6, padding: '0.25rem 0.75rem', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer', minWidth: 42, textAlign: 'center' },
   // Stripe
   stripeConnectBtn: { alignSelf: 'flex-start', background: 'var(--accent)', border: 'none', borderRadius: 8, padding: '0.65rem 1.4rem', fontSize: '0.88rem', fontWeight: 700, color: 'var(--accent-contrast, #111)', cursor: 'pointer' },
