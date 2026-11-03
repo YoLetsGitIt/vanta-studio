@@ -59,7 +59,7 @@ export default function WalkInFormSettings({ styles: s, url }) {
       )}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '1rem' }}>
         <span style={s.label}>Extra fields</span>
-        <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: '0 0 0.35rem' }}>
+        <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '0 0 0.35rem' }}>
           Name, date of birth, email, phone and artist are always asked, and your consent forms are always included.
         </p>
         {fields === null ? <div style={s.loadingDot} /> : FIELDS.map(({ key, label }) => {
@@ -71,7 +71,7 @@ export default function WalkInFormSettings({ styles: s, url }) {
                 <label style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', cursor: 'pointer' }}>
                   <input type="checkbox" aria-label={`Walk-in ${label} required`} checked={!!entry.required} disabled={saving}
                     onChange={e => toggle(key, 'required', e.target.checked)} style={{ accentColor: 'var(--accent)' }} />
-                  <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Required</span>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Required</span>
                 </label>
               )}
               <button role="switch" aria-label={`Walk-in ${label} field`} aria-checked={entry.enabled} disabled={saving}
@@ -87,7 +87,7 @@ export default function WalkInFormSettings({ styles: s, url }) {
             </div>
           );
         })}
-        {error && <p role="alert" style={{ margin: 0, fontSize: '0.78rem', color: 'var(--color-danger)' }}>{error}</p>}
+        {error && <p role="alert" style={{ margin: 0, fontSize: '0.85rem', color: 'var(--color-danger)' }}>{error}</p>}
       </div>
     </section>
   );

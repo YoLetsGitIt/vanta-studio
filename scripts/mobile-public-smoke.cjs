@@ -43,7 +43,7 @@ async function check(page, name){
     await page.getByRole('heading',{name:route==='signin'?'Welcome back':'Start your free trial',exact:true}).waitFor();
     await check(page,`${route}-${width}`);
    }
-   await page.goto(`${base}/studio-booking?s=local`,{waitUntil:'networkidle'});
+   await page.goto(`${base}/studio-booking?s=local&guest=1`,{waitUntil:'networkidle'});
    await page.getByRole('heading',{name:'Northside Tattoo and Piercing Studio',exact:true}).waitFor();
    await check(page,`tattoo-booking-${width}`);
    await page.getByLabel('Appointment type',{exact:true}).selectOption('piercing');

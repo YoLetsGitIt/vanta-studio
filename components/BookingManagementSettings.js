@@ -42,15 +42,15 @@ export default function BookingManagementSettings({ styles: s }) {
                 <span aria-hidden="true" style={{ flexShrink: 0, marginTop: 2, width: 16, height: 16, borderRadius: '50%', border: `2px solid ${on ? 'var(--accent)' : 'var(--text-ghost)'}`, boxShadow: on ? 'inset 0 0 0 3px var(--bg-card)' : 'none', background: on ? 'var(--accent)' : 'transparent' }} />
                 <span style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
                   <span style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--text)' }}>{o.title}</span>
-                  <span style={{ fontSize: '0.8rem', lineHeight: 1.5, color: 'var(--text-secondary)' }}>{o.text}</span>
+                  <span style={{ fontSize: '0.85rem', lineHeight: 1.5, color: 'var(--text-secondary)' }}>{o.text}</span>
                 </span>
               </button>
             );
           })}
         </div>
       )}
-      {saved && !error && <p role="status" style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Saved.</p>}
-      {error && <p role="alert" style={{ margin: 0, fontSize: '0.78rem', color: 'var(--color-danger)' }}>{error}</p>}
+      {saved && !error && <p role="status" style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Saved.</p>}
+      {error && <p role="alert" style={{ margin: 0, fontSize: '0.85rem', color: 'var(--color-danger)' }}>{error}</p>}
     </section>
   );
 }

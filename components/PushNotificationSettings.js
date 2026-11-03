@@ -42,7 +42,7 @@ export default function PushNotificationSettings() {
             <li>Tap <strong>Add to Home Screen</strong>, then <strong>Add</strong>.</li>
             <li>Open <strong>Vanta Studio</strong> from your Home Screen, sign in, and come back here to turn notifications on.</li>
           </ol>
-          <p style={{ ...desc, fontSize: '0.75rem' }}>Needs iOS 16.4 or later.</p>
+          <p style={{ ...desc, fontSize: '0.82rem' }}>Needs iOS 16.4 or later.</p>
         </div>
       )}
 
@@ -66,8 +66,8 @@ export default function PushNotificationSettings() {
   );
 }
 
-const card = { background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', gridColumn: '1 / -1' };
-const title = { margin: 0, fontSize: '1rem', fontWeight: 600, color: 'var(--text)' };
-const descText = { fontSize: '0.85rem', lineHeight: 1.55, color: 'var(--text-secondary)' };
+const card = { background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 14, padding: '1.5rem 1.6rem', display: 'flex', flexDirection: 'column', gap: '0.9rem', gridColumn: '1 / -1' };
+const title = { margin: 0, fontSize: '1.1rem', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.01em' };
+const descText = { fontSize: '0.95rem', lineHeight: 1.55, color: 'var(--text-dim)', maxWidth: '72ch' };
 const desc = { margin: 0, ...descText };
 const steps = { display: 'flex', flexDirection: 'column', gap: '0.5rem' };

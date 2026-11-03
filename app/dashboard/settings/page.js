@@ -191,7 +191,7 @@ function AddressAutocomplete({ value, onChange, onSelect, inputStyle }) {
                 {s.displayLines?.[0] ?? s.completionDescription}
               </span>
               {s.displayLines?.[1] && (
-                <span style={{ display: 'block', fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: 2, lineHeight: 1.3 }}>
+                <span style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: 2, lineHeight: 1.3 }}>
                   {s.displayLines[1]}
                 </span>
               )}
@@ -809,6 +809,7 @@ export default function SettingsPage() {
               <span aria-hidden="true">←</span> Settings
             </button>
             <h1 style={s.pageTitle}>{SETTINGS_TABS.find(tb => tb.id === tab)?.label}</h1>
+            <p style={s.tabIntro}>{SETTINGS_TABS.find(tb => tb.id === tab)?.hint}</p>
           </div>
         ) : (
           <>
@@ -833,6 +834,12 @@ export default function SettingsPage() {
           </>
         )}
       </div>
+      {!isMobile && (
+        <div style={s.tabIntroWrap}>
+          <h2 style={s.tabIntroTitle}>{SETTINGS_TABS.find(tb => tb.id === tab)?.label}</h2>
+          <p style={s.tabIntro}>{SETTINGS_TABS.find(tb => tb.id === tab)?.hint}</p>
+        </div>
+      )}
 
       {tab === 'account' && <PushNotificationSettings />}
       {tab === 'account' && <StudioSetupLinks />}
@@ -923,7 +930,7 @@ export default function SettingsPage() {
                     onChange={e => setHourField(i, 'is_closed', e.target.checked)}
                     style={{ accentColor: 'var(--accent)' }}
                   />
-                  <span style={{ color: day.is_closed ? 'var(--text-ghost)' : 'var(--text-muted)', fontSize: '0.75rem' }}>
+                  <span style={{ color: day.is_closed ? 'var(--text-ghost)' : 'var(--text-muted)', fontSize: '0.82rem' }}>
                     {t('closed')}
                   </span>
                 </label>
@@ -1071,7 +1078,7 @@ export default function SettingsPage() {
                   <span style={{ fontSize: '0.87rem', fontWeight: 600, color: 'var(--text)' }}>
                     {stripeStatus.charges_enabled ? 'Active' : 'Onboarding incomplete'}
                   </span>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                  <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
                     {stripeStatus.charges_enabled
                       ? 'Deposits can be collected from clients.'
                       : 'Finish Stripe onboarding to start accepting payments.'}
@@ -1123,7 +1130,7 @@ export default function SettingsPage() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                     <span style={s.stationName}>{st.name}</span>
                     {st.endDate && (
-                      <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#f59e3a', background: 'rgba(245,158,58,0.1)', border: '1px solid rgba(245,158,58,0.25)', borderRadius: 20, padding: '0.12rem 0.5rem', whiteSpace: 'nowrap' }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#f59e3a', background: 'rgba(245,158,58,0.1)', border: '1px solid rgba(245,158,58,0.25)', borderRadius: 20, padding: '0.12rem 0.5rem', whiteSpace: 'nowrap' }}>
                         Last day {new Date(st.endDate + 'T00:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}
                       </span>
                     )}
@@ -1202,7 +1209,7 @@ export default function SettingsPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                 <label style={s.label}>Form fields</label>
-                <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: '0 0 0.35rem' }}>
+                <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '0 0 0.35rem' }}>
                   Name, date of birth, email, and phone are always shown.
                 </p>
                 {formFields === null ? (
@@ -1237,7 +1244,7 @@ export default function SettingsPage() {
                                 style={{ accentColor: 'var(--accent)' }}
                                 disabled={formFieldsSaving}
                               />
-                              <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Required</span>
+                              <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Required</span>
                             </label>
                           )}
                           <button
@@ -1326,8 +1333,8 @@ export default function SettingsPage() {
                 <input id="booking-slug" className="vanta-input" value={slugDraft} onChange={e => setSlugDraft(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))} maxLength={40} autoCapitalize="none" autoCorrect="off" spellCheck={false} style={{ flex: '1 1 140px', minWidth: 0, background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 8, padding: '0.5rem 0.7rem', fontSize: '16px', color: 'var(--text)' }} />
                 <button type="submit" style={s.copyBtn} disabled={slugSaving || slugDraft === bookingSlug || slugDraft.length < 3}>{slugSaving ? 'Saving…' : 'Save'}</button>
               </div>
-              {slugError ? <p role="alert" style={{ margin: 0, fontSize: '0.78rem', color: 'var(--color-danger)' }}>{slugError}</p>
-                : <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-ghost)' }}>Changing it stops the old link and QR codes working.</p>}
+              {slugError ? <p role="alert" style={{ margin: 0, fontSize: '0.85rem', color: 'var(--color-danger)' }}>{slugError}</p>
+                : <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-ghost)' }}>Changing it stops the old link and QR codes working.</p>}
             </form>
           )}
         </section>
@@ -1486,7 +1493,7 @@ export default function SettingsPage() {
                         style={{ accentColor: 'var(--accent)' }} />
                       <span style={{ fontSize: '0.83rem', color: 'var(--text-secondary)' }}>Require client signature</span>
                     </label>
-                    <p style={{ fontSize: '0.78rem', color: 'var(--text-ghost)', margin: 0, lineHeight: 1.5 }}>
+                    <p style={{ fontSize: '0.85rem', color: 'var(--text-ghost)', margin: 0, lineHeight: 1.5 }}>
                       Guardian consent fields appear automatically when the client's date of birth indicates they are under 18.
                     </p>
                   </div>
@@ -1502,7 +1509,7 @@ export default function SettingsPage() {
                     </div>
 
                     {templateFields.length === 0 && (
-                      <p style={{ fontSize: '0.78rem', color: 'var(--text-ghost)', fontStyle: 'italic' }}>No fields yet. Add fields using the buttons above.</p>
+                      <p style={{ fontSize: '0.85rem', color: 'var(--text-ghost)', fontStyle: 'italic' }}>No fields yet. Add fields using the buttons above.</p>
                     )}
 
                     {templateFields.map((f, idx) => (
@@ -1532,7 +1539,7 @@ export default function SettingsPage() {
                           <label style={{ ...s.toggleRow, marginTop: '0.3rem' }}>
                             <input type="checkbox" checked={!!f.required} onChange={e => updateField(f.id, { required: e.target.checked })}
                               style={{ accentColor: 'var(--accent)' }} />
-                            <span style={{ fontSize: '0.76rem', color: 'var(--text-ghost)' }}>Required</span>
+                            <span style={{ fontSize: '0.82rem', color: 'var(--text-ghost)' }}>Required</span>
                           </label>
                         )}
                       </div>
@@ -1714,7 +1721,7 @@ export default function SettingsPage() {
                           ? 'Canceled'
                           : 'No billing set up'}
               </span>
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+              <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
                 {isCanceling
                   ? `You'll keep full access until ${periodEndLabel}, then your dashboard will lock.`
                   : subscriptionStatus === 'active'
@@ -1788,7 +1795,7 @@ export default function SettingsPage() {
               <span style={{ fontSize: '0.875rem', color: 'var(--text-dim)', fontWeight: 500 }}>
                 {theme === 'dark' ? t('dark_mode') : t('light_mode')}
               </span>
-              <p style={{ fontSize: '0.78rem', color: 'var(--text-faint)', margin: '0.2rem 0 0' }}>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-faint)', margin: '0.2rem 0 0' }}>
                 {theme === 'dark' ? t('switch_to_light') : t('switch_to_dark')}
               </p>
             </div>
@@ -1821,7 +1828,7 @@ export default function SettingsPage() {
                   {l.name}
                 </span>
                 {lang === l.id && (
-                  <span style={{ marginLeft: 'auto', fontSize: '0.72rem', fontWeight: 600, color: 'var(--accent)' }}>✓</span>
+                  <span style={{ marginLeft: 'auto', fontSize: '0.8rem', fontWeight: 600, color: 'var(--accent)' }}>✓</span>
                 )}
               </button>
             ))}
@@ -1838,7 +1845,11 @@ export default function SettingsPage() {
 }
 
 const s = {
-  page: { padding: '2rem 2.5rem 4rem', display: 'flex', flexDirection: 'column', gap: '1.25rem', minHeight: '100%', boxSizing: 'border-box' },
+  // One readable column, capped in width, rather than a ragged two-column grid.
+  page: { padding: '2rem 2.5rem 4rem', display: 'flex', flexDirection: 'column', gap: '1.25rem', minHeight: '100%', boxSizing: 'border-box', width: '100%', maxWidth: 1080 },
+  tabIntroWrap: { display: 'flex', flexDirection: 'column', gap: '0.3rem', marginTop: '0.5rem' },
+  tabIntroTitle: { margin: 0, fontSize: '1.2rem', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.01em' },
+  tabIntro: { margin: 0, fontSize: '0.95rem', lineHeight: 1.5, color: 'var(--text-secondary)' },
   pageHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' },
   pageTitle: { fontSize: '1.5rem', fontWeight: 700, color: 'var(--text)', margin: 0, letterSpacing: '-0.02em' },
   settingsList: { display: 'flex', flexDirection: 'column', marginTop: '0.75rem', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 14, overflow: 'hidden' },
@@ -1847,13 +1858,13 @@ const s = {
   tabBar: { display: 'inline-flex', flexWrap: 'wrap', gap: 4, padding: 4, background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 12 },
   tabBtn: { padding: '0.5rem 1.1rem', borderRadius: 9, border: '1px solid transparent', background: 'transparent', color: 'var(--text-dim)', fontSize: '0.925rem', fontWeight: 500, cursor: 'pointer' },
   tabBtnActive: { background: 'var(--accent)', border: '1px solid var(--accent)', color: 'var(--accent-contrast)', fontWeight: 700 },
-  grid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gridAutoFlow: 'dense', gap: '1.25rem', alignItems: 'start' },
+  grid: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: '1rem', alignItems: 'start' },
   groupLabel: { gridColumn: '1 / -1', margin: '0.5rem 0 -0.25rem', fontSize: '1.05rem', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.01em' },
-  card: { display: 'flex', flexDirection: 'column', gap: '1rem', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 14, padding: '1.4rem' },
+  card: { display: 'flex', flexDirection: 'column', gap: '1.1rem', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 14, padding: '1.5rem 1.6rem' },
   loadingDot: { width: 8, height: 8, borderRadius: '50%', background: 'var(--border)', margin: '4rem auto' },
   section: { display: 'flex', flexDirection: 'column', gap: '1rem' },
-  sectionTitle: { fontSize: '1.05rem', fontWeight: 700, color: 'var(--text)', margin: '0 0 0.25rem' },
-  sectionDesc: { fontSize: '0.9rem', color: 'var(--text-dim)', margin: 0, lineHeight: 1.5 },
+  sectionTitle: { fontSize: '1.1rem', fontWeight: 700, color: 'var(--text)', margin: '0 0 0.1rem', letterSpacing: '-0.01em' },
+  sectionDesc: { fontSize: '0.95rem', color: 'var(--text-dim)', margin: 0, lineHeight: 1.55, maxWidth: '72ch' },
   settingsSectionHeader: { display: 'flex', flexDirection: 'column', gap: '0.25rem', paddingBottom: '0.15rem' },
   form: { display: 'flex', flexDirection: 'column', gap: '1rem' },
   paymentsForm: { display: 'flex', flexDirection: 'column', gap: '1rem', maxWidth: 1120 },
@@ -1867,69 +1878,69 @@ const s = {
   commissionTile: { display: 'flex', flexDirection: 'column', gap: '0.85rem', minWidth: 0, padding: '1rem', background: 'var(--bg-input)', border: '1px solid var(--border-faint)', borderRadius: 10 },
   commissionTileHeader: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem' },
   commissionTitle: { fontSize: '0.9rem', fontWeight: 650, color: 'var(--text)', lineHeight: 1.35 },
-  commissionDescription: { marginTop: '0.25rem', maxWidth: 360, fontSize: '0.85rem', lineHeight: 1.45, color: 'var(--text-muted)' },
+  commissionDescription: { marginTop: '0.25rem', maxWidth: 360, fontSize: '0.9rem', lineHeight: 1.45, color: 'var(--text-muted)' },
   commissionInputWrap: { display: 'flex', alignItems: 'center', flexShrink: 0, width: 96, height: 44, padding: '0 0.65rem', boxSizing: 'border-box', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8 },
   commissionInput: { width: '100%', minWidth: 0, padding: 0, background: 'transparent', border: 0, outline: 'none', color: 'var(--text)', fontSize: '1rem', fontWeight: 650, fontFamily: 'inherit' },
   commissionPercent: { color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 600 },
   commissionSplit: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border-faint)' },
-  commissionSplitLabel: { display: 'flex', flexDirection: 'column', gap: 2, color: 'var(--text-secondary)', fontSize: '0.69rem' },
+  commissionSplitLabel: { display: 'flex', flexDirection: 'column', gap: 2, color: 'var(--text-secondary)', fontSize: '0.8rem' },
   commissionSplitValue: { color: 'var(--text)', fontSize: '0.9rem', fontWeight: 650 },
   sourceChips: { display: 'flex', flexWrap: 'wrap', gap: '0.35rem' },
-  sourceChip: { padding: '0.22rem 0.48rem', borderRadius: 999, background: 'var(--bg-chip)', border: '1px solid var(--border-faint)', color: 'var(--text-muted)', fontSize: '0.67rem', fontWeight: 600 },
+  sourceChip: { padding: '0.22rem 0.48rem', borderRadius: 999, background: 'var(--bg-chip)', border: '1px solid var(--border-faint)', color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 600 },
   paymentSetting: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '2rem', padding: '1rem', background: 'var(--bg-base)', border: '1px solid var(--border-faint)', borderRadius: 10 },
   paymentSettingCopy: { display: 'flex', flexDirection: 'column', gap: '0.3rem', minWidth: 0 },
   paymentSettingTitle: { fontSize: '0.95rem', fontWeight: 700, color: 'var(--text)' },
-  paymentSettingDescription: { maxWidth: 680, margin: 0, color: 'var(--text-muted)', fontSize: '0.85rem', lineHeight: 1.5 },
-  paymentSettingSelect: { width: 230, flexShrink: 0, cursor: 'pointer', colorScheme: 'auto', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 8, padding: '0.6rem 0.8rem', color: 'var(--text)', fontSize: '0.84rem', fontFamily: 'inherit' },
+  paymentSettingDescription: { maxWidth: 680, margin: 0, color: 'var(--text-muted)', fontSize: '0.9rem', lineHeight: 1.5 },
+  paymentSettingSelect: { width: 230, flexShrink: 0, cursor: 'pointer', colorScheme: 'auto', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 8, padding: '0.6rem 0.8rem', color: 'var(--text)', fontSize: '0.9rem', fontFamily: 'inherit' },
   visuallyHidden: { position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0, 0, 0, 0)', whiteSpace: 'nowrap', border: 0 },
   billingStatusDot: (status) => {
     const color = status === 'active' ? 'var(--color-success)' : status === 'canceling' ? 'var(--color-warning)' : status === 'past_due' ? 'var(--color-warning)' : status === 'canceled' ? 'var(--color-danger)' : 'var(--text-ghost)';
     return { width: 10, height: 10, borderRadius: '50%', flexShrink: 0, background: color };
   },
-  cancelSubscriptionLink: { background: 'none', border: 'none', padding: 0, fontSize: '0.78rem', color: 'var(--text-ghost)', textDecoration: 'underline', cursor: 'pointer', fontFamily: 'inherit' },
+  cancelSubscriptionLink: { background: 'none', border: 'none', padding: 0, fontSize: '0.85rem', color: 'var(--text-secondary)', textDecoration: 'underline', cursor: 'pointer', fontFamily: 'inherit' },
   // Billing — the primary "what/when" number gets a hero treatment; seats are
   // supporting context underneath it rather than a competing tile.
   billingHero: { display: 'flex', flexDirection: 'column', gap: 3, background: 'var(--bg-base)', border: '1px solid var(--border-faint)', borderRadius: 10, padding: '0.9rem 1rem' },
-  billingHeroLabel: { fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-ghost)', textTransform: 'uppercase', letterSpacing: '0.04em' },
+  billingHeroLabel: { fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-ghost)', textTransform: 'uppercase', letterSpacing: '0.04em' },
   billingHeroValueRow: { display: 'flex', alignItems: 'baseline', gap: '0.5rem', flexWrap: 'wrap' },
   billingHeroValue: { fontSize: '1.5rem', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em' },
-  billingHeroDate: { fontSize: '0.8rem', color: 'var(--text-secondary)' },
-  billingHeroSub: { fontSize: '0.78rem', color: 'var(--text-secondary)' },
+  billingHeroDate: { fontSize: '0.875rem', color: 'var(--text-secondary)' },
+  billingHeroSub: { fontSize: '0.875rem', color: 'var(--text-secondary)' },
   // Payment method — a compact settings-style row, not another stat tile, since it's a
   // different kind of information (identity, not a number) and a lower priority.
   paymentMethodRow: { display: 'flex', alignItems: 'center', gap: '0.7rem', background: 'var(--bg-base)', border: '1px solid var(--border-faint)', borderRadius: 10, padding: '0.7rem 0.9rem', flexWrap: 'wrap' },
-  cardBadge: { fontSize: '0.62rem', fontWeight: 700, color: '#fff', textTransform: 'uppercase', letterSpacing: '0.04em', borderRadius: 5, padding: '0.3rem 0.45rem' },
-  paymentMethodNumber: { fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-dim)', letterSpacing: '0.02em' },
+  cardBadge: { fontSize: '0.7rem', fontWeight: 700, color: '#fff', textTransform: 'uppercase', letterSpacing: '0.04em', borderRadius: 5, padding: '0.3rem 0.45rem' },
+  paymentMethodNumber: { fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-dim)', letterSpacing: '0.02em' },
   billingActionsRow: { display: 'flex', alignItems: 'center', gap: '1.1rem', marginLeft: 'auto' },
-  updateCardBtn: { background: 'var(--bg-card)', border: '1px solid var(--border-faint)', borderRadius: 8, padding: '0.4rem 0.75rem', fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-dim)', cursor: 'pointer', fontFamily: 'inherit' },
+  updateCardBtn: { background: 'var(--bg-card)', border: '1px solid var(--border-faint)', borderRadius: 8, padding: '0.45rem 0.8rem', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-dim)', cursor: 'pointer', fontFamily: 'inherit' },
   // Hours
-  hoursGrid: { display: 'flex', flexDirection: 'column', gap: '6px' },
-  hoursRow: { display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.5rem 0.75rem', background: 'var(--bg-base)', borderRadius: 8 },
-  dayLabel: { fontSize: '0.83rem', color: 'var(--text-dim)', width: 90, flexShrink: 0 },
+  hoursGrid: { display: 'flex', flexDirection: 'column', gap: 0, maxWidth: 640 },
+  hoursRow: { display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.55rem 0', borderBottom: '1px solid var(--border-faint)' },
+  dayLabel: { fontSize: '0.95rem', fontWeight: 500, color: 'var(--text)', width: 110, flexShrink: 0 },
   closedToggle: { display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', flexShrink: 0 },
   timePair: { display: 'flex', alignItems: 'center', gap: '0.5rem', marginLeft: 'auto' },
-  timeSep: { color: 'var(--text-ghost)', fontSize: '0.8rem' },
-  timeInput: { background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 6, padding: '0.3rem 0.5rem', fontSize: '0.82rem', color: 'var(--text)', outline: 'none', colorScheme: 'auto' },
+  timeSep: { color: 'var(--text-secondary)', fontSize: '0.9rem' },
+  timeInput: { background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 8, padding: '0.45rem 0.6rem', fontSize: '0.9rem', color: 'var(--text)', outline: 'none', colorScheme: 'auto' },
   // Stations
   stationList: { display: 'flex', flexDirection: 'column', gap: '6px' },
   stationRow: { background: 'var(--bg-card)', border: '1px solid var(--border-faint)', borderRadius: 8, overflow: 'hidden' },
   stationTop: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.65rem 0.85rem' },
-  stationName: { fontSize: '0.87rem', fontWeight: 500, color: 'var(--text-dim)' },
+  stationName: { fontSize: '0.95rem', fontWeight: 500, color: 'var(--text)' },
   stationActions: { display: 'flex', gap: '0.5rem' },
-  stationToggleBtn: { background: 'var(--bg-chip)', border: '1px solid var(--border)', borderRadius: 6, padding: '0.25rem 0.65rem', fontSize: '0.75rem', color: 'var(--text-muted)', cursor: 'pointer' },
-  stationRemoveBtn: { background: 'transparent', border: '1px solid rgba(255,80,80,0.2)', borderRadius: 6, padding: '0.25rem 0.65rem', fontSize: '0.75rem', color: 'rgba(255,100,100,0.6)', cursor: 'pointer' },
+  stationToggleBtn: { background: 'var(--bg-chip)', border: '1px solid var(--border)', borderRadius: 8, padding: '0.4rem 0.75rem', fontSize: '0.85rem', color: 'var(--text-dim)', cursor: 'pointer' },
+  stationRemoveBtn: { background: 'transparent', border: '1px solid rgba(255,80,80,0.2)', borderRadius: 8, padding: '0.4rem 0.75rem', fontSize: '0.85rem', color: 'var(--color-danger)', cursor: 'pointer' },
   unavailPanel: { borderTop: '1px solid var(--border-faint)', padding: '0.75rem 0.85rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' },
   unavailAdd: { display: 'flex', alignItems: 'center', gap: '0.75rem' },
-  dateInput: { background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 6, padding: '0.35rem 0.6rem', fontSize: '0.82rem', color: 'var(--text)', outline: 'none', colorScheme: 'auto' },
+  dateInput: { background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 8, padding: '0.45rem 0.6rem', fontSize: '0.9rem', color: 'var(--text)', outline: 'none', colorScheme: 'auto' },
   unavailList: { display: 'flex', flexWrap: 'wrap', gap: '0.4rem' },
   unavailItem: { display: 'flex', alignItems: 'center', gap: '0.4rem', background: 'rgba(255,180,0,0.08)', border: '1px solid rgba(255,180,0,0.2)', borderRadius: 6, padding: '0.2rem 0.5rem' },
-  unavailDate: { fontSize: '0.78rem', color: 'rgba(255,200,60,0.8)' },
-  clearBtn: { background: 'none', border: 'none', color: 'rgba(255,200,60,0.5)', cursor: 'pointer', fontSize: '0.7rem', padding: 0 },
+  unavailDate: { fontSize: '0.85rem', color: 'rgba(255,200,60,0.8)' },
+  clearBtn: { background: 'none', border: 'none', color: 'rgba(255,200,60,0.5)', cursor: 'pointer', fontSize: '0.78rem', padding: 0 },
   // Walk-in
   walkInCard: { display: 'flex', alignItems: 'center', gap: '1.5rem' },
   walkInLeft: { flex: 1, display: 'flex', flexDirection: 'column', gap: '0.75rem', minWidth: 0 },
-  walkInUrl: { fontSize: '0.78rem', color: 'var(--text-muted)', wordBreak: 'break-all' },
-  copyBtn: { alignSelf: 'flex-start', background: 'var(--accent-tint)', border: '1px solid var(--accent-tint-border)', borderRadius: 6, padding: '0.35rem 0.85rem', fontSize: '0.78rem', fontWeight: 600, color: 'var(--accent)', cursor: 'pointer' },
+  walkInUrl: { fontSize: '0.85rem', color: 'var(--text-muted)', wordBreak: 'break-all' },
+  copyBtn: { alignSelf: 'flex-start', background: 'var(--accent-tint)', border: '1px solid var(--accent-tint-border)', borderRadius: 6, padding: '0.35rem 0.85rem', fontSize: '0.85rem', fontWeight: 600, color: 'var(--accent)', cursor: 'pointer' },
   qrWrap: { flexShrink: 0, padding: '0.5rem', background: 'var(--bg-card)', borderRadius: 8 },
   // Widget appearance
   colorRow: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' },
@@ -1938,41 +1949,41 @@ const s = {
   colorSwatch: { width: 36, height: 36, padding: 2, background: 'var(--bg-chip)', border: '1px solid var(--border)', borderRadius: 8, cursor: 'pointer', flexShrink: 0 },
   // Embed
   embedCard: { display: 'flex', flexDirection: 'column', gap: '0.65rem' },
-  codeBlock: { margin: 0, fontFamily: 'ui-monospace,monospace', fontSize: '0.78rem', color: 'var(--text-dim)', lineHeight: 1.7, whiteSpace: 'pre-wrap', wordBreak: 'break-all', background: 'var(--bg-base)', border: '1px solid var(--border-faint)', borderRadius: 8, padding: '0.75rem 1rem' },
+  codeBlock: { margin: 0, fontFamily: 'ui-monospace,monospace', fontSize: '0.85rem', color: 'var(--text-dim)', lineHeight: 1.7, whiteSpace: 'pre-wrap', wordBreak: 'break-all', background: 'var(--bg-base)', border: '1px solid var(--border-faint)', borderRadius: 8, padding: '0.75rem 1rem' },
   // Consent templates
   addTemplateBtn: { background: 'var(--accent-tint)', border: '1px solid var(--accent-tint-border)', borderRadius: 8, padding: '0.5rem 1rem', fontSize: '0.82rem', fontWeight: 600, color: 'var(--accent)', cursor: 'pointer', flexShrink: 0 },
   templateRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--bg-card)', border: '1px solid var(--border-faint)', borderRadius: 8, padding: '0.65rem 0.9rem', gap: '0.75rem' },
   templateRowLeft: { display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', flex: 1, minWidth: 0 },
   templateRowActions: { display: 'flex', gap: '0.4rem', flexShrink: 0 },
   templateName: { fontSize: '0.87rem', fontWeight: 500, color: 'var(--text-dim)' },
-  templateFieldCount: { fontSize: '0.72rem', color: 'var(--text-ghost)' },
-  guardianBadge: { fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', padding: '0.12rem 0.45rem', borderRadius: 4, background: 'var(--accent-tint)', color: 'var(--text-muted)' },
-  inactiveBadge: { fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', padding: '0.12rem 0.45rem', borderRadius: 4, background: 'rgba(255,255,255,0.04)', color: 'var(--text-ghost)' },
-  formTypeBadge: { fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', padding: '0.12rem 0.45rem', borderRadius: 4 },
+  templateFieldCount: { fontSize: '0.8rem', color: 'var(--text-ghost)' },
+  guardianBadge: { fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', padding: '0.12rem 0.45rem', borderRadius: 4, background: 'var(--accent-tint)', color: 'var(--text-muted)' },
+  inactiveBadge: { fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', padding: '0.12rem 0.45rem', borderRadius: 4, background: 'rgba(255,255,255,0.04)', color: 'var(--text-ghost)' },
+  formTypeBadge: { fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', padding: '0.12rem 0.45rem', borderRadius: 4 },
   formTypeBadgeColors: {
     consent: { background: 'var(--accent-tint)', color: 'var(--accent)' },
     waiver:  { background: 'rgba(232,111,111,0.12)', color: '#e86f6f' },
     health:  { background: 'rgba(76,201,138,0.12)', color: '#4cc98a' },
   },
-  templateActionBtn: { background: 'var(--bg-chip)', border: '1px solid var(--border)', borderRadius: 6, padding: '0.25rem 0.65rem', fontSize: '0.75rem', color: 'var(--text-muted)', cursor: 'pointer' },
+  templateActionBtn: { background: 'var(--bg-chip)', border: '1px solid var(--border)', borderRadius: 6, padding: '0.25rem 0.65rem', fontSize: '0.82rem', color: 'var(--text-muted)', cursor: 'pointer' },
   // Template builder modal
   modalOverlay: { position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '2rem 1rem', overflowY: 'auto' },
   templateModal: { background: 'var(--bg-modal)', border: '1px solid var(--border)', borderRadius: 16, padding: '1.75rem', width: '100%', maxWidth: 600, display: 'flex', flexDirection: 'column', gap: '1rem' },
   toggleRow: { display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' },
-  addFieldBtn: { background: 'var(--bg-chip)', border: '1px solid var(--border)', borderRadius: 6, padding: '0.25rem 0.55rem', fontSize: '0.72rem', color: 'var(--text-muted)', cursor: 'pointer' },
+  addFieldBtn: { background: 'var(--bg-chip)', border: '1px solid var(--border)', borderRadius: 6, padding: '0.25rem 0.55rem', fontSize: '0.8rem', color: 'var(--text-muted)', cursor: 'pointer' },
   fieldEditorRow: { background: 'var(--bg-card)', border: '1px solid var(--border-faint)', borderRadius: 8, padding: '0.65rem 0.75rem', marginBottom: '0.4rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' },
-  fieldTypeBadge: { fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', padding: '0.1rem 0.45rem', borderRadius: 4, background: 'var(--bg-chip)', color: 'var(--text-ghost)' },
-  fieldMoveBtn: { background: 'var(--bg-chip)', border: '1px solid var(--border)', borderRadius: 4, padding: '0.1rem 0.35rem', fontSize: '0.72rem', color: 'var(--text-muted)', cursor: 'pointer' },
+  fieldTypeBadge: { fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', padding: '0.1rem 0.45rem', borderRadius: 4, background: 'var(--bg-chip)', color: 'var(--text-ghost)' },
+  fieldMoveBtn: { background: 'var(--bg-chip)', border: '1px solid var(--border)', borderRadius: 4, padding: '0.1rem 0.35rem', fontSize: '0.8rem', color: 'var(--text-muted)', cursor: 'pointer' },
   cancelBtn: { flex: 1, background: 'var(--bg-chip)', border: '1px solid var(--border)', borderRadius: 8, padding: '0.6rem 1rem', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', cursor: 'pointer' },
   formFieldRow: { display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.6rem 0.85rem', background: 'var(--bg-base)', borderRadius: 8 },
-  fieldToggleBtn: { border: '1px solid', borderRadius: 6, padding: '0.25rem 0.75rem', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer', minWidth: 42, textAlign: 'center' },
+  fieldToggleBtn: { border: '1px solid', borderRadius: 6, padding: '0.25rem 0.75rem', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer', minWidth: 42, textAlign: 'center' },
   // Stripe
   stripeConnectBtn: { alignSelf: 'flex-start', background: 'var(--accent)', border: 'none', borderRadius: 8, padding: '0.65rem 1.4rem', fontSize: '0.88rem', fontWeight: 700, color: 'var(--accent-contrast, #111)', cursor: 'pointer' },
-  stripeDisconnectBtn: { alignSelf: 'flex-start', background: 'transparent', border: '1px solid rgba(255,80,80,0.2)', borderRadius: 6, padding: '0.35rem 0.85rem', fontSize: '0.78rem', color: 'rgba(255,100,100,0.65)', cursor: 'pointer' },
+  stripeDisconnectBtn: { alignSelf: 'flex-start', background: 'transparent', border: '1px solid rgba(255,80,80,0.2)', borderRadius: 6, padding: '0.35rem 0.85rem', fontSize: '0.85rem', color: 'rgba(255,100,100,0.65)', cursor: 'pointer' },
   stripeStatusRow: { display: 'flex', alignItems: 'center', gap: '0.85rem', background: 'var(--bg-base)', border: '1px solid var(--border-faint)', borderRadius: 10, padding: '0.9rem 1rem' },
   stripeStatusDot: (active) => ({ width: 10, height: 10, borderRadius: '50%', flexShrink: 0, background: active ? 'var(--status-confirmed)' : 'var(--status-pending)' }),
   // Account
-  signOutBtn: { alignSelf: 'flex-start', background: 'var(--bg-chip)', border: '1px solid var(--border)', borderRadius: 6, padding: '0.4rem 1rem', fontSize: '0.75rem', color: 'var(--text-faint)', cursor: 'pointer' },
+  signOutBtn: { alignSelf: 'flex-start', background: 'var(--bg-chip)', border: '1px solid var(--border)', borderRadius: 6, padding: '0.4rem 1rem', fontSize: '0.82rem', color: 'var(--text-faint)', cursor: 'pointer' },
   themeToggle: { background: 'none', border: 'none', cursor: 'pointer', padding: 0 },
   themeToggleTrack: (theme) => ({
     display: 'block', width: 44, height: 24, borderRadius: 12, padding: 3,
@@ -2001,7 +2012,7 @@ function StationLastDayModal({ onConfirm, onCancel, saving, existingEndDate }) {
 
   return (
     <Dialog title={isChanging ? 'Change last day' : "Set station's last day"} description="No bookings will be available on or after the station’s last day." onClose={onCancel} dismissDisabled={saving} maxWidth={400}>
-        <label htmlFor="last-day" style={{ display: 'block', fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '0.4rem' }}>
+        <label htmlFor="last-day" style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '0.4rem' }}>
           Last day
         </label>
         <input
@@ -2013,7 +2024,7 @@ function StationLastDayModal({ onConfirm, onCancel, saving, existingEndDate }) {
           style={{ width: '100%', boxSizing: 'border-box', background: 'var(--bg-input)', border: `1px solid ${isToday ? 'rgba(232,111,111,0.5)' : 'var(--border-strong)'}`, borderRadius: 8, padding: '0.65rem 0.85rem', fontSize: '0.9rem', color: 'var(--text)', outline: 'none', fontFamily: 'inherit', colorScheme: 'inherit', marginBottom: isToday ? '0.5rem' : '1.25rem' }}
         />
         {isToday && (
-          <p style={{ margin: '0 0 1.25rem', fontSize: '0.78rem', color: '#e86f6f', lineHeight: 1.4 }}>
+          <p style={{ margin: '0 0 1.25rem', fontSize: '0.85rem', color: '#e86f6f', lineHeight: 1.4 }}>
             Setting today will deactivate this station immediately.
           </p>
         )}
@@ -2047,7 +2058,7 @@ function CancelSubscriptionModal({ onConfirm, onCancel, saving, error }) {
 
   return (
     <Dialog title="Cancel subscription" description="You’ll keep full access through the end of your current billing period. After that, your dashboard will lock until billing is added again. Please tell us why you’re canceling." onClose={onCancel} dismissDisabled={saving} maxWidth={440}>
-        <label htmlFor="cancel-subscription-reason" style={{ display: 'block', fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '0.4rem' }}>
+        <label htmlFor="cancel-subscription-reason" style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '0.4rem' }}>
           Reason for canceling
         </label>
         <textarea id="cancel-subscription-reason" aria-describedby="cancel-subscription-hint" aria-invalid={reason.length > 0 && !canSubmit}
@@ -2062,7 +2073,7 @@ function CancelSubscriptionModal({ onConfirm, onCancel, saving, error }) {
             outline: 'none', fontFamily: 'inherit', resize: 'vertical', minHeight: 90,
           }}
         />
-        <p id="cancel-subscription-hint" style={{ margin: '0.4rem 0 1.1rem', fontSize: '0.75rem', color: canSubmit ? 'var(--text-ghost)' : '#e86f6f' }}>
+        <p id="cancel-subscription-hint" style={{ margin: '0.4rem 0 1.1rem', fontSize: '0.82rem', color: canSubmit ? 'var(--text-ghost)' : '#e86f6f' }}>
           {canSubmit ? `${reason.trim().length} characters` : `${remaining} more character${remaining === 1 ? '' : 's'} required`}
         </p>
         {error && <p role="alert" style={{ margin: '0 0 1rem', fontSize: '0.8rem', color: '#e86f6f' }}>{error}</p>}
