@@ -27,6 +27,7 @@ import { initials, toISODate } from '@/lib/format';
 import BookingDetailPanel from '@/components/BookingDetailPanel';
 import CancelDepositButton from '@/components/CancelDepositButton';
 import MarkDepositReceivedButton from '@/components/MarkDepositReceivedButton';
+import { useBookingManagement } from '@/lib/bookingManagement';
 import CompleteBookingModal from '@/components/CompleteBookingModal';
 import RejectBookingModal from '@/components/RejectBookingModal';
 import SendSelectionLinkModal from '@/components/SendSelectionLinkModal';
@@ -96,6 +97,7 @@ export default function HomePage() {
   const [stripeConnected, setStripeConnected] = useState(false);
   const [loadError, setLoadError] = useState('');
   const router = useRouter();
+  const bookingManagement = useBookingManagement();
 
   useEffect(() => {
     function cancelled(event) {
@@ -443,9 +445,14 @@ export default function HomePage() {
                 <AttentionGroup title="Pending bookings" tone="warning" icon="calendar" count={pendingCount} subtitle="Awaiting your approval" open={!!openAttentionGroups.pending} onToggle={() => toggleAttentionGroup('pending')}>
                   {pendingBookings.map(booking => (
                     <AttentionItem key={booking.id} title={booking.requester_name ?? 'Client'} subtitle={bookingSubtitle(booking)} onClick={() => openBookingReview(booking)}>
-                      <button style={s.inlinePrimary} disabled={attentionAction === `send-${booking.id}`} onClick={() => openPendingSendLink(booking)}>
-                        {attentionAction === `send-${booking.id}` ? 'Loading…' : 'Send link'}
-                      </button>
+                      {bookingManagement === 'studio' && booking.availability_windows?.length > 0 ? (
+                        // The client gave weekly availability: offer them times from the booking panel.
+                        <button style={s.inlinePrimary} onClick={() => openBookingReview(booking)}>Offer times</button>
+                      ) : (
+                        <button style={s.inlinePrimary} disabled={attentionAction === `send-${booking.id}`} onClick={() => openPendingSendLink(booking)}>
+                          {attentionAction === `send-${booking.id}` ? 'Loading…' : 'Send link'}
+                        </button>
+                      )}
                       <button style={s.inlineDanger} disabled={attentionAction === booking.id} onClick={() => setRejectBooking(booking)}>Reject</button>
                     </AttentionItem>
                   ))}

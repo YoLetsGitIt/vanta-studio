@@ -3,10 +3,11 @@
 import CancelDepositButton from '@/components/CancelDepositButton';
 import MarkDepositReceivedButton, { depositMethodLabel } from '@/components/MarkDepositReceivedButton';
 import BookTimeModal from '@/components/BookTimeModal';
+import OfferTimesModal from '@/components/OfferTimesModal';
 import { useBookingManagement } from '@/lib/bookingManagement';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { getStations, getClientConsents, getNotes, addNote, deleteNote, getBookingConsentSubmissions, getStudioClients, generateConsentLink, getStudioBookingPayment, getDepositReceipt, listConsentTemplates, downloadConsentPdf } from '@/lib/api';
+import { getStations, getClientConsents, getNotes, addNote, deleteNote, getBookingConsentSubmissions, getStudioClients, generateConsentLink, getStudioBookingPayment, getDepositReceipt, getOfferedTimes, listConsentTemplates, downloadConsentPdf } from '@/lib/api';
 import { useStationAvailability } from '@/lib/useStationAvailability';
 import { statusColors, statusLabel, capitalise as cap } from '@/lib/status';
 import { formatDob as fmtDob, hasArtist } from '@/lib/format';
@@ -74,6 +75,8 @@ export default function BookingDetailPanel({
   const [stationStep,  setStationStep]  = useState(false);
   const [stationError, setStationError] = useState('');
   const [bookTimeOpen, setBookTimeOpen] = useState(false);
+  const [offerOpen, setOfferOpen] = useState(false);
+  const [offer, setOffer] = useState(null); // { booking, data } — times the studio offered the client
   const bookingManagement = useBookingManagement();
 
   // ── Payment recording status ───────────────────────────────────────────────
@@ -170,6 +173,12 @@ export default function BookingDetailPanel({
   // request straight into a time, without the artist.
   const canBookTime       = bookingManagement === 'studio' && Boolean(bookTimeArtists) && ['pending', 'awaiting_payment', 'requires_confirmation'].includes(status) && !booking?.deposit_paid_at && !booking?.deposit_confirmed_at;
 
+  // When the client gave weekly availability, the studio offers up to three times instead of
+  // sending a "choose a time" link.
+  const hasAvailabilityWindows = Array.isArray(booking?.availability_windows) && booking.availability_windows.length > 0;
+  const canOfferTimes     = bookingManagement === 'studio' && Boolean(bookTimeArtists) && status === 'pending' && hasAvailabilityWindows;
+  const currentOffer      = offer?.booking === bookingId ? offer.data : null;
+
   const displayStatus = isNoShow ? 'no_show' : status;
   const sc = statusColors(displayStatus);
 
@@ -190,6 +199,16 @@ export default function BookingDetailPanel({
       .then(d => setPaymentSplits(d.splits ?? []))
       .catch(() => setPaymentSplits([]));
   }, [bookingId, isCompleted]);
+
+  // ── Times the studio offered, while the client chooses ─────────────────────
+  useEffect(() => {
+    if (!bookingId || status !== 'pending' || bookingManagement !== 'studio') { setOffer(null); return; }
+    let live = true;
+    getOfferedTimes(bookingId)
+      .then(data => { if (live) setOffer({ booking: bookingId, data }); })
+      .catch(() => { if (live) setOffer(null); });
+    return () => { live = false; };
+  }, [bookingId, status, bookingManagement]);
 
   // ── How a manually recorded deposit was paid (PayID, bank transfer, cash) ──
   const [depositReceipt, setDepositReceipt] = useState(null);
@@ -364,9 +383,14 @@ export default function BookingDetailPanel({
     );
   }
 
-  const heroTime = chosenTime ?? proposedTime ?? null;
-  const heroCaption = chosenTime ? 'Appointment' : proposedTime ? 'Proposed time' : 'Time to be arranged';
-  const heroMeta = [durationLabel, hasArtist(artistId) ? artistName : t('bdp_artist_unspecified'), stationName].filter(Boolean).join(' · ');
+  const offeredTimes = !chosenTime && currentOffer?.times?.length ? currentOffer.times : null;
+  const heroTime = chosenTime ?? (offeredTimes ? null : proposedTime) ?? null;
+  const heroCaption = chosenTime ? 'Appointment' : offeredTimes ? `Times offered · waiting for ${clientName !== '—' ? clientName.split(' ')[0] : 'the client'} to choose` : proposedTime ? 'Proposed time' : 'Time to be arranged';
+  const offerDuration = offeredTimes && currentOffer?.duration_minutes
+    ? (currentOffer.duration_minutes < 60 ? `${currentOffer.duration_minutes} min` : `${currentOffer.duration_minutes / 60} hr${currentOffer.duration_minutes === 60 ? '' : 's'}`) : null;
+  const heroMeta = offeredTimes
+    ? [offerDuration, currentOffer?.artist_name, currentOffer?.deposit_amount ? `$${Number(currentOffer.deposit_amount).toFixed(2)} deposit to confirm` : null].filter(Boolean).join(' · ')
+    : [durationLabel, hasArtist(artistId) ? artistName : t('bdp_artist_unspecified'), stationName].filter(Boolean).join(' · ');
   const showMoney = status === 'confirmed' || quote != null || depositRequired || depositPaid;
   const depositTone = depositConfirmedAt ? 'success' : depositPaid ? 'warning' : 'danger';
   const hasTimeline = createdAt || (status === 'awaiting_payment' && (updatedAt || selectionTokenExpiresAt)) || (holdExpiresAt && canConfirm);
@@ -389,7 +413,17 @@ export default function BookingDetailPanel({
         {/* ── When / who summary ── */}
         <div className="studio-bdp-hero" style={{ ...p.hero, background: sc.bg, borderColor: sc.border }}>
           <span style={{ ...p.heroCaption, color: sc.text }}>{heroCaption}</span>
-          <span style={p.heroTime}>{heroTime ? fmtDate(heroTime) : '—'}</span>
+          {offeredTimes ? (
+            <ol aria-label="Offered times" style={{ margin: '0.25rem 0', padding: 0, listStyle: 'none', display: 'grid', gap: '0.35rem' }}>
+              {offeredTimes.map((time, i) => (
+                <li key={time} style={{ display: 'flex', gap: '0.6rem', alignItems: 'baseline', fontSize: '1.05rem', fontWeight: 600, color: 'var(--text)' }}>
+                  <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', minWidth: '1.1rem' }}>{i + 1}</span>{fmtDate(time)}
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <span style={p.heroTime}>{heroTime ? fmtDate(heroTime) : '—'}</span>
+          )}
           {heroMeta && <span style={p.heroMeta}>{heroMeta}</span>}
           {cancelReason && <span style={p.heroNote}>{t('bdp_cancelled_reason')}: {cancelReason}</span>}
         </div>
@@ -778,6 +812,10 @@ export default function BookingDetailPanel({
       </div>
 
       {/* ── Actions ── */}
+      {offerOpen && booking && (
+        <OfferTimesModal booking={booking} offer={currentOffer} artists={bookTimeArtists} depositsReady={depositsReady} onClose={() => setOfferOpen(false)}
+          onOffered={async (id, data) => { setOffer({ booking: id, data }); showFeedback(`Times sent to ${clientName !== '—' ? clientName : 'the client'}`, 'success'); await onBooked?.(id); }} />
+      )}
       {bookTimeOpen && booking && (
         <BookTimeModal booking={booking} artists={bookTimeArtists} depositsReady={depositsReady} onClose={() => setBookTimeOpen(false)}
           onBooked={async id => { showFeedback('Booked in', 'success'); await onBooked?.(id); }} />
@@ -785,9 +823,12 @@ export default function BookingDetailPanel({
       {!stationStep && (canAcceptReject || canComplete || isFutureConfirmed || canSendLink || canConfirm || canReschedule || canBookTime) && (
         <div className="studio-bdp-actions" style={p.actions}>
           {canBookTime && (
-            <Btn onClick={() => setBookTimeOpen(true)} disabled={actionLoading} variant={canSendLink ? 'neutral' : 'primary'}>Book a time</Btn>
+            <Btn onClick={() => setBookTimeOpen(true)} disabled={actionLoading} variant={canSendLink || canOfferTimes ? 'neutral' : 'primary'}>Book a time</Btn>
           )}
-          {canSendLink && onSendLink && (
+          {canOfferTimes && (
+            <Btn onClick={() => setOfferOpen(true)} disabled={actionLoading} variant="primary">{currentOffer ? 'Edit times' : 'Offer times'}</Btn>
+          )}
+          {canSendLink && onSendLink && !canOfferTimes && (
             <Btn onClick={onSendLink} disabled={actionLoading} variant="primary">
               {status === 'awaiting_payment' ? t('bdp_resend_link') : t('bdp_send_link')}
             </Btn>
