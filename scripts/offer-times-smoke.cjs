@@ -22,6 +22,17 @@ const pending = { id: 'req-1', requester_name: 'Minseo Park', requester_email: '
       await context.route(/\/stripe\/status/, r => r.fulfill({ json: { charges_enabled: false, manual_deposits_ready: true } }));
       await context.route(/\/studio\/me\/booking-management$/, r => r.fulfill({ json: { mode: 'studio' } }));
       await context.route(/\/studio\/me\/bookings\/req-1\/offered-times$/, r => r.fulfill({ json: { offer } }));
+      // The artist works Mon and Wed 9–6, has one booking coming up, and is busy at 2pm.
+      await context.route(/\/artists\/[^/]+\/work-schedule$/, r => r.fulfill({ json: { schedule: [1, 3].map(d => ({ day_of_week: d, start_time: '09:00:00', end_time: '18:00:00' })) } }));
+      const soon = new Date(Date.now() + 3 * 86400000); soon.setHours(11, 0, 0, 0);
+      let chosenArtist = '';
+      await context.route(/\/studio\/me\/schedule\?.*start=/, r => r.fulfill({ json: { entries: [{ bookingId: 'other', artistId: chosenArtist, chosenTime: soon.toISOString(), durationMins: 120, status: 'confirmed' }] } }));
+      const checks = [];
+      await context.route(/\/studio\/me\/bookings\/req-1\/offer-times\/check/, r => {
+        const times = new URL(r.request().url()).searchParams.getAll('time');
+        checks.push(times);
+        return r.fulfill({ json: { times: times.map(t => new Date(t).getHours() === 14 ? { time: t, available: false, message: 'The artist is already booked then.' } : { time: t, available: true }) } });
+      });
       await context.route(/\/studio\/me\/bookings\/req-1\/offer-times$/, r => {
         sent = r.request().postDataJSON();
         offer = { artist_id: sent.artist_id, artist_name: 'Sam Anderson', duration_minutes: sent.duration_minutes, deposit_amount: sent.deposit_amount, times: [...sent.times].sort(),
@@ -49,8 +60,34 @@ const pending = { id: 'req-1', requester_name: 'Minseo Park', requester_email: '
       assert(await send.isDisabled(), 'An artist is required');
       await dialog.getByRole('status').filter({ hasText: 'Choose an artist to send these times.' }).waitFor();
       await page.waitForFunction(() => document.querySelectorAll('[role="dialog"] select[aria-label="Artist"] option').length > 1);
+      chosenArtist = await dialog.getByLabel('Artist').locator('option').nth(1).getAttribute('value');
       await dialog.getByLabel('Artist').selectOption({ index: 1 });
       await dialog.getByLabel('Duration').selectOption('120');
+
+      // The chosen artist's hours and bookings sit beside the client's availability.
+      const artistPanel = dialog.getByRole('region', { name: "Artist's availability" });
+      await artistPanel.getByText('Monday: 9am – 6pm, both free').waitFor({ state: 'attached' });
+      assert.equal(await artistPanel.getByText(/both free/).count(), 2, 'Mon and Wed are free for both');
+      assert.equal(await artistPanel.getByText(/^Booked .*11am – 1pm$/).count(), 1, 'Their booking is listed');
+      // The week calendar shows the options and lets you tap a free spot to add one.
+      const week = dialog.getByRole('region', { name: 'Week view' });
+      await week.waitFor();
+      const firstDay = (new Date(`${firstDate}T00:00:00`).getDay() + 6) % 7; // Mon = 0
+      await week.locator('div[aria-hidden="true"]').nth(firstDay).click({ position: { x: 8, y: 4 * 2 * 14 + 4 } }); // 1pm on a 9am grid
+      assert.equal(await dialog.getByLabel('Option 2 date').inputValue(), firstDate, 'Tapped day becomes option 2');
+      assert.equal(await dialog.getByLabel('Option 2 start time').inputValue(), '13:00', 'Tapped time becomes option 2');
+      if (shots) await week.screenshot({ path: `${shots}/offer-week-${width}.png` });
+      await dialog.getByRole('button', { name: 'Remove option 2' }).click();
+      // Each option is checked against the artist's bookings as it's picked.
+      await dialog.getByText('✓ Artist is free').waitFor();
+      const firstTime = await dialog.getByLabel('Option 1 start time').inputValue();
+      await dialog.getByLabel('Option 1 start time').fill('14:00');
+      await dialog.getByText('The artist is already booked then.').waitFor();
+      assert(await send.isDisabled(), 'A taken time blocks sending');
+      await dialog.getByRole('status').filter({ hasText: 'The artist isn’t free at one of these times.' }).waitFor();
+      await dialog.getByLabel('Option 1 start time').fill(firstTime);
+      await dialog.getByText('✓ Artist is free').waitFor();
+      assert.ok(checks.length >= 2, 'Times are checked live');
 
       // Up to three options; a time outside their availability is flagged, a duplicate blocks sending.
       await dialog.getByRole('button', { name: '+ Add another time' }).click();
@@ -58,7 +95,7 @@ const pending = { id: 'req-1', requester_name: 'Minseo Park', requester_email: '
       assert.equal(await dialog.getByRole('button', { name: '+ Add another time' }).count(), 0, 'Three at most');
       await dialog.getByLabel('Option 3 date').fill('2099-03-07'); // a Saturday
       await dialog.getByLabel('Option 3 start time').fill('12:00');
-      await dialog.getByText('Outside their availability.').waitFor();
+      await dialog.getByText('Outside their availability and the artist’s hours.').waitFor();
       await dialog.getByLabel('Option 2 date').fill(firstDate);
       await dialog.getByLabel('Option 2 start time').fill(await dialog.getByLabel('Option 1 start time').inputValue());
       await dialog.getByText('Same as another option.').waitFor();

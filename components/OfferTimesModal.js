@@ -6,12 +6,13 @@
 import { useEffect, useState } from 'react';
 import { bookingActions } from '@/lib/bookingActions';
 import { hasArtist } from '@/lib/format';
-import { getStudioArtists } from '@/lib/api';
-import { describeAvailability } from '@/lib/availability';
+import { getStudioArtists, checkOfferTimes, getArtistWorkSchedule, getStudioScheduleRange } from '@/lib/api';
+import { describeAvailability, formatTime } from '@/lib/availability';
 import { showError } from '@/lib/feedback';
 import Dialog from '@/components/ui/Dialog';
 import Button from '@/components/ui/Button';
 import Field, { Input, Select } from '@/components/ui/Field';
+import OfferWeekView, { mondayOf } from '@/components/OfferWeekView';
 
 const pad = n => String(n).padStart(2, '0');
 const DURATIONS = [30, 60, 90, 120, 180, 240, 300, 360, 480];
@@ -57,6 +58,8 @@ export default function OfferTimesModal({ booking, offer = null, artists: givenA
     const suggested = suggestTimes(windows, 1);
     return suggested.length ? suggested : [{ date: '', time: '11:00' }];
   });
+  // Week shown in the calendar: the week of the first option, or this week.
+  const [weekStart, setWeekStart] = useState(() => mondayOf(rows[0]?.date ? new Date(`${rows[0].date}T00:00:00`) : new Date()));
   const [duration, setDuration] = useState(60);
   const [quote, setQuote] = useState('');
   const [deposit, setDeposit] = useState(false);
@@ -78,13 +81,58 @@ export default function OfferTimesModal({ booking, offer = null, artists: givenA
     if (dep) { setDeposit(true); setDepositAmount(String(dep)); }
   }, [booking, offer]);
 
-  const setRow = (i, patch) => setRows(list => list.map((row, j) => (j === i ? { ...row, ...patch } : row)));
+  // The chosen artist's weekly hours at this studio and their bookings over the next
+  // four weeks, shown beside the client's availability. null = loading.
+  const [artistHours, setArtistHours] = useState(null);
+  const [artistBookings, setArtistBookings] = useState(null);
+  useEffect(() => {
+    if (!artistId) { setArtistHours(null); setArtistBookings(null); return undefined; }
+    let active = true;
+    setArtistBookings(null);
+    const studioId = booking?.studio_id;
+    getArtistWorkSchedule(artistId)
+      .then(d => {
+        if (!active) return;
+        const rows = (d.schedule ?? []).filter(r => !studioId || !r.studio_id || r.studio_id === studioId);
+        setArtistHours(rows.map(r => ({ day_of_week: r.day_of_week, start_time: String(r.start_time).slice(0, 5), end_time: String(r.end_time).slice(0, 5) })));
+      })
+      .catch(() => { if (active) setArtistHours([]); });
+    const to = new Date(weekStart); to.setDate(to.getDate() + 6);
+    getStudioScheduleRange(toDate(weekStart), toDate(to))
+      .then(d => {
+        if (!active) return;
+        setArtistBookings((d.entries ?? [])
+          .filter(e => String(e.artistId) === String(artistId) && e.chosenTime && e.bookingId !== booking?.id && e.status !== 'cancelled')
+          .sort((a, b) => new Date(a.chosenTime) - new Date(b.chosenTime)));
+      })
+      .catch(() => { if (active) setArtistBookings([]); });
+    return () => { active = false; };
+  }, [artistId, booking?.id, booking?.studio_id, weekStart.getTime()]); // eslint-disable-line react-hooks/exhaustive-deps
+  const artistHoursList = describeAvailability(artistHours ?? []);
+  const clientDays = new Set(windows.map(w => w.day_of_week));
+  const bothFree = new Set((artistHours ?? []).filter(h => clientDays.has(h.day_of_week)).map(h => h.day_of_week));
+  const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+  const setRow = (i, patch) => {
+    setRows(list => list.map((row, j) => (j === i ? { ...row, ...patch } : row)));
+    // Show the week of a date typed into an option.
+    if (patch.date) setWeekStart(mondayOf(new Date(`${patch.date}T00:00:00`)));
+  };
   function addRow() {
     setRows(list => {
       if (list.length >= MAX_TIMES) return list;
       const taken = new Set(list.map(r => r.date));
       const next = suggestTimes(windows, 10).find(s => !taken.has(s.date));
       return [...list, next ?? { date: '', time: list.at(-1)?.time || '11:00' }];
+    });
+  }
+
+  // Tapping the calendar fills the first option without a date, or adds one (up to three).
+  function pickFromWeek(date, time) {
+    setRows(list => {
+      const empty = list.findIndex(r => !r.date);
+      if (empty >= 0) return list.map((r, j) => (j === empty ? { date, time } : r));
+      return list.length < MAX_TIMES ? [...list, { date, time }] : list;
     });
   }
 
@@ -95,11 +143,37 @@ export default function OfferTimesModal({ booking, offer = null, artists: givenA
   const keys = slots.map(d => d?.getTime());
   const duplicate = i => keys[i] != null && keys.indexOf(keys[i]) !== i;
   const past = i => slots[i] && slots[i].getTime() <= Date.now();
+
+  // Live check: is the artist free at each time? Same rule the server applies on send.
+  // artistFree maps a slot's timestamp to { state: 'checking' | 'free' | 'taken', message }.
+  const [artistFree, setArtistFree] = useState({});
+  const checkable = slots.map((d, i) => (d && !past(i) && !duplicate(i) ? d : null));
+  const checkKey = `${artistId}|${duration}|${checkable.map(d => d?.getTime() ?? '').join(',')}`;
+  useEffect(() => {
+    const times = checkable.filter(Boolean);
+    if (!artistId || !times.length || !booking?.id) { setArtistFree({}); return undefined; }
+    setArtistFree(prev => Object.fromEntries(times.map(d => [d.getTime(), prev[d.getTime()]?.state ? { ...prev[d.getTime()], state: 'checking' } : { state: 'checking' }])));
+    let active = true;
+    const timer = setTimeout(() => {
+      checkOfferTimes(booking.id, { artistId, durationMinutes: duration, times: times.map(d => d.toISOString()) })
+        .then(results => {
+          if (!active) return;
+          setArtistFree(Object.fromEntries(times.map((d, i) => [d.getTime(), results[i]?.available === false
+            ? { state: 'taken', message: results[i].message || 'The artist isn’t free then.' }
+            : { state: 'free' }])));
+        })
+        // If the check fails, the server still checks when sending.
+        .catch(() => { if (active) setArtistFree({}); });
+    }, 300);
+    return () => { active = false; clearTimeout(timer); };
+  }, [checkKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  const taken = i => artistFree[keys[i]]?.state === 'taken';
   // Say what's stopping the send instead of leaving the button greyed out unexplained.
   const blocker = !artistId ? 'Choose an artist to send these times.'
     : !slots.every(Boolean) ? 'Add a date and start time for each option.'
     : slots.some((_, i) => duplicate(i)) ? 'Two options are the same time.'
     : slots.some((_, i) => past(i)) ? 'One of the times has already passed.'
+    : slots.some((_, i) => taken(i)) ? 'The artist isn’t free at one of these times. Change it before sending.'
     : depositInvalid ? (quoteNum > 0 && depositNum > quoteNum ? 'The deposit can’t be more than the quote.' : 'Enter the deposit amount.')
     : '';
   const ready = !blocker;
@@ -124,13 +198,14 @@ export default function OfferTimesModal({ booking, offer = null, artists: givenA
   }
 
   const clientName = booking?.requester_name || 'the client';
+  const artistName = artists.find(a => String(a.artistId ?? a.artist_id ?? a.id) === String(artistId))?.name;
   return (
     <Dialog
       title={offer ? 'Change offered times' : 'Offer times'}
       description={`Pick up to three times. ${clientName} gets an email to choose one${deposit ? ', then pays the deposit to confirm' : ', which confirms the booking'}.`}
       onClose={onClose}
       dismissDisabled={saving}
-      maxWidth={500}
+      maxWidth={680}
       footer={(
         <>
           <Button variant="secondary" onClick={onClose} disabled={saving}>Cancel</Button>
@@ -141,14 +216,34 @@ export default function OfferTimesModal({ booking, offer = null, artists: givenA
       )}
     >
       <fieldset disabled={saving} style={{ display: 'grid', gap: 'var(--space-4)', margin: 0, padding: 0, border: 0, minWidth: 0 }}>
-        {availability.length > 0 && (
-          <section aria-label="Client's weekly availability" style={o.availability}>
-            <span style={o.availabilityTitle}>Their availability</span>
-            {availability.map(a => (
-              <span key={a.day} style={o.availabilityRow}><b style={{ color: 'var(--text)', fontWeight: 600 }}>{a.day}</b> · {a.times}</span>
-            ))}
-          </section>
-        )}
+        <OfferWeekView
+          weekStart={weekStart}
+          onWeekChange={setWeekStart}
+          clientWindows={windows}
+          artistHours={artistId ? artistHours ?? [] : []}
+          bookings={artistId ? artistBookings ?? [] : []}
+          options={rows}
+          duration={duration}
+          onPick={pickFromWeek}
+          canPick={rows.some(r => !r.date) || rows.length < MAX_TIMES}
+        />
+        {/* The same information as text, for screen readers. */}
+        <div className="sr-only">
+          {availability.length > 0 && (
+            <section aria-label="Client's weekly availability">
+              {availability.map(a => <p key={a.day}>{a.day}: {a.times}</p>)}
+            </section>
+          )}
+          {artistId && (
+            <section aria-label="Artist's availability">
+              {artistHoursList.map(a => <p key={a.day}>{a.day}: {a.times}{bothFree.has(DAY_NAMES.indexOf(a.day)) ? ', both free' : ''}</p>)}
+              {(artistBookings ?? []).map(e => {
+                const start = new Date(e.chosenTime), end = new Date(start.getTime() + (e.durationMins ?? 60) * 60000);
+                return <p key={e.bookingId}>Booked {start.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' })}, {formatTime(toTime(start))} – {formatTime(toTime(end))}</p>;
+              })}
+            </section>
+          )}
+        </div>
         <Field label="Artist" required>
           <Select value={artistId} onChange={e => setArtistId(e.target.value)} aria-label="Artist">
             <option value="">Choose an artist</option>
@@ -167,7 +262,11 @@ export default function OfferTimesModal({ booking, offer = null, artists: givenA
         <div style={{ display: 'grid', gap: 'var(--space-3)' }}>
           {rows.map((row, i) => {
             const outside = !withinAvailability(windows, row.date, row.time, duration);
-            const note = duplicate(i) ? 'Same as another option.' : past(i) ? 'This time has passed.' : outside ? 'Outside their availability.' : null;
+            const live = artistFree[keys[i]];
+            const offHours = artistHours?.length > 0 && !withinAvailability(artistHours, row.date, row.time, duration);
+            const note = duplicate(i) ? 'Same as another option.' : past(i) ? 'This time has passed.' : live?.state === 'taken' ? live.message
+              : outside && offHours ? 'Outside their availability and the artist’s hours.' : outside ? 'Outside their availability.' : offHours ? 'Outside the artist’s hours.' : null;
+            const danger = duplicate(i) || past(i) || live?.state === 'taken';
             return (
               <div key={i} style={o.option}>
                 <div style={o.optionHead}>
@@ -180,7 +279,9 @@ export default function OfferTimesModal({ booking, offer = null, artists: givenA
                   <Input type="date" value={row.date} onChange={e => setRow(i, { date: e.target.value })} aria-label={`Option ${i + 1} date`} />
                   <Input type="time" step="900" value={row.time} onChange={e => setRow(i, { time: e.target.value })} aria-label={`Option ${i + 1} start time`} />
                 </div>
-                {note && <span role={duplicate(i) || past(i) ? 'alert' : undefined} style={{ ...o.note, color: duplicate(i) || past(i) ? 'var(--color-danger)' : 'var(--color-warning, #e0a84f)' }}>{note}</span>}
+                {note && <span role={danger ? 'alert' : undefined} style={{ ...o.note, color: danger ? 'var(--color-danger)' : 'var(--color-warning, #e0a84f)' }}>{note}</span>}
+                {!note && live?.state === 'free' && <span style={{ ...o.note, color: 'var(--color-success)' }}>✓ Artist is free</span>}
+                {!note && live?.state === 'checking' && <span style={{ ...o.note, color: 'var(--text-muted)' }}>Checking the artist’s schedule…</span>}
               </div>
             );
           })}
@@ -215,7 +316,7 @@ export default function OfferTimesModal({ booking, offer = null, artists: givenA
 }
 
 const o = {
-  availability: { display: 'grid', gap: 2, padding: '10px 12px', borderRadius: 10, background: 'var(--bg-input)', border: '1px solid var(--border)', fontSize: '0.875rem', color: 'var(--text-muted)' },
+  availability: { display: 'grid', gap: 2, alignContent: 'start', padding: '10px 12px', borderRadius: 10, background: 'var(--bg-input)', border: '1px solid var(--border)', fontSize: '0.875rem', color: 'var(--text-muted)' },
   availabilityTitle: { fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: 2 },
   availabilityRow: { lineHeight: 1.5 },
   option: { display: 'grid', gap: 6 },
