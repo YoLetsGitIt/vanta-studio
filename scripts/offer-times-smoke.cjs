@@ -60,6 +60,9 @@ const pending = { id: 'req-1', requester_name: 'Minseo Park', requester_email: '
       assert(await send.isDisabled(), 'An artist is required');
       await dialog.getByRole('status').filter({ hasText: 'Choose an artist to send these times.' }).waitFor();
       await page.waitForFunction(() => document.querySelectorAll('[role="dialog"] select[aria-label="Artist"] option').length > 1);
+      // The calendar appears once an artist is chosen.
+      assert.equal(await dialog.getByRole('region', { name: 'Week view' }).count(), 0, 'No calendar before an artist is chosen');
+      await dialog.getByText(/Choose an artist to see their availability/).waitFor();
       chosenArtist = await dialog.getByLabel('Artist').locator('option').nth(1).getAttribute('value');
       await dialog.getByLabel('Artist').selectOption({ index: 1 });
       await dialog.getByLabel('Duration').selectOption('120');
@@ -78,6 +81,24 @@ const pending = { id: 'req-1', requester_name: 'Minseo Park', requester_email: '
       assert.equal(await dialog.getByLabel('Option 2 start time').inputValue(), '13:00', 'Tapped time becomes option 2');
       if (shots) await week.screenshot({ path: `${shots}/offer-week-${width}.png` });
       await dialog.getByRole('button', { name: 'Remove option 2' }).click();
+      if (width >= 800) {
+        // With a mouse, drag option 1 to Wednesday at 3pm (the grid starts at 9am, 14px per half hour).
+        const block = week.locator('span[title^="Option 1"]');
+        await block.evaluate(el => el.scrollIntoView({ block: 'center' }));
+        const from = await block.boundingBox();
+        const wed = await week.locator('div[aria-hidden="true"]').nth(2).boundingBox();
+        await page.mouse.move(from.x + from.width / 2, from.y + 2);
+        await page.mouse.down();
+        await page.mouse.move(wed.x + wed.width / 2, wed.y + 6 * 2 * 14 + 2, { steps: 8 });
+        await page.mouse.up();
+        const monday = new Date(`${firstDate}T00:00:00`); monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
+        const wedDate = new Date(monday); wedDate.setDate(monday.getDate() + 2);
+        const iso = `${wedDate.getFullYear()}-${String(wedDate.getMonth() + 1).padStart(2, '0')}-${String(wedDate.getDate()).padStart(2, '0')}`;
+        assert.equal(await dialog.getByLabel('Option 1 date').inputValue(), iso, 'Dragged to Wednesday');
+        assert.equal(await dialog.getByLabel('Option 1 start time').inputValue(), '15:00', 'Dropped at 3pm');
+        assert.equal(await dialog.getByLabel('Option 2 date').count(), 0, 'Dragging does not add an option');
+        if (shots) await week.screenshot({ path: `${shots}/offer-week-dragged.png` });
+      }
       // Each option is checked against the artist's bookings as it's picked.
       await dialog.getByText('✓ Artist is free').waitFor();
       const firstTime = await dialog.getByLabel('Option 1 start time').inputValue();
@@ -96,7 +117,7 @@ const pending = { id: 'req-1', requester_name: 'Minseo Park', requester_email: '
       await dialog.getByLabel('Option 3 date').fill('2099-03-07'); // a Saturday
       await dialog.getByLabel('Option 3 start time').fill('12:00');
       await dialog.getByText('Outside their availability and the artist’s hours.').waitFor();
-      await dialog.getByLabel('Option 2 date').fill(firstDate);
+      await dialog.getByLabel('Option 2 date').fill(await dialog.getByLabel('Option 1 date').inputValue());
       await dialog.getByLabel('Option 2 start time').fill(await dialog.getByLabel('Option 1 start time').inputValue());
       await dialog.getByText('Same as another option.').waitFor();
       assert(await send.isDisabled(), 'Duplicates block sending');

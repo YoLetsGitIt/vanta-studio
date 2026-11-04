@@ -216,17 +216,31 @@ export default function OfferTimesModal({ booking, offer = null, artists: givenA
       )}
     >
       <fieldset disabled={saving} style={{ display: 'grid', gap: 'var(--space-4)', margin: 0, padding: 0, border: 0, minWidth: 0 }}>
-        <OfferWeekView
-          weekStart={weekStart}
-          onWeekChange={setWeekStart}
-          clientWindows={windows}
-          artistHours={artistId ? artistHours ?? [] : []}
-          bookings={artistId ? artistBookings ?? [] : []}
-          options={rows}
-          duration={duration}
-          onPick={pickFromWeek}
-          canPick={rows.some(r => !r.date) || rows.length < MAX_TIMES}
-        />
+        <Field label="Artist" required>
+          <Select value={artistId} onChange={e => setArtistId(e.target.value)} aria-label="Artist">
+            <option value="">Choose an artist</option>
+            {artists.map(artist => {
+              const id = artist.artistId ?? artist.artist_id ?? artist.id;
+              return <option key={id} value={id}>{artist.name}</option>;
+            })}
+          </Select>
+        </Field>
+        {artistId ? (
+          <OfferWeekView
+            weekStart={weekStart}
+            onWeekChange={setWeekStart}
+            clientWindows={windows}
+            artistHours={artistHours ?? []}
+            bookings={artistBookings ?? []}
+            options={rows}
+            duration={duration}
+            onPick={pickFromWeek}
+            onMove={(i, date, time) => setRow(i, { date, time })}
+            canPick={rows.some(r => !r.date) || rows.length < MAX_TIMES}
+          />
+        ) : (
+          <p style={o.choose}>Choose an artist to see their availability and {clientName === 'the client' ? 'the client’s' : `${clientName.split(' ')[0]}’s`} side by side.</p>
+        )}
         {/* The same information as text, for screen readers. */}
         <div className="sr-only">
           {availability.length > 0 && (
@@ -244,15 +258,6 @@ export default function OfferTimesModal({ booking, offer = null, artists: givenA
             </section>
           )}
         </div>
-        <Field label="Artist" required>
-          <Select value={artistId} onChange={e => setArtistId(e.target.value)} aria-label="Artist">
-            <option value="">Choose an artist</option>
-            {artists.map(artist => {
-              const id = artist.artistId ?? artist.artist_id ?? artist.id;
-              return <option key={id} value={id}>{artist.name}</option>;
-            })}
-          </Select>
-        </Field>
         <Field label="Duration">
           <Select value={duration} onChange={e => setDuration(Number(e.target.value))} aria-label="Duration">
             {DURATIONS.map(m => <option key={m} value={m}>{m === 480 ? 'Full day (8 hrs)' : m < 60 ? '30 minutes' : `${m / 60} hour${m === 60 ? '' : 's'}`}</option>)}
@@ -316,6 +321,7 @@ export default function OfferTimesModal({ booking, offer = null, artists: givenA
 }
 
 const o = {
+  choose: { margin: 0, padding: '12px 14px', borderRadius: 10, background: 'var(--bg-input)', border: '1px dashed var(--border)', fontSize: '0.875rem', color: 'var(--text-muted)' },
   availability: { display: 'grid', gap: 2, alignContent: 'start', padding: '10px 12px', borderRadius: 10, background: 'var(--bg-input)', border: '1px solid var(--border)', fontSize: '0.875rem', color: 'var(--text-muted)' },
   availabilityTitle: { fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: 2 },
   availabilityRow: { lineHeight: 1.5 },

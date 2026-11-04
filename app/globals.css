@@ -441,3 +441,6 @@ textarea {
 
 /* Walk-in artist cards hide their radio button, so show keyboard focus on the card. */
 .walkin-artist-card:has(input:focus-visible) { outline: var(--focus-ring-width) solid var(--focus-ring); outline-offset: 2px; }
+
+/* Offer times week view: dragging options is mouse-only, so only mention it there. */
+@media not (pointer: fine) { .offer-week-drag-hint { display: none; } }
