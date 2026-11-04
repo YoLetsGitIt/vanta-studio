@@ -1,5 +1,6 @@
 'use client';
 
+import ArtistCommissionCard from '@/components/ArtistCommissionCard';
 import Dialog from '@/components/ui/Dialog';
 
 import { useState, useEffect, useCallback, Suspense, useRef } from 'react';
@@ -768,6 +769,8 @@ function ArtistDetail({ artist, onBack, onApprove, onReject, onRemove, onToggleA
                   }} />
                 </button>
               </div>
+              {/* Own commission rate (same data as Settings → Payments) */}
+              <ArtistCommissionCard artistId={artist.artistId ?? artist.id} artistName={artist.name} />
               {/* Last day */}
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.85rem 1rem' }}>
                 <div>
