@@ -192,7 +192,9 @@ export default function BookingDetailPanel({
   // When the client gave weekly availability, the studio offers up to three times instead of
   // sending a "choose a time" link.
   const hasAvailabilityWindows = Array.isArray(booking?.availability_windows) && booking.availability_windows.length > 0;
-  const currentOffer      = offer?.booking === bookingId ? offer.data : null;
+  // A deep link can render before either the summary or full booking has loaded.
+  // Two missing IDs must not count as a match for an offer or receipt.
+  const currentOffer      = bookingId && offer?.booking === bookingId ? offer.data : null;
   // Also replaces an unanswered "choose a time" link (awaiting payment, no time yet).
   const canOfferTimes     = bookingManagement === 'studio' && Boolean(bookTimeArtists) && hasAvailabilityWindows
     && (status === 'pending' || (status === 'awaiting_payment' && !chosenTime));
@@ -241,7 +243,7 @@ export default function BookingDetailPanel({
       .catch(() => { if (live) setDepositReceipt(null); });
     return () => { live = false; };
   }, [bookingId, depositPaidAt, depositReceived?.method]);
-  const depositPaidVia = depositReceipt?.booking === bookingId ? depositMethodLabel(depositReceipt.method) : null;
+  const depositPaidVia = bookingId && depositReceipt?.booking === bookingId ? depositMethodLabel(depositReceipt.method) : null;
 
   // The client says they paid by PayID / bank transfer: the studio checks it arrived.
   const [depositClaim, setDepositClaim] = useState(null);
