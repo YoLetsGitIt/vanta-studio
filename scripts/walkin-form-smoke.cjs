@@ -60,14 +60,18 @@ const template = { id: 'tmpl-1', name: 'Walk-in consent', requires_signature: fa
       await page.getByPlaceholder('555 0100').fill('400111222');
       await page.getByRole('button', { name: 'Forearm', exact: true }).click();
       await page.getByRole('button', { name: 'Yes', exact: true }).click();
+      // The artist is required and comes before the consent form.
+      assert.equal(await book.isDisabled(), true, 'disabled until the artist is chosen');
+      await page.getByText('Please choose your artist.').waitFor();
+      // Artists are tappable cards (radio buttons), not a dropdown.
+      const artists = page.getByRole('group', { name: /^Artist/ });
+      assert.equal(await artists.getByRole('radio').count(), 2);
+      assert.equal(await artists.getByRole('radio').first().evaluate(el => el.required), true);
+      await artists.getByText('Sam Rivers', { exact: true }).click();
+      assert.equal(await artists.getByRole('radio', { name: /Sam Rivers/ }).isChecked(), true);
       assert.equal(await book.isDisabled(), true, 'still disabled before agreeing to the consent form');
       await page.getByText('Please confirm you have read and agreed to "Walk-in consent".').waitFor();
       await page.getByText('I have read and agreed', { exact: false }).first().click();
-      assert.equal(await book.isDisabled(), true, 'still disabled until the artist is chosen');
-      // The artist is required.
-      const artist = page.locator('select').filter({ has: page.locator('option', { hasText: 'Choose your artist' }) });
-      assert.equal(await artist.evaluate(el => el.required), true);
-      await artist.selectOption(artistId);
       assert.equal(await book.isDisabled(), false, 'enabled once everything required is filled in');
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
       if (shots) await page.screenshot({ path: `${shots}/walkin-${width}.png`, fullPage: true });

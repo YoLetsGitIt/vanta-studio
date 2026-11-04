@@ -438,3 +438,6 @@ textarea {
   .studio-analytics-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 10px !important; }
   .studio-analytics-kpis > * { padding: 12px !important; min-width: 0; }
 }
+
+/* Walk-in artist cards hide their radio button, so show keyboard focus on the card. */
+.walkin-artist-card:has(input:focus-visible) { outline: var(--focus-ring-width) solid var(--focus-ring); outline-offset: 2px; }

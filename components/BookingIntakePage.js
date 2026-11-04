@@ -298,6 +298,7 @@ function IntakeInner({ mode }) {
     if (guest && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(bookingEmail)) return 'Please provide a valid email address.';
     if (!phoneNum.trim()) return 'Please provide your phone number.';
     if (!dob) return 'Please provide your date of birth.';
+    if (walkIn && !artistId) return 'Please choose your artist.';
     if (field('body_location').enabled && placements.length === 0) return 'Please select at least one placement.';
     if (field('availability_windows').enabled && field('availability_windows').required && availability.length === 0) {
       return 'Please add at least one time you’re available.';
@@ -544,8 +545,11 @@ function IntakeInner({ mode }) {
                 <option value="piercing">Piercing</option>
               </select>
             </Field>}
-            {field('artist_id').enabled && (
-              <Field label={<>{walkIn ? 'Artist' : 'Artist preference'}{field('artist_id').required ? null : <Optional />}</>}>
+            {walkIn && (
+              <ArtistChoice artists={studio.artists} value={artistId} onChange={setArtistId} />
+            )}
+            {!walkIn && field('artist_id').enabled && (
+              <Field label={<>{'Artist preference'}{field('artist_id').required ? null : <Optional />}</>}>
                 <select style={{ ...s.input, ...s.select }} value={artistId} required={field('artist_id').required} onChange={e => setArtistId(e.target.value)}>
                   <option value="">{walkIn ? 'Choose your artist' : 'No preference — studio will assign'}</option>
                   {studio.artists.map(a => (
@@ -969,6 +973,43 @@ function SignaturePad({ onCapture, label = 'Client signature' }) {
 
 function Required() {
   return <span aria-hidden="true" style={{ color: 'var(--color-danger)', marginLeft: 3 }}>*</span>;
+}
+
+// Walk-ins pick their artist from tappable cards rather than a dropdown: on some
+// iPhones the dropdown picker didn't keep the choice, and cards are quicker at a
+// front desk. Built on radio buttons, so keyboards and screen readers work too.
+function ArtistChoice({ artists, value, onChange }) {
+  return (
+    <fieldset style={{ border: 0, margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '0.45rem', minWidth: 0 }}>
+      <legend style={{ ...s.label, padding: 0, marginBottom: '0.45rem' }}>Artist <span aria-hidden="true">*</span></legend>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 210px), 1fr))', gap: '0.5rem' }}>
+        {artists.map(a => {
+          const on = value === a.artistId;
+          const initials = (a.name || '?').split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase();
+          return (
+            <label key={a.artistId} className="walkin-artist-card" style={{
+              position: 'relative', display: 'flex', alignItems: 'center', gap: '0.6rem', minHeight: 52, padding: '0.55rem 0.7rem', borderRadius: 10, cursor: 'pointer',
+              background: on ? 'rgba(213,208,199,0.12)' : 'rgba(255,255,255,0.05)',
+              border: `1px solid ${on ? '#d5d0c7' : 'rgba(255,255,255,0.1)'}`,
+              WebkitTapHighlightColor: 'transparent',
+            }}>
+              <input type="radio" name="walkin-artist" value={a.artistId} checked={on} required onChange={() => onChange(a.artistId)}
+                style={{ position: 'absolute', opacity: 0, width: 1, height: 1, margin: 0 }} />
+              {a.profileImage
+                ? <img src={a.profileImage} alt="" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+                : <span aria-hidden="true" style={{ width: 32, height: 32, borderRadius: '50%', display: 'grid', placeItems: 'center', flexShrink: 0, fontSize: '0.72rem', fontWeight: 700, background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.75)' }}>{initials}</span>}
+              <span style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
+                <span style={{ fontSize: '0.9rem', fontWeight: 600, color: '#fff', overflowWrap: 'anywhere' }}>{a.name}</span>
+                {a.studioType === 'guest' && <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Guest artist</span>}
+              </span>
+              <span aria-hidden="true" style={{ width: 18, height: 18, borderRadius: '50%', flexShrink: 0, border: `2px solid ${on ? '#d5d0c7' : 'rgba(255,255,255,0.3)'}`, background: on ? '#d5d0c7' : 'transparent', boxShadow: on ? 'inset 0 0 0 3px #1a1a1a' : 'none' }} />
+            </label>
+          );
+        })}
+      </div>
+      {artists.length === 0 && <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)' }}>No artists are available right now. Please ask at the front desk.</p>}
+    </fieldset>
+  );
 }
 
 function Optional() {

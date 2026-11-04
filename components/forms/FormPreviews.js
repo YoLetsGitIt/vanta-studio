@@ -261,7 +261,17 @@ export function WalkInPreview({ bg, accent, studioName, logoUrl, fields, consent
           <span style={lbl}>Phone *</span>
           <div style={{ display: 'flex', gap: 6 }}><div style={{ ...inp, width: 72, flexShrink: 0 }} /><div style={{ ...inp, flex: 1 }} /></div>
         </div>
-        <div style={fld}><span style={lbl}>Artist *</span><div style={{ ...inp, display: 'flex', alignItems: 'center', padding: '0 10px', fontSize: '0.75rem', color: 'rgba(255,255,255,0.6)' }}>Choose your artist</div></div>
+        <div style={fld}>
+          <span style={lbl}>Artist *</span>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+            {['Artist one', 'Artist two'].map((name, i) => (
+              <div key={name} style={{ ...inp, display: 'flex', alignItems: 'center', gap: 6, padding: '0 8px', border: `1px solid ${i === 0 ? accent : 'rgba(255,255,255,0.1)'}`, background: i === 0 ? hexToRgbaStr(accent, 0.12) : 'rgba(255,255,255,0.05)' }}>
+                <span style={{ width: 18, height: 18, borderRadius: '50%', background: 'rgba(255,255,255,0.12)', flexShrink: 0 }} />
+                <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#fff' }}>{name}</span>
+              </div>
+            ))}
+          </div>
+        </div>
 
         {group('Your extra fields')}
         {extras.length === 0 && <p style={{ margin: 0, fontSize: '0.72rem', color: 'rgba(255,255,255,0.4)' }}>None turned on. Switch fields on to ask for more.</p>}
