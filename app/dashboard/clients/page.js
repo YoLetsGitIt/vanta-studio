@@ -17,7 +17,7 @@ import Button from '@/components/ui/Button';
 import MarketingConsent from '@/components/MarketingConsent';
 import ConsentSubmissionCard from '@/components/ConsentSubmissionCard';
 import ClientTemplateSend from '@/components/marketing/ClientTemplateSend';
-import { Pill, Section, Fact, SkeletonBar, DetailSkeleton, detailStyles } from '@/components/ui/DetailParts';
+import { Pill, Section, CollapsibleSection, Fact, SkeletonBar, DetailSkeleton, detailStyles } from '@/components/ui/DetailParts';
 
 const CLIENTS_PER_PAGE = 25;
 
@@ -539,9 +539,9 @@ function ClientDetail({ client, marketing, onMarketingChange, clientKey, onClose
         )}
 
         {submissions.length > 0 && (
-          <Section title={`Signed consent forms (${submissions.length})`}>
+          <CollapsibleSection key={clientKey} title={`Signed consent forms (${submissions.length})`}>
             {submissions.map(sub => <ConsentSubmissionCard key={sub.id} sub={sub} templates={consentTemplates} />)}
-          </Section>
+          </CollapsibleSection>
         )}
 
         <Section title="Send an email">

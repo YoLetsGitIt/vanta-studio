@@ -1,5 +1,6 @@
 'use client';
 
+import { useId, useState } from 'react';
 import styles from './DetailParts.module.css';
 
 // Shared building blocks for the booking and client detail panels.
@@ -49,6 +50,22 @@ export function Section({ title, aside, children }) {
         {aside}
       </div>
       {children}
+    </section>
+  );
+}
+
+// A section that starts closed, showing just its title (e.g. a count), and opens on tap.
+export function CollapsibleSection({ title, defaultOpen = false, children }) {
+  const [open, setOpen] = useState(defaultOpen);
+  const bodyId = useId();
+  return (
+    <section style={d.section}>
+      <button type="button" aria-expanded={open} aria-controls={bodyId} onClick={() => setOpen(v => !v)}
+        style={{ ...d.sectionHead, width: '100%', minHeight: 44, padding: 0, border: 0, background: 'none', color: 'inherit', font: 'inherit', textAlign: 'left', cursor: 'pointer' }}>
+        <h3 style={d.sectionTitle}>{title}</h3>
+        <span aria-hidden="true" style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>{open ? '▲' : '▼'}</span>
+      </button>
+      {open && <div id={bodyId} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>{children}</div>}
     </section>
   );
 }

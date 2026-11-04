@@ -29,7 +29,13 @@ const sub = { id: 'sub-1', template_id: 'tmpl-1', template_name: 'Tattoo consent
       assert.equal(await panel.getByText('Not consented', { exact: true }).count(), 0, 'signed client is not shown as not consented');
       assert.ok(await panel.getByText('Consented', { exact: true }).count() >= 1);
       assert.equal(await panel.getByRole('button', { name: 'Send link' }).count(), 0, 'no send link for a consented client');
-      // Collapsed at first: name and signing date only, expanded on tap.
+      // The whole list starts closed, showing only how many forms are signed.
+      const listToggle = panel.getByRole('button', { name: /Signed consent forms \(1\)/ });
+      assert.equal(await listToggle.getAttribute('aria-expanded'), 'false');
+      assert.equal(await panel.getByRole('button', { name: /Tattoo consent/ }).count(), 0, 'forms hidden until the list is opened');
+      await listToggle.click();
+      assert.equal(await listToggle.getAttribute('aria-expanded'), 'true');
+      // Each form is collapsed at first: name and signing date only, expanded on tap.
       const formToggle = panel.getByRole('button', { name: /Tattoo consent/ });
       assert.equal(await formToggle.getAttribute('aria-expanded'), 'false');
       assert.equal(await panel.getByText('Are you feeling well today?', { exact: true }).count(), 0, 'answers hidden until expanded');
