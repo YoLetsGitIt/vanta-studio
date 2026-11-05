@@ -191,6 +191,7 @@ function IntakeInner({ mode }) {
   const [notes, setNotes]           = useState('');
   // Weekly availability: [{ day_of_week, start_time, end_time }]
   const [availability, setAvailability] = useState([]);
+  const [earliestDate, setEarliestDate] = useState('');
   const photoInputRef = useRef(null);
   const [photos, setPhotos]         = useState([]);
   const [photoPreviews, setPhotoPreviews] = useState([]);
@@ -425,6 +426,7 @@ function IntakeInner({ mode }) {
         availability_windows: field('availability_windows').enabled
           ? [...availability].sort((a, b) => a.day_of_week - b.day_of_week || a.start_time.localeCompare(b.start_time))
           : [],
+        earliest_date:        field('availability_windows').enabled ? earliestDate : '',
         image_paths:          imagePaths,
         consent_accepted:     consentSubmissions.length > 0,
         consent_submissions:  consentSubmissions,
@@ -714,8 +716,16 @@ function IntakeInner({ mode }) {
           {/* ── Weekly availability ── */}
           {field('availability_windows').enabled && (
             <Section title="Your availability">
+              <Field label={<>Earliest date you can come in<Optional /></>}>
+                <input
+                  type="date" style={s.input} value={earliestDate}
+                  min={new Date().toLocaleDateString('en-CA')}
+                  onChange={e => setEarliestDate(e.target.value)}
+                />
+              </Field>
               <p style={s.sectionHint}>
                 {field('availability_windows').required ? 'Required' : 'Optional'} — which hours usually suit you each week?
+                Press and drag down a day to mark the times that work, and tap a block to remove it.
               </p>
               <WeeklyAvailabilityGrid value={availability} onChange={setAvailability} hours={studioHours} />
             </Section>

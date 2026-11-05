@@ -117,8 +117,8 @@ async function openForm(page) {
       await openForm(page);
       await page.getByText('Your availability', { exact: true }).waitFor();
 
-      // Required: blocks submit with a clear message.
-      await page.getByRole('button', { name: 'Request booking', exact: true }).click();
+      // Required: submit stays disabled with a clear message.
+      assert.ok(await page.getByRole('button', { name: 'Request booking', exact: true }).isDisabled());
       await page.getByText('Please add at least one time you’re available.').waitFor();
       assert.equal(writes.filter(w => w.path.endsWith('/client-booking')).length, 0);
 
@@ -132,6 +132,7 @@ async function openForm(page) {
         await page.mouse.move(x, box.y + toSlot * 15 + 7, { steps: 4 });
         await page.mouse.up();
       }
+      await page.locator('[data-day="Tuesday"]').evaluate(el => el.scrollIntoView({ block: 'center' }));
       await drag('Tuesday', 4, 17);
       await drag('Saturday', 2, 8);
       await page.getByText('10am – 5pm').waitFor();
@@ -147,6 +148,11 @@ async function openForm(page) {
       await page.getByRole('button', { name: 'Remove Tuesday 10am – 6pm', exact: true }).click();
       await drag('Tuesday', 4, 17);
 
+      // The hint explains press-and-drag; the earliest date goes out with the booking.
+      await page.getByText(/Press and drag down a day/).waitFor();
+      const earliest = new Date(Date.now() + 14 * 864e5).toLocaleDateString('en-CA');
+      await page.getByLabel('Earliest date you can come in').fill(earliest);
+
       // Nothing overflows the card on a phone.
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
       assert.ok(overflow <= 0, `page overflows by ${overflow}px at ${width}px`);
@@ -156,6 +162,7 @@ async function openForm(page) {
       await page.getByRole('heading', { name: "You're on the list!", exact: true }).waitFor();
       const sent = writes.find(w => w.path.endsWith('/client-booking')).body.availability_windows;
       assert.deepEqual(sent, savedWindows);
+      assert.equal(writes.find(w => w.path.endsWith('/client-booking')).body.earliest_date, earliest);
       assert.equal(errors.length, 0, errors.join('\n'));
       console.log(`PASS required weekly availability submits at ${width}px`);
       await context.close();

@@ -145,6 +145,9 @@ export default function BookingDetailPanel({
   const design      = booking?.design_details    ?? entry?.designDetails  ?? null;
   const notes       = booking?.additional_notes  ?? entry?.notes          ?? null;
   const availability = describeAvailability(booking?.availability_windows);
+  const earliestDate = booking?.earliest_date
+    ? new Date(`${String(booking.earliest_date).slice(0, 10)}T12:00:00`).toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })
+    : null;
   const refImages   = booking?.reference_images  ?? [];
   const quote       = booking?.estimated_quote   ?? entry?.estimatedQuote ?? null;
   const duration    = booking?.proposed_duration_minutes ?? entry?.durationMins ?? null;
@@ -549,6 +552,7 @@ export default function BookingDetailPanel({
             {color       && <Fact label={t('bdp_style')}>{color.replace(/^Color\b/, 'Colour')}</Fact>}
             {design      && <Fact label={t('bdp_design')} block>{design}</Fact>}
             {notes       && <Fact label={t('bdp_notes')} block>{notes}</Fact>}
+            {earliestDate && <Fact label="Earliest date">{earliestDate}</Fact>}
             {availability.length > 0 && (
               <Fact label="Weekly availability" block>
                 {availability.map(a => <span key={a.day} style={{ display: 'block' }}><span style={{ fontWeight: 600 }}>{a.day}</span> · {a.times}</span>)}

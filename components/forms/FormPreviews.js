@@ -180,7 +180,10 @@ export function WidgetPreview({ bg, accent, studioName, logoUrl, fields, consent
 
         {fields?.availability_windows?.enabled && (
           <div style={fld}>
+            <span style={lbl}>Earliest date you can come in (optional)</span>
+            <div style={{ ...inp, marginBottom: '0.5rem' }} />
             <span style={lbl}>Your availability{fields.availability_windows.required ? ' *' : ' (optional)'}</span>
+            <span style={{ fontSize: '0.62rem', color: 'rgba(255,255,255,0.45)' }}>Press and drag down a day to mark the times that work.</span>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2 }}>
               {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d, i) => (
                 <div key={d} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>

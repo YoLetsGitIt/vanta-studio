@@ -190,7 +190,8 @@ export default function WeeklyAvailabilityGrid({ value, onChange, hours, accent 
           })}
         </div>
       </div>
-      <p style={g.hint}>Drag down a day to add the hours that suit you. Tap a block to remove it.{known ? ' Shaded times are outside the studio’s opening hours.' : ''}</p>
+      {/* How to drag is explained above the grid by the form. */}
+      {known && <p style={g.hint}>Shaded times are outside the studio’s opening hours.</p>}
 
       {summary.length > 0 && (
         <ul aria-label="Your selected times" style={g.list}>
