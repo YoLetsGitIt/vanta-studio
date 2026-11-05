@@ -2,8 +2,7 @@
 
 // Small month calendar in the sidebar. Each day is shaded by how busy it is: hours booked
 // against the hours the studio's artists work that day (weekly hours, days off and changed
-// hours). Days with bookings but no artist hours get a dot. Clicking a day opens it in the
-// schedule; the schedule reports the day it shows, so both stay in step.
+// hours). Today has a dot. Clicking a day opens it in the schedule; the schedule reports the day it shows, so both stay in step.
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { getStudioScheduleRange, getStudioArtists, getMyStudioAccount, getArtistWorkSchedule } from '@/lib/api';
@@ -142,7 +141,6 @@ export default function SidebarCalendar() {
           const ratio = info?.capacity ? info.booked / info.capacity : 0;
           const level = info?.capacity ? levelFor(ratio) : 0;
           if (level) classes.push(styles[`busy${level}`]);
-          const noHours = info?.count > 0 && !info.capacity;
           const summary = !info?.count ? 'Nothing booked'
             : [`${info.count} booking${info.count === 1 ? '' : 's'}`, info.capacity ? `${Math.round(Math.min(ratio, 1) * 100)}% booked` : 'no artist hours set'].join(' · ');
           const dayName = day.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' });
@@ -157,7 +155,7 @@ export default function SidebarCalendar() {
               aria-label={`${day.toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long' })}, ${summary}`}
             >
               {day.getDate()}
-              {noHours && <span className={styles.dot} aria-hidden="true" />}
+              {date === today && <span className={styles.dot} aria-hidden="true" />}
             </button>
           );
         })}

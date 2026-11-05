@@ -46,17 +46,17 @@ test('calendar arithmetic and overnight durations survive daylight saving', () =
   assert.equal(week[6].bookings[0].displayEnd.getHours(), 4);
 });
 
-test('time grid keeps the working day and stretches to fit early, late and overnight bookings', async () => {
+test('time grid always shows 8am to midnight, starting earlier only for early bookings', async () => {
   const { weekHourRange } = await import('../lib/scheduleWeek.mjs');
   const date = new Date('2026-10-26T12:00:00+11:00');
-  assert.deepEqual(weekHourRange(weekSchedule([], date)), { startHour: 8, endHour: 20 });
+  assert.deepEqual(weekHourRange(weekSchedule([], date)), { startHour: 8, endHour: 24 });
   const stretched = weekSchedule([
     { bookingId: 'early', chosenTime: '2026-10-27T06:30:00+11:00', durationMins: 60 },
     { bookingId: 'late', chosenTime: '2026-10-28T21:15:00+11:00', durationMins: 30 },
   ], date);
-  assert.deepEqual(weekHourRange(stretched), { startHour: 6, endHour: 22 });
+  assert.deepEqual(weekHourRange(stretched), { startHour: 6, endHour: 24 });
   const overnight = weekSchedule([{ bookingId: 'night', chosenTime: '2026-10-28T23:00:00+11:00', durationMins: 180 }], date);
-  assert.deepEqual(weekHourRange(overnight), { startHour: 0, endHour: 24 });
+  assert.deepEqual(weekHourRange(overnight), { startHour: 8, endHour: 24 });
 });
 
 test('overlapping bookings get side-by-side lanes; back-to-back bookings stay full width', async () => {
