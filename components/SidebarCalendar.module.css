@@ -7,14 +7,21 @@
   background: transparent; color: var(--text-muted); font-size: 1rem; line-height: 1;
 }
 .arrows button:hover { background: var(--bg-chip); color: var(--text); }
-.grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 1px; }
+.grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; }
 .weekday { text-align: center; font-size: 0.65rem; font-weight: 600; color: var(--text-ghost); padding-bottom: 2px; }
 .day {
-  position: relative; aspect-ratio: 1; min-width: 0; border: 0; border-radius: 999px;
+  position: relative; aspect-ratio: 1; min-width: 0; border: 0; border-radius: var(--radius-sm);
   background: transparent; color: var(--text-dim); font-size: 0.72rem; font-variant-numeric: tabular-nums;
   display: flex; align-items: center; justify-content: center;
 }
 .day:hover { background: var(--bg-chip); color: var(--text); }
+/* Busyness: hours booked against artist hours that day. */
+.busy1 { background: color-mix(in srgb, var(--color-info) 12%, transparent); }
+.busy2 { background: color-mix(in srgb, var(--color-info) 26%, transparent); }
+.busy3 { background: color-mix(in srgb, var(--color-info) 44%, transparent); color: var(--text); }
+.busy4 { background: color-mix(in srgb, var(--color-info) 66%, transparent); color: var(--text); font-weight: 600; }
+[data-theme="light"] .busy4 { color: #fff; }
+.busy1:hover, .busy2:hover, .busy3:hover, .busy4:hover { filter: brightness(0.96); }
 .outside { color: var(--text-ghost); opacity: 0.6; }
 .today { color: var(--accent); font-weight: 700; box-shadow: inset 0 0 0 1px var(--accent-tint-border); }
 .selected, .selected:hover { background: var(--accent); color: var(--accent-contrast); font-weight: 700; }

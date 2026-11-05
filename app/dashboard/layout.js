@@ -289,7 +289,14 @@ function DashboardShell({ children }) {
               <PlusIcon size={13} />
               {t('new_appointment')}
             </button>
+          </div>
 
+          <div className="studio-dashboard-sidebar-middle" style={s.sidebarMiddle}>
+            <SidebarCalendar />
+            <SidebarNeedsAction paymentRecording={paymentRecording} />
+          </div>
+
+          <div className="studio-dashboard-sidebar-bottom" style={s.sidebarBottom}>
             <nav className="studio-dashboard-navigation" aria-label="Studio navigation" style={s.nav}>
               {NAV.map(({ href, tKey, icon: Icon }, index) => {
                 const active = pathname.startsWith(href);
@@ -312,14 +319,6 @@ function DashboardShell({ children }) {
                 );
               })}
             </nav>
-          </div>
-
-          <div className="studio-dashboard-sidebar-middle" style={s.sidebarMiddle}>
-            <SidebarCalendar />
-            <SidebarNeedsAction paymentRecording={paymentRecording} />
-          </div>
-
-          <div className="studio-dashboard-sidebar-bottom" style={s.sidebarBottom}>
             <div style={s.userRow}>
               <div style={s.avatar}>{displayName[0].toUpperCase()}</div>
               <div style={s.userInfo}>
@@ -720,17 +719,21 @@ const s = {
     display: 'flex',
     flexDirection: 'column',
     gap: '1.25rem',
-    margin: '1rem 0',
-    paddingTop: '1rem',
-    borderTop: '1px solid var(--border-faint)',
+    margin: '1.25rem 0 1rem',
+    paddingBottom: '0.5rem',
   },
   sidebarBottom: {
-    padding: '0 1rem',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '0.75rem',
+    paddingTop: '0.75rem',
+    borderTop: '1px solid var(--border-faint)',
   },
   userRow: {
     display: 'flex',
     alignItems: 'center',
     gap: '0.65rem',
+    padding: '0 1rem',
   },
   gearBtn: {
     marginLeft: 'auto',
