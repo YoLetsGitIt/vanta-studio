@@ -216,7 +216,7 @@ const SETTINGS_TABS = [
   { id: 'consent',  label: 'Consent form',     hint: 'Build the form clients sign' },
   { id: 'messages', label: 'Client messages',  hint: 'Emails, reminders and SMS' },
   { id: 'payments', label: 'Payments',         hint: 'Commission, Stripe and deposit options' },
-  { id: 'account',  label: 'Account',          hint: 'Notifications, billing, appearance and language' },
+  { id: 'account',  label: 'Account',          hint: 'Billing, notifications, appearance and language' },
 ];
 // Older links (setup checklist, tour, bookmarks) used a single Bookings tab.
 const LEGACY_TABS = { bookings: 'requests' };
@@ -289,7 +289,7 @@ export default function SettingsPage() {
         : bookingManagement === 'artist' ? 'Artists confirm times · form, link and widget' : SETTINGS_TABS[1].hint;
       case 'consent': return consentTemplates.length ? 'Set up' : 'Not set up yet';
       case 'payments': return stripeStatus?.charges_enabled ? 'Stripe connected · commission and deposits' : SETTINGS_TABS[5].hint;
-      case 'account': return email ? `${email} · notifications and billing` : SETTINGS_TABS[6].hint;
+      case 'account': return email ? `${email} · billing and notifications` : SETTINGS_TABS[6].hint;
       default: return SETTINGS_TABS.find(tb => tb.id === id)?.hint ?? '';
     }
   }
@@ -864,8 +864,6 @@ export default function SettingsPage() {
 
 
       <div className="settings-bento">
-        {tab === 'account' && <div className="settings-span-6 settings-cell"><PushNotificationSettings /></div>}
-        {tab === 'account' && <div className="settings-span-6 settings-cell"><StudioSetupLinks /></div>}
 
         {tab === 'studio' && <>
 
@@ -1653,15 +1651,6 @@ export default function SettingsPage() {
 
         {tab === 'account' && <>
 
-        <section className="settings-span-4" style={s.card}>
-          <h2 style={s.sectionTitle}>{t('account')}</h2>
-          <div style={s.field}>
-            <label htmlFor="studio-account-email" style={s.label}>Email</label>
-            <input id="studio-account-email" style={{ ...s.input, ...s.inputReadonly }} value={email} readOnly />
-          </div>
-          <button onClick={handleSignOut} style={s.signOutBtn}>{t('sign_out')}</button>
-        </section>
-
         <section className="settings-span-12" style={s.card}>
           <h2 style={s.sectionTitle}>Billing</h2>
           {isBillingExempt ? <div>
@@ -1760,6 +1749,17 @@ export default function SettingsPage() {
           />
         )}
 
+        <div className="settings-span-12 settings-cell"><PushNotificationSettings /></div>
+
+        <section className="settings-span-4" style={s.card}>
+          <h2 style={s.sectionTitle}>{t('account')}</h2>
+          <div style={s.field}>
+            <label htmlFor="studio-account-email" style={s.label}>Email</label>
+            <input id="studio-account-email" style={{ ...s.input, ...s.inputReadonly }} value={email} readOnly />
+          </div>
+          <button onClick={handleSignOut} style={s.signOutBtn}>{t('sign_out')}</button>
+        </section>
+
         <section className="settings-span-4" style={s.card}>
           <h2 style={s.sectionTitle}>{t('appearance')}</h2>
           <ThemePicker value={theme} onChange={chooseTheme} />
@@ -1791,6 +1791,8 @@ export default function SettingsPage() {
             ))}
           </div>
         </section>
+
+        <div className="settings-span-12"><StudioSetupLinks /></div>
 
         </>}
 

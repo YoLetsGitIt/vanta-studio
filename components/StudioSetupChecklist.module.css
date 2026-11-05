@@ -61,32 +61,28 @@
 :global(html:root) .error button { margin-left: .5rem; min-height: 44px; border: 0; background: none; color: inherit; font: inherit; text-decoration: underline; cursor: pointer; }
 :global(html:root) .card button:disabled, :global(html:root) .card input:disabled { opacity: .55; cursor: wait; }
 :global(html:root) .card :is(a, button, input):focus-visible, :global(html:root) .shortcuts a:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 4px; }
-:global(html:root) .shortcuts { display: block; container: account-setup / inline-size; padding: 1.5rem 1.6rem; border-radius: 14px; }
-:global(html:root) .shortcutHeader h2 { margin: 0; font-size: 1.1rem; font-weight: 700; line-height: 1.4; letter-spacing: -.02em; }
-:global(html:root) .shortcutHeader p { margin: .3rem 0 0; color: var(--text-dim); font-size: .95rem; line-height: 1.6; }
-:global(html:root) .shortcutGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; margin-top: 1rem; }
-:global(html:root) .shortcutLink { min-width: 0; display: flex; align-items: center; gap: .85rem; padding: 1rem; border: 1px solid var(--border-faint); border-radius: 10px; color: var(--text); text-decoration: none; transition: border-color 150ms, background 150ms; }
-:global(html:root) .shortcutLink:hover { border-color: color-mix(in srgb, var(--text) 25%, transparent); background: var(--accent-tint); }
-:global(html:root) .shortcutIcon { flex-shrink: 0; display: grid; place-items: center; width: 36px; height: 36px; border: 1px solid var(--border); border-radius: 10px; color: var(--text-dim); }
-:global(html:root) .shortcutIcon svg { width: 20px; height: 20px; }
-:global(html:root) .shortcutCopy { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: .3rem; }
-:global(html:root) .shortcutCopy strong { font-size: .95rem; font-weight: 600; line-height: 1.4; }
-:global(html:root) .shortcutCopy > span { color: var(--text-dim); font-size: .85rem; line-height: 1.6; }
-:global(html:root) .shortcutLink > svg { flex-shrink: 0; width: 18px; height: 18px; color: var(--text-dim); transition: transform 150ms; }
-:global(html:root) .shortcutLink:hover > svg { transform: translateX(3px); color: var(--text); }
-:global(html:root) .importShortcut { background: color-mix(in srgb, var(--text) 2%, transparent); border-color: var(--border); }
-:global(html:root) .importShortcut .shortcutIcon { background: var(--text); border-color: var(--text); color: var(--bg-base); }
-@container account-setup (max-width: 620px) {
-  :global(html:root) .shortcutGrid { grid-template-columns: minmax(0, 1fr); gap: .6rem; }
-  :global(html:root) .shortcutLink { padding: .85rem; gap: .7rem; }
-}
+:global(html:root) .shortcuts { padding: 0; border-radius: 12px; background: transparent; }
+:global(html:root) .shortcutSummary { display: flex; align-items: center; justify-content: space-between; gap: 1rem; min-height: 56px; padding: .75rem 1rem; box-sizing: border-box; list-style: none; cursor: pointer; color: var(--text-dim); font-size: .95rem; font-weight: 600; border-radius: inherit; }
+:global(html:root) .shortcutSummary::-webkit-details-marker { display: none; }
+:global(html:root) .shortcutSummary:hover { background: var(--accent-tint); color: var(--text); }
+:global(html:root) .shortcutSummary:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 3px; }
+:global(html:root) .shortcutSummary svg { width: 18px; height: 18px; flex-shrink: 0; }
+:global(html:root) .shortcuts[open] .shortcutSummary svg { transform: rotate(180deg); }
+:global(html:root) .shortcutGrid { padding: 0 1rem .5rem; }
+:global(html:root) .shortcutLink { display: flex; align-items: center; gap: 1rem; min-height: 44px; padding: .85rem 0; border-top: 1px solid var(--border-faint); color: var(--text); text-decoration: none; }
+:global(html:root) .shortcutLink:hover { color: var(--accent); }
+:global(html:root) .shortcutLink:hover strong { text-decoration: underline; text-underline-offset: 3px; }
+:global(html:root) .shortcutCopy { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: .2rem; }
+:global(html:root) .shortcutCopy strong { font-size: .9rem; font-weight: 600; line-height: 1.4; }
+:global(html:root) .shortcutCopy > span { color: var(--text-dim); font-size: .85rem; line-height: 1.5; }
+:global(html:root) .shortcutLink > svg { flex-shrink: 0; width: 18px; height: 18px; color: var(--text-dim); }
 @container studio-setup (max-width: 360px) {
   :global(html:root) .compactHeader { flex-wrap: wrap; gap: 0 .5rem; }
   :global(html:root) .compactHeader h2 { flex: 1; }
   :global(html:root) .stepLink { gap: .4rem; }
 }
 @media (max-width: 700px) {
-  :global(html:root) .card, :global(html:root) .shortcuts { padding: 1rem; border-radius: 12px; }
+  :global(html:root) .card { padding: 1rem; border-radius: 12px; }
   :global(html:root) .compactHeader { gap: .85rem; }
   :global(html:root) .compactHeader h2 { font-size: 1rem; }
   :global(html:root) .headingGroup { flex-direction: column; align-items: flex-start; }

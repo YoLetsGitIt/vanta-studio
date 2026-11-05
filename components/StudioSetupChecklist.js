@@ -23,24 +23,22 @@ function ArrowIcon() {
 
 export function StudioSetupLinks() {
   return (
-    <aside className={styles.shortcuts} aria-label="Studio setup shortcuts">
-      <div className={styles.shortcutHeader}>
-        <h2>Studio setup</h2>
-        <p>Set up your studio and bring your existing records across.</p>
-      </div>
+    <details className={styles.shortcuts}>
+      <summary className={styles.shortcutSummary}>
+        <span>Setup and imports</span>
+        <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="m6 8 4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+      </summary>
       <div className={styles.shortcutGrid}>
         <a className={styles.shortcutLink} href="/dashboard/home?setup=1#studio-setup" aria-labelledby="account-setup-checklist-title" aria-describedby="account-setup-checklist-description">
-          <span className={styles.shortcutIcon} aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="m4 7 1.5 1.5L8 6m3 1h9M4 12l1.5 1.5L8 11m3 1h9M4 17l1.5 1.5L8 16m3 1h9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg></span>
           <span className={styles.shortcutCopy}><strong id="account-setup-checklist-title">Setup checklist</strong><span id="account-setup-checklist-description">Review your studio, artists and booking setup.</span></span>
           <ArrowIcon />
         </a>
-        <a className={`${styles.shortcutLink} ${styles.importShortcut}`} href="/dashboard/import" aria-labelledby="account-import-title" aria-describedby="account-import-description">
-          <span className={styles.shortcutIcon} aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M12 3v11m-4-4 4 4 4-4M4 14v5a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg></span>
+        <a className={styles.shortcutLink} href="/dashboard/import" aria-labelledby="account-import-title" aria-describedby="account-import-description">
           <span className={styles.shortcutCopy}><strong id="account-import-title">Import data</strong><span id="account-import-description">Bring clients and appointments from Acuity, Jotform or a CSV.</span></span>
           <ArrowIcon />
         </a>
       </div>
-    </aside>
+    </details>
   );
 }
 
