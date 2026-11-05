@@ -160,8 +160,11 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
   const [artistId, setArtistId] = useState('');
   const [bookingDate, setBookingDate] = useState('');
   const [startTime, setStartTime] = useState('');
-  const [durationMins, setDurationMins] = useState(60);
+  const [durationMins, setDurationMins] = useState(0); // 0 until the studio picks one
   const [stationId, setStationId] = useState('');
+  // The schedule is pre-filled with the next free slot, so it only counts as done once the
+  // studio sets or changes something there (or picked the time by clicking the calendar).
+  const [scheduleTouched, setScheduleTouched] = useState(false);
 
   // ── Details
   const [size, setSize] = useState('');
@@ -196,6 +199,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
     setStartTime(initialSlot?.time || slot.time);
     setArtistId(initialSlot?.artistId || '');
     setStationId(initialSlot?.stationId || '');
+    setScheduleTouched(Boolean(initialSlot?.date && initialSlot?.time));
     setBookingType(null);
   }, [open, initialBookingType, initialSlot?.date, initialSlot?.time, initialSlot?.artistId, initialSlot?.stationId]);
 
@@ -280,11 +284,11 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
     if (!startTime) return null;
     const [sh, sm] = startTime.split(':').map(Number);
     const startMins = sh * 60 + sm;
-    const endMins = startMins + durationMins;
+    const endMins = startMins + (durationMins || 0);
     const [oh, om] = dayHours.open_time.split(':').map(Number);
     const [ch, cm] = dayHours.close_time.split(':').map(Number);
     if (startMins < oh * 60 + om) return `${t('nap_err_opens_at')} ${clockLabel(dayHours.open_time)} ${t('nap_err_too_early')}`;
-    if (endMins > ch * 60 + cm) return `${t('nap_err_ends_after')} (${clockLabel(dayHours.close_time)}).`;
+    if (durationMins && endMins > ch * 60 + cm) return `${t('nap_err_ends_after')} (${clockLabel(dayHours.close_time)}).`;
     return null;
   })();
 
@@ -321,6 +325,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
     : !appointmentType ? 'Choose tattoo or piercing.'
     : !artistId ? t('nap_err_artist')
     : !bookingDate || !startTime ? t('nap_err_datetime')
+    : !durationMins ? 'Choose how long the appointment is.'
     : !stationId ? 'Select an available station.'
     : '';
   const disabledReason = loadError || validationError || missingRequirement;
@@ -328,14 +333,14 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
     type: Boolean(bookingType),
     client: Boolean(clientName) && !emailInvalid && !phoneInvalid,
     appointment: Boolean(appointmentType && artistId) && !artistConflict,
-    schedule: Boolean(bookingDate && startTime && stationId) && !timeError && !dateInPast && !artistConflict,
+    schedule: scheduleTouched && Boolean(bookingDate && startTime && durationMins && stationId) && !timeError && !dateInPast && !artistConflict,
     payment: Boolean(depositMode) && !depositInvalid,
   };
   const canSubmit = !disabledReason;
-  const paymentVisible = Boolean(clientName && artistId && bookingDate && startTime && stationId && !timeError && !dateInPast && !artistConflict) && (bookingType !== 'walkin' || showOptional);
+  const paymentVisible = Boolean(clientName && artistId && bookingDate && startTime && durationMins && stationId && !timeError && !dateInPast && !artistConflict) && (bookingType !== 'walkin' || showOptional);
   const activeStep = ['type', 'client', 'appointment', 'schedule', ...(paymentVisible ? ['payment'] : [])].find(step => !sectionDone[step]) ?? null;
   const stepState = step => (step === activeStep ? 'active' : sectionDone[step] ? 'done' : 'upcoming');
-  const essentialsComplete = Boolean(clientName && artistId && bookingDate && startTime && stationId && !timeError && !dateInPast && !artistConflict);
+  const essentialsComplete = Boolean(clientName && artistId && bookingDate && startTime && durationMins && stationId && !timeError && !dateInPast && !artistConflict);
   // The station is picked automatically and the artist can come from the clicked slot, so
   // neither counts as an edit on its own.
   const dirty = Boolean(selectedClient || firstName || lastName || clientEmail || clientPhone || clientDob || (artistId && artistId !== (initialSlot?.artistId || '')) || appointmentType || size || retouch || finalPrice || depositAmount || depositMode || notes || bookingType);
@@ -362,8 +367,8 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
     const slot = nextAppointmentSlot();
     setBookingDate(slot.date);
     setStartTime(slot.time);
-    setDurationMins(60);
-    setStationId('');
+    setDurationMins(0);
+    setStationId(''); setScheduleTouched(false);
     setSize(''); setSizeUnit('cm'); setRetouch(false); setAppointmentType(null);
     setFinalPrice(''); setDepositAmount(''); setDepositMode(null); setShowOptional(false);
     setBookingType(null);
@@ -713,24 +718,25 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
                 <div className={styles.fieldRow}>
                   <div style={bd.field}>
                     <label htmlFor="new-appointment-date" style={bd.label}>{t('sched_date')}</label>
-                    <input style={bd.input} type="date" min={todayStr()} id="new-appointment-date" value={bookingDate} onChange={e => setBookingDate(e.target.value)} required />
+                    <input style={bd.input} type="date" min={todayStr()} id="new-appointment-date" value={bookingDate} onChange={e => { setBookingDate(e.target.value); setScheduleTouched(true); }} required />
                   </div>
                   <div style={bd.field}>
                     <span style={bd.label}>{t('nap_start_time')}</span>
-                    <TimeSelect value={startTime} onChange={setStartTime} label={t('nap_start_time')} />
+                    <TimeSelect value={startTime} onChange={value => { setStartTime(value); setScheduleTouched(true); }} label={t('nap_start_time')} />
                   </div>
                 </div>
                 <div className={styles.fieldRow}>
                   <div style={bd.field}>
                     <label htmlFor="new-appointment-duration" style={bd.label}>{t('bdp_duration')}</label>
-                    <select style={bd.select} id="new-appointment-duration" value={durationMins} onChange={e => setDurationMins(Number(e.target.value))}>
+                    <select style={bd.select} id="new-appointment-duration" value={durationMins || ''} required onChange={e => { setDurationMins(Number(e.target.value) || 0); setScheduleTouched(true); }}>
+                      <option value="" disabled>Select duration…</option>
                       {DURATION_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                     </select>
                   </div>
                   {bookingDate && startTime && allStations.length > 0 && (
                     <div style={bd.field}>
                       <label htmlFor="new-appointment-station" style={bd.label}>{t('bdp_station')}</label>
-                      <select id="new-appointment-station" disabled={!!timeError || stationsLoading} style={bd.select} value={stationId} onChange={e => setStationId(e.target.value)}>
+                      <select id="new-appointment-station" disabled={!!timeError || stationsLoading} style={bd.select} value={stationId} onChange={e => { setStationId(e.target.value); setScheduleTouched(true); }}>
                         <option value="">{stationsLoading ? t('nap_checking') : t('nap_no_station')}</option>
                         {(availableStations ?? allStations).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                       </select>
@@ -876,7 +882,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
                     !appointmentType ? null : isPiercing ? 'Piercing' : retouch ? 'Retouch' : 'Tattoo',
                     artists.find(artist => (artist.artistId ?? artist.artist_id ?? artist.id) === artistId)?.name,
                     chosenDateTime?.toLocaleString('en-AU', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }),
-                    `${durationMins} min`,
+                    durationMins ? `${durationMins} min` : null,
                     (availableStations ?? allStations).find(station => station.id === stationId)?.name,
                   ].filter(Boolean).join(' · ')}</span>
                 </div>

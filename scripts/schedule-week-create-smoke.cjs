@@ -58,6 +58,7 @@ const base = process.env.STUDIO_TEST_URL || 'http://127.0.0.1:3060';
    await panel.getByRole('group',{name:'Matching clients'}).getByRole('button').first().click();
    await panel.getByRole('radio',{name:'Studio appointment',exact:true}).click();
    await panel.getByRole('radio',{name:'Tattoo',exact:true}).click();
+   await panel.locator('#new-appointment-duration').selectOption('60');
    if(process.env.STUDIO_QA_OUTPUT)await page.screenshot({path:`${process.env.STUDIO_QA_OUTPUT}/prefilled-${width}.png`});
    await panel.getByRole('button',{name:'Create Appointment',exact:true}).click();
    await panel.waitFor({state:'hidden'});
