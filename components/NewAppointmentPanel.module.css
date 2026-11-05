@@ -154,13 +154,14 @@
 /* Form sections, one step at a time: the step to do now is bright with a soft outline;
    finished and upcoming steps fade back. Hover or focus brings a faded step up. */
 .section {
-  display: flex; flex-direction: column; gap: 0.85rem; min-width: 0;
-  padding: 1rem 1.1rem; border-radius: 14px;
+  display: flex; flex-direction: column; min-width: 0;
+  padding: 0; border-radius: 14px;
   background: var(--bg-panel); border: 1px solid var(--border);
   transition: opacity 260ms ease, background 220ms ease, border-color 220ms ease, box-shadow 260ms ease, transform 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
-.stepUpcoming { opacity: 0.42; }
-.stepDone { opacity: 0.6; background: transparent; border-color: var(--border-faint); }
+.stepUpcoming { opacity: 0.5; }
+.stepDone { opacity: 0.8; background: transparent; border-color: var(--border-faint); }
+.stepDone.open { opacity: 1; }
 .stepUpcoming:hover, .stepDone:hover { opacity: 0.85; }
 .stepUpcoming:focus-within, .stepDone:focus-within { opacity: 1; }
 .stepActive {
@@ -169,7 +170,29 @@
   animation: stepIn 320ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 @keyframes stepIn { from { transform: translateY(6px); } }
-.sectionHead { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; min-height: 20px; }
+.sectionHead {
+  display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;
+  width: 100%; min-height: 52px; box-sizing: border-box; padding: 0.85rem 1.1rem;
+  border: 0; background: none; color: inherit; font: inherit; text-align: left;
+}
+button.sectionHead { cursor: pointer; border-radius: 14px; }
+button.sectionHead:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+.sectionHeadText { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.sectionHeadEnd { display: flex; align-items: center; gap: 0.6rem; flex: none; }
+.sectionSummary {
+  font-size: 0.875rem; font-weight: 500; color: var(--text); line-height: 1.35;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  animation: summaryIn 220ms ease-out;
+}
+@keyframes summaryIn { from { opacity: 0; transform: translateY(-2px); } }
+.sectionEdit { font-size: 0.78rem; font-weight: 600; color: var(--text-muted); opacity: 0; transition: opacity 150ms; }
+button.sectionHead:hover .sectionEdit, button.sectionHead:focus-visible .sectionEdit, .open .sectionEdit { opacity: 1; }
+/* Opening and folding: the body grows from its heading. */
+.sectionBody { display: grid; grid-template-rows: 1fr; transition: grid-template-rows 280ms cubic-bezier(0.2, 0.8, 0.2, 1); }
+.folded .sectionBody { grid-template-rows: 0fr; }
+.sectionInner { min-height: 0; display: flex; flex-direction: column; gap: 0.85rem; padding: 0 1.1rem 1.1rem; }
+.folded .sectionInner { overflow: hidden; padding-bottom: 0; visibility: hidden; transition: visibility 0s 280ms, padding 280ms; }
+.open .sectionInner { transition: padding 280ms; }
 .sectionTitle {
   margin: 0; font-size: 0.75rem; font-weight: 600; color: var(--text-muted);
   text-transform: uppercase; letter-spacing: 0.06em; transition: color 200ms;
@@ -193,8 +216,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .section, .sectionTitle { transition: none; }
-  .stepActive, .doneTick, .tickPath, .readyButton { animation: none; }
+  .section, .sectionTitle, .sectionBody, .sectionInner, .sectionEdit { transition: none; }
+  .stepActive, .doneTick, .tickPath, .readyButton, .sectionSummary { animation: none; }
 }
 
 /* Choices (booking type, tattoo or piercing, deposit): separate options with a radio

@@ -54,9 +54,10 @@ const base = process.env.STUDIO_TEST_URL || 'http://127.0.0.1:3060';
    await week.focus(); await week.press('Home'); await week.evaluate(el=>{el.scrollTop=0;}); await week.press('ArrowUp');
    // Complete one booking and see it on the week without navigating away.
    await filter.selectOption('artist-1');await openSlot('2026-11-12',870);
+   // Steps open one at a time: booking type, then client, appointment, schedule.
+   await panel.getByRole('radio',{name:'Studio appointment',exact:true}).click();
    await panel.getByRole('searchbox',{name:'Search existing clients'}).fill('Alexandra');
    await panel.getByRole('group',{name:'Matching clients'}).getByRole('button').first().click();
-   await panel.getByRole('radio',{name:'Studio appointment',exact:true}).click();
    await panel.getByRole('radio',{name:'Tattoo',exact:true}).click();
    await panel.locator('#new-appointment-duration').selectOption('60');
    if(process.env.STUDIO_QA_OUTPUT)await page.screenshot({path:`${process.env.STUDIO_QA_OUTPUT}/prefilled-${width}.png`});
