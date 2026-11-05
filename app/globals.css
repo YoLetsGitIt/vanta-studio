@@ -453,3 +453,7 @@ textarea {
 
 /* Booking panel opened over any page (sidebar Needs action): only the panel and its backdrop take clicks. */
 .studio-global-panel-inner > * { pointer-events: auto; }
+
+/* Studio name + settings link at the bottom of the sidebar */
+@media (hover: hover) { .studio-sidebar-account:not([aria-current]):hover { background: var(--bg-row-hover); } }
+.studio-sidebar-account:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }

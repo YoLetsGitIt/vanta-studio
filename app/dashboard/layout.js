@@ -332,6 +332,7 @@ function DashboardShell({ children }) {
               aria-current={pathname.startsWith('/dashboard/settings') ? 'page' : undefined}
               aria-label={`${displayName} settings`}
               title={user?.email ? `${displayName} · ${user.email}` : displayName}
+              className="studio-sidebar-account"
               style={{
                 ...s.userRow,
                 ...(pathname.startsWith('/dashboard/settings') ? s.navActive : {}),
@@ -341,8 +342,10 @@ function DashboardShell({ children }) {
               {studioLogo
                 ? <img src={studioLogo} alt="" style={s.avatarImg} />
                 : <span style={s.avatar} aria-hidden="true">{displayName[0].toUpperCase()}</span>}
-              <span style={s.userName}>{displayName}</span>
-              <span style={s.gearIcon} aria-hidden="true"><GearIcon size={15} /></span>
+              <span style={s.userText}>
+                <span style={s.userName}>{displayName}</span>
+                <span style={s.userSub}>{t('settings')}</span>
+              </span>
             </Link>
           </div>
         </aside>
@@ -744,40 +747,37 @@ const s = {
     alignItems: 'center',
     gap: '0.6rem',
     margin: '0 0.75rem',
-    padding: '0.45rem 0.65rem',
-    borderRadius: 8,
+    padding: '0.5rem 0.6rem',
+    borderRadius: 10,
     textDecoration: 'none',
     transition: 'background 0.12s',
   },
   avatar: {
-    width: 22,
-    height: 22,
-    borderRadius: 6,
+    width: 32,
+    height: 32,
+    borderRadius: 8,
     background: 'var(--bg-chip)',
     border: '1px solid var(--border)',
     color: 'var(--text-dim)',
-    fontSize: '0.7rem',
+    fontSize: '0.8rem',
     fontWeight: 700,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
   },
-  avatarImg: { width: 22, height: 22, borderRadius: 6, objectFit: 'cover', flexShrink: 0, border: '1px solid var(--border)' },
+  avatarImg: { width: 32, height: 32, borderRadius: 8, objectFit: 'cover', flexShrink: 0, background: '#fff', border: '1px solid var(--border)' },
+  userText: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 },
   userName: {
-    flex: 1,
-    minWidth: 0,
     fontSize: '0.82rem',
     fontWeight: 600,
-    lineHeight: 1.3,
+    lineHeight: 1.25,
     color: 'var(--text)',
     overflow: 'hidden',
-    display: '-webkit-box',
-    WebkitLineClamp: 2,
-    WebkitBoxOrient: 'vertical',
-    overflowWrap: 'anywhere',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
   },
-  gearIcon: { display: 'flex', flexShrink: 0, color: 'var(--text-muted)' },
+  userSub: { fontSize: '0.72rem', lineHeight: 1.25, color: 'var(--text-muted)' },
   main: {
     position: 'relative', // Contain absolute descendants inside the dashboard scroller.
     minWidth: 0,
