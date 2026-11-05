@@ -433,7 +433,32 @@ export default function BookingDetailPanel({
     ? [offerDuration, currentOffer?.artist_name, currentOffer?.deposit_amount ? `$${Number(currentOffer.deposit_amount).toFixed(2)} deposit to confirm` : null].filter(Boolean).join(' · ')
     : [durationLabel, hasArtist(artistId) ? artistName : t('bdp_artist_unspecified'), stationName].filter(Boolean).join(' · ');
   const depositTone = depositConfirmedAt ? 'success' : depositPaid ? 'warning' : 'danger';
-  const hasTimeline = createdAt || (status === 'awaiting_payment' && (updatedAt || selectionTokenExpiresAt)) || (holdExpiresAt && canConfirm);
+  // What happened to this booking, oldest first, from the dates the booking keeps.
+  // A booking is confirmed when its deposit is confirmed, or without a deposit when the
+  // client picks a time. That pick isn't recorded, so then "Confirmed" has no date.
+  const firstName = clientName !== '—' ? clientName.split(' ')[0] : 'Client';
+  const ended = ['cancelled', 'rejected', 'declined', 'timed_out'].includes(rawStatus);
+  const timeline = [
+    createdAt && { at: createdAt, label: t('bdp_requested_at') },
+    currentOffer?.email_sent_at && { at: currentOffer.email_sent_at, label: 'Times offered' },
+    status === 'awaiting_payment' && updatedAt && { at: updatedAt, label: t('bdp_link_sent') },
+    clientSaysPaid?.recorded_at && { at: clientSaysPaid.recorded_at, label: `${firstName} says they paid the deposit` },
+    depositPaidAt && { at: depositPaidAt, label: `Deposit paid${depositPaidVia ? ` by ${depositPaidVia}` : ''}` },
+    depositConfirmedAt && { at: depositConfirmedAt, label: depositConfirmedAt === depositPaidAt ? 'Confirmed' : 'Deposit confirmed · booking confirmed' },
+    chosenTime && !ended && { at: chosenTime, label: 'Appointment' },
+    booking?.artist_outcome_recorded_at && { at: booking.artist_outcome_recorded_at, label: 'Artist recorded the session' },
+    outcomeAt && { at: outcomeAt, label: isNoShow ? 'Marked as no show' : 'Marked complete' },
+    ended && updatedAt && { at: updatedAt, label: statusLabel(rawStatus) },
+  ].filter(item => item && Number.isFinite(new Date(item.at).getTime()))
+    .sort((a, b) => new Date(a.at) - new Date(b.at));
+  const wasConfirmed = ['confirmed', 'completed'].includes(rawStatus) || (ended && Boolean(depositConfirmedAt));
+  if (wasConfirmed && !depositConfirmedAt) {
+    // Undated: goes just before the appointment, or at the end.
+    const at = timeline.findIndex(item => item.label === 'Appointment');
+    timeline.splice(at < 0 ? timeline.length : at, 0, { at: null, label: 'Confirmed' });
+  }
+  const now = Date.now();
+  const hasTimeline = timeline.length > 0 || (status === 'awaiting_payment' && selectionTokenExpiresAt) || (holdExpiresAt && canConfirm);
 
   return (
     <>
@@ -715,8 +740,19 @@ export default function BookingDetailPanel({
         {/* ── Timeline ── */}
         {hasTimeline && (
           <Section title="Timeline">
-            {createdAt && <Fact label={t('bdp_requested_at')}>{fmtDate(createdAt)}</Fact>}
-            {status === 'awaiting_payment' && updatedAt && <Fact label={t('bdp_link_sent')}>{fmtDate(updatedAt)}</Fact>}
+            <ol style={p.timeline}>
+              {timeline.map((item, i) => {
+                const future = item.at != null && new Date(item.at).getTime() > now;
+                return (
+                  <li key={`${item.label}-${i}`} style={p.timelineItem}>
+                    <span aria-hidden="true" style={{ ...p.timelineDot, ...(future ? p.timelineDotFuture : {}) }} />
+                    {i < timeline.length - 1 && <span aria-hidden="true" style={p.timelineLine} />}
+                    <span style={{ ...p.timelineLabel, color: future ? 'var(--text-muted)' : 'var(--text)' }}>{item.label}{future ? ' (upcoming)' : ''}</span>
+                    {item.at && <span style={p.timelineDate}>{fmtDate(item.at)}</span>}
+                  </li>
+                );
+              })}
+            </ol>
             {status === 'awaiting_payment' && selectionTokenExpiresAt && <Fact label={t('bdp_link_expires')}>{fmtDate(selectionTokenExpiresAt)}</Fact>}
             {holdExpiresAt && canConfirm && (
               <div style={p.holdBox}>
@@ -941,6 +977,13 @@ const p = {
   phoneBtn: { background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--color-info)', fontSize: '0.95rem', fontWeight: 600, fontFamily: 'inherit' },
   allergy: { background: 'var(--color-danger-surface)', border: '1px solid var(--color-danger-border)', borderRadius: 10, padding: '0.7rem 0.85rem' },
   allergyLabel: { fontSize: '0.85rem', fontWeight: 700, color: 'var(--color-danger)' },
+  timeline: { listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '0.85rem' },
+  timelineItem: { position: 'relative', paddingLeft: '1.4rem', display: 'flex', flexDirection: 'column', gap: '0.1rem' },
+  timelineDot: { position: 'absolute', left: 0, top: '0.35rem', width: 9, height: 9, borderRadius: '50%', background: 'var(--text-dim)' },
+  timelineDotFuture: { background: 'transparent', border: '1.5px solid var(--text-ghost)', boxSizing: 'border-box' },
+  timelineLine: { position: 'absolute', left: 4, top: '1.05rem', bottom: '-0.85rem', width: 1, background: 'var(--border-strong)' },
+  timelineLabel: { fontSize: '0.9rem', fontWeight: 600, lineHeight: 1.3 },
+  timelineDate: { fontSize: '0.8rem', color: 'var(--text-muted)' },
   holdBox: { background: 'var(--color-info-surface)', border: '1px solid var(--color-info-border)', borderRadius: 10, padding: '0.7rem 0.85rem', display: 'flex', flexDirection: 'column', gap: '0.2rem' },
   holdLabel: { fontSize: '0.85rem', fontWeight: 700, color: 'var(--color-info)' },
   actions: {
