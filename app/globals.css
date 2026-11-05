@@ -457,3 +457,7 @@ textarea {
 /* Studio name + settings link at the bottom of the sidebar */
 @media (hover: hover) { .studio-sidebar-account:not([aria-current]):hover { background: var(--bg-row-hover); } }
 .studio-sidebar-account:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+
+/* Artist filter in the schedule header, next to Today */
+.studio-schedule-filter-select { margin-right: 0.5rem; max-width: 200px; min-height: 32px; padding: 0.3rem 1.8rem 0.3rem 0.7rem; border: 1px solid var(--border-strong); border-radius: 8px; background-color: var(--bg-base); color: var(--text); font: inherit; font-size: 0.82rem; font-weight: 600; cursor: pointer; text-overflow: ellipsis; }
+.studio-schedule-filter-select:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }

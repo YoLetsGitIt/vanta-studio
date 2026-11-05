@@ -7,7 +7,8 @@ import { useState, useEffect } from 'react';
 import { getStudioArtists, getStudioSchedule, getStudioScheduleRange, getStudioBooking, createManualBooking, getStations, getStripeStatus } from '@/lib/api';
 import { BOOKING_SOURCES, getBookingStyle, TYPE_STYLE } from '@/lib/bookingType';
 import BookingDetailPanel from '@/components/BookingDetailPanel';
-import ScheduleWeekView from '@/components/ScheduleWeekView';
+import ScheduleWeekView, { useScheduleFilterSlot } from '@/components/ScheduleWeekView';
+import { createPortal } from 'react-dom';
 import weekStyles from '@/components/ScheduleWeekView.module.css';
 import ScheduleScrollFrame, { ScheduleControls } from '@/components/ScheduleScrollFrame';
 import { weekRangeLabel } from '@/lib/scheduleWeek.mjs';
@@ -702,6 +703,7 @@ function DayView({ date, showAll, setShowAll }) {
   const { t } = useLanguage();
   const hourPx = useHourPx();
   const gridH  = (DAY_END - DAY_START) * hourPx;
+  const filterSlot = useScheduleFilterSlot();
   const [artists,        setArtists]        = useState([]);
   const [entries,        setEntries]        = useState([]);
   const [loading,        setLoading]        = useState(true);
@@ -768,7 +770,6 @@ function DayView({ date, showAll, setShowAll }) {
     }));
   }
   const slotTime = minutes => { const at = new Date(date); at.setHours(Math.floor(minutes / 60), minutes % 60, 0, 0); return at.toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' }); };
-  const hiddenCount = sorted.length - working.length;
 
   if (loading) return <p style={s.msg}>{t('loading')}</p>;
   if (error)   return <p style={{ ...s.msg, color: '#e86f6f' }}>{error}</p>;
@@ -777,30 +778,13 @@ function DayView({ date, showAll, setShowAll }) {
   return (
     <div style={{ display: 'flex', flex: 1, overflow: 'hidden', position: 'relative' }}>
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
-      {/* Working-today toggle */}
-      <ScheduleControls>
-      <div className="studio-schedule-filter" style={s.dayFilter}>
-        {!showAll ? (
-          <>
-            <span style={s.dayFilterLabel}>
-              {working.length} {t('sched_artists_working')}
-            </span>
-            {hiddenCount > 0 && (
-              <button onClick={() => setShowAll(true)} style={s.dayFilterBtn}>
-                {t('sched_show_all')} {sorted.length}
-              </button>
-            )}
-          </>
-        ) : (
-          <>
-            <span style={s.dayFilterLabel}>{t('sched_all_artists')}</span>
-            <button onClick={() => setShowAll(false)} style={s.dayFilterBtn}>
-              {t('sched_working_today_only')}
-            </button>
-          </>
-        )}
-      </div>
-      </ScheduleControls>
+      {filterSlot && createPortal(
+        <select className="studio-schedule-filter-select" aria-label="Artists shown" value={showAll || !working.length ? 'all' : 'working'} onChange={e => setShowAll(e.target.value === 'all')}>
+          {working.length > 0 && <option value="working">{t('sched_working_today_only')} ({working.length})</option>}
+          <option value="all">{t('sched_all_artists')} ({sorted.length})</option>
+        </select>,
+        filterSlot,
+      )}
 
       {cols.length === 0 ? (
         <p style={s.msg}>{t('sched_no_artists_working')}</p>
@@ -834,11 +818,12 @@ function DayView({ date, showAll, setShowAll }) {
               {Array.from({ length: (DAY_END - DAY_START) * 2 }, (_, i) => {
                 const minutes = DAY_START * 60 + i * 30;
                 const label = `${t('new_appointment')} · ${artist.name} · ${slotTime(minutes)}`;
+                const covered = bookings.some(b => { const start = minutesFromMidnight(b.chosenTime); return start < minutes + 30 && start + (b.durationMins ?? 60) > minutes; });
                 return (
-                  <button key={minutes} type="button" className={weekStyles.addSlot} aria-label={label} title={label}
-                    style={{ top: i * 30 * (hourPx / 60), height: 30 * (hourPx / 60) }}
+                  <button key={minutes} type="button" className={`${weekStyles.addSlot} ${covered ? weekStyles.addSlotBeside : ''}`} aria-label={label}
+                    style={{ top: i * 30 * (hourPx / 60), height: 30 * (hourPx / 60), '--add-strip': '32px' }}
                     onClick={() => addBooking(artist.artistId, minutes)}>
-                    <span aria-hidden="true">＋ {slotTime(minutes)}</span>
+                    <span aria-hidden="true">{covered ? '＋' : `＋ ${slotTime(minutes)}`}</span>
                   </button>
                 );
               })}
@@ -1355,6 +1340,7 @@ export default function SchedulePage() {
         </div>
 
         <div className="studio-schedule-date-nav" style={s.nav}>
+          <div className="studio-schedule-filter-slot" style={{ display: 'contents' }} />
           <button onClick={goToday} disabled={isCurrentPeriod} style={{ ...s.todayBtn, ...(isCurrentPeriod ? s.todayBtnOff : {}) }} title={isCurrentPeriod ? `Showing this ${period}` : `Back to this ${period}`}>{t('today')}</button>
           <button aria-label={`Previous ${period}`} title={`Previous ${period}`} onClick={() => navigate(-1)} style={s.navBtn}><ChevronIcon dir="left" /></button>
           <span className="studio-schedule-date-label" style={s.navLabel} aria-live="polite">{headerLabel}</span>
@@ -1435,19 +1421,6 @@ const s = {
   msg: { padding: '2rem', fontSize: '0.875rem', color: 'var(--text-faint)' },
 
   // Day filter bar
-  dayFilter: {
-    display: 'flex', alignItems: 'center', gap: '0.75rem',
-    padding: '0.6rem 2rem',
-    borderBottom: '1px solid var(--border-faint)',
-    flexShrink: 0,
-  },
-  dayFilterLabel: { fontSize: '0.78rem', color: 'var(--text-faint)' },
-  dayFilterBtn: {
-    background: 'none', border: '1px solid var(--border)',
-    borderRadius: 6, color: 'var(--text-muted)',
-    fontSize: '0.75rem', fontWeight: 500, padding: '0.2rem 0.65rem', cursor: 'pointer',
-  },
-
   calWrap: { flex: 1, overflow: 'auto' },
 
   // ── Month view ─────────────────────────────────────────────────────────────

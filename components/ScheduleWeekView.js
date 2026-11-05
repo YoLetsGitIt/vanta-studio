@@ -9,15 +9,15 @@ import { hasArtist } from '@/lib/format';
 import { useLanguage } from '@/lib/i18n';
 import { calendarDayAfter, layoutDayLanes, localDateKey, weekHourRange, weekStartFor, weekSchedule } from '@/lib/scheduleWeek.mjs';
 import styles from './ScheduleWeekView.module.css';
-import { ScheduleControls } from './ScheduleScrollFrame';
 
-// A rotated phone: the schedule's one-row toolbar has a slot for the week filter.
+// Where the schedule's filter goes: the header next to "Today", or on a rotated phone the
+// one-row toolbar.
 const PHONE_LANDSCAPE = '(max-width: 1100px) and (max-height: 550px) and (orientation: landscape) and (any-pointer: coarse)';
-function useToolbarSlot() {
+export function useScheduleFilterSlot() {
   const [slot, setSlot] = useState(null);
   useEffect(() => {
     const query = window.matchMedia(PHONE_LANDSCAPE);
-    const update = () => setSlot(query.matches ? document.querySelector('.studio-calendar-toolbar-slot') : null);
+    const update = () => setSlot(document.querySelector(query.matches ? '.studio-calendar-toolbar-slot' : '.studio-schedule-filter-slot'));
     update();
     query.addEventListener('change', update);
     return () => query.removeEventListener('change', update);
@@ -40,7 +40,7 @@ export default function ScheduleWeekView({ date, lens, refreshKey, selectedBooki
   const [retry, setRetry] = useState(0);
   const [focusedSlot, setFocusedSlot] = useState(null);
   const scrollRef = useRef(null);
-  const toolbarSlot = useToolbarSlot();
+  const toolbarSlot = useScheduleFilterSlot();
 
   useEffect(() => { setFilter('all'); }, [lens]);
 
@@ -71,7 +71,6 @@ export default function ScheduleWeekView({ date, lens, refreshKey, selectedBooki
   }
   const activeFilter = filter === 'all' || options.has(filter) ? filter : 'all';
   const days = allDays.map(day => ({ ...day, bookings: day.bookings.filter(({ entry }) => activeFilter === 'all' || resourceId(entry, lens) === activeFilter) }));
-  const count = new Set(days.flatMap(day => day.bookings.map(({ entry }) => entry.bookingId))).size;
   const time = value => new Intl.DateTimeFormat(locale, { hour: 'numeric', minute: '2-digit' }).format(value);
   const hourLabel = hour => new Intl.DateTimeFormat(locale, { hour: 'numeric' }).format(new Date(2000, 0, 1, hour));
   const today = localDateKey(new Date());
@@ -124,7 +123,7 @@ export default function ScheduleWeekView({ date, lens, refreshKey, selectedBooki
   if (error) return <div className={styles.message} role="alert"><p>{error}</p><button type="button" className={styles.retry} onClick={() => { invalidatePrefix('schedule:'); setRetry(value => value + 1); }}>{t('sched_retry')}</button></div>;
 
   const filterSelect = (
-    <select aria-label={t('sched_week_filter')} value={activeFilter} onChange={event => setFilter(event.target.value)}>
+    <select className="studio-schedule-filter-select" aria-label={t('sched_week_filter')} value={activeFilter} onChange={event => setFilter(event.target.value)}>
       <option value="all">{t(lens === 'artist' ? 'sched_all_artists' : 'sched_all_stations')}</option>
       {[...options.entries()].sort((a, b) => String(a[1]).localeCompare(String(b[1]))).map(([id, name]) => <option key={id} value={id}>{name}</option>)}
     </select>
@@ -132,17 +131,7 @@ export default function ScheduleWeekView({ date, lens, refreshKey, selectedBooki
 
   return (
     <div className={styles.view}>
-      {toolbarSlot ? createPortal(filterSelect, toolbarSlot) : (
-        <ScheduleControls>
-          <div className={styles.summary}>
-            <div><span role="status">{t(count === 1 ? 'sched_week_one_booking' : 'sched_week_bookings', { count })}</span><p className={styles.addHint}>{t('sched_week_add_hint')}</p></div>
-            <label className={styles.filter}>
-              <span>{t(lens === 'artist' ? 'bdp_artist' : 'bdp_station')}</span>
-              {filterSelect}
-            </label>
-          </div>
-        </ScheduleControls>
-      )}
+      {toolbarSlot && createPortal(filterSelect, toolbarSlot)}
       <div ref={scrollRef} className={`studio-calendar-scroll ${styles.scroll}`} tabIndex={0} role="region" aria-label={t('sched_week_schedule')}>
         <div className={styles.days} style={{ '--hours': hours.length }}>
           <div className={styles.gutter} aria-hidden="true">
@@ -163,14 +152,17 @@ export default function ScheduleWeekView({ date, lens, refreshKey, selectedBooki
                   const minutes = startHour * 60 + index * 30;
                   const at = new Date(day.date); at.setHours(Math.floor(minutes / 60), minutes % 60, 0, 0);
                   const label = `${t('new_appointment')} · ${day.date.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' })} · ${time(at)}`;
-                  return <button key={minutes} type="button" className={styles.addSlot}
-                    data-booking-slot={`${day.key}-${minutes}`} aria-label={label} title={label}
+                  // Where a booking covers this half hour, only the strip beside it adds one.
+                  const slotEnd = at.getTime() + 30 * 60000;
+                  const covered = day.bookings.some(b => b.displayStart.getTime() < slotEnd && b.displayEnd.getTime() > at.getTime());
+                  return <button key={minutes} type="button" className={`${styles.addSlot} ${covered ? styles.addSlotBeside : ''}`}
+                    data-booking-slot={`${day.key}-${minutes}`} aria-label={label}
                     style={{ top: `${index * 30 / span * 100}%`, height: `${30 / span * 100}%` }}
                     tabIndex={minutes === (focusedSlot?.day === day.key ? focusedSlot.minutes : Math.max(startHour, 9) * 60) ? 0 : -1}
                     onFocus={() => setFocusedSlot({ day: day.key, minutes })}
                     onKeyDown={event => moveSlotFocus(event, dayIndex, minutes)}
                     onClick={() => addBooking(day, minutes)}>
-                    <span aria-hidden="true">＋ {time(at)}</span>
+                    <span aria-hidden="true">{covered ? '＋' : `＋ ${time(at)}`}</span>
                   </button>;
                 })}
                 {hours.map(hour => <div key={hour} className={styles.hourLine} style={{ top: `${(hour - startHour) / hours.length * 100}%` }} />)}

@@ -93,6 +93,7 @@
   .studio-schedule-date-nav { width: 100%; flex-wrap: wrap; gap: 6px !important; }
   .studio-schedule-date-label { min-width: 0 !important; flex: 1; font-size: 13px !important; }
   .studio-schedule-date-nav button { min-width: 44px; }
+  .studio-schedule-date-nav .studio-schedule-filter-select { flex: 1 0 100%; max-width: none; margin: 0; min-height: 44px; font-size: 16px; }
   .studio-schedule-filter { padding: 8px 16px !important; flex-wrap: wrap; gap: 8px !important; }
   .studio-schedule-page { min-height: 320px; }
   .studio-report-controls { width: 100%; }

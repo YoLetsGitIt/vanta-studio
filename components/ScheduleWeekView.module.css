@@ -23,7 +23,7 @@
 .hourLine { position: absolute; left: 0; right: 0; border-top: 1px solid var(--border-faint); pointer-events: none; }
 .nowLine { position: absolute; left: 0; right: 0; z-index: 1; border-top: 2px solid var(--color-danger, #e5484d); pointer-events: none; }
 .nowLine::before { content: ''; position: absolute; left: -4px; top: -5px; width: 8px; height: 8px; border-radius: 50%; background: var(--color-danger, #e5484d); }
-.booking { position: absolute; z-index: 1; min-height: 22px; min-width: 0; display: flex; flex-direction: column; gap: 2px; padding: 5px 7px; overflow: hidden; border: 1px solid var(--border); border-left: 3px solid var(--booking-color); border-radius: 7px; background: var(--bg-card); color: var(--text); text-align: left; font-family: inherit; cursor: pointer; transition: background 150ms, border-color 150ms; }
+.booking { position: absolute; z-index: 1; min-height: 22px; min-width: 0; display: flex; flex-direction: column; gap: 2px; padding: 5px 7px; overflow: hidden; border: 1px solid var(--border); border-left: 3px solid var(--booking-color); border-radius: 7px; background: linear-gradient(var(--bg-card), var(--bg-card)), var(--bg-base); color: var(--text); text-align: left; font-family: inherit; cursor: pointer; transition: background 150ms, border-color 150ms; }
 .booking:hover { z-index: 3; background: var(--bg-row-hover); border-top-color: var(--border-strong); border-right-color: var(--border-strong); border-bottom-color: var(--border-strong); }
 .booking:focus-visible, .dayHeading:focus-visible, .scroll:focus-visible, .filter select:focus-visible, .retry:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
 .selected { z-index: 3; box-shadow: 0 0 0 2px var(--accent); }
@@ -83,3 +83,4 @@
 
 /* Space to the right of bookings, so a busy day still has room to click and add one. */
 .column { --add-strip: 28px; }
+.addSlotBeside { left: calc(100% - var(--add-strip)); width: var(--add-strip); padding: 0; text-align: center; }
