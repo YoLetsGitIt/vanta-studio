@@ -5,7 +5,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { getDashboardAttention } from '@/lib/api';
+import { getDashboardAttention, getDepositStatus } from '@/lib/api';
 import { openBookingPanel, ATTENTION_CHANGED_EVENT } from '@/components/GlobalBookingPanel';
 import { normalizeBookingSource } from '@/lib/bookingType';
 import styles from './SidebarNeedsAction.module.css';
@@ -35,11 +35,13 @@ function when(b) {
 
 const shortDate = t => new Date(t).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
 
-// Deposit links last 7 days unless the studio picked otherwise, so the send date is
-// estimated from the link's expiry.
+// Bookings don't record when a link was sent. Links usually last 7 days, so the send date
+// is estimated from the expiry; it is wrong when the studio picked 24, 48 or 72 hours.
 const LINK_DAYS = 7;
 function depositSent(b) {
-  if (!b.selection_token_expires_at) return 'Deposit link not sent';
+  // Deposits asked for when booking a time don't use a link with an expiry, so there's
+  // nothing to go on.
+  if (!b.selection_token_expires_at) return null;
   const sent = new Date(b.selection_token_expires_at).getTime() - LINK_DAYS * 86400000;
   if (!Number.isFinite(sent) || sent > Date.now()) return 'Deposit link sent';
   const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -58,7 +60,13 @@ export default function SidebarNeedsAction({ paymentRecording, onNavigate }) {
 
   useEffect(() => {
     let live = true;
-    const load = () => getDashboardAttention().then(d => { if (live) setData(d); }).catch(() => {});
+    // Clients who paid by PayID / bank say so on a separate record, so look those up
+    // for each unpaid deposit.
+    const load = () => getDashboardAttention().then(async d => {
+      const unpaid = (d.bookings ?? []).filter(needsDeposit);
+      const found = await Promise.all(unpaid.map(b => getDepositStatus(b.id).then(r => [b.id, r.client_claim]).catch(() => [b.id, null])));
+      if (live) setData({ ...d, claims: Object.fromEntries(found.filter(([, c]) => c)) });
+    }).catch(() => {});
     load();
     // Refresh when the studio comes back to the tab or changes something.
     const events = ['focus', 'booking-deposit-cancelled', 'booking-deposit-received', ATTENTION_CHANGED_EVENT];
@@ -69,11 +77,13 @@ export default function SidebarNeedsAction({ paymentRecording, onNavigate }) {
   if (!data) return null;
   const bookings = data.bookings ?? [];
   const now = Date.now();
+  const claims = data.claims ?? {};
   const recordsOutcomes = paymentRecording && paymentRecording !== 'none' && paymentRecording !== 'artist_only';
   const groups = [
     { key: 'pending', title: 'Pending requests', tone: 'warning', items: bookings.filter(b => b.status === 'pending').map(b => bookingItem(b, [when(b)])) },
     { key: 'confirm', title: 'To confirm', tone: 'info', items: bookings.filter(b => b.status === 'requires_confirmation').map(b => bookingItem(b, [when(b)])) },
-    { key: 'deposit', title: 'Unpaid deposits', tone: 'danger', items: bookings.filter(needsDeposit).map(b => bookingItem(b, [depositSent(b), `Appointment: ${shortDate(b.chosen_time)}`])) },
+    { key: 'check', title: 'Deposits to check', tone: 'info', items: bookings.filter(b => needsDeposit(b) && claims[b.id]).map(b => bookingItem(b, [`Says paid by ${claims[b.id].method === 'payid' ? 'PayID' : 'bank transfer'}${claims[b.id].recorded_at ? ` · ${shortDate(claims[b.id].recorded_at)}` : ''}`, `Appointment: ${shortDate(b.chosen_time)}`])) },
+    { key: 'deposit', title: 'Unpaid deposits', tone: 'danger', items: bookings.filter(b => needsDeposit(b) && !claims[b.id]).map(b => bookingItem(b, [depositSent(b), `Appointment: ${shortDate(b.chosen_time)}`].filter(Boolean))) },
     { key: 'overdue', title: 'Past sessions to finish', tone: 'warning', items: recordsOutcomes ? bookings.filter(b => isOverdue(b, now)).sort((a, b) => new Date(a.chosen_time) - new Date(b.chosen_time)).map(b => bookingItem(b, [`${b.artist_name ?? 'No artist'} · ${shortDate(b.chosen_time)}`])) : [] },
     { key: 'artists', title: 'Artist requests', tone: 'info', items: (data.pending_artists ?? []).map(a => ({ id: a.id, title: a.name ?? 'Artist', lines: [a.email || 'Wants to join'], href: '/dashboard/artists' })) },
     { key: 'reimburse', title: 'Reimbursements', tone: 'warning', items: (data.pending_reimbursements ?? []).map(r => ({ id: r.id, title: r.artist_name ?? 'Artist', lines: [`$${Number(r.amount ?? 0).toFixed(2)}${r.description ? ` · ${r.description}` : ''}`], href: '/dashboard/financial' })) },
