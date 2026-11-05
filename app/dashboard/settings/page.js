@@ -217,7 +217,7 @@ const SETTINGS_TABS = [
   { id: 'consent',  label: 'Consent form',     hint: 'Build the form clients sign' },
   { id: 'messages', label: 'Client messages',  hint: 'Emails, reminders and SMS' },
   { id: 'payments', label: 'Payments',         hint: 'Commission, Stripe and deposit options' },
-  { id: 'account',  label: 'Account',          hint: 'Billing, account details and preferences' },
+  { id: 'account',  label: 'Account',          hint: 'Account details, billing and preferences' },
 ];
 // Older links (setup checklist, tour, bookmarks) used a single Bookings tab.
 const LEGACY_TABS = { bookings: 'requests' };
@@ -1652,6 +1652,14 @@ export default function SettingsPage() {
 
         {tab === 'account' && <>
 
+        <section className={`settings-span-12 ${accountStyles.identity}`} aria-labelledby="account-details-heading">
+          <div className={accountStyles.identityCopy}>
+            <h2 id="account-details-heading">{t('account_details')}</h2>
+            <p><span>{t('signed_in_as')}</span> <span className={accountStyles.email}>{email}</span></p>
+          </div>
+          <button type="button" onClick={handleSignOut} className={accountStyles.signOut}>{t('sign_out')}</button>
+        </section>
+
         <section className="settings-span-12" style={s.card}>
           <h2 style={s.sectionTitle}>Billing</h2>
           {isBillingExempt ? <div>
@@ -1749,14 +1757,6 @@ export default function SettingsPage() {
             onCancel={() => setCancelModalOpen(false)}
           />
         )}
-
-        <section className={`settings-span-12 ${accountStyles.identity}`} aria-labelledby="account-details-heading">
-          <div className={accountStyles.identityCopy}>
-            <h2 id="account-details-heading">{t('account_details')}</h2>
-            <p><span>{t('signed_in_as')}</span> <span className={accountStyles.email}>{email}</span></p>
-          </div>
-          <button type="button" onClick={handleSignOut} className={accountStyles.signOut}>{t('sign_out')}</button>
-        </section>
 
         <div className="settings-span-12 settings-cell"><PushNotificationSettings /></div>
 
