@@ -1,0 +1,21 @@
+.identity { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem 1.6rem; border: 1px solid var(--border); border-radius: 14px; background: var(--bg-card); }
+.identityCopy { min-width: 0; }
+.identityCopy h2 { margin: 0 0 .3rem; font-size: .95rem; font-weight: 650; color: var(--text); }
+.identityCopy p { margin: 0; font-size: .875rem; line-height: 1.5; color: var(--text-muted); }
+.email { color: var(--text); overflow-wrap: anywhere; }
+.signOut { flex-shrink: 0; min-height: 44px; padding: .5rem .85rem; border: 1px solid var(--border-strong); border-radius: 8px; background: transparent; color: var(--text-dim); font: inherit; font-size: .85rem; cursor: pointer; }
+.signOut:hover { background: var(--bg-row-hover); color: var(--text); }
+.preferences { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(180px, 1fr); gap: 1.5rem; }
+.appearance { min-width: 0; max-width: 520px; }
+.preferenceTitle { display: block; margin: 0 0 .65rem; font-size: .9rem; font-weight: 600; color: var(--text); }
+.language { min-width: 0; padding-left: 1.5rem; border-left: 1px solid var(--border-faint); }
+.languageSelect { box-sizing: border-box; width: 100%; max-width: 280px; min-height: 44px; padding: .65rem .75rem; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--bg-input); color: var(--text); font: inherit; font-size: .9rem; cursor: pointer; }
+.signOut:focus-visible, .languageSelect:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 3px; }
+@media (max-width: 900px) {
+  .preferences { grid-template-columns: minmax(0, 1fr); gap: 1.25rem; }
+  .language { padding: 1.25rem 0 0; border-left: 0; border-top: 1px solid var(--border-faint); }
+  .appearance, .languageSelect { max-width: none; }
+}
+@media (max-width: 480px) {
+  .identity { align-items: flex-start; flex-direction: column; padding: 1rem; gap: .65rem; }
+}

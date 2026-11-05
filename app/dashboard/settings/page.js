@@ -24,6 +24,7 @@ import { getSupabase } from '@/lib/supabase';
 import { invalidate } from '@/lib/cache';
 import { getTheme, setTheme } from '@/lib/theme';
 import ThemePicker from '@/components/ThemePicker';
+import accountStyles from './AccountSettings.module.css';
 import { useLanguage, LANGUAGES } from '@/lib/i18n';
 import { requestConfirmation, showError, showFeedback } from '@/lib/feedback';
 
@@ -216,7 +217,7 @@ const SETTINGS_TABS = [
   { id: 'consent',  label: 'Consent form',     hint: 'Build the form clients sign' },
   { id: 'messages', label: 'Client messages',  hint: 'Emails, reminders and SMS' },
   { id: 'payments', label: 'Payments',         hint: 'Commission, Stripe and deposit options' },
-  { id: 'account',  label: 'Account',          hint: 'Billing, notifications, appearance and language' },
+  { id: 'account',  label: 'Account',          hint: 'Billing, account details and preferences' },
 ];
 // Older links (setup checklist, tour, bookmarks) used a single Bookings tab.
 const LEGACY_TABS = { bookings: 'requests' };
@@ -1749,46 +1750,29 @@ export default function SettingsPage() {
           />
         )}
 
+        <section className={`settings-span-12 ${accountStyles.identity}`} aria-labelledby="account-details-heading">
+          <div className={accountStyles.identityCopy}>
+            <h2 id="account-details-heading">{t('account_details')}</h2>
+            <p><span>{t('signed_in_as')}</span> <span className={accountStyles.email}>{email}</span></p>
+          </div>
+          <button type="button" onClick={handleSignOut} className={accountStyles.signOut}>{t('sign_out')}</button>
+        </section>
+
         <div className="settings-span-12 settings-cell"><PushNotificationSettings /></div>
 
-        <section className="settings-span-4" style={s.card}>
-          <h2 style={s.sectionTitle}>{t('account')}</h2>
-          <div style={s.field}>
-            <label htmlFor="studio-account-email" style={s.label}>Email</label>
-            <input id="studio-account-email" style={{ ...s.input, ...s.inputReadonly }} value={email} readOnly />
-          </div>
-          <button onClick={handleSignOut} style={s.signOutBtn}>{t('sign_out')}</button>
-        </section>
-
-        <section className="settings-span-4" style={s.card}>
-          <h2 style={s.sectionTitle}>{t('appearance')}</h2>
-          <ThemePicker value={theme} onChange={chooseTheme} />
-        </section>
-
-        <section className="settings-span-4" style={s.card}>
-          <h2 style={s.sectionTitle}>{t('language')}</h2>
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            {LANGUAGES.map(l => (
-              <button
-                key={l.id}
-                aria-pressed={lang === l.id}
-                onClick={() => switchLanguage(l.id)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: '0.75rem',
-                  minHeight: 48, padding: '0 0.25rem',
-                  background: 'transparent', border: 0, borderBottom: '1px solid var(--border-faint)',
-                  cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit',
-                }}
-              >
-                <span style={{ fontSize: '1.1rem' }}>{l.flag}</span>
-                <span style={{ fontSize: '0.95rem', fontWeight: lang === l.id ? 650 : 500, color: lang === l.id ? 'var(--text)' : 'var(--text-dim)' }}>
-                  {l.name}
-                </span>
-                {lang === l.id && (
-                  <span style={{ marginLeft: 'auto', fontSize: '0.8rem', fontWeight: 600, color: 'var(--accent)' }}>✓</span>
-                )}
-              </button>
-            ))}
+        <section className="settings-span-12" style={s.card} aria-labelledby="account-preferences-heading">
+          <h2 id="account-preferences-heading" style={s.sectionTitle}>{t('preferences')}</h2>
+          <div className={accountStyles.preferences}>
+            <div className={accountStyles.appearance}>
+              <h3 className={accountStyles.preferenceTitle}>{t('appearance')}</h3>
+              <ThemePicker value={theme} onChange={chooseTheme} />
+            </div>
+            <div className={accountStyles.language}>
+              <label htmlFor="account-language" className={accountStyles.preferenceTitle}>{t('language')}</label>
+              <select id="account-language" className={accountStyles.languageSelect} value={lang} onChange={event => switchLanguage(event.target.value)}>
+                {LANGUAGES.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+              </select>
+            </div>
           </div>
         </section>
 
@@ -1833,7 +1817,6 @@ const s = {
   field: { display: 'flex', flexDirection: 'column', gap: '0.4rem' },
   label: { fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-dim)' },
   input: { background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 8, padding: '0.7rem 0.95rem', fontSize: '0.95rem', color: 'var(--text)', outline: 'none', width: '100%', boxSizing: 'border-box' },
-  inputReadonly: { color: 'var(--text-faint)', cursor: 'default' },
   errorText: { fontSize: '0.875rem', color: 'var(--color-danger)', margin: 0 },
   saveBtn: { alignSelf: 'flex-start', marginTop: 'auto', background: 'var(--accent)', border: '1px solid var(--accent)', borderRadius: 9, padding: '0.65rem 1.4rem', fontSize: '0.925rem', fontWeight: 700, color: 'var(--accent-contrast)', cursor: 'pointer' },
   commissionGrid: { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '0.75rem' },
@@ -1945,7 +1928,6 @@ const s = {
   stripeStatusRow: { display: 'flex', alignItems: 'center', gap: '0.85rem', background: 'var(--bg-base)', border: '1px solid var(--border-faint)', borderRadius: 10, padding: '0.9rem 1rem' },
   stripeStatusDot: (active) => ({ width: 10, height: 10, borderRadius: '50%', flexShrink: 0, background: active ? 'var(--status-confirmed)' : 'var(--status-pending)' }),
   // Account
-  signOutBtn: { alignSelf: 'flex-start', background: 'var(--bg-chip)', border: '1px solid var(--border)', borderRadius: 6, padding: '0.4rem 1rem', fontSize: '0.82rem', color: 'var(--text-faint)', cursor: 'pointer' },
 
 };
 
