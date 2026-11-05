@@ -1,6 +1,5 @@
 'use client';
 
-import { MOBILE_MEDIA } from '@/lib/responsive';
 import { SCHEDULE_GO_TO_DATE, SCHEDULE_SHOWN_DATE } from '@/components/SidebarCalendar';
 
 import { useState, useEffect } from 'react';
@@ -1241,16 +1240,12 @@ const LANG_LOCALE = { en: 'en-AU', 'zh-Hans': 'zh-CN', ko: 'ko-KR' };
 export default function SchedulePage() {
   const { t, lang } = useLanguage();
   const locale = LANG_LOCALE[lang] ?? 'en-AU';
-  const [view,      setView]      = useState('week');  // 'month' | 'week' | 'day'; phones switch to day
+  const [view,      setView]      = useState('week');  // 'month' | 'week' | 'day'
   const [showAll, setShowAll] = useState(false);
   // The schedule always groups by artist. Station views (StationView, StationMonthView) are kept but not shown.
   const lens = 'artist';
   const [monthStart, setMonthStart] = useState(() => getMonthStart(new Date()));
   const [dayDate,    setDayDate]    = useState(() => new Date());
-
-  useEffect(() => {
-    if (window.matchMedia(MOBILE_MEDIA).matches) setView('day');
-  }, []);
 
   // The sidebar calendar opens a day here, from another page (?date=) or this one (event).
   useEffect(() => {
