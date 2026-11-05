@@ -70,3 +70,13 @@
   .booking { padding: 3px 6px; gap: 1px; }
   .compact .resource, .compact .status, .compact .pendingTag { display: none; }
 }
+
+.addHint { margin: 4px 0 0; font-size: 12px; color: var(--text-muted); }
+.addSlot { position: absolute; left: 0; width: 100%; min-height: 0; padding: 0 8px; border: 0; border-radius: 4px; background: transparent; color: var(--text-muted); text-align: left; font: inherit; font-size: 11px; cursor: pointer; }
+.addSlot > span { opacity: 0; }
+@media (hover: hover) { .addSlot:hover { background: var(--bg-row-hover); } .addSlot:hover > span { opacity: 1; } }
+.addSlot:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; background: var(--bg-row-hover); }
+.addSlot:focus-visible > span { opacity: 1; }
+
+/* Half-hour targets stay 44px tall on touch screens, including landscape. */
+@media (any-pointer: coarse) { .days { --hour-px: 88px; } }

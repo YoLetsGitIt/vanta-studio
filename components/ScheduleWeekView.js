@@ -38,6 +38,7 @@ export default function ScheduleWeekView({ date, lens, refreshKey, selectedBooki
   const [error, setError] = useState('');
   const [filter, setFilter] = useState('all');
   const [retry, setRetry] = useState(0);
+  const [focusedSlot, setFocusedSlot] = useState(null);
   const scrollRef = useRef(null);
   const toolbarSlot = useToolbarSlot();
 
@@ -90,6 +91,35 @@ export default function ScheduleWeekView({ date, lens, refreshKey, selectedBooki
     scroller.scrollTop = (scrollHour - startHour) * (column.offsetHeight / (endHour - startHour));
   }, [loading, startKey, lens, scrollHour, startHour, endHour]);
 
+  function addBooking(day, minutes) {
+    const selectedResource = resources.find(resource => (lens === 'artist' ? resource.artistId ?? resource.id : resource.id) === activeFilter);
+    window.dispatchEvent(new CustomEvent('vanta:open-new-appointment', {
+      detail: {
+        bookingType: 'studio',
+        slot: {
+          date: day.key,
+          time: `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`,
+          ...(selectedResource ? { [lens === 'artist' ? 'artistId' : 'stationId']: activeFilter } : {}),
+        },
+      },
+    }));
+  }
+
+  function moveSlotFocus(event, dayIndex, minutes) {
+    let nextDay = dayIndex, nextMinutes = minutes;
+    if (event.key === 'ArrowDown') nextMinutes += 30;
+    else if (event.key === 'ArrowUp') nextMinutes -= 30;
+    else if (event.key === 'ArrowRight') nextDay += 1;
+    else if (event.key === 'ArrowLeft') nextDay -= 1;
+    else if (event.key === 'Home') nextMinutes = startHour * 60;
+    else if (event.key === 'End') nextMinutes = endHour * 60 - 30;
+    else return;
+    event.preventDefault();
+    nextDay = Math.max(0, Math.min(6, nextDay));
+    nextMinutes = Math.max(startHour * 60, Math.min(endHour * 60 - 30, nextMinutes));
+    scrollRef.current?.querySelector(`[data-booking-slot="${days[nextDay].key}-${nextMinutes}"]`)?.focus();
+  }
+
   if (loading) return <p className={styles.message} role="status">{t('loading')}</p>;
   if (error) return <div className={styles.message} role="alert"><p>{error}</p><button type="button" className={styles.retry} onClick={() => { invalidatePrefix('schedule:'); setRetry(value => value + 1); }}>{t('sched_retry')}</button></div>;
 
@@ -105,7 +135,7 @@ export default function ScheduleWeekView({ date, lens, refreshKey, selectedBooki
       {toolbarSlot ? createPortal(filterSelect, toolbarSlot) : (
         <ScheduleControls>
           <div className={styles.summary}>
-            <span role="status">{t(count === 1 ? 'sched_week_one_booking' : 'sched_week_bookings', { count })}</span>
+            <div><span role="status">{t(count === 1 ? 'sched_week_one_booking' : 'sched_week_bookings', { count })}</span><p className={styles.addHint}>{t('sched_week_add_hint')}</p></div>
             <label className={styles.filter}>
               <span>{t(lens === 'artist' ? 'bdp_artist' : 'bdp_station')}</span>
               {filterSelect}
@@ -121,7 +151,7 @@ export default function ScheduleWeekView({ date, lens, refreshKey, selectedBooki
               {hours.map(hour => <span key={hour} className={styles.hourLabel} style={{ top: `${(hour - startHour) / hours.length * 100}%` }}>{hour === startHour ? '' : hourLabel(hour)}</span>)}
             </div>
           </div>
-          {days.map(day => (
+          {days.map((day, dayIndex) => (
             <section key={day.key} className={`${styles.day} ${day.key === today ? styles.today : ''}`} aria-label={day.date.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' })}>
               <button type="button" className={styles.dayHeading} onClick={() => onDayClick(day.date)} aria-current={day.key === today ? 'date' : undefined}>
                 <span className={styles.dayName}>{day.date.toLocaleDateString(locale, { weekday: 'short' })}</span>
@@ -129,6 +159,20 @@ export default function ScheduleWeekView({ date, lens, refreshKey, selectedBooki
                 <span className={styles.dayCount} data-empty={day.bookings.length === 0 || undefined}>{day.bookings.length}</span>
               </button>
               <div className={styles.column}>
+                {Array.from({ length: span / 30 }, (_, index) => {
+                  const minutes = startHour * 60 + index * 30;
+                  const at = new Date(day.date); at.setHours(Math.floor(minutes / 60), minutes % 60, 0, 0);
+                  const label = `${t('new_appointment')} · ${day.date.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' })} · ${time(at)}`;
+                  return <button key={minutes} type="button" className={styles.addSlot}
+                    data-booking-slot={`${day.key}-${minutes}`} aria-label={label} title={label}
+                    style={{ top: `${index * 30 / span * 100}%`, height: `${30 / span * 100}%` }}
+                    tabIndex={minutes === (focusedSlot?.day === day.key ? focusedSlot.minutes : Math.max(startHour, 9) * 60) ? 0 : -1}
+                    onFocus={() => setFocusedSlot({ day: day.key, minutes })}
+                    onKeyDown={event => moveSlotFocus(event, dayIndex, minutes)}
+                    onClick={() => addBooking(day, minutes)}>
+                    <span aria-hidden="true">＋ {time(at)}</span>
+                  </button>;
+                })}
                 {hours.map(hour => <div key={hour} className={styles.hourLine} style={{ top: `${(hour - startHour) / hours.length * 100}%` }} />)}
                 {day.key === today && now >= day.date && <div className={styles.nowLine} style={{ top: `${offset(day, now)}%` }} aria-hidden="true" />}
                 {layoutDayLanes(day.bookings).map(booking => {

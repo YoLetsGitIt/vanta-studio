@@ -136,6 +136,7 @@ function DashboardShell({ children }) {
   const [ready, setReady] = useState(false);
   const [appointmentPanelOpen, setAppointmentPanelOpen] = useState(false);
   const [appointmentType, setAppointmentType] = useState('walkin');
+  const [appointmentSlot, setAppointmentSlot] = useState(null);
   const [tourStep, setTourStep] = useState(null);
   const [moreOpen, setMoreOpen] = useState(false);
   const [fullNavigation, setFullNavigation] = useState(false);
@@ -166,6 +167,7 @@ function DashboardShell({ children }) {
   useEffect(() => {
     function openAppointment(event) {
       setAppointmentType(event.detail?.bookingType ?? 'walkin');
+      setAppointmentSlot(event.detail?.slot ?? null);
       setAppointmentPanelOpen(true);
     }
     window.addEventListener('vanta:open-new-appointment', openAppointment);
@@ -268,7 +270,7 @@ function DashboardShell({ children }) {
         <Link href="/dashboard/home" aria-label="Vanta Studio home" style={s.logo}>
           <span style={s.logoMark}>vanta</span><span style={s.logoSub}>studio</span>
         </Link>
-        <button type="button" className="studio-button studio-button--sm" onClick={() => { setAppointmentType('walkin'); setAppointmentPanelOpen(true); }}>
+        <button type="button" className="studio-button studio-button--sm" onClick={() => { setAppointmentType('walkin'); setAppointmentSlot(null); setAppointmentPanelOpen(true); }}>
           <PlusIcon />{t('new_appointment')}
         </button>
       </header>
@@ -281,7 +283,7 @@ function DashboardShell({ children }) {
               <span style={s.logoSub}>studio</span>
             </Link>
 
-            <button onClick={() => { setAppointmentType('walkin'); setAppointmentPanelOpen(true); }} style={s.newApptBtn}>
+            <button onClick={() => { setAppointmentType('walkin'); setAppointmentSlot(null); setAppointmentPanelOpen(true); }} style={s.newApptBtn}>
               <PlusIcon size={13} />
               {t('new_appointment')}
             </button>
@@ -359,6 +361,7 @@ function DashboardShell({ children }) {
       <NewAppointmentPanel
         open={appointmentPanelOpen}
         initialBookingType={appointmentType}
+        initialSlot={appointmentSlot}
         onClose={() => setAppointmentPanelOpen(false)}
         onCreated={() => {}}
       />

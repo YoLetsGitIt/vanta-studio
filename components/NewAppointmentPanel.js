@@ -108,7 +108,7 @@ function TimeSelect({ value, onChange, label }) {
   );
 }
 
-export default function NewAppointmentPanel({ open, onClose, onCreated, initialBookingType = 'personal' }) {
+export default function NewAppointmentPanel({ open, onClose, onCreated, initialBookingType = 'personal', initialSlot = null }) {
   const { t } = useLanguage();
   const router = useRouter();
   const panelRef = useRef(null);
@@ -165,10 +165,12 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
   useEffect(() => {
     if (!open) return;
     const slot = nextAppointmentSlot();
-    setBookingDate(slot.date);
-    setStartTime(slot.time);
+    setBookingDate(initialSlot?.date || slot.date);
+    setStartTime(initialSlot?.time || slot.time);
+    setArtistId(initialSlot?.artistId || '');
+    setStationId(initialSlot?.stationId || '');
     setBookingType(initialBookingType);
-  }, [open, initialBookingType]);
+  }, [open, initialBookingType, initialSlot?.date, initialSlot?.time, initialSlot?.artistId, initialSlot?.stationId]);
 
   // Clear a saved validation/API error once the user changes the fields that
   // produced it. Current validationError remains derived and updates instantly.
@@ -687,7 +689,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
                     </div>
                   )}
                 </div>
-                {stationId && <p style={bd.hint}>First available station selected. Change it if needed.</p>}
+                {stationId && <p style={bd.hint}>Check the station and change it if needed.</p>}
                 {availableStations !== null && availableStations.length === 0 && <p style={bd.inlineError}>{t('nap_no_stations_date')}</p>}
                 {stationAvailabilityError && <p role="alert" style={bd.inlineError}>Live station availability could not be checked. The booking will be verified when you create it.</p>}
                 {timeError ? (
