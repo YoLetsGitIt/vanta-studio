@@ -284,10 +284,15 @@ function DashboardShell({ children }) {
               <span style={s.logoMark}>vanta</span>
               <span style={s.logoSub}>studio</span>
             </Link>
-
-            <button onClick={() => { setAppointmentType('walkin'); setAppointmentSlot(null); setAppointmentPanelOpen(true); }} style={s.newApptBtn}>
-              <PlusIcon size={13} />
-              {t('new_appointment')}
+            <button
+              type="button"
+              onClick={() => { setAppointmentType('walkin'); setAppointmentSlot(null); setAppointmentPanelOpen(true); }}
+              style={s.newApptBtn}
+              aria-label={t('new_appointment')}
+              title={t('new_appointment')}
+            >
+              <PlusIcon size={12} />
+              New
             </button>
           </div>
 
@@ -652,14 +657,15 @@ const s = {
   },
   sidebarTop: {
     display: 'flex',
-    flexDirection: 'column',
-    gap: '1.25rem',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: '0.5rem',
+    padding: '0 0.75rem 0 1.25rem',
   },
   logo: {
     display: 'flex',
     alignItems: 'baseline',
     gap: '0.35rem',
-    padding: '0 1.25rem',
   },
   logoMark: {
     fontSize: '1.25rem',
@@ -677,9 +683,9 @@ const s = {
   newApptBtn: {
     display: 'flex',
     alignItems: 'center',
-    gap: '0.5rem',
-    margin: '0 0.75rem',
-    padding: '0.6rem 0.85rem',
+    gap: '0.3rem',
+    flexShrink: 0,
+    padding: '0.4rem 0.7rem',
     background: 'var(--accent)',
     border: 'none',
     borderRadius: 8,

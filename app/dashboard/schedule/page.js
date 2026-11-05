@@ -1312,24 +1312,27 @@ export default function SchedulePage() {
         <button type="button" className="studio-calendar-add" aria-label={t('new_appointment')} title={t('new_appointment')} onClick={() => window.dispatchEvent(new CustomEvent('vanta:open-new-appointment', { detail: { bookingType: 'walkin' } }))}>＋</button>
       </div>
       <div className="studio-feature-header" style={s.header}>
-        <div className="studio-schedule-toggles" style={s.headerLeft}>
-          <h1 style={s.title}>{t('nav_schedule')}</h1>
-          <div style={s.viewToggle}>
+        <h1 className="sr-only">{t('nav_schedule')}</h1>
+        <div className="studio-schedule-date-nav" style={s.nav}>
+          <button onClick={goToday} style={{ ...s.todayBtn, ...(isCurrentPeriod ? s.todayBtnCurrent : {}) }}>{t('today')}</button>
+          <span style={s.arrows}>
+            <button aria-label={`Previous ${period}`} onClick={() => navigate(-1)} style={s.navBtn}>‹</button>
+            <button aria-label={`Next ${period}`} onClick={() => navigate(1)} style={s.navBtn}>›</button>
+          </span>
+          <span className="studio-schedule-date-label" style={s.navLabel} aria-live="polite">{periodLabel}</span>
+        </div>
+
+        <div className="studio-schedule-toggles" style={s.headerRight}>
+          <div style={s.viewToggle} role="group" aria-label="Calendar view">
             <button aria-pressed={view === 'month'} onClick={() => changeView('month')} style={{ ...s.toggleBtn, ...(view === 'month' ? s.toggleActive : {}) }}>{t('sched_month')}</button>
             <button aria-pressed={view === 'week'} onClick={() => changeView('week')} style={{ ...s.toggleBtn, ...(view === 'week' ? s.toggleActive : {}) }}>{t('sched_week')}</button>
             <button aria-pressed={view === 'day'} onClick={() => changeView('day')}   style={{ ...s.toggleBtn, ...(view === 'day'   ? s.toggleActive : {}) }}>{t('sched_day')}</button>
           </div>
-          <div style={{ ...s.viewToggle, marginLeft: '0.25rem' }}>
+          <span style={s.toggleDivider} aria-hidden="true" />
+          <div style={s.viewToggle} role="group" aria-label="Group by">
             <button aria-pressed={lens === 'artist'} onClick={() => setLens('artist')}  style={{ ...s.toggleBtn, ...(lens === 'artist'  ? s.toggleActive : {}) }}>{t('bdp_artist')}</button>
             <button aria-pressed={lens === 'station'} onClick={() => setLens('station')} style={{ ...s.toggleBtn, ...(lens === 'station' ? s.toggleActive : {}) }}>{t('bdp_station')}</button>
           </div>
-        </div>
-
-        <div className="studio-schedule-date-nav" style={s.nav}>
-          <button aria-label={`Previous ${period}`} onClick={() => navigate(-1)} style={s.navBtn}>←</button>
-          <span className="studio-schedule-date-label" style={s.navLabel} aria-live="polite">{periodLabel}</span>
-          <button aria-label={`Next ${period}`} onClick={() => navigate(1)} style={s.navBtn}>→</button>
-          {!isCurrentPeriod && <button onClick={goToday} style={s.todayBtn}>{t('today')}</button>}
         </div>
       </div>
 
@@ -1348,7 +1351,7 @@ export default function SchedulePage() {
 const s = {
   page: { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' },
   header: {
-    padding: '1.5rem 2rem 1rem',
+    padding: '1.1rem 2rem',
     borderBottom: '1px solid var(--border-faint)',
     display: 'flex',
     alignItems: 'center',
@@ -1357,60 +1360,59 @@ const s = {
     flexWrap: 'wrap',
     flexShrink: 0,
   },
-  headerLeft: { display: 'flex', alignItems: 'center', gap: '1rem' },
-  title: { fontSize: '1.5rem', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em', margin: 0 },
-  viewToggle: {
-    display: 'flex',
-    background: 'var(--bg-input)',
-    border: '1px solid var(--border)',
-    borderRadius: 10,
-    padding: 3,
-    gap: 2,
-  },
+  headerRight: { display: 'flex', alignItems: 'center', gap: '0.5rem' },
+  viewToggle: { display: 'flex', gap: 2 },
+  toggleDivider: { width: 1, height: 18, background: 'var(--border)', margin: '0 0.25rem' },
   toggleBtn: {
-    padding: '0.4rem 0.9rem',
+    padding: '0.38rem 0.75rem',
     borderRadius: 7,
     border: 'none',
     background: 'transparent',
-    color: 'var(--text-dim)',
-    fontSize: '0.875rem',
-    fontWeight: 600,
+    color: 'var(--text-muted)',
+    fontSize: '0.85rem',
+    fontWeight: 500,
     cursor: 'pointer',
   },
   toggleActive: {
-    background: 'var(--accent)',
-    color: 'var(--accent-contrast)',
-    fontWeight: 700,
-  },
-  nav: { display: 'flex', alignItems: 'center', gap: '0.5rem' },
-  navBtn: {
     background: 'var(--bg-chip)',
-    border: '1px solid var(--border)',
-    borderRadius: 8,
     color: 'var(--text)',
-    fontSize: '1rem',
-    padding: '0.4rem 0.75rem',
-    cursor: 'pointer',
+    fontWeight: 600,
+    boxShadow: 'inset 0 0 0 1px var(--border)',
+  },
+  nav: { display: 'flex', alignItems: 'center', gap: '0.75rem', minWidth: 0 },
+  arrows: { display: 'flex', gap: 2 },
+  navBtn: {
+    width: 32,
+    height: 32,
+    background: 'transparent',
+    border: 'none',
+    borderRadius: 8,
+    color: 'var(--text-dim)',
+    fontSize: '1.3rem',
     lineHeight: 1,
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   navLabel: {
-    fontSize: '1rem',
+    fontSize: '1.3rem',
     fontWeight: 700,
     color: 'var(--text)',
-    minWidth: 200,
-    textAlign: 'center',
+    letterSpacing: '-0.015em',
+    whiteSpace: 'nowrap',
   },
   todayBtn: {
-    background: 'var(--color-info-surface)',
-    border: '1px solid var(--color-info-border)',
+    background: 'transparent',
+    border: '1px solid var(--border-strong)',
     borderRadius: 8,
-    color: 'var(--color-info)',
-    fontSize: '0.875rem',
-    fontWeight: 700,
-    padding: '0.4rem 0.9rem',
+    color: 'var(--text)',
+    fontSize: '0.85rem',
+    fontWeight: 600,
+    padding: '0.38rem 0.8rem',
     cursor: 'pointer',
-    marginLeft: '0.25rem',
   },
+  todayBtnCurrent: { color: 'var(--text-muted)', borderColor: 'var(--border)' },
   msg: { padding: '2rem', fontSize: '0.875rem', color: 'var(--text-faint)' },
 
   // Day filter bar
