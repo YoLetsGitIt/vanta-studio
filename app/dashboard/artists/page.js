@@ -1,6 +1,8 @@
 'use client';
 
 import ArtistCommissionCard from '@/components/ArtistCommissionCard';
+import InviteArtistsDialog from '@/components/InviteArtistsDialog';
+import DuplicateStudioBanner from '@/components/DuplicateStudioBanner';
 import Dialog from '@/components/ui/Dialog';
 
 import { useState, useEffect, useCallback, Suspense, useRef } from 'react';
@@ -52,6 +54,7 @@ function ArtistsInner() {
   const [artistGuideOpen, setArtistGuideOpen] = useState(false);
   const [studioName, setStudioName] = useState('Your studio');
   const [studioNameCopied, setStudioNameCopied] = useState(false);
+  const [inviteOpen, setInviteOpen] = useState(false);
 
   const load = useCallback(async (bust = false) => {
     if (bust) invalidatePrefix('artists:');
@@ -235,6 +238,8 @@ function ArtistsInner() {
             {t(showPending ? 'artists_pending_desc' : 'artists_approved_desc')}
           </p>
         </div>
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+        <button type="button" onClick={() => setInviteOpen(true)} style={s.inviteBtn}>Invite artists</button>
         <button
           aria-pressed={showPending}
           onMouseDown={e => e.preventDefault()}
@@ -248,9 +253,12 @@ function ArtistsInner() {
             </>
           )}
         </button>
+        </div>
       </div>
+      {inviteOpen && <InviteArtistsDialog studioName={studioName} onClose={() => setInviteOpen(false)} />}
 
       <div className="studio-feature-body" style={s.body}>
+        {!showPending && <DuplicateStudioBanner studioName={studioName} onAccepted={() => load(true)} />}
         {loading && <p role="status" style={s.msg}>{t('loading')}</p>}
         {error && <p role="alert" style={{ ...s.msg, color: 'var(--color-danger)' }}>{error}</p>}
         {!loading && !error && artists.length === 0 && (
@@ -981,6 +989,18 @@ const s = {
     margin: 0,
   },
   subtitle: { fontSize: '0.95rem', color: 'var(--text-dim)', margin: 0 },
+  inviteBtn: {
+    padding: '0.55rem 1.1rem',
+    borderRadius: 20,
+    border: 'none',
+    background: 'var(--accent)',
+    color: 'var(--accent-contrast)',
+    fontSize: '0.9rem',
+    fontWeight: 700,
+    fontFamily: 'inherit',
+    cursor: 'pointer',
+    whiteSpace: 'nowrap',
+  },
   pendingBtn: {
     display: 'flex',
     alignItems: 'center',
