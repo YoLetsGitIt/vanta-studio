@@ -888,7 +888,7 @@ function Btn({ onClick, disabled, variant, children }) {
 const p = {
   ...detailStyles,
   panel: {
-    position: 'absolute', top: 0, right: 0, bottom: 0, width: 'min(420px, 100%)',
+    position: 'absolute', top: 0, right: 0, bottom: 0, width: 'min(clamp(480px, 40vw, 720px), 100%)',
     background: 'var(--bg-panel)', borderLeft: '1px solid var(--border)',
     display: 'flex', flexDirection: 'column', zIndex: 10,
   },
