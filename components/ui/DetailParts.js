@@ -13,7 +13,7 @@ export const detailStyles = {
     background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 14, padding: '1rem 1.1rem',
   },
   sectionHead: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem' },
-  sectionTitle: { margin: 0, fontSize: '1rem', fontWeight: 700, color: 'var(--text)' },
+  sectionTitle: { margin: 0, fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' },
   fact: { display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '1rem' },
   factControl: { alignItems: 'center', minHeight: 34 },
   factValueControl: { display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.5rem', flexWrap: 'wrap' },

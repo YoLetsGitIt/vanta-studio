@@ -16,7 +16,7 @@ import {
   getStudioHours, updateStudioHours,
   getStations, addStation, removeStation, setStationLastDay,
   setStationUnavailability, clearStationUnavailability,
-  listConsentTemplates, createConsentTemplate, updateConsentTemplate, deleteConsentTemplate,
+  listConsentTemplates, createConsentTemplate, updateConsentTemplate,
   getStripeStatus, startStripeOnboarding, disconnectStripe,
   getFormConfig, updateFormConfig,
   startBillingCheckout, getBillingDetails, cancelBillingSubscription, reactivateBillingSubscription, openBillingPortal, getBookingLink, updateBookingLink, checkBookingLink } from '@/lib/api';
@@ -25,7 +25,7 @@ import { invalidate } from '@/lib/cache';
 import { getTheme, setTheme } from '@/lib/theme';
 import ThemePicker from '@/components/ThemePicker';
 import { useLanguage, LANGUAGES } from '@/lib/i18n';
-import { requestConfirmation, showError } from '@/lib/feedback';
+import { requestConfirmation, showError, showFeedback } from '@/lib/feedback';
 
 import DownloadableQR from '@/components/DownloadableQR';
 import WalkInFormSettings from '@/components/WalkInFormSettings';
@@ -213,7 +213,7 @@ const SETTINGS_TABS = [
   { id: 'studio',   label: 'Studio',           hint: 'Profile, logo, opening hours and stations' },
   { id: 'requests', label: 'Booking requests', hint: 'Who confirms times, booking form, link and widget' },
   { id: 'walkins',  label: 'Walk-ins',         hint: 'Walk-in link, QR code and form fields' },
-  { id: 'consent',  label: 'Consent forms',    hint: 'Build the forms clients sign' },
+  { id: 'consent',  label: 'Consent form',     hint: 'Build the form clients sign' },
   { id: 'messages', label: 'Client messages',  hint: 'Emails, reminders and SMS' },
   { id: 'payments', label: 'Payments',         hint: 'Commission, Stripe and deposit options' },
   { id: 'account',  label: 'Account',          hint: 'Notifications, billing, appearance and language' },
@@ -287,7 +287,7 @@ export default function SettingsPage() {
       case 'studio': return name ? `${name} · profile, hours and stations` : SETTINGS_TABS[0].hint;
       case 'requests': return bookingManagement === 'studio' ? 'The studio confirms times · form, link and widget'
         : bookingManagement === 'artist' ? 'Artists confirm times · form, link and widget' : SETTINGS_TABS[1].hint;
-      case 'consent': return consentTemplates.length ? `${consentTemplates.length} consent form${consentTemplates.length === 1 ? '' : 's'}` : 'No consent forms yet';
+      case 'consent': return consentTemplates.length ? 'Set up' : 'Not set up yet';
       case 'payments': return stripeStatus?.charges_enabled ? 'Stripe connected · commission and deposits' : SETTINGS_TABS[5].hint;
       case 'account': return email ? `${email} · notifications and billing` : SETTINGS_TABS[6].hint;
       default: return SETTINGS_TABS.find(tb => tb.id === id)?.hint ?? '';
@@ -314,7 +314,6 @@ export default function SettingsPage() {
   // ── Consent templates ──────────────────────────────────────────────────────
   const [consentTemplates, setConsentTemplates] = useState([]);
   const [widgetConsentTemplateId, setWidgetConsentTemplateId] = useState('');
-  const [templateBuilderOpen, setTemplateBuilderOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState(null); // null = new
   const [templateName, setTemplateName] = useState('');
   const [templateRequiresSig, setTemplateRequiresSig] = useState(true);
@@ -559,24 +558,33 @@ export default function SettingsPage() {
 
   // ── Consent template helpers ──────────────────────────────────────────────
 
-  function openNewTemplate() {
-    setEditingTemplate(null);
-    setTemplateName('');
-    setTemplateRequiresSig(true);
-    setTemplateRequiresGuardian(false);
-    setTemplateFields([]);
+  // Studios have one consent form for now (the API allows more). It's the form used on
+  // the booking link, or else the first one; with none yet, saving creates it.
+  const consentForm = consentTemplates.find(x => x.id === widgetConsentTemplateId) ?? consentTemplates[0] ?? null;
+  const consentDraft = { name: templateName, requiresSig: templateRequiresSig, fields: templateFields };
+  const consentSaved = consentForm
+    ? { name: consentForm.name, requiresSig: consentForm.requires_signature, fields: consentForm.fields ?? [] }
+    : { name: 'Consent form', requiresSig: true, fields: [] };
+  const consentDirty = JSON.stringify(consentDraft) !== JSON.stringify(consentSaved);
+  const consentLoadedFor = useRef(undefined);
+  useEffect(() => {
+    if (loading) return;
+    const id = consentForm?.id ?? null;
+    if (consentLoadedFor.current === id) return;
+    consentLoadedFor.current = id;
+    setEditingTemplate(consentForm);
+    setTemplateName(consentSaved.name);
+    setTemplateRequiresSig(consentSaved.requiresSig);
+    setTemplateRequiresGuardian(consentForm?.requires_minor_guardian ?? false);
+    setTemplateFields(consentSaved.fields);
     setTemplateError('');
-    setTemplateBuilderOpen(true);
-  }
+  }, [loading, consentForm?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  function openEditTemplate(t) {
-    setEditingTemplate(t);
-    setTemplateName(t.name);
-    setTemplateRequiresSig(t.requires_signature);
-    setTemplateRequiresGuardian(t.requires_minor_guardian);
-    setTemplateFields(t.fields ?? []);
+  function resetConsentForm() {
+    setTemplateName(consentSaved.name);
+    setTemplateRequiresSig(consentSaved.requiresSig);
+    setTemplateFields(consentSaved.fields);
     setTemplateError('');
-    setTemplateBuilderOpen(true);
   }
 
   function addField(type) {
@@ -605,7 +613,7 @@ export default function SettingsPage() {
   }
 
   async function saveTemplate() {
-    if (!templateName.trim()) { setTemplateError('Template name is required.'); return; }
+    if (!templateName.trim()) { setTemplateError('Give the form a name.'); return; }
     setTemplateSaving(true);
     setTemplateError('');
     try {
@@ -615,28 +623,19 @@ export default function SettingsPage() {
         requires_minor_guardian: templateRequiresGuardian,
         fields: templateFields,
       };
-      if (editingTemplate) {
-        const updated = await updateConsentTemplate(editingTemplate.id, payload);
-        setConsentTemplates(prev => prev.map(t => t.id === editingTemplate.id ? updated : t));
+      if (consentForm) {
+        const updated = await updateConsentTemplate(consentForm.id, payload);
+        setConsentTemplates(prev => prev.map(t => t.id === consentForm.id ? updated : t));
       } else {
         const created = await createConsentTemplate(payload);
+        consentLoadedFor.current = created.id;
         setConsentTemplates(prev => [...prev, created]);
       }
-      setTemplateBuilderOpen(false);
+      showFeedback('Consent form saved.', 'success');
     } catch (e) {
       setTemplateError(e.message);
     } finally {
       setTemplateSaving(false);
-    }
-  }
-
-  async function handleDeleteTemplate(t) {
-    if (!await requestConfirmation({ title: `Delete “${t.name}”?`, message: 'This consent form will be permanently deleted.', confirmLabel: 'Delete form', danger: true })) return;
-    try {
-      await deleteConsentTemplate(t.id);
-      setConsentTemplates(prev => prev.filter(x => x.id !== t.id));
-    } catch (e) {
-      showError(e);
     }
   }
 
@@ -1429,65 +1428,8 @@ export default function SettingsPage() {
         </>}
 
         {tab === 'consent' && <>
-        <section className="settings-span-12" style={s.card}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
-            <div style={{ flex: '1 1 260px', minWidth: 0 }}>
-              <h2 style={s.sectionTitle}>{t('consent_forms')}</h2>
-              <p style={s.sectionDesc}>Create consent forms with custom fields, e-signatures, and minor / guardian support.</p>
-            </div>
-            <button type="button" onClick={openNewTemplate} style={{ ...s.addTemplateBtn, minHeight: 44, maxWidth: '100%' }}>Create consent form template</button>
-          </div>
-
-          {walkInUrl && (
-            <div className="studio-wrap-row" style={{ ...s.walkInCard, margin: '1rem 0' }}>
-              <div style={s.walkInLeft}>
-                <strong style={{ fontSize: '0.85rem', color: 'var(--text)' }}>Client consent QR code</strong>
-                <span style={s.sectionDesc}>Print or display this in your studio. Scanning it opens your consent form; clients create an account or sign in, then fill in and sign it.</span>
-                <span style={s.walkInUrl}>{consentUrl}</span>
-              </div>
-              <DownloadableQR value={consentUrl} filename="consent-qr" displaySize={112} />
-            </div>
-          )}
-
-          {consentTemplates.length === 0 && (
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-ghost)', fontStyle: 'italic' }}>No consent forms yet. Create a template to get started.</p>
-          )}
-
-          {consentTemplates.map(t => (
-            <div key={t.id} className="studio-wrap-row" style={s.templateRow}>
-              <div style={s.templateRowLeft}>
-                <span style={s.templateName}>{t.name}</span>
-                <span style={s.templateFieldCount}>{(t.fields ?? []).length} field{(t.fields ?? []).length !== 1 ? 's' : ''}</span>
-              </div>
-              <div style={s.templateRowActions}>
-                <button style={s.templateActionBtn} onClick={() => openEditTemplate(t)}>Edit</button>
-                <button
-                  style={{ ...s.templateActionBtn, color: '#e86f6f', opacity: consentTemplates.length <= 1 ? 0.35 : 1, cursor: consentTemplates.length <= 1 ? 'not-allowed' : 'pointer' }}
-                  onClick={() => handleDeleteTemplate(t)}
-                  disabled={consentTemplates.length <= 1}
-                  title={consentTemplates.length <= 1 ? 'At least one consent form is required' : undefined}
-                >Delete</button>
-              </div>
-            </div>
-          ))}
-        </section>
-
-        {/* ── Template builder modal ── */}
-        {templateBuilderOpen && (
-          <Dialog
-            title={editingTemplate ? 'Edit form' : 'New consent form'}
-            onClose={() => setTemplateBuilderOpen(false)}
-            dismissDisabled={templateSaving}
-            maxWidth={980}
-            className="studio-consent-editor"
-            footer={<>
-              <button style={s.cancelBtn} disabled={templateSaving} onClick={() => setTemplateBuilderOpen(false)}>Cancel</button>
-              <button style={{ ...s.saveBtn, flex: 2 }} onClick={saveTemplate} disabled={templateSaving}>
-                {templateSaving ? 'Saving…' : 'Save form'}
-              </button>
-            </>}
-          >
-
+        <section className="settings-span-12 studio-consent-editor" style={s.card} aria-label="Consent form editor">
+          <p style={{ ...s.sectionDesc, margin: 0 }}>Clients fill in and sign this before their appointment. The preview shows what they see.</p>
               <div className="studio-feature-grid studio-consent-editor-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', alignItems: 'start' }}>
                 {/* Left — editor */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -1567,9 +1509,29 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              {templateError && <p role="alert" style={{ fontSize: '0.8rem', color: 'var(--color-danger)', margin: 0 }}>{templateError}</p>}
+          {templateError && <p role="alert" style={{ fontSize: '0.8rem', color: 'var(--color-danger)', margin: 0 }}>{templateError}</p>}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.6rem', flexWrap: 'wrap', borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>
+            <span role="status" style={{ marginRight: 'auto', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+              {consentDirty ? 'Unsaved changes' : consentForm ? 'All changes saved' : 'Not saved yet'}
+            </span>
+            {consentDirty && consentForm && <button type="button" style={s.cancelBtn} disabled={templateSaving} onClick={resetConsentForm}>Discard</button>}
+            <button type="button" style={s.saveBtn} onClick={saveTemplate} disabled={templateSaving || (!consentDirty && !!consentForm)}>
+              {templateSaving ? 'Saving…' : consentForm ? 'Save form' : 'Create form'}
+            </button>
+          </div>
+        </section>
 
-          </Dialog>
+        {walkInUrl && (
+          <section className="settings-span-12" style={s.card} aria-labelledby="consent-qr-title">
+            <div className="studio-wrap-row" style={s.walkInCard}>
+              <div style={s.walkInLeft}>
+                <h2 id="consent-qr-title" style={s.sectionTitle}>Consent QR code</h2>
+                <span style={s.sectionDesc}>Print or display this in your studio. Scanning it opens your consent form; clients create an account or sign in, then fill in and sign it.</span>
+                <span style={s.walkInUrl}>{consentUrl}</span>
+              </div>
+              <DownloadableQR value={consentUrl} filename="consent-qr" displaySize={112} />
+            </div>
+          </section>
         )}
 
         </>}

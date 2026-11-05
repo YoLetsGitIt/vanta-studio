@@ -432,7 +432,6 @@ export default function BookingDetailPanel({
   const heroMeta = offeredTimes
     ? [offerDuration, currentOffer?.artist_name, currentOffer?.deposit_amount ? `$${Number(currentOffer.deposit_amount).toFixed(2)} deposit to confirm` : null].filter(Boolean).join(' · ')
     : [durationLabel, hasArtist(artistId) ? artistName : t('bdp_artist_unspecified'), stationName].filter(Boolean).join(' · ');
-  const showMoney = status === 'confirmed' || quote != null || depositRequired || depositPaid;
   const depositTone = depositConfirmedAt ? 'success' : depositPaid ? 'warning' : 'danger';
   const hasTimeline = createdAt || (status === 'awaiting_payment' && (updatedAt || selectionTokenExpiresAt)) || (holdExpiresAt && canConfirm);
 
@@ -443,6 +442,18 @@ export default function BookingDetailPanel({
       <div className="studio-bdp-header" style={p.header}>
         <div className="studio-bdp-headtext" style={p.headerText}>
           <span style={p.title}>{clientName}</span>
+          {(email || phone) && (
+            <div style={p.contact}>
+              {email && (
+                <button type="button" style={p.contactLink} title="Copy email"
+                  onClick={() => navigator.clipboard.writeText(email).then(() => showFeedback('Email copied.', 'success')).catch(showError)}>
+                  {email}
+                </button>
+              )}
+              {email && phone && <span aria-hidden="true" style={{ color: 'var(--text-ghost)' }}>·</span>}
+              {phone && <a href={`sms:${phone}`} style={p.contactLink} title="Send a text">{phone}</a>}
+            </div>
+          )}
           <div style={p.headerPills}>
             {status && <Pill colors={sc}>{statusLabel(displayStatus)}</Pill>}
             {source && <Pill>{getBookingSourceLabel(source)}</Pill>}
@@ -454,8 +465,8 @@ export default function BookingDetailPanel({
 
       <div className={`studio-bdp-body ${panelLayout.body}`} style={p.body}>
         {/* ── When / who summary ── */}
-        <div className="studio-bdp-hero" style={{ ...p.hero, background: sc.bg, borderColor: sc.border }}>
-          <span style={{ ...p.heroCaption, color: sc.text }}>{heroCaption}</span>
+        <div className="studio-bdp-hero" style={p.hero}>
+          <span style={p.heroCaption}>{heroCaption}</span>
           {offeredTimes ? (
             <ol aria-label="Offered times" style={{ margin: '0.25rem 0', padding: 0, listStyle: 'none', display: 'grid', gap: '0.35rem' }}>
               {offeredTimes.map((time, i) => (
@@ -484,6 +495,46 @@ export default function BookingDetailPanel({
           {cancelReason && <span style={p.heroNote}>{t('bdp_cancelled_reason')}: {cancelReason}</span>}
         </div>
 
+        {/* ── At a glance: price, deposit, consent ── */}
+        {(() => {
+          const money = n => `$${Number(n).toLocaleString('en-AU', { maximumFractionDigits: 2 })}`;
+          const price = showCompleted && finalPrice != null
+            ? { label: t('bdp_final_price'), value: money(finalPrice) }
+            : { label: t('bdp_quoted'), value: quote != null ? money(quote) : 'Not set', muted: quote == null };
+          const deposit = !depositRequired && !depositPaid ? { value: 'Not required', muted: true }
+            : depositConfirmedAt ? { value: depositAmount != null ? `${money(depositAmount)} paid` : 'Paid', tone: 'success' }
+            : depositPaid ? { value: t('bdp_deposit_unconfirmed'), tone: 'warning' }
+            : clientSaysPaid ? { value: 'Check payment', tone: 'warning', sub: `Says paid by ${clientSaysPaid.method === 'payid' ? 'PayID' : 'bank'}` }
+            : { value: depositAmount != null ? `${money(depositAmount)} unpaid` : 'Unpaid', tone: 'danger' };
+          const consentTile = !email ? null
+            : consentLoading || submissionsLoading ? { value: t('loading'), muted: true }
+            : { value: consentLabel, tone: consentStatus === 'current' ? 'success' : consentStatus === 'outdated' ? 'warning' : 'danger',
+                sub: consent ? `v${consent.consent_version} · ${new Date(consent.agreed_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}` : null,
+                action: consentStatus === 'none' || consentStatus === 'outdated' };
+          const tiles = [
+            { key: 'price', ...price },
+            { key: 'deposit', label: t('bdp_deposit'), ...deposit },
+            consentTile && { key: 'consent', label: t('bdp_consent'), ...consentTile },
+          ].filter(Boolean);
+          return (
+            <div style={{ ...p.glance, gridTemplateColumns: `repeat(${tiles.length}, minmax(0, 1fr))` }}>
+              {tiles.map(tile => (
+                <div key={tile.key} style={p.glanceTile}>
+                  <span style={p.glanceLabel}>{tile.label}</span>
+                  <span style={{ ...p.glanceValue, color: tile.muted ? 'var(--text-muted)' : tile.tone ? `var(--color-${tile.tone})` : 'var(--text)', fontWeight: tile.muted ? 500 : 700 }}>{tile.value}</span>
+                  {tile.sub && <span style={p.glanceSub}>{tile.sub}</span>}
+                  {tile.action && (
+                    <button onClick={() => handleSendConsentLink('__inline__')} disabled={linkGeneratingId === '__inline__'}
+                      style={{ ...p.textLink, fontSize: '0.8rem', alignSelf: 'flex-start', marginTop: '0.15rem' }}>
+                      {linkSentId === '__inline__' ? 'Link sent ✓' : linkGeneratingId === '__inline__' ? 'Sending…' : 'Send consent link'}
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          );
+        })()}
+
         {/* Cards use two columns when the panel has room, and one on narrow screens. */}
         <div className={`studio-bdp-cards ${panelLayout.cards}`}>
         {/* ── Outcome (completed / no-show) ── */}
@@ -504,7 +555,6 @@ export default function BookingDetailPanel({
                 </span>
               )}
             </div>
-            {showCompleted && finalPrice != null && <Fact label={t('bdp_final_price')} strong>${finalPrice}</Fact>}
             {showCompleted && paymentMethod && <Fact label={t('bdp_payment')}>{PAYMENT_LABELS[paymentMethod] ?? paymentMethod}</Fact>}
             {showCompleted && paymentSplits !== null && (() => {
               const artistSplits = paymentSplits.filter(s => s.recorded_by === 'artist');
@@ -575,21 +625,10 @@ export default function BookingDetailPanel({
         )}
 
         {/* ── Payment ── */}
-        {showMoney && (
-          <Section title="Payment">
-            <Fact label={t('bdp_quoted')} strong>{quote != null ? `$${Number(quote).toLocaleString()}` : '—'}</Fact>
-            {(status === 'confirmed' || depositRequired || depositPaid) && (
-              <div style={p.depositBox}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
-                  <span style={p.factLabel}>{t('bdp_deposit')}</span>
-                  {!depositRequired && !depositPaid ? (
-                    <Pill>Not required</Pill>
-                  ) : (
-                    <Pill tone={depositTone}>
-                      {depositConfirmedAt ? t('bdp_deposit_confirmed') : depositPaid ? t('bdp_deposit_unconfirmed') : t('bdp_deposit_unpaid')}
-                    </Pill>
-                  )}
-                </div>
+        {(depositRequired || depositPaid) && (
+          <Section title={t('bdp_deposit')} aside={<Pill tone={depositTone}>{depositConfirmedAt ? t('bdp_deposit_confirmed') : depositPaid ? t('bdp_deposit_unconfirmed') : t('bdp_deposit_unpaid')}</Pill>}>
+            {(
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 {depositAmount != null && (() => {
                   const feeCents = Math.round(depositAmount * 0.03 * 100) + 50;
                   const total = depositAmount + feeCents / 100;
@@ -629,7 +668,7 @@ export default function BookingDetailPanel({
 
         {/* ── Client ── */}
         <Section
-          title={t('bdp_client_info')}
+          title="Client"
           aside={(email || (clientName && clientName !== '—')) && (
             <button
               onClick={() => {
@@ -644,44 +683,6 @@ export default function BookingDetailPanel({
           )}
         >
           {dob && <Fact label="Date of birth">{fmtDob(dob)}{clientAge != null && ` · ${clientAge} yrs`}</Fact>}
-          <Fact block label="Email">{email && <button type="button" style={{ ...detailStyles.textLink, display: 'block', minHeight: 44 }} onClick={() => navigator.clipboard.writeText(email).then(() => showFeedback('Email copied.', 'success')).catch(showError)}>Copy email</button>}{email || <span style={{ color: 'var(--text-muted)' }}>{t('clients_no_email')}</span>}</Fact>
-          <Fact label="Phone">
-            {phone ? (
-              <button
-                onClick={() => { const a = document.createElement('a'); a.href = `sms:${phone}`; a.click(); }}
-                style={p.phoneBtn}
-              >
-                {phone} <span aria-hidden="true">↗</span>
-              </button>
-            ) : <span style={{ color: 'var(--text-muted)' }}>{t('clients_no_phone')}</span>}
-          </Fact>
-
-          {email && (
-            <Fact label={t('bdp_consent')} control>
-              {consentLoading || submissionsLoading ? (
-                <Pill>{t('loading')}</Pill>
-              ) : (
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                  <Pill tone={consentStatus === 'current' ? 'success' : consentStatus === 'outdated' ? 'warning' : 'danger'}>{consentLabel}</Pill>
-                  {(consentStatus === 'none' || consentStatus === 'outdated') && (
-                    <button
-                      onClick={() => handleSendConsentLink('__inline__')}
-                      disabled={linkGeneratingId === '__inline__'}
-                      style={{ ...p.smallAction, ...(linkSentId === '__inline__' ? p.smallActionDone : {}) }}
-                    >
-                      {linkSentId === '__inline__' ? 'Sent ✓' : linkGeneratingId === '__inline__' ? '…' : 'Send link'}
-                    </button>
-                  )}
-                </span>
-              )}
-            </Fact>
-          )}
-          {consent && !consentLoading && (
-            <span style={p.hint}>
-              Signed v{consent.consent_version} on {new Date(consent.agreed_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
-            </span>
-          )}
-
           <MarketingConsent
             email={email}
             phone={phone}
@@ -881,16 +882,15 @@ export default function BookingDetailPanel({
   );
 }
 
+// The main step (complete, confirm, offer times) is filled; others are outlined, and
+// destructive ones (cancel, no show, reject) are quiet red outlines.
 function Btn({ onClick, disabled, variant, children }) {
-  const c = variant === 'success' ? { bg: 'var(--color-success-surface)', border: 'var(--color-success-border)', text: 'var(--color-success)' }
-    : variant === 'primary'  ? { bg: 'var(--color-info-surface)', border: 'var(--color-info-border)', text: 'var(--color-info)' }
-    : variant === 'neutral'  ? { bg: 'var(--bg-chip)', border: 'var(--border)', text: 'var(--text-muted)' }
-    : { bg: 'var(--color-danger-surface)', border: 'var(--color-danger-border)', text: 'var(--color-danger)' };
+  const main = variant === 'success' || variant === 'primary';
+  const style = main ? { flex: 1.4 }
+    : variant === 'neutral' ? { flex: 1 }
+    : { flex: 1, background: 'transparent', border: '1px solid var(--border-strong)', color: 'var(--color-danger)' };
   return (
-    <Button onClick={onClick} disabled={disabled} size="sm" style={{
-      flex: 1,
-      border: `1px solid ${c.border}`, background: c.bg, color: c.text,
-    }}>
+    <Button onClick={onClick} disabled={disabled} size="sm" variant={main ? 'primary' : 'secondary'} style={style}>
       {children}
     </Button>
   );
@@ -916,12 +916,19 @@ const p = {
     display: 'flex', flexDirection: 'column', gap: '1rem',
   },
   hero: {
-    border: '1px solid', borderRadius: 14, padding: '1rem 1.1rem',
-    display: 'flex', flexDirection: 'column', gap: '0.25rem',
+    display: 'flex', flexDirection: 'column', gap: '0.2rem',
+    padding: '0.15rem 0 0.25rem',
   },
-  heroCaption: { fontSize: '0.85rem', fontWeight: 700 },
-  heroTime: { fontSize: '1.3rem', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.01em' },
+  heroCaption: { fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' },
+  heroTime: { fontSize: '1.6rem', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em', lineHeight: 1.2 },
   heroMeta: { fontSize: '0.95rem', color: 'var(--text-dim)' },
+  contact: { display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap', marginTop: '-0.25rem', minWidth: 0 },
+  contactLink: { background: 'none', border: 'none', padding: 0, color: 'var(--text-dim)', fontSize: '0.875rem', fontFamily: 'inherit', cursor: 'pointer', textDecoration: 'none', overflowWrap: 'anywhere', textAlign: 'left' },
+  glance: { display: 'grid', gap: '0.5rem' },
+  glanceTile: { display: 'flex', flexDirection: 'column', gap: '0.2rem', minWidth: 0, padding: '0.75rem 0.85rem', borderRadius: 12, background: 'var(--bg-card)', border: '1px solid var(--border)' },
+  glanceLabel: { fontSize: '0.75rem', color: 'var(--text-muted)' },
+  glanceValue: { fontSize: '1rem', lineHeight: 1.3, overflowWrap: 'anywhere' },
+  glanceSub: { fontSize: '0.75rem', color: 'var(--text-muted)' },
   heroNote: { marginTop: '0.4rem', fontSize: '0.9rem', color: 'var(--color-danger)', fontWeight: 600 },
   collapseHead: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', width: '100%', background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' },
   outcomeSub: { borderTop: '1px solid var(--border)', paddingTop: '0.7rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' },
