@@ -7,3 +7,18 @@
   .panel .cards { display: block; columns: 2; column-gap: 16px; }
   .panel .cards > * { break-inside: avoid; margin: 0 0 16px; }
 }
+
+/* Booking panel: one column on narrow screens; on wider panels the booking on the left
+   and its timeline on the right. */
+.panel .split { display: flex; flex-direction: column; gap: 12px; min-width: 0; flex-shrink: 0; }
+.panel .column { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.panel .column > * { min-width: 0; margin: 0; flex-shrink: 0; }
+@container (min-width: 680px) {
+  .panel .split { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 16px; align-items: start; }
+}
+
+/* Price / deposit / consent: side by side when there's room, stacked on a phone. */
+.panel .glance { grid-template-columns: minmax(0, 1fr); }
+@container (min-width: 520px) {
+  .panel .glance { grid-template-columns: repeat(var(--tiles), minmax(0, 1fr)); }
+}

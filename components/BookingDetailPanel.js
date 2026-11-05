@@ -436,10 +436,12 @@ export default function BookingDetailPanel({
   // What happened to this booking, oldest first, from the dates the booking keeps.
   // A booking is confirmed when its deposit is confirmed, or without a deposit when the
   // client picks a time. That pick isn't recorded, so then "Confirmed" has no date.
+  // MarketingConsent shows only when the client's marketing choices have loaded.
+  const hasMarketing = Boolean(clientProfile && clientProfile.email_marketing_opt_in !== undefined && (email || phone) && clientProfile.id);
   const firstName = clientName !== '—' ? clientName.split(' ')[0] : 'Client';
   const ended = ['cancelled', 'rejected', 'declined', 'timed_out'].includes(rawStatus);
   const timeline = [
-    createdAt && { at: createdAt, label: t('bdp_requested_at') },
+    createdAt && { at: createdAt, label: t('bdp_requested_at'), first: true },
     currentOffer?.email_sent_at && { at: currentOffer.email_sent_at, label: 'Times offered' },
     status === 'awaiting_payment' && updatedAt && { at: updatedAt, label: t('bdp_link_sent') },
     clientSaysPaid?.recorded_at && { at: clientSaysPaid.recorded_at, label: `${firstName} says they paid the deposit` },
@@ -450,7 +452,7 @@ export default function BookingDetailPanel({
     outcomeAt && { at: outcomeAt, label: isNoShow ? 'Marked as no show' : 'Marked complete' },
     ended && updatedAt && { at: updatedAt, label: statusLabel(rawStatus) },
   ].filter(item => item && Number.isFinite(new Date(item.at).getTime()))
-    .sort((a, b) => new Date(a.at) - new Date(b.at));
+    .sort((a, b) => (a.first ? -1 : b.first ? 1 : new Date(a.at) - new Date(b.at)));
   const wasConfirmed = ['confirmed', 'completed'].includes(rawStatus) || (ended && Boolean(depositConfirmedAt));
   if (wasConfirmed && !depositConfirmedAt) {
     // Undated: goes just before the appointment, or at the end.
@@ -467,7 +469,7 @@ export default function BookingDetailPanel({
       <div className="studio-bdp-header" style={p.header}>
         <div className="studio-bdp-headtext" style={p.headerText}>
           <span style={p.title}>{clientName}</span>
-          {(email || phone) && (
+          {(email || phone || dob) && (
             <div style={p.contact}>
               {email && (
                 <button type="button" style={p.contactLink} title="Copy email"
@@ -477,6 +479,15 @@ export default function BookingDetailPanel({
               )}
               {email && phone && <span aria-hidden="true" style={{ color: 'var(--text-ghost)' }}>·</span>}
               {phone && <a href={`sms:${phone}`} style={p.contactLink} title="Send a text">{phone}</a>}
+              {dob && (email || phone) && <span aria-hidden="true" style={{ color: 'var(--text-ghost)' }}>·</span>}
+              {dob && <span style={{ ...p.contactLink, cursor: 'default' }}>{fmtDob(dob)}{clientAge != null && ` (${clientAge})`}</span>}
+              {(email || (clientName && clientName !== '—')) && (
+                <button type="button" style={{ ...p.textLink, marginLeft: '0.35rem' }} onClick={() => {
+                  const key = email || clientName;
+                  onClose?.();
+                  router.push(`/dashboard/clients?client=${encodeURIComponent(key)}`);
+                }}>{t('bdp_view_client')}</button>
+              )}
             </div>
           )}
           <div style={p.headerPills}>
@@ -542,7 +553,7 @@ export default function BookingDetailPanel({
             consentTile && { key: 'consent', label: t('bdp_consent'), ...consentTile },
           ].filter(Boolean);
           return (
-            <div style={{ ...p.glance, gridTemplateColumns: `repeat(${tiles.length}, minmax(0, 1fr))` }}>
+            <div className={panelLayout.glance} style={{ ...p.glance, '--tiles': tiles.length }}>
               {tiles.map(tile => (
                 <div key={tile.key} style={p.glanceTile}>
                   <span style={p.glanceLabel}>{tile.label}</span>
@@ -561,7 +572,9 @@ export default function BookingDetailPanel({
         })()}
 
         {/* Cards use two columns when the panel has room, and one on narrow screens. */}
-        <div className={`studio-bdp-cards ${panelLayout.cards}`}>
+        {/* Two columns when there's room: the booking on the left, its history on the right. */}
+        <div className={`studio-bdp-cards ${panelLayout.split}`}>
+        <div className={panelLayout.column}>
         {/* ── Outcome (completed / no-show) ── */}
         {isCompleted && (
           <div style={{
@@ -617,6 +630,27 @@ export default function BookingDetailPanel({
               </div>
             )}
           </div>
+        )}
+
+        {/* ── Client health and preferences ── */}
+        {(allergies || designPreferences.length > 0 || painTolerance) && (
+        <Section title="Client">
+          {allergies && (
+            <div style={p.allergy}>
+              <span style={p.allergyLabel}>{t('bdp_allergies')}</span>
+              <p style={{ margin: '0.2rem 0 0', fontSize: '0.95rem', color: 'var(--text)', lineHeight: 1.45 }}>{allergies}</p>
+            </div>
+          )}
+          {designPreferences.length > 0 && (
+            <div>
+              <span style={p.factLabel}>{t('clients_design_prefs')}</span>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginTop: '0.4rem' }}>
+                {designPreferences.map(st => <Pill key={st} tone="info">{st}</Pill>)}
+              </div>
+            </div>
+          )}
+          {painTolerance && <Fact label={t('clients_pain')}>{cap(painTolerance)}</Fact>}
+        </Section>
         )}
 
         {/* ── Tattoo ── */}
@@ -691,52 +725,95 @@ export default function BookingDetailPanel({
           </Section>
         )}
 
-        {/* ── Client ── */}
-        <Section
-          title="Client"
-          aside={(email || (clientName && clientName !== '—')) && (
-            <button
-              onClick={() => {
-                const key = email || clientName;
-                onClose?.();
-                router.push(`/dashboard/clients?client=${encodeURIComponent(key)}`);
-              }}
-              style={p.textLink}
-            >
-              {t('bdp_view_client')}
+        {/* ── Station picker ── */}
+        {stationStep && (
+          <div style={p.stationPicker}>
+            <p style={p.stationLabel}>{t('bdp_assign_station')}</p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+              {availableStations.map(st => (
+                <button key={st.id} onClick={() => { setStationStep(false); onAccept(st.id); }}
+                  disabled={actionLoading} style={p.stationBtn}>
+                  {st.name}
+                </button>
+              ))}
+            </div>
+            <button onClick={() => setStationStep(false)} style={p.textLink}>
+              {t('cancel')}
             </button>
-          )}
-        >
-          {dob && <Fact label="Date of birth">{fmtDob(dob)}{clientAge != null && ` · ${clientAge} yrs`}</Fact>}
-          <MarketingConsent
-            email={email}
-            phone={phone}
-            clientKey={clientProfile?.id}
-            marketing={clientProfile && clientProfile.email_marketing_opt_in !== undefined
-              ? { optIn: marketingOverride ?? clientProfile.email_marketing_opt_in === true, smsOptIn: marketingOverride ?? clientProfile.sms_marketing_opt_in === true, unsubscribed: clientProfile.email_unsubscribed === true }
-              : null}
-            onChange={setMarketingOverride}
-          />
+          </div>
+        )}
+        {stationError && <p style={{ fontSize: '0.9rem', color: 'var(--color-danger)', margin: 0 }}>{stationError}</p>}
 
-          {booking?.id && <BookingSMS key={booking.id} bookingId={booking.id} />}
+        {/* ── Marketing ── */}
+        {(booking?.id || hasMarketing) && (
+          <Section title="Marketing">
+            <MarketingConsent
+              email={email}
+              phone={phone}
+              clientKey={clientProfile?.id}
+              marketing={clientProfile && clientProfile.email_marketing_opt_in !== undefined
+                ? { optIn: marketingOverride ?? clientProfile.email_marketing_opt_in === true, smsOptIn: marketingOverride ?? clientProfile.sms_marketing_opt_in === true, unsubscribed: clientProfile.email_unsubscribed === true }
+                : null}
+              onChange={setMarketingOverride}
+            />
 
-          {allergies && (
-            <div style={p.allergy}>
-              <span style={p.allergyLabel}>{t('bdp_allergies')}</span>
-              <p style={{ margin: '0.2rem 0 0', fontSize: '0.95rem', color: 'var(--text)', lineHeight: 1.45 }}>{allergies}</p>
+            {booking?.id && <BookingSMS key={booking.id} bookingId={booking.id} divider={hasMarketing} />}
+          </Section>
+        )}
+
+        {/* ── Studio notes ── */}
+        {bookingId && (
+          <Section title={t('bdp_studio_notes')}>
+            <textarea
+              aria-label={t('clients_add_note')}
+              value={noteInput}
+              onChange={e => setNoteInput(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleAddNote(); }}
+              placeholder={t('bdp_note_placeholder')}
+              rows={3}
+              style={p.noteInput}
+            />
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <Button size="sm" variant="secondary" onClick={handleAddNote} disabled={noteAdding || !noteInput.trim()}>
+                {noteAdding ? t('saving') : t('clients_add_note_btn')}
+              </Button>
             </div>
-          )}
-          {designPreferences.length > 0 && (
-            <div>
-              <span style={p.factLabel}>{t('clients_design_prefs')}</span>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginTop: '0.4rem' }}>
-                {designPreferences.map(st => <Pill key={st} tone="info">{st}</Pill>)}
+            {studioNotes !== null && studioNotes.map(n => (
+              <div key={n.id} style={p.subCard}>
+                <p style={{ margin: 0, fontSize: '0.95rem', color: 'var(--text)', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{n.content}</p>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={p.hint}>
+                    {new Date(n.created_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  </span>
+                  <button onClick={() => handleDeleteNote(n.id)} style={{ ...p.textLink, color: 'var(--color-danger)' }}>
+                    {t('delete')}
+                  </button>
+                </div>
               </div>
-            </div>
-          )}
-          {painTolerance && <Fact label={t('clients_pain')}>{cap(painTolerance)}</Fact>}
-        </Section>
+            ))}
+          </Section>
+        )}
+        {/* ── Consent forms (collapsible) ── */}
+        {!submissionsLoading && consentSubmissions.length > 0 && (
+          <section style={p.section}>
+            <button
+              style={p.collapseHead}
+              aria-expanded={submissionsExpanded}
+              onClick={() => setSubmissionsExpanded(x => !x)}
+            >
+              <h3 style={p.sectionTitle}>{t('bdp_consent_forms')} ({consentSubmissions.length})</h3>
+              <span aria-hidden="true" style={{ color: 'var(--text-muted)' }}>{submissionsExpanded ? '▲' : '▼'}</span>
+            </button>
+            {submissionsExpanded && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                {consentSubmissions.map(sub => <ConsentSubmissionCard key={sub.id} sub={sub} templates={consentTemplates} />)}
+              </div>
+            )}
+          </section>
+        )}
 
+        </div>
+        <div className={panelLayout.column}>
         {/* ── Timeline ── */}
         {hasTimeline && (
           <Section title="Timeline">
@@ -787,76 +864,7 @@ export default function BookingDetailPanel({
           </Section>
         )}
 
-        {/* ── Consent forms (collapsible) ── */}
-        {!submissionsLoading && consentSubmissions.length > 0 && (
-          <section style={p.section}>
-            <button
-              style={p.collapseHead}
-              aria-expanded={submissionsExpanded}
-              onClick={() => setSubmissionsExpanded(x => !x)}
-            >
-              <h3 style={p.sectionTitle}>{t('bdp_consent_forms')} ({consentSubmissions.length})</h3>
-              <span aria-hidden="true" style={{ color: 'var(--text-muted)' }}>{submissionsExpanded ? '▲' : '▼'}</span>
-            </button>
-            {submissionsExpanded && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-                {consentSubmissions.map(sub => <ConsentSubmissionCard key={sub.id} sub={sub} templates={consentTemplates} />)}
-              </div>
-            )}
-          </section>
-        )}
-
-        {/* ── Station picker ── */}
-        {stationStep && (
-          <div style={p.stationPicker}>
-            <p style={p.stationLabel}>{t('bdp_assign_station')}</p>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-              {availableStations.map(st => (
-                <button key={st.id} onClick={() => { setStationStep(false); onAccept(st.id); }}
-                  disabled={actionLoading} style={p.stationBtn}>
-                  {st.name}
-                </button>
-              ))}
-            </div>
-            <button onClick={() => setStationStep(false)} style={p.textLink}>
-              {t('cancel')}
-            </button>
-          </div>
-        )}
-        {stationError && <p style={{ fontSize: '0.9rem', color: 'var(--color-danger)', margin: 0 }}>{stationError}</p>}
-
-        {/* ── Studio notes ── */}
-        {bookingId && (
-          <Section title={t('bdp_studio_notes')}>
-            <textarea
-              aria-label={t('clients_add_note')}
-              value={noteInput}
-              onChange={e => setNoteInput(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleAddNote(); }}
-              placeholder={t('bdp_note_placeholder')}
-              rows={3}
-              style={p.noteInput}
-            />
-            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <Button size="sm" variant="secondary" onClick={handleAddNote} disabled={noteAdding || !noteInput.trim()}>
-                {noteAdding ? t('saving') : t('clients_add_note_btn')}
-              </Button>
-            </div>
-            {studioNotes !== null && studioNotes.map(n => (
-              <div key={n.id} style={p.subCard}>
-                <p style={{ margin: 0, fontSize: '0.95rem', color: 'var(--text)', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{n.content}</p>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={p.hint}>
-                    {new Date(n.created_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
-                  </span>
-                  <button onClick={() => handleDeleteNote(n.id)} style={{ ...p.textLink, color: 'var(--color-danger)' }}>
-                    {t('delete')}
-                  </button>
-                </div>
-              </div>
-            ))}
-          </Section>
-        )}
+        </div>
         </div>
       </div>
 
@@ -935,7 +943,7 @@ function Btn({ onClick, disabled, variant, children }) {
 const p = {
   ...detailStyles,
   panel: {
-    position: 'absolute', top: 0, right: 0, bottom: 0, width: 'min(960px, 100%)',
+    position: 'fixed', top: 0, right: 0, bottom: 0, width: 'min(960px, 100%)',
     background: 'var(--bg-panel)', borderLeft: '1px solid var(--border)',
     display: 'flex', flexDirection: 'column', zIndex: 10,
   },

@@ -26,7 +26,8 @@ const SHORT = {
   undelivered: 'Undelivered', retry: 'Retrying', unknown: 'Needs review', short_notice: 'Skipped', too_late: 'Too late', disabled: 'Off', unavailable: 'Not active', not_confirmed: 'Waiting', invalid_phone: 'Bad number',
 };
 
-export default function BookingSMS({ bookingId }) {
+// divider: a line above, for when it follows other settings.
+export default function BookingSMS({ bookingId, divider = true }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -50,7 +51,7 @@ export default function BookingSMS({ bookingId }) {
     ? { background: `var(--color-${tone}-surface)`, color: `var(--color-${tone})`, border: `1px solid var(--color-${tone}-border)` }
     : { background: 'var(--bg-chip)', color: 'var(--text-dim)', border: '1px solid var(--border-strong)' };
   const hint = { margin: 0, fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.45 };
-  return <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '0.85rem 0 0.15rem', borderTop: '1px solid var(--border)' }}>
+  return <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', ...(divider ? { padding: '0.85rem 0 0.15rem', borderTop: '1px solid var(--border)' } : {}) }}>
     <Fact label="SMS reminder" control>
       <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.6rem' }}>
         {status && <span style={{ ...pill, fontSize: '0.8rem', fontWeight: 700, padding: '0.2rem 0.65rem', borderRadius: 20, whiteSpace: 'nowrap' }}>{SHORT[status] || status}</span>}
