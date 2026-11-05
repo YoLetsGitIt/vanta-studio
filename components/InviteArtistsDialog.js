@@ -4,14 +4,12 @@ import { useEffect, useState } from 'react';
 import Dialog from '@/components/ui/Dialog';
 import { cancelArtistInvite, getArtistInvites, inviteArtist, resetArtistInviteLink } from '@/lib/api';
 
-const looksLikeEmail = value => value.includes('@');
-
-// Invite artists to the studio: share one link, or send an invite to an email
-// or mobile number. Artists who accept are connected straight away.
+// Invite artists to the studio: share one link, or email an invite. Artists who
+// accept are connected straight away.
 export default function InviteArtistsDialog({ studioName, onClose }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
-  const [contact, setContact] = useState('');
+  const [email, setEmail] = useState('');
   const [busy, setBusy] = useState('');
   const [copied, setCopied] = useState('');
   const [notice, setNotice] = useState('');
@@ -34,14 +32,12 @@ export default function InviteArtistsDialog({ studioName, onClose }) {
 
   async function send(event) {
     event.preventDefault();
-    const value = contact.trim();
+    const value = email.trim();
     if (!value) return;
     await run('send', async () => {
-      const next = await inviteArtist(looksLikeEmail(value) ? { email: value } : { phone: value });
-      setData(next);
-      setContact('');
-      const sent = next.pending?.[0];
-      setNotice(sent?.send_error ? `Invite saved. ${sent.send_error}.` : `Invite sent to ${value}.`);
+      setData(await inviteArtist(value));
+      setEmail('');
+      setNotice(`Invite sent to ${value}.`);
     });
   }
 
@@ -55,7 +51,7 @@ export default function InviteArtistsDialog({ studioName, onClose }) {
 
       <section style={st.section}>
         <h3 style={st.label}>Invite link</h3>
-        <p style={st.help}>Send this link to your artists by text, email or group chat. They sign in to their Vanta artist account and tap Join.</p>
+        <p style={st.help}>Send this link to your artists by text, email or group chat. It opens the Vanta app, where they tap Join.</p>
         <div style={st.linkRow}>
           <input readOnly value={link || 'Loading…'} aria-label="Invite link" style={st.linkInput} onFocus={e => e.target.select()} />
           <button type="button" disabled={!link} onClick={() => copy(link, 'link')} style={st.primary}>{copied === 'link' ? 'Copied' : 'Copy'}</button>
@@ -67,11 +63,11 @@ export default function InviteArtistsDialog({ studioName, onClose }) {
       </section>
 
       <section style={st.section}>
-        <h3 style={st.label}>Invite by email or mobile</h3>
-        <p style={st.help}>We’ll send them the link. If they don’t have Vanta yet, they’re connected automatically when they sign up as an artist with this email or number.</p>
+        <h3 style={st.label}>Invite by email</h3>
+        <p style={st.help}>We’ll send them the link. If they don’t have Vanta yet, they’re connected automatically when they sign up as an artist with this email.</p>
         <form onSubmit={send} style={st.linkRow}>
-          <input value={contact} onChange={e => setContact(e.target.value)} placeholder="artist@email.com or 0412 345 678" aria-label="Artist email or mobile number" autoComplete="off" style={st.linkInput} />
-          <button type="submit" disabled={!contact.trim() || Boolean(busy)} style={st.primary}>{busy === 'send' ? 'Sending…' : 'Send'}</button>
+          <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="artist@email.com" aria-label="Artist email" autoComplete="off" style={st.linkInput} />
+          <button type="submit" disabled={!email.trim() || Boolean(busy)} style={st.primary}>{busy === 'send' ? 'Sending…' : 'Send'}</button>
         </form>
         {notice && <p role="status" style={st.notice}>{notice}</p>}
       </section>
@@ -81,7 +77,7 @@ export default function InviteArtistsDialog({ studioName, onClose }) {
           <h3 style={st.label}>Waiting to join ({pending.length})</h3>
           <ul style={st.list}>
             {pending.map(invite => {
-              const who = invite.email || invite.phone;
+              const who = invite.email;
               const url = link ? link.replace(/[^/]+$/, invite.code) : '';
               return (
                 <li key={invite.id} style={st.item}>

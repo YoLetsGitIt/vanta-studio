@@ -1,4 +1,4 @@
-// Artists → Invite artists: copy the link, invite by email and by phone, cancel.
+// Artists → Invite artists: copy the link, invite by email, cancel.
 // Serve out/ with clean URLs first. All services are intercepted.
 const assert = require('node:assert/strict');
 const { chromium } = require(process.env.STUDIO_PLAYWRIGHT_PATH || 'playwright');
@@ -20,8 +20,7 @@ const base = process.env.STUDIO_TEST_URL || 'http://127.0.0.1:3058';
           writes.push('reset'); state = { ...state, link_url: 'https://www.vanta.tattoo/j/newlink234' };
         } else if (req.method() === 'POST') {
           const body = req.postDataJSON(); writes.push(body);
-          const phone = body.phone ? '+61412345678' : null;
-          state = { ...state, pending: [{ id: `inv-${writes.length}`, code: `pers${writes.length}code`, kind: 'personal', email: body.email || null, phone, created_at: '2026-11-05T01:00:00Z', sent_via: phone ? null : 'email', send_error: phone ? 'text messages are off; copy the link and send it yourself' : null }, ...state.pending] };
+          state = { ...state, pending: [{ id: `inv-${writes.length}`, code: `pers${writes.length}code`, kind: 'personal', email: body.email, created_at: '2026-11-05T01:00:00Z', sent_via: 'email' }, ...state.pending] };
           return route.fulfill({ status: 201, json: state });
         } else if (req.method() === 'DELETE') {
           const id = url.pathname.split('/').pop(); writes.push({ cancel: id });
@@ -44,17 +43,14 @@ const base = process.env.STUDIO_TEST_URL || 'http://127.0.0.1:3058';
       await dialog.getByRole('button', { name: 'Copied' }).waitFor();
       assert.equal(await page.evaluate(() => navigator.clipboard.readText()), 'https://www.vanta.tattoo/j/abcdefghjk');
 
-      await dialog.getByLabel('Artist email or mobile number').fill('dani@example.com');
-      await dialog.getByRole('button', { name: 'Send' }).click();
-      await dialog.getByText('Invite sent to dani@example.com.').waitFor();
-      assert.deepEqual(writes.at(-1), { email: 'dani@example.com', phone: '' });
-
-      await dialog.getByLabel('Artist email or mobile number').fill('0412 345 678');
-      await dialog.getByRole('button', { name: 'Send' }).click();
-      await dialog.getByText(/Invite saved\. text messages are off/).waitFor();
-      assert.deepEqual(writes.at(-1), { email: '', phone: '0412 345 678' });
+      assert.equal(await dialog.getByText(/mobile/i).count(), 0, 'No phone invites');
+      for (const email of ['dani@example.com', 'sam@example.com']) {
+        await dialog.getByLabel('Artist email').fill(email);
+        await dialog.getByRole('button', { name: 'Send' }).click();
+        await dialog.getByText(`Invite sent to ${email}.`).waitFor();
+        assert.deepEqual(writes.at(-1), { email });
+      }
       await dialog.getByText('Waiting to join (2)').waitFor();
-      await dialog.getByText('Not sent: copy the link and send it yourself').waitFor();
 
       await dialog.getByRole('button', { name: 'Cancel' }).first().click();
       await dialog.getByText('Waiting to join (1)').waitFor();
