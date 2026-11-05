@@ -531,47 +531,107 @@ export default function BookingDetailPanel({
           {cancelReason && <span style={p.heroNote}>{t('bdp_cancelled_reason')}: {cancelReason}</span>}
         </div>
 
-        {/* ── At a glance: price, deposit, consent ── */}
+        {/* ── Payment and consent ── */}
         {(() => {
           const money = n => `$${Number(n).toLocaleString('en-AU', { maximumFractionDigits: 2 })}`;
-          const price = showCompleted && finalPrice != null
-            ? { label: t('bdp_final_price'), value: money(finalPrice) }
-            : { label: t('bdp_quoted'), value: quote != null ? money(quote) : 'Not set', muted: quote == null };
-          const deposit = !depositRequired && !depositPaid ? { value: 'Not required', muted: true }
-            : depositConfirmedAt ? { value: depositAmount != null ? `${money(depositAmount)} paid` : 'Paid', tone: 'success' }
-            : depositPaid ? { value: t('bdp_deposit_unconfirmed'), tone: 'warning' }
-            : clientSaysPaid ? { value: 'Check payment', tone: 'warning', sub: `Says paid by ${clientSaysPaid.method === 'payid' ? 'PayID' : 'bank'}` }
-            : { value: depositAmount != null ? `${money(depositAmount)} unpaid` : 'Unpaid', tone: 'danger' };
-          const consentTile = !email ? null
-            : consentLoading || submissionsLoading ? { value: t('loading'), muted: true }
-            : { value: consentLabel, tone: consentStatus === 'current' ? 'success' : consentStatus === 'outdated' ? 'warning' : 'danger',
-                sub: consent ? `v${consent.consent_version} · ${new Date(consent.agreed_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}` : null,
-                action: consentStatus === 'none' || consentStatus === 'outdated' };
-          const tiles = [
-            { key: 'price', ...price },
-            { key: 'deposit', label: t('bdp_deposit'), ...deposit },
-            consentTile && { key: 'consent', label: t('bdp_consent'), ...consentTile },
-          ].filter(Boolean);
+          const priceLabel = showCompleted && finalPrice != null ? t('bdp_final_price') : t('bdp_quoted');
+          const priceValue = showCompleted && finalPrice != null ? money(finalPrice) : quote != null ? money(quote) : null;
+          const hasDeposit = depositRequired || depositPaid;
+          const depositPill = depositConfirmedAt ? { tone: 'success', text: t('bdp_deposit_confirmed') }
+            : depositPaid ? { tone: 'warning', text: t('bdp_deposit_unconfirmed') }
+            : clientSaysPaid ? { tone: 'warning', text: 'Check payment' }
+            : { tone: 'danger', text: t('bdp_deposit_unpaid') };
+          const showConsent = Boolean(email) || consentSubmissions.length > 0;
+          const consentTone = consentStatus === 'current' ? 'success' : consentStatus === 'outdated' ? 'warning' : 'danger';
           return (
-            <div className={panelLayout.glance} style={{ ...p.glance, '--tiles': tiles.length }}>
-              {tiles.map(tile => (
-                <div key={tile.key} style={p.glanceTile}>
-                  <span style={p.glanceLabel}>{tile.label}</span>
-                  <span style={{ ...p.glanceValue, color: tile.muted ? 'var(--text-muted)' : tile.tone ? `var(--color-${tile.tone})` : 'var(--text)', fontWeight: tile.muted ? 500 : 700 }}>{tile.value}</span>
-                  {tile.sub && <span style={p.glanceSub}>{tile.sub}</span>}
-                  {tile.action && (
+            <div className={panelLayout.glance} style={{ ...p.glance, '--tiles': showConsent ? 2 : 1 }}>
+              <section style={p.summaryCard} aria-label="Payment">
+                <div style={p.summaryRow}>
+                  <span style={p.glanceLabel}>{priceLabel}</span>
+                  <span style={{ ...p.summaryValue, ...(priceValue ? {} : p.summaryMuted) }}>{priceValue ?? 'Not set'}</span>
+                </div>
+                <div style={p.summaryDivider} />
+                <div style={p.summaryRow}>
+                  <span style={p.glanceLabel}>{t('bdp_deposit')}</span>
+                  {hasDeposit
+                    ? <Pill tone={depositPill.tone}>{depositPill.text}</Pill>
+                    : <span style={p.summaryMuted}>Not required</span>}
+                </div>
+                {hasDeposit && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    {depositAmount != null && (() => {
+                      const feeCents = Math.round(depositAmount * 0.03 * 100) + 50;
+                      const total = depositAmount + feeCents / 100;
+                      return (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                          <span style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text)' }}>${depositAmount.toFixed(2)}</span>
+                          <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                            + ${(feeCents / 100).toFixed(2)} fee = ${total.toFixed(2)} charged to client
+                          </span>
+                        </div>
+                      );
+                    })()}
+                    {clientSaysPaid && (
+                      <p role="status" style={{ margin: 0, padding: '0.6rem 0.75rem', borderRadius: 10, background: 'var(--color-warning-surface, rgba(224,168,79,0.12))', border: '1px solid var(--color-warning-border, rgba(224,168,79,0.4))', color: 'var(--text)', fontSize: '0.9rem', lineHeight: 1.45 }}>
+                        {clientName !== '—' ? clientName.split(' ')[0] : 'The client'} says they paid by {clientSaysPaid.method === 'payid' ? 'PayID' : 'bank transfer'} on{' '}
+                        {new Date(clientSaysPaid.recorded_at).toLocaleString('en-AU', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}. Check it’s arrived, then mark it received.
+                      </p>
+                    )}
+                    {depositRequired && !depositPaid && !depositConfirmedAt && ['confirmed', 'awaiting_payment', 'requires_confirmation', 'deposit_expired'].includes(status) && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                        <MarkDepositReceivedButton bookingId={bookingId} clientName={clientName !== '—' ? clientName : undefined} disabled={actionLoading}
+                          onReceived={result => setReceivedDeposit({ id: bookingId, at: new Date().toISOString(), status: result?.status, method: result?.method })} />
+                        {chosenTime && status !== 'deposit_expired' && (
+                          <CancelDepositButton bookingId={bookingId} onCancelled={() => setCancelledDepositId(bookingId)} disabled={actionLoading} />
+                        )}
+                      </div>
+                    )}
+                    {depositPaidAt && (
+                      <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                        Paid {depositPaidVia ? `by ${depositPaidVia} · ` : ''}{new Date(depositPaidAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </section>
+
+              {showConsent && (
+                <section style={p.summaryCard} aria-label={t('bdp_consent')}>
+                  <div style={p.summaryRow}>
+                    <span style={p.glanceLabel}>{t('bdp_consent')}</span>
+                    {consentLoading || submissionsLoading ? <Pill>{t('loading')}</Pill> : <Pill tone={consentTone}>{consentLabel}</Pill>}
+                  </div>
+                  {consent && !consentLoading && (
+                    <span style={p.glanceSub}>
+                      Signed v{consent.consent_version} on {new Date(consent.agreed_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </span>
+                  )}
+                  {email && !consentLoading && (consentStatus === 'none' || consentStatus === 'outdated') && (
                     <button onClick={() => handleSendConsentLink('__inline__')} disabled={linkGeneratingId === '__inline__'}
-                      style={{ ...p.textLink, fontSize: '0.8rem', alignSelf: 'flex-start', marginTop: '0.15rem' }}>
+                      style={{ ...p.textLink, alignSelf: 'flex-start' }}>
                       {linkSentId === '__inline__' ? 'Link sent ✓' : linkGeneratingId === '__inline__' ? 'Sending…' : 'Send consent link'}
                     </button>
                   )}
-                </div>
-              ))}
+                  {!submissionsLoading && consentSubmissions.length > 0 && (
+                    <>
+                      <div style={p.summaryDivider} />
+                      <button style={p.collapseHead} aria-expanded={submissionsExpanded} onClick={() => setSubmissionsExpanded(x => !x)}>
+                        <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text)' }}>{t('bdp_consent_forms')} ({consentSubmissions.length})</span>
+                        <span aria-hidden="true" style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>{submissionsExpanded ? '▲' : '▼'}</span>
+                      </button>
+                      {submissionsExpanded && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                          {consentSubmissions.map(sub => <ConsentSubmissionCard key={sub.id} sub={sub} templates={consentTemplates} />)}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </section>
+              )}
             </div>
           );
         })()}
 
-        {/* Cards use two columns when the panel has room, and one on narrow screens. */}
         {/* Two columns when there's room: the booking on the left, its history on the right. */}
         <div className={`studio-bdp-cards ${panelLayout.split}`}>
         <div className={panelLayout.column}>
@@ -683,48 +743,6 @@ export default function BookingDetailPanel({
           </Section>
         )}
 
-        {/* ── Payment ── */}
-        {(depositRequired || depositPaid) && (
-          <Section title={t('bdp_deposit')} aside={<Pill tone={depositTone}>{depositConfirmedAt ? t('bdp_deposit_confirmed') : depositPaid ? t('bdp_deposit_unconfirmed') : t('bdp_deposit_unpaid')}</Pill>}>
-            {(
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                {depositAmount != null && (() => {
-                  const feeCents = Math.round(depositAmount * 0.03 * 100) + 50;
-                  const total = depositAmount + feeCents / 100;
-                  return (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
-                      <span style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text)' }}>${depositAmount.toFixed(2)}</span>
-                      <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                        + ${(feeCents / 100).toFixed(2)} fee = ${total.toFixed(2)} charged to client
-                      </span>
-                    </div>
-                  );
-                })()}
-                {clientSaysPaid && (
-                  <p role="status" style={{ margin: 0, padding: '0.6rem 0.75rem', borderRadius: 10, background: 'var(--color-warning-surface, rgba(224,168,79,0.12))', border: '1px solid var(--color-warning-border, rgba(224,168,79,0.4))', color: 'var(--text)', fontSize: '0.9rem', lineHeight: 1.45 }}>
-                    {clientName !== '—' ? clientName.split(' ')[0] : 'The client'} says they paid by {clientSaysPaid.method === 'payid' ? 'PayID' : 'bank transfer'} on{' '}
-                    {new Date(clientSaysPaid.recorded_at).toLocaleString('en-AU', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}. Check it’s arrived, then mark it received.
-                  </p>
-                )}
-                {depositRequired && !depositPaid && !depositConfirmedAt && ['confirmed', 'awaiting_payment', 'requires_confirmation', 'deposit_expired'].includes(status) && (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                    <MarkDepositReceivedButton bookingId={bookingId} clientName={clientName !== '—' ? clientName : undefined} disabled={actionLoading}
-                      onReceived={result => setReceivedDeposit({ id: bookingId, at: new Date().toISOString(), status: result?.status, method: result?.method })} />
-                    {chosenTime && status !== 'deposit_expired' && (
-                      <CancelDepositButton bookingId={bookingId} onCancelled={() => setCancelledDepositId(bookingId)} disabled={actionLoading} />
-                    )}
-                  </div>
-                )}
-                {depositPaidAt && (
-                  <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                    Paid {depositPaidVia ? `by ${depositPaidVia} · ` : ''}{new Date(depositPaidAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
-                  </span>
-                )}
-              </div>
-            )}
-          </Section>
-        )}
-
         {/* ── Station picker ── */}
         {stationStep && (
           <div style={p.stationPicker}>
@@ -793,25 +811,6 @@ export default function BookingDetailPanel({
             ))}
           </Section>
         )}
-        {/* ── Consent forms (collapsible) ── */}
-        {!submissionsLoading && consentSubmissions.length > 0 && (
-          <section style={p.section}>
-            <button
-              style={p.collapseHead}
-              aria-expanded={submissionsExpanded}
-              onClick={() => setSubmissionsExpanded(x => !x)}
-            >
-              <h3 style={p.sectionTitle}>{t('bdp_consent_forms')} ({consentSubmissions.length})</h3>
-              <span aria-hidden="true" style={{ color: 'var(--text-muted)' }}>{submissionsExpanded ? '▲' : '▼'}</span>
-            </button>
-            {submissionsExpanded && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-                {consentSubmissions.map(sub => <ConsentSubmissionCard key={sub.id} sub={sub} templates={consentTemplates} />)}
-              </div>
-            )}
-          </section>
-        )}
-
         </div>
         <div className={panelLayout.column}>
         {/* ── Timeline ── */}
@@ -969,6 +968,11 @@ const p = {
   contact: { display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap', marginTop: '-0.25rem', minWidth: 0 },
   contactLink: { background: 'none', border: 'none', padding: 0, color: 'var(--text-dim)', fontSize: '0.875rem', fontFamily: 'inherit', cursor: 'pointer', textDecoration: 'none', overflowWrap: 'anywhere', textAlign: 'left' },
   glance: { display: 'grid', gap: '0.5rem' },
+  summaryCard: { display: 'flex', flexDirection: 'column', gap: '0.6rem', minWidth: 0, padding: '0.9rem 1rem', borderRadius: 12, background: 'var(--bg-card)', border: '1px solid var(--border)' },
+  summaryRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', minHeight: 26 },
+  summaryValue: { fontSize: '1.15rem', fontWeight: 700, color: 'var(--text)' },
+  summaryMuted: { fontSize: '0.95rem', fontWeight: 500, color: 'var(--text-muted)' },
+  summaryDivider: { borderTop: '1px solid var(--border)' },
   glanceTile: { display: 'flex', flexDirection: 'column', gap: '0.2rem', minWidth: 0, padding: '0.75rem 0.85rem', borderRadius: 12, background: 'var(--bg-card)', border: '1px solid var(--border)' },
   glanceLabel: { fontSize: '0.75rem', color: 'var(--text-muted)' },
   glanceValue: { fontSize: '1rem', lineHeight: 1.3, overflowWrap: 'anywhere' },
