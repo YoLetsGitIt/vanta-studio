@@ -57,42 +57,6 @@
   border-color: var(--accent) !important;
 }
 
-.bookingTypes {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  padding: 4px;
-  gap: 4px;
-  border: 1px solid var(--border-strong);
-  border-radius: 11px;
-  background: var(--appointment-input);
-}
-
-.bookingTypes button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  min-height: 44px;
-  padding: 8px 4px;
-  border: 1px solid transparent;
-  border-radius: 7px;
-  background: transparent;
-  color: var(--text-dim);
-  font-size: 13px;
-  font-weight: 500;
-  transition: background 150ms, color 150ms;
-}
-
-.bookingTypes button:hover { background: var(--bg-chip); }
-.bookingTypes button[aria-pressed='true'] {
-  background: var(--accent);
-  color: var(--accent-contrast);
-  font-weight: 700;
-}
-
-.choiceMark { display: none; }
-[aria-pressed='true'] > .choiceMark { display: inline; }
-
 .smsConsent {
   display: flex;
   align-items: flex-start;
@@ -165,3 +129,24 @@
   .footer { padding-block: 8px; gap: 6px; }
   .summary { gap: 2px; }
 }
+
+/* One look for every choice in the panel (client, booking type, appointment type, deposit,
+   size unit): same height as the inputs, with the chosen option raised. */
+.segmented {
+  display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 3px;
+  box-sizing: border-box; min-height: 44px; padding: 3px;
+  border: 1px solid var(--border-strong); border-radius: 9px;
+  background: var(--appointment-input, var(--bg-input));
+}
+.segmented button {
+  min-height: 36px; padding: 0 0.5rem; border: 0; border-radius: 7px;
+  background: transparent; color: var(--text-secondary);
+  font: inherit; font-size: 0.875rem; font-weight: 500; cursor: pointer;
+  transition: background 120ms, color 120ms;
+}
+.segmented button:hover { color: var(--text); }
+.segmented button[aria-pressed='true'] {
+  background: var(--bg-modal); color: var(--text); font-weight: 600;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 12%), 0 0 0 1px var(--border);
+}
+.segmented button:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }

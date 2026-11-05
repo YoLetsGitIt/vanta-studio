@@ -108,6 +108,14 @@ function TimeSelect({ value, onChange, label }) {
   );
 }
 
+// "09:00:00" → "9:00 am"
+function clockLabel(value) {
+  const [h, m] = String(value ?? '').split(':').map(Number);
+  if (!Number.isFinite(h)) return value ?? '';
+  const at = new Date(2000, 0, 1, h, m || 0);
+  return at.toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' });
+}
+
 export default function NewAppointmentPanel({ open, onClose, onCreated, initialBookingType = 'personal', initialSlot = null }) {
   const { t } = useLanguage();
   const router = useRouter();
@@ -256,8 +264,8 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
     const endMins = startMins + durationMins;
     const [oh, om] = dayHours.open_time.split(':').map(Number);
     const [ch, cm] = dayHours.close_time.split(':').map(Number);
-    if (startMins < oh * 60 + om) return `${t('nap_err_opens_at')} ${dayHours.open_time} — ${t('nap_err_too_early')}`;
-    if (endMins > ch * 60 + cm) return `${t('nap_err_ends_after')} (${dayHours.close_time}).`;
+    if (startMins < oh * 60 + om) return `${t('nap_err_opens_at')} ${clockLabel(dayHours.open_time)} ${t('nap_err_too_early')}`;
+    if (endMins > ch * 60 + cm) return `${t('nap_err_ends_after')} (${clockLabel(dayHours.close_time)}).`;
     return null;
   })();
 
@@ -476,15 +484,33 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
         ) : (
           <form onSubmit={handleSubmit} style={bd.form}>
             <div className={styles.body}>
+              {/* ── BOOKING TYPE ── */}
+              <section style={bd.section} aria-labelledby="booking-type-label">
+                <h2 id="booking-type-label" style={bd.sectionLabel}>{t('nap_booking_type')}</h2>
+                <div className={styles.segmented} role="group" aria-labelledby="booking-type-label" aria-describedby="booking-type-description">
+                  {[
+                    ['studio', t('nap_type_studio'), 'Studio appointment'],
+                    ['walkin', 'Walk-in', 'Walk-in'],
+                    ['personal', t('nap_type_personal'), 'Personal appointment'],
+                  ].map(([value, label, accessibleLabel]) => (
+                    <button key={value} type="button" aria-label={accessibleLabel} aria-pressed={bookingType === value} onClick={() => setBookingType(value)}>{label}</button>
+                  ))}
+                </div>
+                <p id="booking-type-description" style={bd.hint}>{
+                  bookingType === 'walkin' ? 'Client arrived without a planned booking.'
+                    : bookingType === 'studio' ? 'Planned and booked by the studio.'
+                    : 'Client brought in by the artist.'
+                }</p>
+              </section>
+
               {/* ── CLIENT ── */}
               <section style={bd.section} aria-labelledby="client-section-title">
                 <h2 id="client-section-title" style={bd.sectionLabel}>{t('nap_client')}</h2>
 
-                <div style={bd.modeTabs}>
+                <div className={styles.segmented} role="group" aria-label="Client">
                   <button
                     type="button"
                     aria-pressed={clientMode === 'search'}
-                    style={{ ...bd.modeTab, ...(clientMode === 'search' ? bd.modeTabActive : {}) }}
                     onClick={() => { setClientMode('search'); setFirstName(''); setLastName(''); setClientEmail(''); setClientPhone(''); }}
                   >
                     {t('nap_search_existing')}
@@ -492,7 +518,6 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
                   <button
                     type="button"
                     aria-pressed={clientMode === 'manual'}
-                    style={{ ...bd.modeTab, ...(clientMode === 'manual' ? bd.modeTabActive : {}) }}
                     onClick={() => { setClientMode('manual'); setSelectedClient(null); }}
                   >
                     {t('nap_new_client')}
@@ -621,11 +646,12 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
                 <h2 id="appointment-section-title" style={bd.sectionLabel}>{t('nap_appointment')}</h2>
                 <div className={styles.fieldRow}>
                   <div style={bd.field}>
-                    <label style={bd.label} htmlFor="new-appointment-type">Appointment type</label>
-                    <select id="new-appointment-type" style={bd.select} value={appointmentType} onChange={e => setAppointmentType(e.target.value)}>
-                      <option value="tattoo">Tattoo</option>
-                      <option value="piercing">Piercing</option>
-                    </select>
+                    <span id="new-appointment-type" style={bd.label}>Appointment type</span>
+                    <div className={styles.segmented} role="group" aria-labelledby="new-appointment-type">
+                      {[['tattoo', 'Tattoo'], ['piercing', 'Piercing']].map(([value, label]) => (
+                        <button key={value} type="button" aria-pressed={appointmentType === value} onClick={() => setAppointmentType(value)}>{label}</button>
+                      ))}
+                    </div>
                   </div>
                   <div style={bd.field}>
                     <label htmlFor="new-appointment-artist" style={bd.label}>{t('bdp_artist')}</label>
@@ -636,25 +662,6 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
                       ))}
                     </select>
                   </div>
-                </div>
-                <div style={bd.field}>
-                  <span id="booking-type-label" style={bd.label}>{t('nap_booking_type')}</span>
-                  <div className={styles.bookingTypes} role="group" aria-labelledby="booking-type-label" aria-describedby="booking-type-description">
-                    {[
-                      ['studio', t('nap_type_studio'), 'Studio appointment'],
-                      ['walkin', 'Walk-in', 'Walk-in'],
-                      ['personal', t('nap_type_personal'), 'Personal appointment'],
-                    ].map(([value, label, accessibleLabel]) => (
-                      <button key={value} type="button" aria-label={accessibleLabel} aria-pressed={bookingType === value} onClick={() => setBookingType(value)}>
-                        <span aria-hidden="true" className={styles.choiceMark}>{bookingType === value ? '✓' : ''}</span>{label}
-                      </button>
-                    ))}
-                  </div>
-                  <p id="booking-type-description" style={bd.hint}>{
-                    bookingType === 'walkin' ? 'Client arrived without a planned booking.'
-                      : bookingType === 'studio' ? 'Planned and booked by the studio.'
-                      : 'Client brought in by the artist.'
-                  }</p>
                 </div>
                 {artists.length === 0 && <p role="alert" style={bd.inlineError}>Add or approve an artist before creating an appointment.</p>}
                 {allStations.length === 0 && <p role="alert" style={bd.inlineError}>No active station was found. Reload the studio or add a station in Settings before creating an appointment.</p>}
@@ -689,7 +696,6 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
                     </div>
                   )}
                 </div>
-                {stationId && <p style={bd.hint}>Check the station and change it if needed.</p>}
                 {availableStations !== null && availableStations.length === 0 && <p style={bd.inlineError}>{t('nap_no_stations_date')}</p>}
                 {stationAvailabilityError && <p role="alert" style={bd.inlineError}>Live station availability could not be checked. The booking will be verified when you create it.</p>}
                 {timeError ? (
@@ -698,7 +704,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
                     {timeError}
                   </div>
                 ) : dayHours && !dayHours.is_closed ? (
-                  <p style={bd.hint}>{t('nap_studio_open')} {dayHours.open_time} – {dayHours.close_time}</p>
+                  <p style={bd.hint}>{t('nap_studio_open')} {clockLabel(dayHours.open_time)} – {clockLabel(dayHours.close_time)}</p>
                 ) : bookingDate && !studioHours.length ? (
                   <p style={bd.hint}>{t('nap_no_hours_hint')}</p>
                 ) : null}
@@ -730,12 +736,12 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
                   <h2 id="payment-section-title" style={bd.sectionLabel}>{t('bdp_payment')}</h2>
                   <div style={bd.field}>
                     <span id="deposit-mode-label" style={bd.label}>Deposit</span>
-                    <div style={bd.depositModes} role="group" aria-labelledby="deposit-mode-label">
+                    <div className={styles.segmented} role="group" aria-labelledby="deposit-mode-label">
                       {[
                         ['none', 'No deposit'],
                         ['later', stripeConnected ? 'Collect later' : 'Due later'],
                         ['paid', 'Already paid'],
-                      ].map(([value, label]) => <button key={value} type="button" aria-pressed={depositMode === value} onClick={() => setDepositMode(value)} style={{ ...bd.depositMode, ...(depositMode === value ? bd.depositModeActive : {}) }}>{label}</button>)}
+                      ].map(([value, label]) => <button key={value} type="button" aria-pressed={depositMode === value} onClick={() => setDepositMode(value)}>{label}</button>)}
                     </div>
                   </div>
                   <div className={styles.fieldRow}>
@@ -791,11 +797,10 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
                             onChange={e => setSize(e.target.value)}
                             placeholder="e.g. 10"
                           />
-                          <div style={bd.unitToggle}>
+                          <div className={styles.segmented} style={{ flexShrink: 0, minWidth: 104 }} role="group" aria-label="Size unit">
                             {['cm', 'in'].map(u => (
                               <button
                                 key={u} type="button" aria-pressed={sizeUnit === u}
-                                style={{ ...bd.unitBtn, ...(sizeUnit === u ? bd.unitBtnActive : {}) }}
                                 onClick={() => setSizeUnit(u)}
                               >
                                 {u}
@@ -837,7 +842,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
                 </div>
               )}
 
-              {(validationError || error) && <p role="alert" style={bd.errorText}>{error || validationError}</p>}
+              {error && error !== disabledReason && <p role="alert" style={bd.errorText}>{error}</p>}
 
               <Button
                 type="submit"
@@ -898,29 +903,13 @@ const bd = {
     display: 'flex', flexDirection: 'column',
   },
   section: {
-    display: 'flex', flexDirection: 'column', gap: '1rem', minWidth: 0,
-    padding: '1.125rem', borderRadius: 14,
+    display: 'flex', flexDirection: 'column', gap: '0.85rem', minWidth: 0,
+    padding: '1rem 1.1rem', borderRadius: 14,
     background: 'var(--bg-panel)', border: '1px solid var(--border)',
   },
   sectionLabel: {
-    margin: 0, fontSize: '1rem', fontWeight: 650,
-    color: 'var(--text)', letterSpacing: '-0.02em',
-  },
-  modeTabs: {
-    display: 'flex',
-    background: 'var(--appointment-input, var(--bg-input))',
-    border: '1px solid var(--border-faint)',
-    borderRadius: 9, padding: 3, gap: 3,
-  },
-  modeTab: {
-    flex: 1, background: 'none', border: 'none', borderRadius: 7,
-    padding: '0.45rem 0.75rem',
-    fontSize: '0.82rem', fontWeight: 500,
-    color: 'var(--text-secondary)', cursor: 'pointer',
-  },
-  modeTabActive: {
-    background: 'var(--bg-modal)',
-    color: 'var(--text)', fontWeight: 600, boxShadow: '0 1px 4px rgba(0,0,0,0.15)',
+    margin: 0, fontSize: '0.75rem', fontWeight: 600,
+    color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em',
   },
   field: { display: 'flex', flexDirection: 'column', gap: '0.5rem', minWidth: 0 },
   label: { fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-dim)' },
@@ -997,19 +986,6 @@ const bd = {
     background: 'none', border: 'none',
     color: 'var(--accent)', fontSize: '0.8rem', cursor: 'pointer', padding: 0,
   },
-  unitToggle: {
-    display: 'flex', flexShrink: 0,
-    background: 'var(--appointment-input, var(--bg-input))', border: '1px solid var(--border)',
-    borderRadius: 8, padding: 3, gap: 2,
-  },
-  unitBtn: {
-    background: 'none', border: 'none', borderRadius: 6,
-    padding: '0.3rem 0.55rem', fontSize: '0.78rem', fontWeight: 500,
-    color: 'var(--text-secondary)', cursor: 'pointer',
-  },
-  unitBtnActive: {
-    background: 'var(--bg-chip)', color: 'var(--text)', fontWeight: 600,
-  },
   optionalToggle: { width: '100%', margin: 0, padding: '0.85rem 0.9rem', borderRadius: 10, borderWidth: 1, borderStyle: 'solid', borderColor: 'var(--border-faint)', background: 'var(--bg-card)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', textAlign: 'left' },
   optionalToggleOpen: { background: 'var(--appointment-input, var(--bg-input))', borderColor: 'var(--border)' },
   optionalToggleCopy: { display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 },
@@ -1017,9 +993,6 @@ const bd = {
   optionalToggleDescription: { color: 'var(--text-secondary)', fontSize: '0.7rem', fontWeight: 400, lineHeight: 1.35 },
   optionalToggleAction: { display: 'flex', alignItems: 'center', gap: '0.45rem', flexShrink: 0, color: 'var(--text-muted)', fontSize: '0.72rem', fontWeight: 600 },
   optionalChevron: { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: '50%', background: 'var(--bg-chip)', border: '1px solid var(--border)', color: 'var(--text-dim)', fontSize: '1rem', lineHeight: 1, transition: 'transform 0.2s ease' },
-  depositModes: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 5 },
-  depositMode: { padding: '0.5rem 0.35rem', borderRadius: 7, borderWidth: 1, borderStyle: 'solid', borderColor: 'var(--border)', background: 'var(--appointment-input, var(--bg-input))', color: 'var(--text-muted)', fontSize: '0.75rem', minHeight: 44, cursor: 'pointer' },
-  depositModeActive: { borderColor: 'var(--accent)', background: 'var(--accent-tint)', color: 'var(--accent)', fontWeight: 700 },
   errorText: { margin: '0.5rem 0 0', fontSize: '0.8rem', color: '#ff6b6b' },
   disabledReason: { marginTop: '0.45rem', textAlign: 'center', color: 'var(--text-ghost)', fontSize: '0.73rem' },
 

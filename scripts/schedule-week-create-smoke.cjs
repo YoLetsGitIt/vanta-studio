@@ -43,17 +43,7 @@ const base = process.env.STUDIO_TEST_URL || 'http://127.0.0.1:3060';
    assert.equal(await panel.getByRole('button',{name:'Studio appointment',exact:true}).getAttribute('aria-pressed'),'true');
    await close();
    await week.focus(); await week.press('Home'); await week.evaluate(el=>{el.scrollTop=0;}); await week.press('ArrowUp');
-   // Changing lens carries only the selected station, never the previous artist.
-   if(width===844)await page.getByLabel('Calendar view').selectOption('week:station');else await page.getByRole('button',{name:'Station',exact:true}).click();
-   await filter.selectOption('station-2');
-   await openSlot('2026-11-10',810);
-   await checkSlot('2026-11-10','1','30');
-   await page.waitForFunction(()=>document.querySelector('#new-appointment-station')?.value==='station-2');
-   assert.equal(await panel.locator('#new-appointment-artist').inputValue(),'');
-   await close();
-   await week.focus(); await week.press('Home'); await week.evaluate(el=>{el.scrollTop=0;}); await week.press('ArrowUp');
-   // All resources leaves the artist unset; keyboard arrows choose half-hour slots.
-   if(width===844)await page.getByLabel('Calendar view').selectOption('week:artist');else await page.getByRole('button',{name:'Artist',exact:true}).click();
+   // All artists leaves the artist unset; (the station view was removed) keyboard arrows choose half-hour slots.
    await filter.selectOption('all');
    const keyboardSlot=week.locator('[data-booking-slot="2026-11-11-540"]');
    await keyboardSlot.focus();await keyboardSlot.press('ArrowDown');await page.keyboard.press('Enter');
