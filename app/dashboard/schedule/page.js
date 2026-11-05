@@ -10,8 +10,21 @@ import ScheduleWeekView, { useScheduleFilterSlot } from '@/components/ScheduleWe
 import { createPortal } from 'react-dom';
 import weekStyles from '@/components/ScheduleWeekView.module.css';
 import ScheduleScrollFrame, { ScheduleControls } from '@/components/ScheduleScrollFrame';
-import { weekRangeLabel } from '@/lib/scheduleWeek.mjs';
-import { getCached, setCached, invalidatePrefix } from '@/lib/cache';
+import { weekRangeLabel, localDateKey } from '@/lib/scheduleWeek.mjs';
+
+// A day's bookings from a week or month the schedule already loaded, so switching to
+// day view doesn't fetch again. Null when no loaded range covers the day.
+function dayFromLoadedRange(dateStr) {
+  const day = new Date(`${dateStr}T00:00:00`);
+  const covers = (start, days) => { const from = new Date(`${start}T00:00:00`); const to = new Date(from); to.setDate(to.getDate() + days); return day >= from && day < to; };
+  const ranges = [
+    ...cachedWithPrefix('schedule:week:').filter(([key]) => covers(key.slice('schedule:week:'.length), 7)),
+    ...cachedWithPrefix('schedule:month:').filter(([key]) => covers(key.slice('schedule:month:'.length), 35)),
+  ];
+  if (!ranges.length) return null;
+  return ranges[0][1].filter(e => e.chosenTime && localDateKey(new Date(e.chosenTime)) === dateStr);
+}
+import { getCached, setCached, invalidatePrefix, cachedWithPrefix } from '@/lib/cache';
 import CompleteBookingModal from '@/components/CompleteBookingModal';
 import RejectBookingModal from '@/components/RejectBookingModal';
 import { initials, toISODate, hasArtist } from '@/lib/format';
@@ -726,7 +739,7 @@ function DayView({ date, showAll, setShowAll }) {
       const dateStr = toISO(date);
       const ak = 'artists:approved';
       const sk = `schedule:${dateStr}`;
-      const ca = getCached(ak), cs = getCached(sk);
+      const ca = getCached(ak), cs = getCached(sk) ?? dayFromLoadedRange(dateStr);
       if (ca && cs) {
         if (!cancelled) { setArtists(ca); setEntries(cs); setLoading(false); }
         return;
@@ -1004,7 +1017,7 @@ function StationMonthView({ monthStart, onDayClick }) {
     const key   = `schedule:month:${start}`;
     const cached = getCached(key);
     if (cached) { setEntries(cached); setLoading(false); }
-    setLoading(true);
+    else setLoading(true);
     getStudioScheduleRange(start, end)
       .then(d => { const e = d.entries ?? []; setCached(key, e); if (!cancelled) { setEntries(e); setLoading(false); } })
       .catch(e => { if (!cancelled) { setError(e.message); setLoading(false); } });
@@ -1240,7 +1253,7 @@ const LANG_LOCALE = { en: 'en-AU', 'zh-Hans': 'zh-CN', ko: 'ko-KR' };
 export default function SchedulePage() {
   const { t, lang } = useLanguage();
   const locale = LANG_LOCALE[lang] ?? 'en-AU';
-  const [view,      setView]      = useState('week');  // 'month' | 'week' | 'day'
+  const [view,      setView]      = useState('week');  // 'week' | 'day' (month view hidden for now)
   const [showAll, setShowAll] = useState(false);
   // The schedule always groups by artist. Station views (StationView, StationMonthView) are kept but not shown.
   const lens = 'artist';
@@ -1315,7 +1328,6 @@ export default function SchedulePage() {
           <option value="day:artist">{t('sched_day')} · {t('bdp_artist')}</option>
           <option value="day:artist:all">{t('sched_day')} · {t('sched_all_artists')}</option>
           <option value="week:artist">{t('sched_week')} · {t('bdp_artist')}</option>
-          <option value="month:artist">{t('sched_month')} · {t('bdp_artist')}</option>
         </select>
         {view === 'week' && <div className="studio-calendar-toolbar-slot" />}
         <button type="button" aria-label={`Previous ${period}`} onClick={() => navigate(-1)}>←</button>
@@ -1327,7 +1339,8 @@ export default function SchedulePage() {
       <div className="studio-feature-header" style={s.header}>
         <h1 className="sr-only">{t('nav_schedule')}</h1>
         <div className="studio-schedule-toggles" style={s.tabs} role="group" aria-label="Calendar view">
-          {['month', 'week', 'day'].map(v => (
+          {/* Month view is hidden for now; the sidebar calendar covers the month. */}
+          {['week', 'day'].map(v => (
             <button key={v} aria-pressed={view === v} onClick={() => changeView(v)} style={{ ...s.tab, ...(view === v ? s.tabActive : {}) }}>
               {t(`sched_${v}`)}
             </button>
