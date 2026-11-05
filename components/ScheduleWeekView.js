@@ -188,7 +188,7 @@ export default function ScheduleWeekView({ date, lens, refreshKey, selectedBooki
                     <button
                       key={entry.bookingId} type="button" data-booking-id={entry.bookingId} aria-label={label} title={label}
                       className={`${styles.booking} ${pending ? styles.pending : ''} ${selectedBookingId === entry.bookingId ? styles.selected : ''} ${minutes < 45 ? styles.short : minutes < 75 ? styles.compact : ''} ${booking.lanes >= 3 ? styles.narrow : ''}`}
-                      style={{ '--booking-color': source.border, top: `${top}%`, height: `${height}%`, left: `calc(${booking.lane / booking.lanes * 100}% + 2px)`, width: `calc(${100 / booking.lanes}% - 4px)` }}
+                      style={{ '--booking-color': source.border, top: `${top}%`, height: `${height}%`, left: `calc((100% - var(--add-strip)) * ${booking.lane / booking.lanes} + 2px)`, width: `calc((100% - var(--add-strip)) / ${booking.lanes} - 4px)` }}
                       onClick={() => onOpenDetail(entry)}
                     >
                       <span className={styles.client}>{entry.clientName}</span>

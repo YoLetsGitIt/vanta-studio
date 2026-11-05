@@ -8,6 +8,7 @@ import { getStudioArtists, getStudioSchedule, getStudioScheduleRange, getStudioB
 import { BOOKING_SOURCES, getBookingStyle, TYPE_STYLE } from '@/lib/bookingType';
 import BookingDetailPanel from '@/components/BookingDetailPanel';
 import ScheduleWeekView from '@/components/ScheduleWeekView';
+import weekStyles from '@/components/ScheduleWeekView.module.css';
 import ScheduleScrollFrame, { ScheduleControls } from '@/components/ScheduleScrollFrame';
 import { weekRangeLabel } from '@/lib/scheduleWeek.mjs';
 import { getCached, setCached, invalidatePrefix } from '@/lib/cache';
@@ -759,7 +760,14 @@ function DayView({ date, showAll, setShowAll }) {
   const sorted = [...artists].sort((a, b) => a.name.localeCompare(b.name));
   const workingIds = new Set(Object.keys(byArtist));
   const working = sorted.filter(a => workingIds.has(a.artistId));
-  const cols = showAll ? sorted : working;
+  // With nobody booked yet, show everyone so there's somewhere to add a booking.
+  const cols = showAll || !working.length ? sorted : working;
+  function addBooking(artistId, minutes) {
+    window.dispatchEvent(new CustomEvent('vanta:open-new-appointment', {
+      detail: { bookingType: 'studio', slot: { date: toISO(date), time: `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`, artistId } },
+    }));
+  }
+  const slotTime = minutes => { const at = new Date(date); at.setHours(Math.floor(minutes / 60), minutes % 60, 0, 0); return at.toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' }); };
   const hiddenCount = sorted.length - working.length;
 
   if (loading) return <p style={s.msg}>{t('loading')}</p>;
@@ -823,7 +831,18 @@ function DayView({ date, showAll, setShowAll }) {
           const bookings = byArtist[artist.artistId] ?? [];
           return (
             <div key={artist.id} style={{ ...s.dayCol, height: gridH }}>
-              {HOURS.map(h => <div key={h} style={{ ...s.gridLine, top: (h - DAY_START) * hourPx }} />)}
+              {Array.from({ length: (DAY_END - DAY_START) * 2 }, (_, i) => {
+                const minutes = DAY_START * 60 + i * 30;
+                const label = `${t('new_appointment')} · ${artist.name} · ${slotTime(minutes)}`;
+                return (
+                  <button key={minutes} type="button" className={weekStyles.addSlot} aria-label={label} title={label}
+                    style={{ top: i * 30 * (hourPx / 60), height: 30 * (hourPx / 60) }}
+                    onClick={() => addBooking(artist.artistId, minutes)}>
+                    <span aria-hidden="true">＋ {slotTime(minutes)}</span>
+                  </button>
+                );
+              })}
+              {HOURS.map(h => <div key={h} style={{ ...s.gridLine, top: (h - DAY_START) * hourPx, pointerEvents: 'none' }} />)}
               {bookings.map(b => {
                 const startMin = minutesFromMidnight(b.chosenTime);
                 const durMin   = b.durationMins ?? 60;
@@ -834,14 +853,14 @@ function DayView({ date, showAll, setShowAll }) {
                 const ss = srcStyle(b.source);
                 const unconfirmed = b.status === 'requires_confirmation' || b.status === 'awaiting_payment';
                 const blockBorder = unconfirmed ? 'rgba(255,255,255,0.18)' : ss.border;
-                const blockBg     = unconfirmed ? 'rgba(255,255,255,0.04)' : ss.bg;
+                const blockBg     = unconfirmed ? 'var(--bg-base)' : ss.bg;
                 const nameColor   = unconfirmed ? 'rgba(255,255,255,0.4)'  : 'var(--text-dim)';
                 return (
                   <div
                     key={b.bookingId}
                     onClick={() => actions.openDetail(b)}
                     style={{
-                      ...s.block, top, height, left: 4, right: 4, width: undefined,
+                      ...s.block, top, height, left: 4, right: 32, width: undefined, zIndex: 1,
                       background: blockBg,
                       border: `1px ${unconfirmed ? 'dashed' : 'solid'} ${blockBorder}55`,
                       borderLeft: `3px ${unconfirmed ? 'dashed' : 'solid'} ${blockBorder}`,
