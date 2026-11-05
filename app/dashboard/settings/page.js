@@ -23,6 +23,7 @@ import {
 import { getSupabase } from '@/lib/supabase';
 import { invalidate } from '@/lib/cache';
 import { getTheme, setTheme } from '@/lib/theme';
+import ThemePicker from '@/components/ThemePicker';
 import { useLanguage, LANGUAGES } from '@/lib/i18n';
 import { requestConfirmation, showError } from '@/lib/feedback';
 
@@ -306,10 +307,8 @@ export default function SettingsPage() {
     if (SETTINGS_TABS.some(tb => tb.id === wanted)) setTabState(wanted);
   }, [requestedTab]);
 
-  function toggleTheme() {
-    const next = theme === 'dark' ? 'light' : 'dark';
-    setTheme(next);
-    setThemeState(next);
+  function chooseTheme(next) {
+    setThemeState(setTheme(next));
   }
 
   // ── Consent templates ──────────────────────────────────────────────────────
@@ -1801,21 +1800,7 @@ export default function SettingsPage() {
 
         <section className="settings-span-4" style={s.card}>
           <h2 style={s.sectionTitle}>{t('appearance')}</h2>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div>
-              <span style={{ fontSize: '0.875rem', color: 'var(--text-dim)', fontWeight: 500 }}>
-                {theme === 'dark' ? t('dark_mode') : t('light_mode')}
-              </span>
-              <p style={{ fontSize: '0.85rem', color: 'var(--text-faint)', margin: '0.2rem 0 0' }}>
-                {theme === 'dark' ? t('switch_to_light') : t('switch_to_dark')}
-              </p>
-            </div>
-            <button onClick={toggleTheme} style={s.themeToggle} role="switch" aria-checked={theme === 'dark'} aria-label={t('dark_mode')}>
-              <span style={s.themeToggleTrack(theme)}>
-                <span style={s.themeToggleThumb(theme)} />
-              </span>
-            </button>
-          </div>
+          <ThemePicker value={theme} onChange={chooseTheme} />
         </section>
 
         <section className="settings-span-4" style={s.card}>
@@ -1997,19 +1982,7 @@ const s = {
   stripeStatusDot: (active) => ({ width: 10, height: 10, borderRadius: '50%', flexShrink: 0, background: active ? 'var(--status-confirmed)' : 'var(--status-pending)' }),
   // Account
   signOutBtn: { alignSelf: 'flex-start', background: 'var(--bg-chip)', border: '1px solid var(--border)', borderRadius: 6, padding: '0.4rem 1rem', fontSize: '0.82rem', color: 'var(--text-faint)', cursor: 'pointer' },
-  themeToggle: { background: 'none', border: 'none', cursor: 'pointer', padding: 0 },
-  themeToggleTrack: (theme) => ({
-    display: 'block', width: 44, height: 24, borderRadius: 12, padding: 3,
-    background: theme === 'light' ? 'var(--accent)' : 'var(--bg-chip)',
-    border: `1px solid var(--border)`,
-    transition: 'background 0.2s', boxSizing: 'border-box',
-  }),
-  themeToggleThumb: (theme) => ({
-    display: 'block', width: 16, height: 16, borderRadius: '50%',
-    background: theme === 'light' ? 'var(--bg-sidebar)' : 'var(--text-muted)',
-    transform: `translateX(${theme === 'light' ? '20px' : '0px'})`,
-    transition: 'transform 0.2s, background 0.2s',
-  }),
+
 };
 
 function StationLastDayModal({ onConfirm, onCancel, saving, existingEndDate }) {

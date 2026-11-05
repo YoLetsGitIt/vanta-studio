@@ -15,6 +15,14 @@
   --appointment-input: #f8f5ef;
 }
 
+:global([data-theme='nature']) .panel {
+  --accent: #2e663e;
+  --accent-contrast: #f7f5eb;
+  --accent-tint: rgba(46, 102, 62, 0.08);
+  --accent-tint-border: rgba(46, 102, 62, 0.25);
+  --appointment-input: #f1eee2;
+}
+
 .body {
   flex: 1;
   min-height: 0;

@@ -151,6 +151,59 @@
   --shadow-modal: 0 28px 80px rgba(28,23,17,0.24);
 }
 
+/* Nature matches the phone app's VantaPalette.nature: parchment, forest ink and green. */
+[data-theme="nature"] {
+  --panel-backdrop: rgba(23, 36, 28, 0.22);
+  color-scheme: light;
+  --text: #17241c;
+  --text-dim: #3d493e;
+  --text-muted: #535c50;
+  --text-secondary: #4a5248;
+  --text-faint: #535c50;
+  --text-ghost: #535c50;
+  --bg-base: #e3ddcc;
+  --bg-sidebar: #ede8db;
+  --bg-panel: #ede8db;
+  --bg-modal: #f7f5eb;
+  --bg-card: #e7e2d2;
+  --bg-row-active: #d1d5be;
+  --bg-row-hover: #dadbc7;
+  --bg-input: #f1eee2;
+  --bg-chip: #d6d3c1;
+  --border-faint: rgba(23,36,28,0.10);
+  --border: rgba(23,36,28,0.14);
+  --border-strong: rgba(23,36,28,0.28);
+  --accent: #2e663e;
+  --accent-contrast: #f7f5eb;
+  --accent-tint: rgba(46,102,62,0.08);
+  --accent-tint-border: rgba(46,102,62,0.25);
+  --accent-active-tint: rgba(46,102,62,0.13);
+  --accent-active-border: rgba(46,102,62,0.40);
+  --nav-active-bg: #d3dac5;
+  --switch-on: #2e663e;
+  --switch-off: #c4c8b6;
+  --switch-thumb: #f7f5eb;
+  --switch-edge: rgba(23,36,28,0.28);
+  --color-success: #236b3b;
+  --color-success-surface: #dbe6d3;
+  --color-success-border: #8aab83;
+  --color-warning: #80560c;
+  --color-warning-surface: #eee1bf;
+  --color-warning-border: #bba16d;
+  --color-danger: #9b3b29;
+  --color-danger-surface: #efdbcf;
+  --color-danger-border: #bf9582;
+  --color-on-danger: #f7f5eb;
+  --color-info: #245f6a;
+  --color-info-surface: #d8e4df;
+  --color-info-border: #88aaa6;
+  --focus-ring: #2e663e;
+  --control-border: #69745f;
+  --overlay-backdrop: rgba(23,36,28,0.4);
+  --shadow-card: 0 1px 0 rgba(247,245,235,0.5), 0 8px 24px rgba(23,36,28,0.08);
+  --shadow-modal: 0 28px 80px rgba(23,36,28,0.28);
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
