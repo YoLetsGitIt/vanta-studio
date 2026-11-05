@@ -201,8 +201,7 @@
   .studio-dashboard-shell:has(.studio-schedule-page) > .studio-mobile-header,
   .studio-dashboard-shell:has(.studio-schedule-page) > .studio-mobile-nav,
   .studio-schedule-page .studio-feature-header,
-  .studio-schedule-page .studio-schedule-filter,
-  .studio-schedule-page .studio-schedule-lens { display: none !important; }
+  .studio-schedule-page .studio-schedule-filter { display: none !important; }
   .studio-calendar-toolbar {
     display: flex; align-items: center; gap: 4px; flex-shrink: 0;
     padding: 2px 8px; border-bottom: 1px solid var(--border); background: var(--bg-sidebar);

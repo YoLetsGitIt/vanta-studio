@@ -10,7 +10,6 @@ import { useLanguage } from '@/lib/i18n';
 import { calendarDayAfter, layoutDayLanes, localDateKey, weekHourRange, weekStartFor, weekSchedule } from '@/lib/scheduleWeek.mjs';
 import styles from './ScheduleWeekView.module.css';
 import { ScheduleControls } from './ScheduleScrollFrame';
-import ScheduleLensSwitch from './ScheduleLensSwitch';
 
 // A rotated phone: the schedule's one-row toolbar has a slot for the week filter.
 const PHONE_LANDSCAPE = '(max-width: 1100px) and (max-height: 550px) and (orientation: landscape) and (any-pointer: coarse)';
@@ -137,13 +136,10 @@ export default function ScheduleWeekView({ date, lens, refreshKey, selectedBooki
         <ScheduleControls>
           <div className={styles.summary}>
             <div><span role="status">{t(count === 1 ? 'sched_week_one_booking' : 'sched_week_bookings', { count })}</span><p className={styles.addHint}>{t('sched_week_add_hint')}</p></div>
-            <div className={styles.summaryRight}>
-              <ScheduleLensSwitch />
-              <label className={styles.filter}>
-                <span>{t(lens === 'artist' ? 'bdp_artist' : 'bdp_station')}</span>
-                {filterSelect}
-              </label>
-            </div>
+            <label className={styles.filter}>
+              <span>{t(lens === 'artist' ? 'bdp_artist' : 'bdp_station')}</span>
+              {filterSelect}
+            </label>
           </div>
         </ScheduleControls>
       )}

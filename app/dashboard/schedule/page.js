@@ -9,7 +9,6 @@ import { BOOKING_SOURCES, getBookingStyle, TYPE_STYLE } from '@/lib/bookingType'
 import BookingDetailPanel from '@/components/BookingDetailPanel';
 import ScheduleWeekView from '@/components/ScheduleWeekView';
 import ScheduleScrollFrame, { ScheduleControls } from '@/components/ScheduleScrollFrame';
-import ScheduleLensSwitch, { ScheduleLensContext } from '@/components/ScheduleLensSwitch';
 import { weekRangeLabel } from '@/lib/scheduleWeek.mjs';
 import { getCached, setCached, invalidatePrefix } from '@/lib/cache';
 import CompleteBookingModal from '@/components/CompleteBookingModal';
@@ -792,7 +791,6 @@ function DayView({ date, showAll, setShowAll }) {
             </button>
           </>
         )}
-        <span style={{ marginLeft: 'auto' }}><ScheduleLensSwitch /></span>
       </div>
       </ScheduleControls>
 
@@ -1241,7 +1239,8 @@ export default function SchedulePage() {
   const locale = LANG_LOCALE[lang] ?? 'en-AU';
   const [view,      setView]      = useState('week');  // 'month' | 'week' | 'day'; phones switch to day
   const [showAll, setShowAll] = useState(false);
-  const [lens,      setLens]      = useState('artist'); // 'artist' | 'station'
+  // The schedule always groups by artist. Station views (StationView, StationMonthView) are kept but not shown.
+  const lens = 'artist';
   const [monthStart, setMonthStart] = useState(() => getMonthStart(new Date()));
   const [dayDate,    setDayDate]    = useState(() => new Date());
 
@@ -1312,15 +1311,12 @@ export default function SchedulePage() {
         <button type="button" aria-label="Open studio navigation" onClick={() => window.dispatchEvent(new Event('vanta:open-navigation'))}>☰</button>
         <select aria-label="Calendar view" value={`${view}:${lens}${view === 'day' && lens === 'artist' && showAll ? ':all' : ''}`} onChange={event => {
           const [nextView, nextLens, all] = event.target.value.split(':');
-          changeView(nextView); setLens(nextLens); setShowAll(all === 'all');
+          changeView(nextView); setShowAll(all === 'all');
         }}>
           <option value="day:artist">{t('sched_day')} · {t('bdp_artist')}</option>
           <option value="day:artist:all">{t('sched_day')} · {t('sched_all_artists')}</option>
-          <option value="day:station">{t('sched_day')} · {t('bdp_station')}</option>
           <option value="week:artist">{t('sched_week')} · {t('bdp_artist')}</option>
-          <option value="week:station">{t('sched_week')} · {t('bdp_station')}</option>
           <option value="month:artist">{t('sched_month')} · {t('bdp_artist')}</option>
-          <option value="month:station">{t('sched_month')} · {t('bdp_station')}</option>
         </select>
         {view === 'week' && <div className="studio-calendar-toolbar-slot" />}
         <button type="button" aria-label={`Previous ${period}`} onClick={() => navigate(-1)}>←</button>
@@ -1348,18 +1344,9 @@ export default function SchedulePage() {
       </div>
 
       </ScheduleControls>
-      <ScheduleLensContext.Provider value={{ lens, setLens }}>
-      {(view === 'month' || (view === 'day' && lens === 'station')) && (
-        <ScheduleControls>
-          <div className="studio-schedule-filter studio-schedule-lens-bar" style={s.lensBar}><ScheduleLensSwitch /></div>
-        </ScheduleControls>
-      )}
       {view === 'month' && lens === 'artist'  && <MonthView        monthStart={monthStart} onDayClick={goToDayView} />}
-      {view === 'month' && lens === 'station' && <StationMonthView monthStart={monthStart} onDayClick={day => { goToDayView(day); setLens('station'); }} />}
       {view === 'week' && <WeekView date={dayDate} lens={lens} onDayClick={goToDayView} />}
       {view === 'day'   && lens === 'artist'  && <DayView          date={dayDate} showAll={showAll} setShowAll={setShowAll} />}
-      {view === 'day'   && lens === 'station' && <StationView      date={dayDate} />}
-      </ScheduleLensContext.Provider>
     </ScheduleScrollFrame>
   );
 }
@@ -1426,12 +1413,6 @@ const s = {
     cursor: 'pointer',
   },
   todayBtnOff: { color: 'var(--text-muted)', borderColor: 'var(--border)', opacity: 1, cursor: 'default' },
-  lensBar: {
-    display: 'flex', justifyContent: 'flex-end', alignItems: 'center',
-    padding: '0.5rem 2rem',
-    borderBottom: '1px solid var(--border-faint)',
-    flexShrink: 0,
-  },
   msg: { padding: '2rem', fontSize: '0.875rem', color: 'var(--text-faint)' },
 
   // Day filter bar
