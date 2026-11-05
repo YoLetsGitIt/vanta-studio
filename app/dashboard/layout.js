@@ -16,6 +16,7 @@ import { registerServiceWorker } from '@/lib/push';
 import { useHideHeaderOnScroll } from '@/lib/useHideHeaderOnScroll';
 import SidebarCalendar from '@/components/SidebarCalendar';
 import SidebarNeedsAction from '@/components/SidebarNeedsAction';
+import GlobalBookingPanel from '@/components/GlobalBookingPanel';
 
 const NAV = [
   { href: '/dashboard/schedule',     tKey: 'nav_schedule',  icon: GridCalIcon },
@@ -378,6 +379,8 @@ function DashboardShell({ children }) {
         onClose={() => setAppointmentPanelOpen(false)}
         onCreated={() => {}}
       />
+
+      <GlobalBookingPanel />
 
       {tourStep !== null && (
         <DashboardTour

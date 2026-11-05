@@ -450,3 +450,6 @@ textarea {
 
 /* Offer times week view: dragging options is mouse-only, so only mention it there. */
 @media not (pointer: fine) { .offer-week-drag-hint { display: none; } }
+
+/* Booking panel opened over any page (sidebar Needs action): only the panel and its backdrop take clicks. */
+.studio-global-panel-inner > * { pointer-events: auto; }

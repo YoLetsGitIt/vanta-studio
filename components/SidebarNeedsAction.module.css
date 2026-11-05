@@ -26,7 +26,7 @@
 .list { list-style: none; margin: 0 0 0.25rem; padding: 0 0 0 0.85rem; display: flex; flex-direction: column; }
 .item {
   display: flex; flex-direction: column; gap: 1px; padding: 0.35rem 0.4rem; border-radius: var(--radius-sm);
-  min-width: 0;
+  min-width: 0; width: 100%; border: 0; background: transparent; text-align: left; font: inherit; color: inherit;
 }
 .item:hover { background: var(--bg-chip); }
 .itemTitle { font-size: var(--font-size-xs); font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

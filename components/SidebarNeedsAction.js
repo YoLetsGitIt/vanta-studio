@@ -1,11 +1,12 @@
 'use client';
 
-// "Needs action" list in the sidebar (and the phone "More" menu). Each item opens the
-// page where it is handled: bookings open in the Bookings panel.
+// "Needs action" list in the sidebar (and the phone "More" menu). Bookings open in a
+// panel over the current page; artist requests and reimbursements open their page.
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { getDashboardAttention } from '@/lib/api';
+import { openBookingPanel, ATTENTION_CHANGED_EVENT } from '@/components/GlobalBookingPanel';
 import { normalizeBookingSource } from '@/lib/bookingType';
 import styles from './SidebarNeedsAction.module.css';
 
@@ -32,7 +33,21 @@ function when(b) {
   return `${d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}, ${d.toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' })}`;
 }
 
-const bookingHref = b => `/dashboard/appointments?booking=${encodeURIComponent(b.id)}`;
+const shortDate = t => new Date(t).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
+
+// Deposit links last 7 days unless the studio picked otherwise, so the send date is
+// estimated from the link's expiry.
+const LINK_DAYS = 7;
+function depositSent(b) {
+  if (!b.selection_token_expires_at) return 'Deposit link not sent';
+  const sent = new Date(b.selection_token_expires_at).getTime() - LINK_DAYS * 86400000;
+  if (!Number.isFinite(sent) || sent > Date.now()) return 'Deposit link sent';
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const days = Math.round((today.getTime() - new Date(sent).setHours(0, 0, 0, 0)) / 86400000);
+  return days <= 0 ? 'Sent today' : days === 1 ? 'Sent yesterday' : `Sent ${days} days ago`;
+}
+
+const bookingItem = (b, lines) => ({ id: b.id, title: b.requester_name ?? 'Client', lines, booking: b });
 
 // paymentRecording: the studio's payment_recording_requirement. Past sessions only need
 // an outcome when the studio records payments.
@@ -46,7 +61,7 @@ export default function SidebarNeedsAction({ paymentRecording, onNavigate }) {
     const load = () => getDashboardAttention().then(d => { if (live) setData(d); }).catch(() => {});
     load();
     // Refresh when the studio comes back to the tab or changes something.
-    const events = ['focus', 'booking-deposit-cancelled', 'booking-deposit-received', 'vanta:attention-changed'];
+    const events = ['focus', 'booking-deposit-cancelled', 'booking-deposit-received', ATTENTION_CHANGED_EVENT];
     events.forEach(e => window.addEventListener(e, load));
     return () => { live = false; events.forEach(e => window.removeEventListener(e, load)); };
   }, [pathname]);
@@ -56,12 +71,12 @@ export default function SidebarNeedsAction({ paymentRecording, onNavigate }) {
   const now = Date.now();
   const recordsOutcomes = paymentRecording && paymentRecording !== 'none' && paymentRecording !== 'artist_only';
   const groups = [
-    { key: 'pending', title: 'Pending requests', tone: 'warning', items: bookings.filter(b => b.status === 'pending').map(b => ({ id: b.id, title: b.requester_name ?? 'Client', sub: when(b), href: bookingHref(b) })) },
-    { key: 'confirm', title: 'To confirm', tone: 'info', items: bookings.filter(b => b.status === 'requires_confirmation').map(b => ({ id: b.id, title: b.requester_name ?? 'Client', sub: when(b), href: bookingHref(b) })) },
-    { key: 'deposit', title: 'Unpaid deposits', tone: 'danger', items: bookings.filter(needsDeposit).map(b => ({ id: b.id, title: b.requester_name ?? 'Client', sub: when(b), href: bookingHref(b) })) },
-    { key: 'overdue', title: 'Past sessions to finish', tone: 'warning', items: recordsOutcomes ? bookings.filter(b => isOverdue(b, now)).sort((a, b) => new Date(a.chosen_time) - new Date(b.chosen_time)).map(b => ({ id: b.id, title: b.requester_name ?? 'Client', sub: when(b), href: bookingHref(b) })) : [] },
-    { key: 'artists', title: 'Artist requests', tone: 'info', items: (data.pending_artists ?? []).map(a => ({ id: a.id, title: a.name ?? 'Artist', sub: a.email || 'Wants to join', href: '/dashboard/artists' })) },
-    { key: 'reimburse', title: 'Reimbursements', tone: 'warning', items: (data.pending_reimbursements ?? []).map(r => ({ id: r.id, title: r.artist_name ?? 'Artist', sub: `$${Number(r.amount ?? 0).toFixed(2)}${r.description ? ` · ${r.description}` : ''}`, href: '/dashboard/financial' })) },
+    { key: 'pending', title: 'Pending requests', tone: 'warning', items: bookings.filter(b => b.status === 'pending').map(b => bookingItem(b, [when(b)])) },
+    { key: 'confirm', title: 'To confirm', tone: 'info', items: bookings.filter(b => b.status === 'requires_confirmation').map(b => bookingItem(b, [when(b)])) },
+    { key: 'deposit', title: 'Unpaid deposits', tone: 'danger', items: bookings.filter(needsDeposit).map(b => bookingItem(b, [depositSent(b), `Appointment: ${shortDate(b.chosen_time)}`])) },
+    { key: 'overdue', title: 'Past sessions to finish', tone: 'warning', items: recordsOutcomes ? bookings.filter(b => isOverdue(b, now)).sort((a, b) => new Date(a.chosen_time) - new Date(b.chosen_time)).map(b => bookingItem(b, [`${b.artist_name ?? 'No artist'} · ${shortDate(b.chosen_time)}`])) : [] },
+    { key: 'artists', title: 'Artist requests', tone: 'info', items: (data.pending_artists ?? []).map(a => ({ id: a.id, title: a.name ?? 'Artist', lines: [a.email || 'Wants to join'], href: '/dashboard/artists' })) },
+    { key: 'reimburse', title: 'Reimbursements', tone: 'warning', items: (data.pending_reimbursements ?? []).map(r => ({ id: r.id, title: r.artist_name ?? 'Artist', lines: [`$${Number(r.amount ?? 0).toFixed(2)}${r.description ? ` · ${r.description}` : ''}`], href: '/dashboard/financial' })) },
   ].filter(g => g.items.length);
   const total = groups.reduce((n, g) => n + g.items.length, 0);
 
@@ -85,10 +100,17 @@ export default function SidebarNeedsAction({ paymentRecording, onNavigate }) {
               <ul className={styles.list}>
                 {g.items.map(item => (
                   <li key={item.id}>
-                    <Link href={item.href} className={styles.item} onClick={onNavigate}>
-                      <span className={styles.itemTitle}>{item.title}</span>
-                      <span className={styles.itemSub}>{item.sub}</span>
-                    </Link>
+                    {item.booking ? (
+                      <button type="button" className={styles.item} onClick={() => { onNavigate?.(); openBookingPanel(item.id, item.booking); }}>
+                        <span className={styles.itemTitle}>{item.title}</span>
+                        {item.lines.map(line => <span key={line} className={styles.itemSub}>{line}</span>)}
+                      </button>
+                    ) : (
+                      <Link href={item.href} className={styles.item} onClick={onNavigate}>
+                        <span className={styles.itemTitle}>{item.title}</span>
+                        {item.lines.map(line => <span key={line} className={styles.itemSub}>{line}</span>)}
+                      </Link>
+                    )}
                   </li>
                 ))}
               </ul>
