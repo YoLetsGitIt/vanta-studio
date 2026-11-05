@@ -111,7 +111,7 @@ function TimeSelect({ value, onChange, label }) {
 // One step of the form. Only the step to do now is open; finished steps fold into a line
 // saying what was chosen, and upcoming steps show just their heading. Any folded step opens
 // when clicked. A step stays open while someone is typing in it.
-function FormSection({ id, step, title, state, done, summary, expanded, onToggle, onTyping, children }) {
+function FormSection({ id, step, title, state, done, summary, expanded, onToggle, onTyping, onPicked, children }) {
   const stateClass = state === 'active' ? styles.stepActive : state === 'done' ? styles.stepDone : styles.stepUpcoming;
   const canToggle = state !== 'active';
   const tick = done && (
@@ -126,8 +126,14 @@ function FormSection({ id, step, title, state, done, summary, expanded, onToggle
         {!expanded && summary && <span className={styles.sectionSummary}>{summary}</span>}
       </span>
       <span className={styles.sectionHeadEnd}>
-        {canToggle && <span className={styles.sectionEdit} aria-hidden="true">{expanded ? 'Close' : done ? 'Edit' : ''}</span>}
-        {tick}
+        {/* Open by hand: the tick turns into a fold arrow. Payment stays open on its own,
+            so it keeps its tick beside the arrow. */}
+        {canToggle && expanded && step === 'payment' && tick}
+        {canToggle && expanded ? (
+          <span className={styles.collapseIcon} aria-hidden="true">
+            <svg viewBox="0 0 16 16" width="12" height="12"><path d="M4 10l4-4 4 4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          </span>
+        ) : tick}
       </span>
     </>
   );
@@ -138,15 +144,26 @@ function FormSection({ id, step, title, state, done, summary, expanded, onToggle
       aria-labelledby={id} data-step={step} aria-current={state === 'active' ? 'step' : undefined}
       onFocus={event => { if (typing(event)) onTyping(step); }}
       onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) onTyping(null, step); }}
+      onClickCapture={event => { if (event.target.closest?.('[role=radio]')) onPicked(step); }}
     >
       {canToggle
-        ? <button type="button" className={styles.sectionHead} aria-expanded={expanded} onClick={onToggle}>{heading}</button>
+        ? <button type="button" className={styles.sectionHead} aria-expanded={expanded} aria-label={`${expanded ? 'Fold' : 'Open'} ${typeof title === 'string' ? title : ''}`.trim()} onClick={onToggle}>{heading}</button>
         : <div className={styles.sectionHead}>{heading}</div>}
       <div className={styles.sectionBody} inert={!expanded}>
         <div className={styles.sectionInner}>{children}</div>
       </div>
     </section>
   );
+}
+
+// "1999-09-09" → "27 yrs", or null without a valid date of birth.
+function ageOf(dob) {
+  const born = dob ? new Date(`${String(dob).slice(0, 10)}T00:00:00`) : null;
+  if (!born || !Number.isFinite(born.getTime())) return null;
+  const now = new Date();
+  let age = now.getFullYear() - born.getFullYear();
+  if (now.getMonth() < born.getMonth() || (now.getMonth() === born.getMonth() && now.getDate() < born.getDate())) age -= 1;
+  return age >= 0 && age < 130 ? `${age} yrs` : null;
 }
 
 // "09:00:00" → "9:00 am"
@@ -222,6 +239,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
     setArtistId(initialSlot?.artistId || '');
     setStationId(initialSlot?.stationId || '');
     setScheduleTouched(Boolean(initialSlot?.date && initialSlot?.time));
+    setPaymentFolded(false);
     setBookingType(null);
   }, [open, initialBookingType, initialSlot?.date, initialSlot?.time, initialSlot?.artistId, initialSlot?.stationId]);
 
@@ -281,6 +299,9 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
     setClientSearch('');
     setShowDropdown(false);
     setSelectedClient(c);
+    // Choosing a client finishes this step, so fold it even if it was opened by hand.
+    setTypingStep(current => (current === 'client' ? null : current));
+    setOpenStep(current => (current === 'client' ? null : current));
   }
 
   function clearSelectedClient() {
@@ -356,7 +377,8 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
     client: Boolean(clientName) && !emailInvalid && !phoneInvalid,
     appointment: Boolean(appointmentType && artistId) && !artistConflict,
     schedule: scheduleTouched && Boolean(bookingDate && startTime && durationMins && stationId) && !timeError && !dateInPast && !artistConflict,
-    payment: Boolean(depositMode) && !depositInvalid,
+    // Ticked once there's a price; the deposit choice is optional.
+    payment: quote > 0 && !depositInvalid,
   };
   const canSubmit = !disabledReason;
   const paymentVisible = Boolean(clientName && artistId && bookingDate && startTime && durationMins && stationId && !timeError && !dateInPast && !artistConflict) && (bookingType !== 'walkin' || showOptional);
@@ -365,8 +387,17 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
   // Steps opened by hand, and the step being typed in, stay open alongside the current one.
   const [openStep, setOpenStep] = useState(null);
   const [typingStep, setTypingStep] = useState(null);
-  const isOpen = step => step === activeStep || step === openStep || step === typingStep;
+  // Payment has no clear end, so it never folds by itself: it stays open until folded by hand.
+  const [paymentFolded, setPaymentFolded] = useState(false);
+  const isOpen = step => step === activeStep || step === openStep || step === typingStep || (step === 'payment' && paymentVisible && !paymentFolded);
+  const [pickedStep, setPickedStep] = useState(null);
+  useEffect(() => {
+    if (!pickedStep) return;
+    if (pickedStep !== 'payment' && pickedStep === openStep && pickedStep !== activeStep && sectionDone[pickedStep]) setOpenStep(null);
+    setPickedStep(null);
+  }, [pickedStep]); // eslint-disable-line react-hooks/exhaustive-deps
   function toggleStep(step) {
+    if (step === 'payment') { setPaymentFolded(folded => !folded); setOpenStep(null); return; }
     if (isOpen(step)) { setOpenStep(null); if (typingStep === step) setTypingStep(null); }
     else setOpenStep(step);
   }
@@ -376,7 +407,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
   const durationName = DURATION_OPTIONS.find(option => option.value === durationMins)?.label;
   const stepSummary = {
     type: { studio: 'Studio', walkin: 'Walk-in', personal: 'Personal' }[bookingType],
-    client: clientName ? [clientName, clientMode === 'search' ? selectedClient?.email : clientEmail.trim()].filter(Boolean).join(' · ') : null,
+    client: clientName ? [clientName, ageOf(clientMode === 'search' ? selectedClient?.dob : clientDob), clientMode === 'search' ? selectedClient?.email : clientEmail.trim()].filter(Boolean).join(' · ') : null,
     appointment: [appointmentType && (isPiercing ? 'Piercing' : 'Tattoo'), artistName].filter(Boolean).join(' · ') || null,
     schedule: sectionDone.schedule ? [chosenDateTime?.toLocaleString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }), durationName, stationName].filter(Boolean).join(' · ') : null,
     payment: depositMode ? [{ none: 'No deposit', later: stripeConnected ? 'Deposit to collect' : 'Deposit due later', paid: 'Deposit paid' }[depositMode] + (depositEnabled && deposit > 0 ? ` $${deposit.toFixed(2)}` : ''), quote > 0 ? `$${quote.toFixed(2)} quoted` : null].filter(Boolean).join(' · ') : null,
@@ -410,7 +441,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
     setBookingDate(slot.date);
     setStartTime(slot.time);
     setDurationMins(0);
-    setStationId(''); setScheduleTouched(false);
+    setStationId(''); setScheduleTouched(false); setPaymentFolded(false);
     setSize(''); setSizeUnit('cm'); setRetouch(false); setAppointmentType(null);
     setFinalPrice(''); setDepositAmount(''); setDepositMode(null); setShowOptional(false);
     setBookingType(null);
@@ -576,7 +607,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
           <form onSubmit={handleSubmit} style={bd.form}>
             <div ref={bodyRef} className={styles.body}>
               {/* ── BOOKING TYPE ── */}
-              <FormSection id="booking-type-label" step="type" title={t('nap_booking_type')} state={stepState('type')} done={sectionDone.type} summary={stepSummary.type} expanded={isOpen('type')} onToggle={() => toggleStep('type')} onTyping={trackTyping}>
+              <FormSection id="booking-type-label" step="type" title={t('nap_booking_type')} state={stepState('type')} done={sectionDone.type} summary={stepSummary.type} expanded={isOpen('type')} onToggle={() => toggleStep('type')} onTyping={trackTyping} onPicked={setPickedStep}>
                 <div className={styles.choices} role="radiogroup" aria-labelledby="booking-type-label" aria-describedby={bookingType ? 'booking-type-description' : undefined}>
                   {[
                     ['studio', t('nap_type_studio'), 'Studio appointment'],
@@ -595,7 +626,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
               </FormSection>
 
               {/* ── CLIENT ── */}
-              <FormSection id="client-section-title" step="client" title={t('nap_client')} state={stepState('client')} done={sectionDone.client} summary={stepSummary.client} expanded={isOpen('client')} onToggle={() => toggleStep('client')} onTyping={trackTyping}>
+              <FormSection id="client-section-title" step="client" title={t('nap_client')} state={stepState('client')} done={sectionDone.client} summary={stepSummary.client} expanded={isOpen('client')} onToggle={() => toggleStep('client')} onTyping={trackTyping} onPicked={setPickedStep}>
 
                 <div className={styles.segmented} role="group" aria-label="Client">
                   <button
@@ -732,7 +763,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
                 </label>}
               </FormSection>
 
-              <FormSection id="appointment-section-title" step="appointment" title={t('nap_appointment')} state={stepState('appointment')} done={sectionDone.appointment} summary={stepSummary.appointment} expanded={isOpen('appointment')} onToggle={() => toggleStep('appointment')} onTyping={trackTyping}>
+              <FormSection id="appointment-section-title" step="appointment" title={t('nap_appointment')} state={stepState('appointment')} done={sectionDone.appointment} summary={stepSummary.appointment} expanded={isOpen('appointment')} onToggle={() => toggleStep('appointment')} onTyping={trackTyping} onPicked={setPickedStep}>
                 <div className={styles.fieldRow}>
                   <div style={bd.field}>
                     <span id="new-appointment-type" style={bd.label}>Appointment type</span>
@@ -756,7 +787,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
                 {allStations.length === 0 && <p role="alert" style={bd.inlineError}>No active station was found. Reload the studio or add a station in Settings before creating an appointment.</p>}
               </FormSection>
 
-              <FormSection id="schedule-section-title" step="schedule" title={t('nav_schedule')} state={stepState('schedule')} done={sectionDone.schedule} summary={stepSummary.schedule} expanded={isOpen('schedule')} onToggle={() => toggleStep('schedule')} onTyping={trackTyping}>
+              <FormSection id="schedule-section-title" step="schedule" title={t('nav_schedule')} state={stepState('schedule')} done={sectionDone.schedule} summary={stepSummary.schedule} expanded={isOpen('schedule')} onToggle={() => toggleStep('schedule')} onTyping={trackTyping} onPicked={setPickedStep}>
                 <div className={styles.fieldRow}>
                   <div style={bd.field}>
                     <label htmlFor="new-appointment-date" style={bd.label}>{t('sched_date')}</label>
@@ -821,7 +852,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
 
               {essentialsComplete && (bookingType !== 'walkin' || showOptional) && <>
                 {/* ── PRICING ── */}
-                <FormSection id="payment-section-title" step="payment" title={t('bdp_payment')} state={stepState('payment')} done={sectionDone.payment} summary={stepSummary.payment} expanded={isOpen('payment')} onToggle={() => toggleStep('payment')} onTyping={trackTyping}>
+                <FormSection id="payment-section-title" step="payment" title={t('bdp_payment')} state={stepState('payment')} done={sectionDone.payment} summary={stepSummary.payment} expanded={isOpen('payment')} onToggle={() => toggleStep('payment')} onTyping={trackTyping} onPicked={setPickedStep}>
                   <div style={bd.field}>
                     <span id="deposit-mode-label" style={bd.label}>Deposit</span>
                     <div className={styles.choices} role="radiogroup" aria-labelledby="deposit-mode-label">

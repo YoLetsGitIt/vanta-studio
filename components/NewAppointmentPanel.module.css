@@ -185,8 +185,14 @@ button.sectionHead:focus-visible { outline: 2px solid var(--focus-ring); outline
   animation: summaryIn 220ms ease-out;
 }
 @keyframes summaryIn { from { opacity: 0; transform: translateY(-2px); } }
-.sectionEdit { font-size: 0.78rem; font-weight: 600; color: var(--text-muted); opacity: 0; transition: opacity 150ms; }
-button.sectionHead:hover .sectionEdit, button.sectionHead:focus-visible .sectionEdit, .open .sectionEdit { opacity: 1; }
+.collapseIcon {
+  display: inline-flex; align-items: center; justify-content: center; flex: none;
+  width: 20px; height: 20px; border-radius: 50%;
+  background: var(--bg-chip); color: var(--text-muted);
+  animation: tickPop 260ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: background 150ms, color 150ms;
+}
+button.sectionHead:hover .collapseIcon { background: var(--border-strong); color: var(--text); }
 /* Opening and folding: the body grows from its heading. */
 .sectionBody { display: grid; grid-template-rows: 1fr; transition: grid-template-rows 280ms cubic-bezier(0.2, 0.8, 0.2, 1); }
 .folded .sectionBody { grid-template-rows: 0fr; }
@@ -216,7 +222,8 @@ button.sectionHead:hover .sectionEdit, button.sectionHead:focus-visible .section
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .section, .sectionTitle, .sectionBody, .sectionInner, .sectionEdit { transition: none; }
+  .section, .sectionTitle, .sectionBody, .sectionInner { transition: none; }
+  .collapseIcon { animation: none; }
   .stepActive, .doneTick, .tickPath, .readyButton, .sectionSummary { animation: none; }
 }
 
