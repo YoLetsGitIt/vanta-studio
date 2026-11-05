@@ -21,6 +21,7 @@ import MarketingConsent from '@/components/MarketingConsent';
 import { Pill, Section, Fact, SkeletonBar, DetailSkeleton, PanelBackdrop, detailStyles } from '@/components/ui/DetailParts';
 import ConsentSubmissionCard from '@/components/ConsentSubmissionCard';
 import { describeAvailability } from '@/lib/availability';
+import panelLayout from '@/components/ui/DetailPanelLayout.module.css';
 
 const PAYMENT_LABELS = { cash: 'Cash', card: 'Card / POS', bank_transfer: 'Bank Transfer' };
 
@@ -409,7 +410,7 @@ export default function BookingDetailPanel({
     return (
       <>
       <PanelBackdrop onClose={onClose} />
-      <aside className="studio-booking-detail" aria-label={`${clientName} booking details`} aria-busy="true" style={p.panel}>
+      <aside className={`studio-booking-detail ${panelLayout.panel}`} aria-label={`${clientName} booking details`} aria-busy="true" style={p.panel}>
         <div style={p.header}>
           <div style={p.headerText}>
             <span style={p.title}>{clientName}</span>
@@ -438,7 +439,7 @@ export default function BookingDetailPanel({
   return (
     <>
     <PanelBackdrop onClose={onClose} />
-    <aside className="studio-booking-detail" aria-label={`${clientName} booking details`} style={p.panel}>
+    <aside className={`studio-booking-detail ${panelLayout.panel}`} aria-label={`${clientName} booking details`} style={p.panel}>
       <div className="studio-bdp-header" style={p.header}>
         <div className="studio-bdp-headtext" style={p.headerText}>
           <span style={p.title}>{clientName}</span>
@@ -451,7 +452,7 @@ export default function BookingDetailPanel({
         <IconButton onClick={onClose} aria-label="Close booking details">✕</IconButton>
       </div>
 
-      <div className="studio-bdp-body" style={p.body}>
+      <div className={`studio-bdp-body ${panelLayout.body}`} style={p.body}>
         {/* ── When / who summary ── */}
         <div className="studio-bdp-hero" style={{ ...p.hero, background: sc.bg, borderColor: sc.border }}>
           <span style={{ ...p.heroCaption, color: sc.text }}>{heroCaption}</span>
@@ -483,8 +484,8 @@ export default function BookingDetailPanel({
           {cancelReason && <span style={p.heroNote}>{t('bdp_cancelled_reason')}: {cancelReason}</span>}
         </div>
 
-        {/* Cards: one column normally; two balanced columns on a rotated phone. */}
-        <div className="studio-bdp-cards">
+        {/* Cards use two columns when the panel has room, and one on narrow screens. */}
+        <div className={`studio-bdp-cards ${panelLayout.cards}`}>
         {/* ── Outcome (completed / no-show) ── */}
         {isCompleted && (
           <div style={{
@@ -898,20 +899,20 @@ function Btn({ onClick, disabled, variant, children }) {
 const p = {
   ...detailStyles,
   panel: {
-    position: 'absolute', top: 0, right: 0, bottom: 0, width: 'min(clamp(480px, 40vw, 720px), 100%)',
+    position: 'absolute', top: 0, right: 0, bottom: 0, width: 'min(960px, 100%)',
     background: 'var(--bg-panel)', borderLeft: '1px solid var(--border)',
     display: 'flex', flexDirection: 'column', zIndex: 10,
   },
   header: {
     display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '0.75rem',
-    padding: '1.25rem 1.25rem 1rem',
+    padding: '1rem 1.25rem',
     borderBottom: '1px solid var(--border)', flexShrink: 0,
   },
   headerText: { display: 'flex', flexDirection: 'column', gap: '0.55rem', minWidth: 0 },
   headerPills: { display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' },
   title: { fontSize: '1.25rem', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.01em', overflowWrap: 'anywhere' },
   body: {
-    flex: 1, overflowY: 'auto', padding: '1.1rem 1.25rem 1.5rem',
+    flex: 1, overflowY: 'auto', padding: '1rem 1.25rem 1.25rem',
     display: 'flex', flexDirection: 'column', gap: '1rem',
   },
   hero: {

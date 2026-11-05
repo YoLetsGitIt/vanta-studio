@@ -19,6 +19,8 @@ import ConsentSubmissionCard from '@/components/ConsentSubmissionCard';
 import ClientTemplateSend from '@/components/marketing/ClientTemplateSend';
 import { Pill, Section, CollapsibleSection, Fact, SkeletonBar, DetailSkeleton, PanelBackdrop, detailStyles } from '@/components/ui/DetailParts';
 
+import panelLayout from '@/components/ui/DetailPanelLayout.module.css';
+
 const CLIENTS_PER_PAGE = 25;
 
 function ClientsInner() {
@@ -290,7 +292,7 @@ function ClientsInner() {
         {(detailLoading || selectedClient) && <PanelBackdrop onClose={() => setSelected(null)} />}
 
         {detailLoading && (
-          <aside id="client-detail" className="studio-client-detail" aria-label="Loading client details" aria-busy="true" style={s.panel}>
+          <aside id="client-detail" className={`studio-client-detail ${panelLayout.panel}`} aria-label="Loading client details" aria-busy="true" style={s.panel}>
             <div style={s.panelHeader}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', minWidth: 0 }}>
                 <span style={s.panelTitle}>{clients.find(c => c.id === selected)?.name ?? <SkeletonBar w={180} h={22} />}</span>
@@ -298,7 +300,7 @@ function ClientsInner() {
               </div>
               <button type="button" aria-label="Close client details" onClick={() => setSelected(null)} style={s.closeBtn}>✕</button>
             </div>
-            <div style={s.panelBody}><DetailSkeleton label="Loading client details…" stats /></div>
+            <div className={panelLayout.body} style={s.panelBody}><DetailSkeleton label="Loading client details…" stats /></div>
           </aside>
         )}
         {!detailLoading && selectedClient && (
@@ -481,7 +483,7 @@ function ClientDetail({ client, marketing, onMarketingChange, clientKey, onClose
   const lastVisit = sorted[0]?.created_at ?? null;
 
   return (
-    <aside id="client-detail" className="studio-client-detail" aria-label={`${client.name} details`} style={s.panel}>
+    <aside id="client-detail" className={`studio-client-detail ${panelLayout.panel}`} aria-label={`${client.name} details`} style={s.panel}>
       <div style={s.panelHeader}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', minWidth: 0 }}>
           <span style={s.panelTitle}>{client.name}</span>
@@ -493,13 +495,14 @@ function ClientDetail({ client, marketing, onMarketingChange, clientKey, onClose
         </div>
         <button type="button" aria-label="Close client details" onClick={onClose} style={s.closeBtn}>✕</button>
       </div>
-      <div style={s.panelBody}>
+      <div className={panelLayout.body} style={s.panelBody}>
         <div style={s.statRow}>
           <div style={{ ...s.stat, ...s.statBlue }}><span style={s.statValue}>{client.bookings.length}</span><span style={s.statLabel}>{t('clients_total_sessions')}</span></div>
           <div style={{ ...s.stat, ...s.statGreen }}><span style={s.statValue}>{completedCount}</span><span style={s.statLabel}>{t('status_completed')}</span></div>
           <div style={s.stat}><span style={{ ...s.statValue, fontSize: '1rem' }}>{lastVisit ? new Date(lastVisit).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }) : '—'}</span><span style={s.statLabel}>Last booking</span></div>
         </div>
 
+        <div className={panelLayout.cards}>
         <Section title="Contact">
           <Fact label="Email">{client.email || <span style={{ color: 'var(--text-muted)' }}>{t('clients_no_email')}</span>}</Fact>
           <Fact label="Phone">
@@ -702,6 +705,7 @@ function ClientDetail({ client, marketing, onMarketingChange, clientKey, onClose
             </button>
           ))}
         </Section>
+        </div>
       </div>
     </aside>
   );
@@ -890,7 +894,7 @@ const s = {
     color: 'var(--text-muted)',
   },
   panel: {
-    position: 'absolute', top: 0, right: 0, bottom: 0, width: 'min(clamp(480px, 40vw, 720px), 100%)',
+    position: 'absolute', top: 0, right: 0, bottom: 0, width: 'min(960px, 100%)',
     background: 'var(--bg-panel)',
     borderLeft: '1px solid var(--border)',
     display: 'flex',
@@ -902,7 +906,7 @@ const s = {
     alignItems: 'flex-start',
     justifyContent: 'space-between',
     gap: '0.75rem',
-    padding: '1.25rem 1.25rem 1rem',
+    padding: '1rem 1.25rem',
     borderBottom: '1px solid var(--border)',
     flexShrink: 0,
   },
@@ -924,7 +928,7 @@ const s = {
   panelBody: {
     flex: 1,
     overflowY: 'auto',
-    padding: '1.1rem 1.25rem 1.5rem',
+    padding: '1rem 1.25rem 1.25rem',
     display: 'flex',
     flexDirection: 'column',
     gap: '1rem',

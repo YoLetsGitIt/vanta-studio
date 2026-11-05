@@ -1,0 +1,9 @@
+/* Query the drawer's available width, including when it fills a small screen. */
+.panel { container-type: inline-size; box-shadow: -12px 0 32px rgb(0 0 0 / 16%); }
+.panel .body { min-height: 0; }
+.panel .cards { display: flex; flex-direction: column; gap: 12px; min-width: 0; flex-shrink: 0; }
+.panel .cards > * { min-width: 0; margin: 0; flex-shrink: 0; }
+@container (min-width: 680px) {
+  .panel .cards { display: block; columns: 2; column-gap: 16px; }
+  .panel .cards > * { break-inside: avoid; margin: 0 0 16px; }
+}
