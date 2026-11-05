@@ -40,7 +40,8 @@ const base = process.env.STUDIO_TEST_URL || 'http://127.0.0.1:3060';
    await checkSlot('2026-11-09','2','30');
    assert.equal(await panel.getByLabel('Start time AM or PM').inputValue(),'PM');
    assert.equal(await panel.locator('#new-appointment-artist').inputValue(),'artist-1');
-   assert.equal(await panel.getByRole('button',{name:'Studio appointment',exact:true}).getAttribute('aria-pressed'),'true');
+   // Booking type starts unchosen; the studio picks it.
+   assert.equal(await panel.getByRole('radio',{name:'Studio appointment',exact:true}).getAttribute('aria-checked'),'false');
    await close();
    await week.focus(); await week.press('Home'); await week.evaluate(el=>{el.scrollTop=0;}); await week.press('ArrowUp');
    // All artists leaves the artist unset; (the station view was removed) keyboard arrows choose half-hour slots.
@@ -55,6 +56,8 @@ const base = process.env.STUDIO_TEST_URL || 'http://127.0.0.1:3060';
    await filter.selectOption('artist-1');await openSlot('2026-11-12',870);
    await panel.getByRole('searchbox',{name:'Search existing clients'}).fill('Alexandra');
    await panel.getByRole('group',{name:'Matching clients'}).getByRole('button').first().click();
+   await panel.getByRole('radio',{name:'Studio appointment',exact:true}).click();
+   await panel.getByRole('radio',{name:'Tattoo',exact:true}).click();
    if(process.env.STUDIO_QA_OUTPUT)await page.screenshot({path:`${process.env.STUDIO_QA_OUTPUT}/prefilled-${width}.png`});
    await panel.getByRole('button',{name:'Create Appointment',exact:true}).click();
    await panel.waitFor({state:'hidden'});

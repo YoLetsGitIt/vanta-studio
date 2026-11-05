@@ -150,3 +150,53 @@
   box-shadow: 0 1px 3px rgb(0 0 0 / 12%), 0 0 0 1px var(--border);
 }
 .segmented button:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+
+/* Form sections: a card while there's something to fill in; once complete it fades back
+   to an outline and shows a green tick. */
+.section {
+  display: flex; flex-direction: column; gap: 0.85rem; min-width: 0;
+  padding: 1rem 1.1rem; border-radius: 14px;
+  background: var(--bg-panel); border: 1px solid var(--border);
+  transition: background 200ms, border-color 200ms;
+}
+.sectionDone { background: transparent; border-color: var(--border-faint); }
+.sectionHead { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; min-height: 20px; }
+.sectionTitle {
+  margin: 0; font-size: 0.75rem; font-weight: 600; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.06em;
+}
+.doneTick {
+  display: inline-flex; align-items: center; justify-content: center; flex: none;
+  width: 20px; height: 20px; border-radius: 50%;
+  background: var(--color-success); color: #fff;
+  animation: tickIn 180ms ease-out;
+}
+@keyframes tickIn { from { transform: scale(0.6); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .doneTick { animation: none; } .section { transition: none; } }
+
+/* Choices (booking type, tattoo or piercing, deposit): separate options with a radio
+   circle, same height as the inputs. Nothing is picked until the studio picks. */
+.choices { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 8px; }
+.choices button {
+  display: flex; align-items: center; gap: 10px; min-width: 0; min-height: 44px; box-sizing: border-box;
+  padding: 0 12px; border: 1px solid var(--border-strong); border-radius: 9px;
+  background: var(--appointment-input, var(--bg-input)); color: var(--text-secondary);
+  font: inherit; font-size: 0.875rem; font-weight: 500; text-align: left; cursor: pointer;
+  transition: border-color 120ms, background 120ms, color 120ms;
+}
+.choices button:hover { border-color: var(--text-muted); color: var(--text); }
+.choices button[aria-checked='true'] {
+  border-color: var(--accent); color: var(--text); font-weight: 600;
+  background: color-mix(in srgb, var(--accent) 8%, var(--appointment-input, var(--bg-input)));
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.choices button:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.radio {
+  flex: none; width: 16px; height: 16px; box-sizing: border-box; border-radius: 50%;
+  border: 1.5px solid var(--border-strong); position: relative; transition: border-color 120ms;
+}
+.choices button[aria-checked='true'] .radio { border-color: var(--accent); }
+.choices button[aria-checked='true'] .radio::after {
+  content: ''; position: absolute; inset: 3px; border-radius: 50%; background: var(--accent);
+}
+@media (max-width: 420px) { .choices button { padding: 0 9px; gap: 7px; font-size: 0.82rem; } }

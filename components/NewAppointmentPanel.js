@@ -108,6 +108,23 @@ function TimeSelect({ value, onChange, label }) {
   );
 }
 
+// A form section. Once it's filled in it steps back and shows a green tick.
+function FormSection({ id, title, done, children }) {
+  return (
+    <section className={`${styles.section} ${done ? styles.sectionDone : ''}`} aria-labelledby={id}>
+      <div className={styles.sectionHead}>
+        <h2 id={id} className={styles.sectionTitle}>{title}</h2>
+        {done && (
+          <span className={styles.doneTick} role="img" aria-label="Complete">
+            <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          </span>
+        )}
+      </div>
+      {children}
+    </section>
+  );
+}
+
 // "09:00:00" → "9:00 am"
 function clockLabel(value) {
   const [h, m] = String(value ?? '').split(':').map(Number);
@@ -147,20 +164,20 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
   // ── Details
   const [size, setSize] = useState('');
   const [sizeUnit, setSizeUnit] = useState(getDefaultSizeUnit);
-  const [appointmentType, setAppointmentType] = useState('tattoo');
+  const [appointmentType, setAppointmentType] = useState(null); // 'tattoo' | 'piercing', chosen by the studio
   const isPiercing = appointmentType === 'piercing';
   const [retouch, setRetouch] = useState(false);
 
   // ── Pricing
   const [finalPrice, setFinalPrice] = useState('');
   const [depositAmount, setDepositAmount] = useState('');
-  const [depositMode, setDepositMode] = useState('none');
+  const [depositMode, setDepositMode] = useState(null); // 'none' | 'later' | 'paid'; nothing chosen means no deposit
   const [showOptional, setShowOptional] = useState(false);
   const [daySchedule, setDaySchedule] = useState([]);
   const [scheduleError, setScheduleError] = useState('');
 
   // Distinct analytics sources: studio appointment, walk-in, or artist personal.
-  const [bookingType, setBookingType] = useState(initialBookingType);
+  const [bookingType, setBookingType] = useState(null); // 'studio' | 'walkin' | 'personal'
 
   // ── Notes
   const [notes, setNotes] = useState('');
@@ -177,7 +194,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
     setStartTime(initialSlot?.time || slot.time);
     setArtistId(initialSlot?.artistId || '');
     setStationId(initialSlot?.stationId || '');
-    setBookingType(initialBookingType);
+    setBookingType(null);
   }, [open, initialBookingType, initialSlot?.date, initialSlot?.time, initialSlot?.artistId, initialSlot?.stationId]);
 
   // Clear a saved validation/API error once the user changes the fields that
@@ -276,7 +293,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
   const phoneInvalid = !!clientPhone.trim() && clientPhone.replace(/\D/g, '').length < 7;
   const quote = Number(finalPrice || 0);
   const deposit = Number(depositAmount || 0);
-  const depositEnabled = depositMode !== 'none';
+  const depositEnabled = depositMode === 'later' || depositMode === 'paid';
   const depositInvalid = depositEnabled && (deposit <= 0 || (quote > 0 && deposit > quote));
   const chosenDateTime = bookingDate && startTime ? new Date(`${bookingDate}T${startTime}:00`) : null;
   const dateInPast = chosenDateTime && Number.isFinite(chosenDateTime.getTime()) && chosenDateTime.getTime() < Date.now();
@@ -297,15 +314,24 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
     || (phoneInvalid ? 'Enter a valid client phone number.' : '')
     || (artistConflict ? 'This artist already has an appointment at that time.' : '')
     || (depositInvalid ? (deposit <= 0 ? 'Enter a deposit amount.' : 'The deposit cannot be greater than the quoted price.') : '');
-  const missingRequirement = !clientName ? t('nap_err_client')
+  const missingRequirement = !bookingType ? 'Choose a booking type.'
+    : !clientName ? t('nap_err_client')
+    : !appointmentType ? 'Choose tattoo or piercing.'
     : !artistId ? t('nap_err_artist')
     : !bookingDate || !startTime ? t('nap_err_datetime')
     : !stationId ? 'Select an available station.'
     : '';
   const disabledReason = loadError || validationError || missingRequirement;
+  const sectionDone = {
+    type: Boolean(bookingType),
+    client: Boolean(clientName) && !emailInvalid && !phoneInvalid,
+    appointment: Boolean(appointmentType && artistId) && !artistConflict,
+    schedule: Boolean(bookingDate && startTime && stationId) && !timeError && !dateInPast && !artistConflict,
+    payment: Boolean(depositMode) && !depositInvalid,
+  };
   const canSubmit = !disabledReason;
   const essentialsComplete = Boolean(clientName && artistId && bookingDate && startTime && stationId && !timeError && !dateInPast && !artistConflict);
-  const dirty = Boolean(selectedClient || firstName || lastName || clientEmail || clientPhone || clientDob || artistId || stationId || appointmentType !== 'tattoo' || size || retouch || finalPrice || depositAmount || depositMode !== 'none' || notes || bookingType !== initialBookingType);
+  const dirty = Boolean(selectedClient || firstName || lastName || clientEmail || clientPhone || clientDob || artistId || stationId || appointmentType || size || retouch || finalPrice || depositAmount || depositMode || notes || bookingType);
   dirtyRef.current = dirty;
   savingRef.current = saving;
 
@@ -320,9 +346,9 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
     setStartTime(slot.time);
     setDurationMins(60);
     setStationId('');
-    setSize(''); setSizeUnit('cm'); setRetouch(false); setAppointmentType('tattoo');
-    setFinalPrice(''); setDepositAmount(''); setDepositMode('none'); setShowOptional(false);
-    setBookingType(initialBookingType);
+    setSize(''); setSizeUnit('cm'); setRetouch(false); setAppointmentType(null);
+    setFinalPrice(''); setDepositAmount(''); setDepositMode(null); setShowOptional(false);
+    setBookingType(null);
     setNotes(''); setError('');
   }
 
@@ -485,27 +511,26 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
           <form onSubmit={handleSubmit} style={bd.form}>
             <div className={styles.body}>
               {/* ── BOOKING TYPE ── */}
-              <section style={bd.section} aria-labelledby="booking-type-label">
-                <h2 id="booking-type-label" style={bd.sectionLabel}>{t('nap_booking_type')}</h2>
-                <div className={styles.segmented} role="group" aria-labelledby="booking-type-label" aria-describedby="booking-type-description">
+              <FormSection id="booking-type-label" title={t('nap_booking_type')} done={sectionDone.type}>
+                <div className={styles.choices} role="radiogroup" aria-labelledby="booking-type-label" aria-describedby={bookingType ? 'booking-type-description' : undefined}>
                   {[
                     ['studio', t('nap_type_studio'), 'Studio appointment'],
                     ['walkin', 'Walk-in', 'Walk-in'],
                     ['personal', t('nap_type_personal'), 'Personal appointment'],
                   ].map(([value, label, accessibleLabel]) => (
-                    <button key={value} type="button" aria-label={accessibleLabel} aria-pressed={bookingType === value} onClick={() => setBookingType(value)}>{label}</button>
+                    <button key={value} type="button" role="radio" aria-label={accessibleLabel} aria-checked={bookingType === value} onClick={() => setBookingType(value)}><span aria-hidden="true" className={styles.radio} />{label}</button>
                   ))}
                 </div>
                 <p id="booking-type-description" style={bd.hint}>{
                   bookingType === 'walkin' ? 'Client arrived without a planned booking.'
                     : bookingType === 'studio' ? 'Planned and booked by the studio.'
-                    : 'Client brought in by the artist.'
+                    : bookingType === 'personal' ? 'Client brought in by the artist.'
+                    : 'Studio: booked by the studio · Walk-in: arrived without booking · Personal: the artist’s own client.'
                 }</p>
-              </section>
+              </FormSection>
 
               {/* ── CLIENT ── */}
-              <section style={bd.section} aria-labelledby="client-section-title">
-                <h2 id="client-section-title" style={bd.sectionLabel}>{t('nap_client')}</h2>
+              <FormSection id="client-section-title" title={t('nap_client')} done={sectionDone.client}>
 
                 <div className={styles.segmented} role="group" aria-label="Client">
                   <button
@@ -640,16 +665,15 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
                     onChange={e => setSMSOptIn(e.target.checked)} style={{ accentColor: 'var(--accent)' }} />
                   <span>I have the client’s permission to send one SMS reminder for this appointment. <span className={styles.consentHint}>Included at no extra charge.</span></span>
                 </label>}
-              </section>
+              </FormSection>
 
-              <section style={bd.section} aria-labelledby="appointment-section-title">
-                <h2 id="appointment-section-title" style={bd.sectionLabel}>{t('nap_appointment')}</h2>
+              <FormSection id="appointment-section-title" title={t('nap_appointment')} done={sectionDone.appointment}>
                 <div className={styles.fieldRow}>
                   <div style={bd.field}>
                     <span id="new-appointment-type" style={bd.label}>Appointment type</span>
-                    <div className={styles.segmented} role="group" aria-labelledby="new-appointment-type">
+                    <div className={styles.choices} role="radiogroup" aria-labelledby="new-appointment-type">
                       {[['tattoo', 'Tattoo'], ['piercing', 'Piercing']].map(([value, label]) => (
-                        <button key={value} type="button" aria-pressed={appointmentType === value} onClick={() => setAppointmentType(value)}>{label}</button>
+                        <button key={value} type="button" role="radio" aria-checked={appointmentType === value} onClick={() => setAppointmentType(value)}><span aria-hidden="true" className={styles.radio} />{label}</button>
                       ))}
                     </div>
                   </div>
@@ -665,10 +689,9 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
                 </div>
                 {artists.length === 0 && <p role="alert" style={bd.inlineError}>Add or approve an artist before creating an appointment.</p>}
                 {allStations.length === 0 && <p role="alert" style={bd.inlineError}>No active station was found. Reload the studio or add a station in Settings before creating an appointment.</p>}
-              </section>
+              </FormSection>
 
-              <section style={bd.section} aria-labelledby="schedule-section-title">
-                <h2 id="schedule-section-title" style={bd.sectionLabel}>{t('nav_schedule')}</h2>
+              <FormSection id="schedule-section-title" title={t('nav_schedule')} done={sectionDone.schedule}>
                 <div className={styles.fieldRow}>
                   <div style={bd.field}>
                     <label htmlFor="new-appointment-date" style={bd.label}>{t('sched_date')}</label>
@@ -710,7 +733,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
                 ) : null}
                 {artistConflict && <div role="alert" style={bd.timeWarning}><span style={bd.timeWarningIcon}>⚠</span>This artist already has an appointment that overlaps this time.</div>}
                 {scheduleError && <p role="status" style={bd.availabilityNotice}>{scheduleError} The server will verify it when you create the appointment.</p>}
-              </section>
+              </FormSection>
 
               {essentialsComplete && bookingType === 'walkin' && (
                 <button
@@ -732,16 +755,15 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
 
               {essentialsComplete && (bookingType !== 'walkin' || showOptional) && <>
                 {/* ── PRICING ── */}
-                <section style={bd.section} aria-labelledby="payment-section-title">
-                  <h2 id="payment-section-title" style={bd.sectionLabel}>{t('bdp_payment')}</h2>
+                <FormSection id="payment-section-title" title={t('bdp_payment')} done={sectionDone.payment}>
                   <div style={bd.field}>
                     <span id="deposit-mode-label" style={bd.label}>Deposit</span>
-                    <div className={styles.segmented} role="group" aria-labelledby="deposit-mode-label">
+                    <div className={styles.choices} role="radiogroup" aria-labelledby="deposit-mode-label">
                       {[
                         ['none', 'No deposit'],
                         ['later', stripeConnected ? 'Collect later' : 'Due later'],
                         ['paid', 'Already paid'],
-                      ].map(([value, label]) => <button key={value} type="button" aria-pressed={depositMode === value} onClick={() => setDepositMode(value)}>{label}</button>)}
+                      ].map(([value, label]) => <button key={value} type="button" role="radio" aria-checked={depositMode === value} onClick={() => setDepositMode(value)}><span aria-hidden="true" className={styles.radio} />{label}</button>)}
                     </div>
                   </div>
                   <div className={styles.fieldRow}>
@@ -752,7 +774,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
                         <input style={{ ...bd.input, paddingLeft: '1.75rem' }} type="number" min="0" step="0.01" id="new-appointment-estimate" value={finalPrice} onChange={e => setFinalPrice(e.target.value)} placeholder="0.00" />
                       </div>
                     </div>
-                    {depositMode !== 'none' && (
+                    {depositEnabled && (
                       <div style={bd.field}>
                         <label htmlFor="new-appointment-deposit" style={bd.label}>Deposit amount</label>
                         <div style={bd.prefixWrap}>
@@ -762,7 +784,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
                       </div>
                     )}
                   </div>
-                  {depositMode !== 'none' && <>
+                  {depositEnabled && <>
                     {depositMode === 'later' && <span style={bd.hint}>{stripeConnected ? 'This will appear as an unpaid deposit to collect.' : 'Record the external payment when it is received.'}</span>}
                     {depositMode === 'paid' && <span style={bd.hint}>The deposit will be recorded as received now.</span>}
                     {(() => {
@@ -777,7 +799,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
                       );
                     })()}
                   </>}
-                </section>
+                </FormSection>
 
                 <details className={styles.additionalDetails}>
                   <summary><span>{t('nap_additional_details')}</span><span className={styles.optionalBadge}>{t('optional')}</span></summary>
@@ -833,7 +855,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
                     {quote > 0 && <strong>${quote.toFixed(2)}</strong>}
                   </div>
                   <span>{[
-                    isPiercing ? 'Piercing' : retouch ? 'Retouch' : 'Tattoo',
+                    !appointmentType ? null : isPiercing ? 'Piercing' : retouch ? 'Retouch' : 'Tattoo',
                     artists.find(artist => (artist.artistId ?? artist.artist_id ?? artist.id) === artistId)?.name,
                     chosenDateTime?.toLocaleString('en-AU', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }),
                     `${durationMins} min`,
@@ -901,15 +923,6 @@ const bd = {
   form: {
     flex: 1, minHeight: 0, overflow: 'hidden',
     display: 'flex', flexDirection: 'column',
-  },
-  section: {
-    display: 'flex', flexDirection: 'column', gap: '0.85rem', minWidth: 0,
-    padding: '1rem 1.1rem', borderRadius: 14,
-    background: 'var(--bg-panel)', border: '1px solid var(--border)',
-  },
-  sectionLabel: {
-    margin: 0, fontSize: '0.75rem', fontWeight: 600,
-    color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em',
   },
   field: { display: 'flex', flexDirection: 'column', gap: '0.5rem', minWidth: 0 },
   label: { fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-dim)' },
