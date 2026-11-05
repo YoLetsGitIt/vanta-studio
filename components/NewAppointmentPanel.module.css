@@ -151,28 +151,51 @@
 }
 .segmented button:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
 
-/* Form sections: a card while there's something to fill in; once complete it fades back
-   to an outline and shows a green tick. */
+/* Form sections, one step at a time: the step to do now is bright with a soft outline;
+   finished and upcoming steps fade back. Hover or focus brings a faded step up. */
 .section {
   display: flex; flex-direction: column; gap: 0.85rem; min-width: 0;
   padding: 1rem 1.1rem; border-radius: 14px;
   background: var(--bg-panel); border: 1px solid var(--border);
-  transition: background 200ms, border-color 200ms;
+  transition: opacity 260ms ease, background 220ms ease, border-color 220ms ease, box-shadow 260ms ease, transform 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
-.sectionDone { background: transparent; border-color: var(--border-faint); }
+.stepUpcoming { opacity: 0.42; }
+.stepDone { opacity: 0.6; background: transparent; border-color: var(--border-faint); }
+.stepUpcoming:hover, .stepDone:hover { opacity: 0.85; }
+.stepUpcoming:focus-within, .stepDone:focus-within { opacity: 1; }
+.stepActive {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 10%, transparent), 0 8px 24px rgb(0 0 0 / 6%);
+  animation: stepIn 320ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@keyframes stepIn { from { transform: translateY(6px); } }
 .sectionHead { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; min-height: 20px; }
 .sectionTitle {
   margin: 0; font-size: 0.75rem; font-weight: 600; color: var(--text-muted);
-  text-transform: uppercase; letter-spacing: 0.06em;
+  text-transform: uppercase; letter-spacing: 0.06em; transition: color 200ms;
 }
+.stepActive .sectionTitle { color: var(--text); }
 .doneTick {
   display: inline-flex; align-items: center; justify-content: center; flex: none;
   width: 20px; height: 20px; border-radius: 50%;
   background: var(--color-success); color: #fff;
-  animation: tickIn 180ms ease-out;
+  animation: tickPop 360ms cubic-bezier(0.34, 1.56, 0.64, 1);
 }
-@keyframes tickIn { from { transform: scale(0.6); opacity: 0; } }
-@media (prefers-reduced-motion: reduce) { .doneTick { animation: none; } .section { transition: none; } }
+.tickPath { stroke-dasharray: 14; stroke-dashoffset: 0; animation: tickDraw 300ms 120ms ease-out backwards; }
+@keyframes tickPop { from { transform: scale(0.3); opacity: 0; } }
+@keyframes tickDraw { from { stroke-dashoffset: 14; } }
+
+/* Create button: one soft pulse when everything needed is filled in. */
+.readyButton { animation: readyPulse 900ms ease-out 1; }
+@keyframes readyPulse {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 45%, transparent); }
+  100% { box-shadow: 0 0 0 10px transparent; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .section, .sectionTitle { transition: none; }
+  .stepActive, .doneTick, .tickPath, .readyButton { animation: none; }
+}
 
 /* Choices (booking type, tattoo or piercing, deposit): separate options with a radio
    circle, same height as the inputs. Nothing is picked until the studio picks. */
@@ -182,8 +205,9 @@
   padding: 0 12px; border: 1px solid var(--border-strong); border-radius: 9px;
   background: var(--appointment-input, var(--bg-input)); color: var(--text-secondary);
   font: inherit; font-size: 0.875rem; font-weight: 500; text-align: left; cursor: pointer;
-  transition: border-color 120ms, background 120ms, color 120ms;
+  transition: border-color 120ms, background 120ms, color 120ms, transform 100ms ease-out;
 }
+.choices button:active { transform: scale(0.97); }
 .choices button:hover { border-color: var(--text-muted); color: var(--text); }
 .choices button[aria-checked='true'] {
   border-color: var(--accent); color: var(--text); font-weight: 600;
@@ -196,7 +220,10 @@
   border: 1.5px solid var(--border-strong); position: relative; transition: border-color 120ms;
 }
 .choices button[aria-checked='true'] .radio { border-color: var(--accent); }
-.choices button[aria-checked='true'] .radio::after {
+.radio::after {
   content: ''; position: absolute; inset: 3px; border-radius: 50%; background: var(--accent);
+  transform: scale(0); transition: transform 180ms cubic-bezier(0.34, 1.56, 0.64, 1);
 }
+.choices button[aria-checked='true'] .radio::after { transform: scale(1); }
+@media (prefers-reduced-motion: reduce) { .choices button, .radio::after { transition: none; } .choices button:active { transform: none; } }
 @media (max-width: 420px) { .choices button { padding: 0 9px; gap: 7px; font-size: 0.82rem; } }

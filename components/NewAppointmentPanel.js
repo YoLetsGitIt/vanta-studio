@@ -108,15 +108,17 @@ function TimeSelect({ value, onChange, label }) {
   );
 }
 
-// A form section. Once it's filled in it steps back and shows a green tick.
-function FormSection({ id, title, done, children }) {
+// A form section. The step to do now is bright; the others fade back. A finished step
+// shows a green tick. Hovering or focusing a faded step brings it back up.
+function FormSection({ id, step, title, state, done, children }) {
+  const stateClass = state === 'active' ? styles.stepActive : state === 'done' ? styles.stepDone : styles.stepUpcoming;
   return (
-    <section className={`${styles.section} ${done ? styles.sectionDone : ''}`} aria-labelledby={id}>
+    <section className={`${styles.section} ${stateClass}`} aria-labelledby={id} data-step={step} aria-current={state === 'active' ? 'step' : undefined}>
       <div className={styles.sectionHead}>
         <h2 id={id} className={styles.sectionTitle}>{title}</h2>
         {done && (
           <span className={styles.doneTick} role="img" aria-label="Complete">
-            <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path className={styles.tickPath} d="M3.5 8.5l3 3 6-7" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
           </span>
         )}
       </div>
@@ -330,9 +332,25 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
     payment: Boolean(depositMode) && !depositInvalid,
   };
   const canSubmit = !disabledReason;
+  const paymentVisible = Boolean(clientName && artistId && bookingDate && startTime && stationId && !timeError && !dateInPast && !artistConflict) && (bookingType !== 'walkin' || showOptional);
+  const activeStep = ['type', 'client', 'appointment', 'schedule', ...(paymentVisible ? ['payment'] : [])].find(step => !sectionDone[step]) ?? null;
+  const stepState = step => (step === activeStep ? 'active' : sectionDone[step] ? 'done' : 'upcoming');
   const essentialsComplete = Boolean(clientName && artistId && bookingDate && startTime && stationId && !timeError && !dateInPast && !artistConflict);
-  const dirty = Boolean(selectedClient || firstName || lastName || clientEmail || clientPhone || clientDob || artistId || stationId || appointmentType || size || retouch || finalPrice || depositAmount || depositMode || notes || bookingType);
+  // The station is picked automatically and the artist can come from the clicked slot, so
+  // neither counts as an edit on its own.
+  const dirty = Boolean(selectedClient || firstName || lastName || clientEmail || clientPhone || clientDob || (artistId && artistId !== (initialSlot?.artistId || '')) || appointmentType || size || retouch || finalPrice || depositAmount || depositMode || notes || bookingType);
   dirtyRef.current = dirty;
+  const bodyRef = useRef(null);
+  const lastStep = useRef(activeStep);
+  useEffect(() => {
+    const previous = lastStep.current;
+    lastStep.current = activeStep;
+    if (!open || !activeStep || !previous || previous === activeStep) return;
+    const typing = document.activeElement?.matches?.('input:not([type=checkbox]):not([type=radio]), textarea');
+    if (typing) return;
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    bodyRef.current?.querySelector(`[data-step="${activeStep}"]`)?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'nearest' });
+  }, [activeStep, open]);
   savingRef.current = saving;
 
   function resetForm() {
@@ -509,9 +527,9 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
           </div>
         ) : (
           <form onSubmit={handleSubmit} style={bd.form}>
-            <div className={styles.body}>
+            <div ref={bodyRef} className={styles.body}>
               {/* ── BOOKING TYPE ── */}
-              <FormSection id="booking-type-label" title={t('nap_booking_type')} done={sectionDone.type}>
+              <FormSection id="booking-type-label" step="type" title={t('nap_booking_type')} state={stepState('type')} done={sectionDone.type}>
                 <div className={styles.choices} role="radiogroup" aria-labelledby="booking-type-label" aria-describedby={bookingType ? 'booking-type-description' : undefined}>
                   {[
                     ['studio', t('nap_type_studio'), 'Studio appointment'],
@@ -530,7 +548,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
               </FormSection>
 
               {/* ── CLIENT ── */}
-              <FormSection id="client-section-title" title={t('nap_client')} done={sectionDone.client}>
+              <FormSection id="client-section-title" step="client" title={t('nap_client')} state={stepState('client')} done={sectionDone.client}>
 
                 <div className={styles.segmented} role="group" aria-label="Client">
                   <button
@@ -667,7 +685,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
                 </label>}
               </FormSection>
 
-              <FormSection id="appointment-section-title" title={t('nap_appointment')} done={sectionDone.appointment}>
+              <FormSection id="appointment-section-title" step="appointment" title={t('nap_appointment')} state={stepState('appointment')} done={sectionDone.appointment}>
                 <div className={styles.fieldRow}>
                   <div style={bd.field}>
                     <span id="new-appointment-type" style={bd.label}>Appointment type</span>
@@ -691,7 +709,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
                 {allStations.length === 0 && <p role="alert" style={bd.inlineError}>No active station was found. Reload the studio or add a station in Settings before creating an appointment.</p>}
               </FormSection>
 
-              <FormSection id="schedule-section-title" title={t('nav_schedule')} done={sectionDone.schedule}>
+              <FormSection id="schedule-section-title" step="schedule" title={t('nav_schedule')} state={stepState('schedule')} done={sectionDone.schedule}>
                 <div className={styles.fieldRow}>
                   <div style={bd.field}>
                     <label htmlFor="new-appointment-date" style={bd.label}>{t('sched_date')}</label>
@@ -755,7 +773,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
 
               {essentialsComplete && (bookingType !== 'walkin' || showOptional) && <>
                 {/* ── PRICING ── */}
-                <FormSection id="payment-section-title" title={t('bdp_payment')} done={sectionDone.payment}>
+                <FormSection id="payment-section-title" step="payment" title={t('bdp_payment')} state={stepState('payment')} done={sectionDone.payment}>
                   <div style={bd.field}>
                     <span id="deposit-mode-label" style={bd.label}>Deposit</span>
                     <div className={styles.choices} role="radiogroup" aria-labelledby="deposit-mode-label">
@@ -871,6 +889,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
                 loading={saving}
                 loadingLabel={t('sched_creating')}
                 fullWidth
+                className={canSubmit ? styles.readyButton : ''}
                 disabled={!canSubmit}
                 title={!canSubmit ? disabledReason : undefined}
                 aria-describedby={!canSubmit ? 'new-appointment-disabled-reason' : undefined}
