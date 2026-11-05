@@ -31,6 +31,7 @@
   --focus-ring: #b9d5ff;
   --control-border: #78746e;
   --overlay-backdrop: rgba(0, 0, 0, 0.62);
+  --panel-backdrop: rgba(0, 0, 0, 0.5);
 
   /* Structural colours */
   --text:           #f2f0ec;
@@ -94,6 +95,7 @@
 
 [data-theme="light"] {
   color-scheme: light;
+  --panel-backdrop: rgba(17, 16, 8, 0.22);
   --text:           #111008;
   --text-dim:       #38342e;
   --text-muted:     #575148;

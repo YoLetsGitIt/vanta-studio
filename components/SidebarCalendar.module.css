@@ -1,0 +1,22 @@
+.calendar { padding: 0 0.75rem; display: flex; flex-direction: column; gap: 0.4rem; }
+.head { display: flex; align-items: center; justify-content: space-between; padding: 0 0.25rem; }
+.month { font-size: var(--font-size-sm); font-weight: 600; color: var(--text); }
+.arrows { display: flex; gap: 2px; }
+.arrows button {
+  width: 24px; height: 24px; border: 0; border-radius: var(--radius-sm);
+  background: transparent; color: var(--text-muted); font-size: 1rem; line-height: 1;
+}
+.arrows button:hover { background: var(--bg-chip); color: var(--text); }
+.grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 1px; }
+.weekday { text-align: center; font-size: 0.65rem; font-weight: 600; color: var(--text-ghost); padding-bottom: 2px; }
+.day {
+  position: relative; aspect-ratio: 1; min-width: 0; border: 0; border-radius: 999px;
+  background: transparent; color: var(--text-dim); font-size: 0.72rem; font-variant-numeric: tabular-nums;
+  display: flex; align-items: center; justify-content: center;
+}
+.day:hover { background: var(--bg-chip); color: var(--text); }
+.outside { color: var(--text-ghost); opacity: 0.6; }
+.today { color: var(--accent); font-weight: 700; box-shadow: inset 0 0 0 1px var(--accent-tint-border); }
+.selected, .selected:hover { background: var(--accent); color: var(--accent-contrast); font-weight: 700; }
+.dot { position: absolute; bottom: 2px; left: 50%; width: 3px; height: 3px; margin-left: -1.5px; border-radius: 50%; background: var(--color-info); }
+.selected .dot { background: var(--accent-contrast); }

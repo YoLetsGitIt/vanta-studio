@@ -14,9 +14,10 @@ import FeedbackHost from '@/components/FeedbackHost';
 import Dialog from '@/components/ui/Dialog';
 import { registerServiceWorker } from '@/lib/push';
 import { useHideHeaderOnScroll } from '@/lib/useHideHeaderOnScroll';
+import SidebarCalendar from '@/components/SidebarCalendar';
+import SidebarNeedsAction from '@/components/SidebarNeedsAction';
 
 const NAV = [
-  { href: '/dashboard/home',         tKey: 'nav_dashboard', icon: HomeIcon },
   { href: '/dashboard/schedule',     tKey: 'nav_schedule',  icon: GridCalIcon },
   { href: '/dashboard/artists',      tKey: 'nav_artists',   icon: UsersIcon },
   { href: '/dashboard/clients',      tKey: 'nav_clients',   icon: PersonIcon },
@@ -26,8 +27,8 @@ const NAV = [
   { href: '/dashboard/financial',    tKey: 'revenue_financial', icon: RevenueIcon },
 ];
 
-const MOBILE_NAV = [NAV[0], NAV[1], NAV[4], NAV[3]];
-const MORE_NAV = [NAV[2], NAV[5], NAV[6], NAV[7], { href: '/dashboard/settings', tKey: 'settings', icon: GearIcon }];
+const MOBILE_NAV = [NAV[0], NAV[3], NAV[2]];
+const MORE_NAV = [NAV[1], NAV[4], NAV[5], NAV[6], { href: '/dashboard/settings', tKey: 'settings', icon: GearIcon }];
 
 const TOUR_STEPS = [
   {
@@ -36,16 +37,15 @@ const TOUR_STEPS = [
     action: 'Start tutorial',
   },
   ...NAV.map(({ href, tKey }, index) => ({
-    title: ['Your daily overview', 'Studio schedule', 'Your artists', 'Client records', 'Bookings', 'Analytics', 'Financials', 'Marketing'][index],
+    title: ['Studio schedule', 'Your artists', 'Client records', 'Bookings', 'Marketing', 'Analytics', 'Financials'][index],
     body: [
-      'See what needs attention today, who is working, and how the week is filling up.',
-      'See every artist, station, and appointment in one calendar—without double-booking a chair.',
+      'See every artist, station, and appointment in one calendar—without double-booking a chair. The sidebar shows the month and everything that needs action.',
       'Approve artists, manage availability, review their performance, and record payouts.',
       'Keep client details, consent status, preferences, and booking history together.',
       'Review incoming requests, confirm appointments, and keep deposits and follow-ups on track.',
+      'Email clients who have agreed to hear from you: fill cancelled slots, send offers, and run campaigns.',
       'Understand appointment performance, returning clients, and studio growth at a glance.',
       'Track revenue, payments, and how earnings are split across your studio.',
-      'Email clients who have agreed to hear from you: fill cancelled slots, send offers, and run campaigns.',
     ][index],
     target: 'nav', targetIndex: index, href, tKey,
   })),
@@ -131,6 +131,7 @@ function DashboardShell({ children }) {
   const { t } = useLanguage();
   const [user, setUser] = useState(null);
   const [studioName, setStudioName] = useState('');
+  const [paymentRecording, setPaymentRecording] = useState(null);
   const [billingBlocked, setBillingBlocked] = useState(false);
   const [subscriptionStatus, setSubscriptionStatus] = useState('');
   const [ready, setReady] = useState(false);
@@ -209,6 +210,7 @@ function DashboardShell({ children }) {
       }
 
       setStudioName(studioAccount.studio?.name ?? '');
+      setPaymentRecording(studioAccount.studio?.payment_recording_requirement ?? null);
       setSubscriptionStatus(studioAccount.studio?.subscription_status ?? '');
 
       setBillingBlocked(subscriptionInactive(studioAccount.studio));
@@ -223,7 +225,7 @@ function DashboardShell({ children }) {
       const showTestTourThisSession = alwaysShowTour && (explicitlyRequested || !sessionStorage.getItem(sessionTourKey));
       if (showTestTourThisSession) sessionStorage.setItem(sessionTourKey, 'shown');
       sessionStorage.removeItem(requestedTourKey);
-      if (requestedByRoute) window.history.replaceState({}, '', '/dashboard/home');
+      if (requestedByRoute) window.history.replaceState({}, '', '/dashboard/schedule');
       if (showTestTourThisSession || !localStorage.getItem(tourKey)) setTourStep(0);
       setReady(true);
     }
@@ -267,7 +269,7 @@ function DashboardShell({ children }) {
   return (
     <div ref={shellRef} className="studio-dashboard-shell" style={s.shell}>
       <header ref={headerRef} className="studio-mobile-header">
-        <Link href="/dashboard/home" aria-label="Vanta Studio home" style={s.logo}>
+        <Link href="/dashboard/schedule" aria-label="Vanta Studio home" style={s.logo}>
           <span style={s.logoMark}>vanta</span><span style={s.logoSub}>studio</span>
         </Link>
         <button type="button" className="studio-button studio-button--sm" onClick={() => { setAppointmentType('walkin'); setAppointmentSlot(null); setAppointmentPanelOpen(true); }}>
@@ -278,7 +280,7 @@ function DashboardShell({ children }) {
       <div className="studio-dashboard-body" style={s.body}>
         <aside className="studio-dashboard-sidebar" style={s.sidebar}>
           <div className="studio-dashboard-sidebar-top" style={s.sidebarTop}>
-            <Link href="/dashboard/appointments" style={s.logo}>
+            <Link href="/dashboard/schedule" style={s.logo}>
               <span style={s.logoMark}>vanta</span>
               <span style={s.logoSub}>studio</span>
             </Link>
@@ -310,6 +312,11 @@ function DashboardShell({ children }) {
                 );
               })}
             </nav>
+          </div>
+
+          <div className="studio-dashboard-sidebar-middle" style={s.sidebarMiddle}>
+            <SidebarCalendar />
+            <SidebarNeedsAction paymentRecording={paymentRecording} />
           </div>
 
           <div className="studio-dashboard-sidebar-bottom" style={s.sidebarBottom}>
@@ -350,6 +357,7 @@ function DashboardShell({ children }) {
       {moreOpen && (
         <Dialog title={t('nav_more')} onClose={() => setMoreOpen(false)} footer={<button type="button" className="studio-button studio-button--secondary" onClick={() => setMoreOpen(false)}>{t('close')}</button>}>
           <p className="studio-mobile-studio-name">{displayName}</p>
+          <div className="studio-mobile-needs-action"><SidebarNeedsAction paymentRecording={paymentRecording} onNavigate={() => setMoreOpen(false)} /></div>
           <nav className="studio-mobile-menu" aria-label="More studio navigation">
             {(fullNavigation ? [...NAV, MORE_NAV.find(item => item.href === '/dashboard/settings')] : MORE_NAV).map(({ href, tKey, icon: Icon }) => (
               <Link key={href} href={href} onClick={() => setMoreOpen(false)} aria-current={pathname.startsWith(href) ? 'page' : undefined}><Icon size={20} />{t(tKey)}</Link>
@@ -503,14 +511,6 @@ function ChartIcon({ size = 16 }) {
   );
 }
 
-function HomeIcon({ size = 16 }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
-      <path d="M2 6.5L8 2l6 4.5V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V6.5Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
-      <path d="M6 15v-5h4v5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
 
 function GridCalIcon({ size = 16 }) {
   return (
@@ -654,7 +654,7 @@ const s = {
   sidebarTop: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '2rem',
+    gap: '1.25rem',
   },
   logo: {
     display: 'flex',
@@ -700,7 +700,7 @@ const s = {
     display: 'flex',
     alignItems: 'center',
     gap: '0.65rem',
-    padding: '0.55rem 0.65rem',
+    padding: '0.45rem 0.65rem',
     borderRadius: 8,
     fontSize: '0.875rem',
     transition: 'background 0.12s',
@@ -712,6 +712,17 @@ const s = {
   tourHighlight: {
     position: 'relative', zIndex: 101,
     background: 'var(--accent-tint)', boxShadow: '0 0 0 1px var(--accent-active-border), 0 12px 30px rgba(0,0,0,0.24)',
+  },
+  sidebarMiddle: {
+    flex: 1,
+    minHeight: 0,
+    overflowY: 'auto',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '1.25rem',
+    margin: '1rem 0',
+    paddingTop: '1rem',
+    borderTop: '1px solid var(--border-faint)',
   },
   sidebarBottom: {
     padding: '0 1rem',

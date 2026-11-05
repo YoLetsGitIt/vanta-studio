@@ -1,6 +1,7 @@
 'use client';
 
 import { MOBILE_MEDIA } from '@/lib/responsive';
+import { SCHEDULE_GO_TO_DATE, SCHEDULE_SHOWN_DATE } from '@/components/SidebarCalendar';
 
 import { useState, useEffect } from 'react';
 import { getStudioArtists, getStudioSchedule, getStudioScheduleRange, getStudioBooking, createManualBooking, getStations, getStripeStatus } from '@/lib/api';
@@ -1238,6 +1239,21 @@ export default function SchedulePage() {
     if (window.matchMedia(MOBILE_MEDIA).matches) setView('day');
   }, []);
 
+  // The sidebar calendar opens a day here, from another page (?date=) or this one (event).
+  useEffect(() => {
+    function open(date) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date ?? '')) return;
+      const day = new Date(`${date}T00:00:00`);
+      setDayDate(day);
+      setMonthStart(getMonthStart(day));
+      setView(current => (current === 'month' ? 'day' : current));
+    }
+    open(new URLSearchParams(window.location.search).get('date'));
+    const onGo = event => open(event.detail?.date);
+    window.addEventListener(SCHEDULE_GO_TO_DATE, onGo);
+    return () => window.removeEventListener(SCHEDULE_GO_TO_DATE, onGo);
+  }, []);
+
   const today          = new Date();
   const isCurrentMonth = isSameMonth(monthStart, today);
 
@@ -1263,6 +1279,12 @@ export default function SchedulePage() {
     else setDayDate(date => addDays(date, offset * (view === 'week' ? 7 : 1)));
   }
   function goToday() { setDayDate(new Date()); setMonthStart(getMonthStart(new Date())); }
+
+  // Keep the sidebar calendar on the period shown here.
+  useEffect(() => {
+    const detail = view === 'month' ? { date: toISO(monthStart), month: true } : { date: toISO(dayDate) };
+    window.dispatchEvent(new CustomEvent(SCHEDULE_SHOWN_DATE, { detail }));
+  }, [view, monthStart, dayDate]);
 
 
   return (

@@ -10,3 +10,16 @@
 .card { display: flex; flex-direction: column; gap: 0.85rem; background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; padding: 1.1rem; }
 .statRow { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.6rem; }
 .line { display: flex; justify-content: space-between; gap: 1rem; }
+
+/* Dims and softly blurs the page behind a side panel. */
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9;
+  background: var(--panel-backdrop);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  animation: backdropIn var(--duration-normal) ease-out;
+}
+@keyframes backdropIn { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .backdrop { animation: none; } }

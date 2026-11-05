@@ -18,7 +18,7 @@ import { getBookingSourceLabel } from '@/lib/bookingType';
 import Button, { IconButton } from '@/components/ui/Button';
 import BookingSMS from '@/components/BookingSMS';
 import MarketingConsent from '@/components/MarketingConsent';
-import { Pill, Section, Fact, SkeletonBar, DetailSkeleton, detailStyles } from '@/components/ui/DetailParts';
+import { Pill, Section, Fact, SkeletonBar, DetailSkeleton, PanelBackdrop, detailStyles } from '@/components/ui/DetailParts';
 import ConsentSubmissionCard from '@/components/ConsentSubmissionCard';
 import { describeAvailability } from '@/lib/availability';
 
@@ -404,6 +404,8 @@ export default function BookingDetailPanel({
   // keep the detail sections hidden rather than rendering them from partial data.
   if (loading) {
     return (
+      <>
+      <PanelBackdrop onClose={onClose} />
       <aside className="studio-booking-detail" aria-label={`${clientName} booking details`} aria-busy="true" style={p.panel}>
         <div style={p.header}>
           <div style={p.headerText}>
@@ -414,6 +416,7 @@ export default function BookingDetailPanel({
         </div>
         <div style={p.body}><DetailSkeleton label={t('loading')} hero cards={3} /></div>
       </aside>
+      </>
     );
   }
 
@@ -430,6 +433,8 @@ export default function BookingDetailPanel({
   const hasTimeline = createdAt || (status === 'awaiting_payment' && (updatedAt || selectionTokenExpiresAt)) || (holdExpiresAt && canConfirm);
 
   return (
+    <>
+    <PanelBackdrop onClose={onClose} />
     <aside className="studio-booking-detail" aria-label={`${clientName} booking details`} style={p.panel}>
       <div className="studio-bdp-header" style={p.header}>
         <div className="studio-bdp-headtext" style={p.headerText}>
@@ -867,6 +872,7 @@ export default function BookingDetailPanel({
         </div>
       )}
     </aside>
+    </>
   );
 }
 

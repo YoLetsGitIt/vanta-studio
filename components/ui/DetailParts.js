@@ -111,3 +111,8 @@ export function DetailSkeleton({ label = 'Loading details…', stats = false, he
     </div>
   );
 }
+
+/** Dims the page behind a detail panel; clicking it closes the panel. Render it just before the panel. */
+export function PanelBackdrop({ onClose }) {
+  return <div className={styles.backdrop} aria-hidden="true" onClick={onClose} />;
+}

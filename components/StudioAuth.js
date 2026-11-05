@@ -49,7 +49,7 @@ export default function StudioAuth({ initialTab = 'signin', mode = initialTab })
           if (signInError) throw signInError;
           window.sessionStorage.removeItem('vanta-pending-signup');
           // Load a document after auth so static-export navigation cannot expose RSC data.
-          window.location.replace('/dashboard/home');
+          window.location.replace('/dashboard/schedule');
           return;
         } catch (err) {
           setNotice(err.message || 'Payment setup is complete. Please sign in to continue.');
@@ -58,7 +58,7 @@ export default function StudioAuth({ initialTab = 'signin', mode = initialTab })
         setTab('signup');
       }
       const { data: { session } } = await getSupabase().auth.getSession();
-      if (session) window.location.replace('/dashboard/home');
+      if (session) window.location.replace('/dashboard/schedule');
       else setChecking(false);
     }
     initialize();
@@ -82,7 +82,7 @@ export default function StudioAuth({ initialTab = 'signin', mode = initialTab })
     // Verify this is a studio account
     try {
       await getMyStudioAccount();
-      window.location.replace(email.trim().toLowerCase() === 'studio@test.com' ? '/dashboard/home?tour=1' : '/dashboard/home');
+      window.location.replace(email.trim().toLowerCase() === 'studio@test.com' ? '/dashboard/schedule?tour=1' : '/dashboard/schedule');
     } catch {
       // No studio account — sign them out and block access
       await supabase.auth.signOut();
@@ -111,7 +111,7 @@ export default function StudioAuth({ initialTab = 'signin', mode = initialTab })
     setLoading(true);
     const { error: updateError } = await getSupabase().auth.updateUser({ password: newPassword });
     if (updateError) { setError(updateError.message); setLoading(false); return; }
-    window.location.replace('/dashboard/home');
+    window.location.replace('/dashboard/schedule');
   }
 
   function showSignIn() { setTab('signin'); setError(''); setNotice(''); }

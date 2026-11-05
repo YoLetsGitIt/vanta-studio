@@ -375,3 +375,6 @@
   .studio-home-header > div:first-of-type { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
   .studio-home-header p { font-size: 0.9rem !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 }
+
+/* Needs action inside the phone "More" menu. */
+.studio-mobile-needs-action { margin: 0 -0.75rem 1rem; }

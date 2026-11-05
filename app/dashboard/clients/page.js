@@ -17,7 +17,7 @@ import Button from '@/components/ui/Button';
 import MarketingConsent from '@/components/MarketingConsent';
 import ConsentSubmissionCard from '@/components/ConsentSubmissionCard';
 import ClientTemplateSend from '@/components/marketing/ClientTemplateSend';
-import { Pill, Section, CollapsibleSection, Fact, SkeletonBar, DetailSkeleton, detailStyles } from '@/components/ui/DetailParts';
+import { Pill, Section, CollapsibleSection, Fact, SkeletonBar, DetailSkeleton, PanelBackdrop, detailStyles } from '@/components/ui/DetailParts';
 
 const CLIENTS_PER_PAGE = 25;
 
@@ -287,6 +287,8 @@ function ClientsInner() {
           )}
         </div>
 
+        {(detailLoading || selectedClient) && <PanelBackdrop onClose={() => setSelected(null)} />}
+
         {detailLoading && (
           <aside id="client-detail" className="studio-client-detail" aria-label="Loading client details" aria-busy="true" style={s.panel}>
             <div style={s.panelHeader}>
@@ -548,6 +550,7 @@ function ClientDetail({ client, marketing, onMarketingChange, clientKey, onClose
           <ClientTemplateSend key={clientKey} clientKey={clientKey} email={client.email} marketing={marketing} />
         </Section>
 
+        {/* Client profile hidden for now.
         <Section title={t('clients_profile')}>
           <div>
             <span style={s.fieldLabel}>{t('clients_design_prefs')}</span>
@@ -645,6 +648,7 @@ function ClientDetail({ client, marketing, onMarketingChange, clientKey, onClose
             {profErr && <span style={{ fontSize: '0.875rem', color: 'var(--color-danger)' }}>{profErr}</span>}
           </div>
         </Section>
+        */}
 
         <Section title={t('clients_notes')}>
           <textarea

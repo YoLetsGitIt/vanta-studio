@@ -92,7 +92,7 @@ function AppointmentsInner() {
   const [studioArtists, setStudioArtists] = useState([]);
   const [stripeConnected, setStripeConnected] = useState(false);
   const requestedBookingId = searchParams.get('booking');
-  const deepLinkTabSet = useRef(false);
+  const deepLinkTabSet = useRef(null); // the deep-linked booking whose tab was already chosen
 
   const activeSub = activeFilter === COMPLETED_TAB
     ? (COMPLETED_SUB_FILTERS.find(f => f.value === completedSubFilter) ?? COMPLETED_SUB_FILTERS[0])
@@ -159,8 +159,8 @@ function AppointmentsInner() {
         if (!active) return;
         setSelectedBooking(booking);
         // Opened via a link (e.g. a client's booking history): show the tab this booking lives in.
-        if (selected === requestedBookingId && !deepLinkTabSet.current) {
-          deepLinkTabSet.current = true;
+        if (selected === requestedBookingId && deepLinkTabSet.current !== requestedBookingId) {
+          deepLinkTabSet.current = requestedBookingId;
           const tab = filterForStatus(booking.status);
           if (tab) { setActiveFilter(tab); setCompletedSubFilter('all'); setConfirmedSubFilter('all'); }
         }
