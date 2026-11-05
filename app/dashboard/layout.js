@@ -132,6 +132,7 @@ function DashboardShell({ children }) {
   const [user, setUser] = useState(null);
   const [studioName, setStudioName] = useState('');
   const [paymentRecording, setPaymentRecording] = useState(null);
+  const [studioLogo, setStudioLogo] = useState('');
   const [billingBlocked, setBillingBlocked] = useState(false);
   const [subscriptionStatus, setSubscriptionStatus] = useState('');
   const [ready, setReady] = useState(false);
@@ -211,6 +212,7 @@ function DashboardShell({ children }) {
 
       setStudioName(studioAccount.studio?.name ?? '');
       setPaymentRecording(studioAccount.studio?.payment_recording_requirement ?? null);
+      setStudioLogo(studioAccount.studio?.logo_url ?? '');
       setSubscriptionStatus(studioAccount.studio?.subscription_status ?? '');
 
       setBillingBlocked(subscriptionInactive(studioAccount.studio));
@@ -324,24 +326,23 @@ function DashboardShell({ children }) {
                 );
               })}
             </nav>
-            <div style={s.userRow}>
-              <div style={s.avatar}>{displayName[0].toUpperCase()}</div>
-              <div style={s.userInfo}>
-                <span style={s.userName}>{displayName}</span>
-                <span style={s.userEmail}>{user?.email}</span>
-              </div>
-              <Link
-                href="/dashboard/settings"
-                style={{
-                  ...s.gearBtn,
-                  ...(TOUR_STEPS[tourStep]?.target === 'settings' && !TOUR_STEPS[tourStep]?.settingsTab ? s.tourHighlight : {}),
-                  color: pathname.startsWith('/dashboard/settings') ? 'var(--accent)' : 'var(--text-muted)',
-                }}
-                title="Settings"
-              >
-                <GearIcon size={17} />
-              </Link>
-            </div>
+            <Link
+              href="/dashboard/settings"
+              aria-current={pathname.startsWith('/dashboard/settings') ? 'page' : undefined}
+              aria-label={`${displayName} settings`}
+              title={user?.email ? `${displayName} · ${user.email}` : displayName}
+              style={{
+                ...s.userRow,
+                ...(pathname.startsWith('/dashboard/settings') ? s.navActive : {}),
+                ...(TOUR_STEPS[tourStep]?.target === 'settings' && !TOUR_STEPS[tourStep]?.settingsTab ? s.tourHighlight : {}),
+              }}
+            >
+              {studioLogo
+                ? <img src={studioLogo} alt="" style={s.avatarImg} />
+                : <span style={s.avatar} aria-hidden="true">{displayName[0].toUpperCase()}</span>}
+              <span style={s.userName}>{displayName}</span>
+              <span style={s.gearIcon} aria-hidden="true"><GearIcon size={15} /></span>
+            </Link>
           </div>
         </aside>
 
@@ -738,52 +739,42 @@ const s = {
   userRow: {
     display: 'flex',
     alignItems: 'center',
-    gap: '0.65rem',
-    padding: '0 1rem',
-  },
-  gearBtn: {
-    marginLeft: 'auto',
-    flexShrink: 0,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: '0.25rem',
-    borderRadius: 6,
+    gap: '0.6rem',
+    margin: '0 0.75rem',
+    padding: '0.45rem 0.65rem',
+    borderRadius: 8,
     textDecoration: 'none',
+    transition: 'background 0.12s',
   },
   avatar: {
-    width: 30,
-    height: 30,
-    borderRadius: '50%',
-    background: 'var(--accent-tint)',
-    color: 'var(--accent)',
-    fontSize: '0.8rem',
-    fontWeight: 600,
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    background: 'var(--bg-chip)',
+    border: '1px solid var(--border)',
+    color: 'var(--text-dim)',
+    fontSize: '0.7rem',
+    fontWeight: 700,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
   },
-  userInfo: {
-    display: 'flex',
-    flexDirection: 'column',
-    minWidth: 0,
-  },
+  avatarImg: { width: 22, height: 22, borderRadius: 6, objectFit: 'cover', flexShrink: 0, border: '1px solid var(--border)' },
   userName: {
-    fontSize: '0.8rem',
+    flex: 1,
+    minWidth: 0,
+    fontSize: '0.82rem',
     fontWeight: 600,
-    color: 'var(--text-dim)',
+    lineHeight: 1.3,
+    color: 'var(--text)',
     overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap',
+    display: '-webkit-box',
+    WebkitLineClamp: 2,
+    WebkitBoxOrient: 'vertical',
+    overflowWrap: 'anywhere',
   },
-  userEmail: {
-    fontSize: '0.7rem',
-    color: 'var(--text-ghost)',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap',
-  },
+  gearIcon: { display: 'flex', flexShrink: 0, color: 'var(--text-muted)' },
   main: {
     position: 'relative', // Contain absolute descendants inside the dashboard scroller.
     minWidth: 0,

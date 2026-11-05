@@ -46,6 +46,14 @@ function srcStyle(source) { return getBookingStyle(source); }
 // ── helpers ──────────────────────────────────────────────────────────────────
 
 const toISO = toISODate; // local alias; the many call sites below read cleaner as toISO
+function ChevronIcon({ dir }) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path d={dir === 'left' ? 'M10 3.5 5.5 8l4.5 4.5' : 'M6 3.5 10.5 8 6 12.5'} stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 function getMonday(d) {
   const r = new Date(d);
   const dow = r.getDay();
@@ -1229,7 +1237,7 @@ const LANG_LOCALE = { en: 'en-AU', 'zh-Hans': 'zh-CN', ko: 'ko-KR' };
 export default function SchedulePage() {
   const { t, lang } = useLanguage();
   const locale = LANG_LOCALE[lang] ?? 'en-AU';
-  const [view,      setView]      = useState('month');  // 'month' | 'week' | 'day'
+  const [view,      setView]      = useState('week');  // 'month' | 'week' | 'day'; phones switch to day
   const [showAll, setShowAll] = useState(false);
   const [lens,      setLens]      = useState('artist'); // 'artist' | 'station'
   const [monthStart, setMonthStart] = useState(() => getMonthStart(new Date()));
@@ -1264,6 +1272,14 @@ export default function SchedulePage() {
 
   const monthLabel = monthStart.toLocaleDateString(locale, { month: 'long', year: 'numeric' });
   const dayLabel   = dayDate.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' });
+  // Header title: the full period, with the year.
+  const headerLabel = (() => {
+    if (view === 'month') return monthLabel;
+    if (view === 'day') return dayDate.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    const start = getMonday(dayDate), end = addDays(start, 6);
+    const f = new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'long', year: 'numeric' });
+    return f.formatRange ? f.formatRange(start, end) : `${f.format(start)} – ${f.format(end)}`;
+  })();
   const weekLabel = weekRangeLabel(dayDate, locale);
   const period = view === 'month' ? 'month' : view === 'week' ? 'week' : 'day';
   const periodLabel = view === 'month' ? monthLabel : view === 'week' ? weekLabel : dayLabel;
@@ -1314,22 +1330,22 @@ export default function SchedulePage() {
       <div className="studio-feature-header" style={s.header}>
         <h1 className="sr-only">{t('nav_schedule')}</h1>
         <div className="studio-schedule-date-nav" style={s.nav}>
-          <button onClick={goToday} style={{ ...s.todayBtn, ...(isCurrentPeriod ? s.todayBtnCurrent : {}) }}>{t('today')}</button>
-          <span style={s.arrows}>
-            <button aria-label={`Previous ${period}`} onClick={() => navigate(-1)} style={s.navBtn}>‹</button>
-            <button aria-label={`Next ${period}`} onClick={() => navigate(1)} style={s.navBtn}>›</button>
+          <span style={s.navGroup}>
+            <button onClick={goToday} disabled={isCurrentPeriod} style={{ ...s.navGroupBtn, borderLeft: 'none', padding: '0 0.85rem', ...(isCurrentPeriod ? s.navGroupBtnOff : {}) }} title={isCurrentPeriod ? `Showing this ${period}` : `Go to this ${period}`}>{t('today')}</button>
+            <button aria-label={`Previous ${period}`} title={`Previous ${period}`} onClick={() => navigate(-1)} style={{ ...s.navGroupBtn, ...s.navGroupArrow }}><ChevronIcon dir="left" /></button>
+            <button aria-label={`Next ${period}`} title={`Next ${period}`} onClick={() => navigate(1)} style={{ ...s.navGroupBtn, ...s.navGroupArrow }}><ChevronIcon dir="right" /></button>
           </span>
-          <span className="studio-schedule-date-label" style={s.navLabel} aria-live="polite">{periodLabel}</span>
+          <span className="studio-schedule-date-label" style={s.navLabel} aria-live="polite">{headerLabel}</span>
         </div>
 
         <div className="studio-schedule-toggles" style={s.headerRight}>
-          <div style={s.viewToggle} role="group" aria-label="Calendar view">
+          <div style={s.segment} role="group" aria-label="Calendar view">
             <button aria-pressed={view === 'month'} onClick={() => changeView('month')} style={{ ...s.toggleBtn, ...(view === 'month' ? s.toggleActive : {}) }}>{t('sched_month')}</button>
             <button aria-pressed={view === 'week'} onClick={() => changeView('week')} style={{ ...s.toggleBtn, ...(view === 'week' ? s.toggleActive : {}) }}>{t('sched_week')}</button>
             <button aria-pressed={view === 'day'} onClick={() => changeView('day')}   style={{ ...s.toggleBtn, ...(view === 'day'   ? s.toggleActive : {}) }}>{t('sched_day')}</button>
           </div>
-          <span style={s.toggleDivider} aria-hidden="true" />
-          <div style={s.viewToggle} role="group" aria-label="Group by">
+          <span style={s.groupLabel} id="schedule-group-by">Group by</span>
+          <div style={s.segment} role="group" aria-labelledby="schedule-group-by">
             <button aria-pressed={lens === 'artist'} onClick={() => setLens('artist')}  style={{ ...s.toggleBtn, ...(lens === 'artist'  ? s.toggleActive : {}) }}>{t('bdp_artist')}</button>
             <button aria-pressed={lens === 'station'} onClick={() => setLens('station')} style={{ ...s.toggleBtn, ...(lens === 'station' ? s.toggleActive : {}) }}>{t('bdp_station')}</button>
           </div>
@@ -1360,59 +1376,49 @@ const s = {
     flexWrap: 'wrap',
     flexShrink: 0,
   },
-  headerRight: { display: 'flex', alignItems: 'center', gap: '0.5rem' },
-  viewToggle: { display: 'flex', gap: 2 },
-  toggleDivider: { width: 1, height: 18, background: 'var(--border)', margin: '0 0.25rem' },
+  headerRight: { display: 'flex', alignItems: 'center', gap: '0.6rem' },
+  segment: { display: 'flex', gap: 2, padding: 3, borderRadius: 10, background: 'var(--segment-track)' },
+  groupLabel: { fontSize: '0.8rem', color: 'var(--text-muted)', marginLeft: '0.6rem' },
   toggleBtn: {
-    padding: '0.38rem 0.75rem',
+    padding: '0.35rem 0.8rem',
     borderRadius: 7,
     border: 'none',
     background: 'transparent',
-    color: 'var(--text-muted)',
+    color: 'var(--text-dim)',
     fontSize: '0.85rem',
     fontWeight: 500,
     cursor: 'pointer',
   },
   toggleActive: {
-    background: 'var(--bg-chip)',
+    background: 'var(--segment-active)',
     color: 'var(--text)',
     fontWeight: 600,
-    boxShadow: 'inset 0 0 0 1px var(--border)',
+    boxShadow: '0 1px 2px rgba(0,0,0,0.12), 0 0 0 1px var(--border)',
   },
-  nav: { display: 'flex', alignItems: 'center', gap: '0.75rem', minWidth: 0 },
-  arrows: { display: 'flex', gap: 2 },
-  navBtn: {
-    width: 32,
-    height: 32,
-    background: 'transparent',
-    border: 'none',
-    borderRadius: 8,
-    color: 'var(--text-dim)',
-    fontSize: '1.3rem',
-    lineHeight: 1,
-    cursor: 'pointer',
+  nav: { display: 'flex', alignItems: 'center', gap: '1rem', minWidth: 0 },
+  navGroup: { display: 'flex', alignItems: 'stretch', border: '1px solid var(--border-strong)', borderRadius: 9, overflow: 'hidden', flexShrink: 0 },
+  navGroupBtn: {
+    height: 34,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
+    background: 'transparent',
+    border: 'none',
+    borderLeft: '1px solid var(--border)',
+    color: 'var(--text)',
+    fontSize: '0.85rem',
+    fontWeight: 600,
+    cursor: 'pointer',
   },
+  navGroupArrow: { width: 36 },
+  navGroupBtnOff: { color: 'var(--text-muted)', opacity: 1, cursor: 'default' },
   navLabel: {
-    fontSize: '1.3rem',
+    fontSize: '1.25rem',
     fontWeight: 700,
     color: 'var(--text)',
     letterSpacing: '-0.015em',
     whiteSpace: 'nowrap',
   },
-  todayBtn: {
-    background: 'transparent',
-    border: '1px solid var(--border-strong)',
-    borderRadius: 8,
-    color: 'var(--text)',
-    fontSize: '0.85rem',
-    fontWeight: 600,
-    padding: '0.38rem 0.8rem',
-    cursor: 'pointer',
-  },
-  todayBtnCurrent: { color: 'var(--text-muted)', borderColor: 'var(--border)' },
   msg: { padding: '2rem', fontSize: '0.875rem', color: 'var(--text-faint)' },
 
   // Day filter bar

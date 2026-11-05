@@ -32,6 +32,8 @@
   --control-border: #78746e;
   --overlay-backdrop: rgba(0, 0, 0, 0.62);
   --panel-backdrop: rgba(0, 0, 0, 0.5);
+  --segment-track: #1c1c1c;
+  --segment-active: #343434;
 
   /* Structural colours */
   --text:           #f2f0ec;
@@ -96,6 +98,8 @@
 [data-theme="light"] {
   color-scheme: light;
   --panel-backdrop: rgba(17, 16, 8, 0.22);
+  --segment-track: #f0f0f0;
+  --segment-active: #ffffff;
   --text:           #111008;
   --text-dim:       #38342e;
   --text-muted:     #575148;
