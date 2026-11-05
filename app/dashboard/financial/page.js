@@ -275,7 +275,7 @@ function FinancialContent({ s, weeklyChart, startDate, endDate, isLight }) {
   const { t } = useLanguage();
   const tickColor = isLight ? 'rgba(17,16,8,0.4)' : 'rgba(255,255,255,0.3)';
   const gridColor = isLight ? 'rgba(0,0,0,0.07)' : 'rgba(255,255,255,0.05)';
-  const tooltipBg = isLight ? '#f5f2ec' : '#151b24';
+  const tooltipBg = isLight ? '#ffffff' : '#151b24';
   const tooltipBorder = isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)';
   const tooltipColor = isLight ? '#111008' : '#fff';
   return (

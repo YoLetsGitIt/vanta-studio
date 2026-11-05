@@ -101,10 +101,10 @@
   --text-faint:     #655f57;
   --text-ghost:     #686159;
 
-  --bg-base:        #f0ede8;
-  --bg-sidebar:     #e8e4de;
-  --bg-panel:       #eae6df;
-  --bg-modal:       #f5f2ec;
+  --bg-base:        #ffffff;
+  --bg-sidebar:     #fafafa;
+  --bg-panel:       #f7f7f7;
+  --bg-modal:       #ffffff;
   --bg-card:        rgba(0,0,0,0.025);
   --bg-row-active:  rgba(0,0,0,0.035);
   --bg-input:       rgba(0,0,0,0.04);
@@ -122,7 +122,7 @@
   --accent-active-border: rgba(26,21,16,0.22);
   --nav-active-bg:        rgba(26,21,16,0.07);
   --switch-on:            #68645e;
-  --switch-off:           #d2cec7;
+  --switch-off:           #d4d4d4;
   --switch-thumb:         #ffffff;
   --switch-edge:          rgba(0,0,0,0.18);
 
