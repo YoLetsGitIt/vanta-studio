@@ -9,6 +9,7 @@ import { BOOKING_SOURCES, getBookingStyle, TYPE_STYLE } from '@/lib/bookingType'
 import BookingDetailPanel from '@/components/BookingDetailPanel';
 import ScheduleWeekView from '@/components/ScheduleWeekView';
 import ScheduleScrollFrame, { ScheduleControls } from '@/components/ScheduleScrollFrame';
+import ScheduleLensSwitch, { ScheduleLensContext } from '@/components/ScheduleLensSwitch';
 import { weekRangeLabel } from '@/lib/scheduleWeek.mjs';
 import { getCached, setCached, invalidatePrefix } from '@/lib/cache';
 import CompleteBookingModal from '@/components/CompleteBookingModal';
@@ -791,6 +792,7 @@ function DayView({ date, showAll, setShowAll }) {
             </button>
           </>
         )}
+        <span style={{ marginLeft: 'auto' }}><ScheduleLensSwitch /></span>
       </div>
       </ScheduleControls>
 
@@ -1329,35 +1331,35 @@ export default function SchedulePage() {
       </div>
       <div className="studio-feature-header" style={s.header}>
         <h1 className="sr-only">{t('nav_schedule')}</h1>
-        <div className="studio-schedule-date-nav" style={s.nav}>
-          <span style={s.navGroup}>
-            <button onClick={goToday} disabled={isCurrentPeriod} style={{ ...s.navGroupBtn, borderLeft: 'none', padding: '0 0.85rem', ...(isCurrentPeriod ? s.navGroupBtnOff : {}) }} title={isCurrentPeriod ? `Showing this ${period}` : `Go to this ${period}`}>{t('today')}</button>
-            <button aria-label={`Previous ${period}`} title={`Previous ${period}`} onClick={() => navigate(-1)} style={{ ...s.navGroupBtn, ...s.navGroupArrow }}><ChevronIcon dir="left" /></button>
-            <button aria-label={`Next ${period}`} title={`Next ${period}`} onClick={() => navigate(1)} style={{ ...s.navGroupBtn, ...s.navGroupArrow }}><ChevronIcon dir="right" /></button>
-          </span>
-          <span className="studio-schedule-date-label" style={s.navLabel} aria-live="polite">{headerLabel}</span>
+        <div className="studio-schedule-toggles" style={s.tabs} role="group" aria-label="Calendar view">
+          {['month', 'week', 'day'].map(v => (
+            <button key={v} aria-pressed={view === v} onClick={() => changeView(v)} style={{ ...s.tab, ...(view === v ? s.tabActive : {}) }}>
+              {t(`sched_${v}`)}
+            </button>
+          ))}
         </div>
 
-        <div className="studio-schedule-toggles" style={s.headerRight}>
-          <div style={s.segment} role="group" aria-label="Calendar view">
-            <button aria-pressed={view === 'month'} onClick={() => changeView('month')} style={{ ...s.toggleBtn, ...(view === 'month' ? s.toggleActive : {}) }}>{t('sched_month')}</button>
-            <button aria-pressed={view === 'week'} onClick={() => changeView('week')} style={{ ...s.toggleBtn, ...(view === 'week' ? s.toggleActive : {}) }}>{t('sched_week')}</button>
-            <button aria-pressed={view === 'day'} onClick={() => changeView('day')}   style={{ ...s.toggleBtn, ...(view === 'day'   ? s.toggleActive : {}) }}>{t('sched_day')}</button>
-          </div>
-          <span style={s.groupLabel} id="schedule-group-by">Group by</span>
-          <div style={s.segment} role="group" aria-labelledby="schedule-group-by">
-            <button aria-pressed={lens === 'artist'} onClick={() => setLens('artist')}  style={{ ...s.toggleBtn, ...(lens === 'artist'  ? s.toggleActive : {}) }}>{t('bdp_artist')}</button>
-            <button aria-pressed={lens === 'station'} onClick={() => setLens('station')} style={{ ...s.toggleBtn, ...(lens === 'station' ? s.toggleActive : {}) }}>{t('bdp_station')}</button>
-          </div>
+        <div className="studio-schedule-date-nav" style={s.nav}>
+          <button onClick={goToday} disabled={isCurrentPeriod} style={{ ...s.todayBtn, ...(isCurrentPeriod ? s.todayBtnOff : {}) }} title={isCurrentPeriod ? `Showing this ${period}` : `Back to this ${period}`}>{t('today')}</button>
+          <button aria-label={`Previous ${period}`} title={`Previous ${period}`} onClick={() => navigate(-1)} style={s.navBtn}><ChevronIcon dir="left" /></button>
+          <span className="studio-schedule-date-label" style={s.navLabel} aria-live="polite">{headerLabel}</span>
+          <button aria-label={`Next ${period}`} title={`Next ${period}`} onClick={() => navigate(1)} style={s.navBtn}><ChevronIcon dir="right" /></button>
         </div>
       </div>
 
       </ScheduleControls>
+      <ScheduleLensContext.Provider value={{ lens, setLens }}>
+      {(view === 'month' || (view === 'day' && lens === 'station')) && (
+        <ScheduleControls>
+          <div className="studio-schedule-filter studio-schedule-lens-bar" style={s.lensBar}><ScheduleLensSwitch /></div>
+        </ScheduleControls>
+      )}
       {view === 'month' && lens === 'artist'  && <MonthView        monthStart={monthStart} onDayClick={goToDayView} />}
       {view === 'month' && lens === 'station' && <StationMonthView monthStart={monthStart} onDayClick={day => { goToDayView(day); setLens('station'); }} />}
       {view === 'week' && <WeekView date={dayDate} lens={lens} onDayClick={goToDayView} />}
       {view === 'day'   && lens === 'artist'  && <DayView          date={dayDate} showAll={showAll} setShowAll={setShowAll} />}
       {view === 'day'   && lens === 'station' && <StationView      date={dayDate} />}
+      </ScheduleLensContext.Provider>
     </ScheduleScrollFrame>
   );
 }
@@ -1367,7 +1369,8 @@ export default function SchedulePage() {
 const s = {
   page: { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' },
   header: {
-    padding: '1.1rem 2rem',
+    padding: '0 2rem',
+    minHeight: 60,
     borderBottom: '1px solid var(--border-faint)',
     display: 'flex',
     alignItems: 'center',
@@ -1376,48 +1379,58 @@ const s = {
     flexWrap: 'wrap',
     flexShrink: 0,
   },
-  headerRight: { display: 'flex', alignItems: 'center', gap: '0.6rem' },
-  segment: { display: 'flex', gap: 2, padding: 3, borderRadius: 10, background: 'var(--segment-track)' },
-  groupLabel: { fontSize: '0.8rem', color: 'var(--text-muted)', marginLeft: '0.6rem' },
-  toggleBtn: {
-    padding: '0.35rem 0.8rem',
-    borderRadius: 7,
+  tabs: { display: 'flex', alignItems: 'stretch', gap: '1.5rem', alignSelf: 'stretch' },
+  tab: {
+    position: 'relative',
+    padding: '0 0.1rem',
     border: 'none',
+    borderBottom: '2px solid transparent',
+    marginBottom: -1, // sit the underline on the header's bottom border
     background: 'transparent',
-    color: 'var(--text-dim)',
-    fontSize: '0.85rem',
+    color: 'var(--text-muted)',
+    fontSize: '0.95rem',
     fontWeight: 500,
     cursor: 'pointer',
   },
-  toggleActive: {
-    background: 'var(--segment-active)',
-    color: 'var(--text)',
-    fontWeight: 600,
-    boxShadow: '0 1px 2px rgba(0,0,0,0.12), 0 0 0 1px var(--border)',
-  },
-  nav: { display: 'flex', alignItems: 'center', gap: '1rem', minWidth: 0 },
-  navGroup: { display: 'flex', alignItems: 'stretch', border: '1px solid var(--border-strong)', borderRadius: 9, overflow: 'hidden', flexShrink: 0 },
-  navGroupBtn: {
-    height: 34,
+  tabActive: { color: 'var(--text)', fontWeight: 700, borderBottom: '2px solid var(--accent)' },
+  nav: { display: 'flex', alignItems: 'center', gap: '0.35rem', minWidth: 0 },
+  navBtn: {
+    width: 32,
+    height: 32,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     background: 'transparent',
     border: 'none',
-    borderLeft: '1px solid var(--border)',
-    color: 'var(--text)',
-    fontSize: '0.85rem',
-    fontWeight: 600,
+    borderRadius: 8,
+    color: 'var(--text-dim)',
     cursor: 'pointer',
   },
-  navGroupArrow: { width: 36 },
-  navGroupBtnOff: { color: 'var(--text-muted)', opacity: 1, cursor: 'default' },
   navLabel: {
-    fontSize: '1.25rem',
+    minWidth: 240,
+    textAlign: 'center',
+    fontSize: '1rem',
     fontWeight: 700,
     color: 'var(--text)',
-    letterSpacing: '-0.015em',
     whiteSpace: 'nowrap',
+  },
+  todayBtn: {
+    marginRight: '0.5rem',
+    background: 'transparent',
+    border: '1px solid var(--border-strong)',
+    borderRadius: 8,
+    color: 'var(--text)',
+    fontSize: '0.82rem',
+    fontWeight: 600,
+    padding: '0.35rem 0.8rem',
+    cursor: 'pointer',
+  },
+  todayBtnOff: { color: 'var(--text-muted)', borderColor: 'var(--border)', opacity: 1, cursor: 'default' },
+  lensBar: {
+    display: 'flex', justifyContent: 'flex-end', alignItems: 'center',
+    padding: '0.5rem 2rem',
+    borderBottom: '1px solid var(--border-faint)',
+    flexShrink: 0,
   },
   msg: { padding: '2rem', fontSize: '0.875rem', color: 'var(--text-faint)' },
 
