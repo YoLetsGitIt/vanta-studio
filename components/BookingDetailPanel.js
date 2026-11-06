@@ -425,10 +425,6 @@ export default function BookingDetailPanel({
     .filter(bk => bk.id !== bookingId)
     .sort((a, b) => new Date(b.chosen_time || b.proposed_time_primary || b.created_at || 0) - new Date(a.chosen_time || a.proposed_time_primary || a.created_at || 0));
 
-  // ── Duration / time string ─────────────────────────────────────────────────
-  const durationLabel = duration
-    ? `${Math.round((duration / 60) * 10) / 10} hrs`
-    : null;
 
   // While the full booking is fetching, show only the header + a loading state —
   // keep the detail sections hidden rather than rendering them from partial data.
@@ -457,7 +453,7 @@ export default function BookingDetailPanel({
     ? (currentOffer.duration_minutes < 60 ? `${currentOffer.duration_minutes} min` : `${currentOffer.duration_minutes / 60} hr${currentOffer.duration_minutes === 60 ? '' : 's'}`) : null;
   const heroMeta = offeredTimes
     ? [offerDuration, currentOffer?.artist_name, currentOffer?.deposit_amount ? `$${Number(currentOffer.deposit_amount).toFixed(2)} deposit to confirm` : null].filter(Boolean).join(' · ')
-    : [durationLabel, hasArtist(artistId) ? artistName : t('bdp_artist_unspecified'), stationName].filter(Boolean).join(' · ');
+    : null;
   const depositTone = depositConfirmedAt ? 'success' : depositPaid ? 'warning' : 'danger';
   // What happened to this booking, oldest first, from the dates the booking keeps.
   // A booking is confirmed when its deposit is confirmed, or without a deposit when the
@@ -543,10 +539,6 @@ export default function BookingDetailPanel({
             const clock = d => d.toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' });
             return (
               <div style={p.heroWhen}>
-                <div aria-hidden="true" style={p.dateTile}>
-                  <span style={p.dateTileMonth}>{start.toLocaleDateString('en-AU', { month: 'short' })}</span>
-                  <span style={p.dateTileDay}>{start.getDate()}</span>
-                </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem', minWidth: 0 }}>
                   <span style={p.heroDate}>
                     {start.toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long', year: start.getFullYear() === new Date().getFullYear() ? undefined : 'numeric' })}
@@ -572,7 +564,19 @@ export default function BookingDetailPanel({
               <span style={{ ...p.heroMeta, fontSize: '0.85rem' }}>Emailed to {currentOffer.email_to} · {sentAt}{delivery ? ` · ${delivery.label}` : ''}</span>
             );
           })() : null)}
-          {heroMeta && <span style={p.heroMeta}>{heroMeta}</span>}
+          {offeredTimes ? (heroMeta && <span style={p.heroMeta}>{heroMeta}</span>) : (
+            <div style={p.heroPeople}>
+              {hasArtist(artistId) ? (
+                <span style={p.heroArtist}>
+                  <span aria-hidden="true" style={p.heroArtistAvatar}>{(artistName || '?').trim().charAt(0).toUpperCase()}</span>
+                  {artistName}
+                </span>
+              ) : (
+                <span style={{ ...p.heroArtist, color: 'var(--text-muted)', fontWeight: 500 }}>{t('bdp_artist_unspecified')}</span>
+              )}
+              {stationName && <span style={p.heroStation}>{stationName}</span>}
+            </div>
+          )}
           {cancelReason && <span style={p.heroNote}>{t('bdp_cancelled_reason')}: {cancelReason}</span>}
         </div>
 
@@ -1023,19 +1027,16 @@ const p = {
     boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
   },
   heroWhen: { display: 'flex', alignItems: 'center', gap: '0.9rem', minWidth: 0 },
-  dateTile: {
-    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-    width: 58, height: 62, flexShrink: 0, borderRadius: 12, overflow: 'hidden',
-    background: 'var(--bg-input)', border: '1px solid var(--border)',
-  },
-  dateTileMonth: { alignSelf: 'stretch', textAlign: 'center', padding: '0.15rem 0', fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-info)', background: 'var(--color-info-surface)', borderBottom: '1px solid var(--border)' },
-  dateTileDay: { flex: 1, display: 'flex', alignItems: 'center', fontSize: '1.45rem', fontWeight: 700, color: 'var(--text)', fontVariantNumeric: 'tabular-nums', lineHeight: 1 },
   heroDate: { display: 'flex', alignItems: 'baseline', flexWrap: 'wrap', gap: '0.2rem 0.5rem', fontSize: '0.92rem', fontWeight: 600, color: 'var(--text-dim)' },
+  heroPeople: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap', paddingTop: '0.65rem', borderTop: '1px solid var(--border-faint, var(--border))' },
+  heroArtist: { display: 'inline-flex', alignItems: 'center', gap: '0.55rem', fontSize: '1.02rem', fontWeight: 650, color: 'var(--text)', minWidth: 0 },
+  heroArtistAvatar: { width: 28, height: 28, borderRadius: '50%', flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem', fontWeight: 700, background: 'var(--color-info-surface)', border: '1px solid var(--color-info-border)', color: 'var(--color-info)' },
+  heroStation: { fontSize: '0.8rem', color: 'var(--text-muted)' },
   heroRelative: { fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-info)', background: 'var(--color-info-surface)', padding: '0.05rem 0.45rem', borderRadius: 99 },
   sourceText: { fontSize: '0.8rem', color: 'var(--text-muted)' },
   heroCaption: { fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' },
   heroTime: { fontSize: '1.5rem', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em', lineHeight: 1.2 },
-  heroMeta: { fontSize: '0.9rem', color: 'var(--text-dim)', paddingTop: '0.55rem', borderTop: '1px solid var(--border-faint, var(--border))' },
+  heroMeta: { fontSize: '0.9rem', color: 'var(--text-dim)' },
   contact: { display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap', marginTop: '-0.25rem', minWidth: 0 },
   contactLink: { background: 'none', border: 'none', padding: 0, color: 'var(--text-dim)', fontSize: '0.875rem', fontFamily: 'inherit', cursor: 'pointer', textDecoration: 'none', overflowWrap: 'anywhere', textAlign: 'left' },
   glance: { display: 'grid', gap: '0.5rem', alignItems: 'stretch' },
