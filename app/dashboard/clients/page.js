@@ -27,6 +27,12 @@ import panelLayout from '@/components/ui/DetailPanelLayout.module.css';
 
 const CLIENTS_PER_PAGE = 25;
 
+// "6 Nov", or "6 Nov 2025" when it's not this year.
+function shortDate(value) {
+  const d = new Date(value);
+  return d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: d.getFullYear() === new Date().getFullYear() ? undefined : 'numeric' });
+}
+
 // Client list orderings. Clients without the value being sorted on go last.
 const time = value => (value ? new Date(value).getTime() : NaN);
 function byTime(field, newestFirst) {
@@ -278,17 +284,25 @@ function ClientsInner() {
                   {client.name.charAt(0).toUpperCase()}
                 </div>
                 <div style={s.clientInfo}>
-                  <span style={s.clientName}>{client.name}</span>
+                  <div style={s.clientNameLine}>
+                    <span style={s.clientName}>{client.name}</span>
+                    <ConsentBadge status={consentStatus} />
+                    <MarketingBadge marketing={marketingFor(client)} />
+                    {client.imported && <span style={{ ...s.badge, ...s.badgeGrey }}>{t('clients_imported')}</span>}
+                  </div>
                   <span style={s.clientMeta}>
-                    {client.email || client.phone || '—'}
+                    {[client.email, client.phone].filter(Boolean).join(' · ') || 'No contact details'}
                   </span>
                 </div>
                 <div className="studio-client-stats" style={s.clientStats}>
-                  <span style={s.sessionCount}>{client.bookingCount} {t('clients_sessions')}</span>
-                  {client.imported && <span style={{ ...s.badge, ...s.badgeGrey }}>{t('clients_imported')}</span>}
-                  <ConsentBadge status={consentStatus} />
-                  <MarketingBadge marketing={marketingFor(client)} />
+                  <span style={s.sessionCount}>
+                    <strong style={s.sessionNumber}>{client.bookingCount}</strong> {client.bookingCount === 1 ? 'session' : 'sessions'}
+                  </span>
+                  <span style={s.lastBooked}>
+                    {client.lastBooking ? `Last booked ${shortDate(client.lastBooking)}` : 'No bookings yet'}
+                  </span>
                 </div>
+                <span aria-hidden="true" className="studio-client-chevron" style={s.rowChevron}>›</span>
               </div>
             );
           })}
@@ -588,15 +602,27 @@ function ClientDetail({ client, marketing, onMarketingChange, clientKey, onClose
   return (
     <aside id="client-detail" className={`studio-client-detail ${panelLayout.panel}`} aria-label={`${client.name} details`} style={s.panel}>
       <div style={s.panelHeader}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', minWidth: 0 }}>
-          <span style={s.panelTitle}>{client.name}</span>
-          <span style={s.headerStats}>
-            {client.bookings.length === 0 ? 'No bookings yet' : [
-              `${client.bookings.length} session${client.bookings.length === 1 ? '' : 's'}`,
-              `${completedCount} completed`,
-              lastVisit ? `last booked ${new Date(lastVisit).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: new Date(lastVisit).getFullYear() === new Date().getFullYear() ? undefined : 'numeric' })}` : null,
-            ].filter(Boolean).join(' · ')}
-          </span>
+        <div style={s.headerIdentity}>
+          <div aria-hidden="true" style={s.headerAvatar}>{client.name.charAt(0).toUpperCase()}</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', minWidth: 0 }}>
+            <span style={s.panelTitle}>{client.name}</span>
+            {client.bookings.length === 0 ? (
+              <span style={s.headerStatLabel}>No bookings yet</span>
+            ) : (
+              <dl style={s.headerStats}>
+                {[
+                  [client.bookings.length, client.bookings.length === 1 ? 'Session' : 'Sessions'],
+                  [completedCount, 'Completed'],
+                  lastVisit && [new Date(lastVisit).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: new Date(lastVisit).getFullYear() === new Date().getFullYear() ? undefined : 'numeric' }), 'Last booked'],
+                ].filter(Boolean).map(([value, label], i) => (
+                  <div key={label} style={{ ...s.headerStat, ...(i > 0 ? s.headerStatDivided : { paddingLeft: 0 }) }}>
+                    <dt style={s.headerStatLabel}>{label}</dt>
+                    <dd style={s.headerStatValue}>{value}</dd>
+                  </div>
+                ))}
+              </dl>
+            )}
+          </div>
         </div>
         <button type="button" aria-label="Close client details" onClick={onClose} style={s.closeBtn}>✕</button>
       </div>
@@ -975,13 +1001,22 @@ const s = {
     flex: 1,
     display: 'flex',
     flexDirection: 'column',
-    gap: '0.15rem',
+    gap: '0.3rem',
+    minWidth: 0,
+  },
+  clientNameLine: {
+    display: 'flex',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: '0.35rem 0.5rem',
     minWidth: 0,
   },
   clientName: {
     fontSize: '1.02rem',
     fontWeight: 700,
     color: 'var(--text)',
+    letterSpacing: '-0.01em',
+    marginRight: '0.15rem',
   },
   clientMeta: {
     fontSize: '0.875rem',
@@ -994,18 +1029,37 @@ const s = {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'flex-end',
-    gap: '0.3rem',
+    gap: '0.2rem',
     flexShrink: 0,
   },
   sessionCount: {
-    fontSize: '0.875rem',
+    fontSize: '0.8rem',
     color: 'var(--text-dim)',
     fontWeight: 600,
+    fontVariantNumeric: 'tabular-nums',
+  },
+  sessionNumber: {
+    fontSize: '1.05rem',
+    fontWeight: 700,
+    color: 'var(--text)',
+  },
+  lastBooked: {
+    fontSize: '0.8rem',
+    color: 'var(--text-muted)',
+    whiteSpace: 'nowrap',
+  },
+  rowChevron: {
+    color: 'var(--text-muted)',
+    fontSize: '1.3rem',
+    lineHeight: 1,
+    flexShrink: 0,
+    marginLeft: '0.25rem',
   },
   badge: {
-    fontSize: '0.75rem',
+    fontSize: '0.72rem',
     fontWeight: 700,
-    padding: '0.15rem 0.6rem',
+    padding: '0.1rem 0.55rem',
+    whiteSpace: 'nowrap',
     borderRadius: 99,
     border: '1px solid transparent',
   },
@@ -1069,7 +1123,19 @@ const s = {
     flexDirection: 'column',
     gap: '1rem',
   },
-  headerStats: { fontSize: '0.9rem', color: 'var(--text-dim)', fontVariantNumeric: 'tabular-nums' },
+  headerIdentity: { display: 'flex', alignItems: 'center', gap: '1rem', minWidth: 0 },
+  headerAvatar: {
+    width: 52, height: 52, borderRadius: '50%', flexShrink: 0,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    background: 'var(--color-info-surface)', border: '1px solid var(--color-info-border)',
+    color: 'var(--color-info)', fontSize: '1.35rem', fontWeight: 700,
+    boxShadow: '0 1px 2px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.35)',
+  },
+  headerStats: { display: 'flex', margin: 0 },
+  headerStat: { display: 'flex', flexDirection: 'column-reverse', gap: '0.15rem', padding: '0 0.85rem', whiteSpace: 'nowrap' },
+  headerStatDivided: { borderLeft: '1px solid var(--border)' },
+  headerStatValue: { margin: 0, fontSize: '1.2rem', fontWeight: 700, color: 'var(--text)', fontVariantNumeric: 'tabular-nums', lineHeight: 1.15 },
+  headerStatLabel: { fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-dim)', letterSpacing: '0.02em' },
   phoneBtn: { background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--color-info)', fontSize: '0.95rem', fontWeight: 600, fontFamily: 'inherit' },
   consentSection: {
     borderTop: '1px solid var(--border-faint)',

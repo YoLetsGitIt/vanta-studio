@@ -67,7 +67,8 @@
   .studio-booking-main { overflow-wrap: anywhere; }
   .studio-booking-status { grid-column: 2; flex-direction: row !important; align-items: center !important; flex-wrap: wrap; gap: 8px !important; }
   .studio-client-row { display: grid !important; grid-template-columns: 36px minmax(0, 1fr); gap: 8px 12px !important; padding: 12px !important; }
-  .studio-client-stats { grid-column: 2; flex-direction: row !important; flex-wrap: wrap; justify-content: flex-start; align-items: center !important; }
+  .studio-client-stats { grid-column: 2; flex-direction: row !important; flex-wrap: wrap; justify-content: flex-start; align-items: baseline !important; gap: 4px 10px !important; }
+  .studio-client-chevron { display: none; }
   .studio-feature-page .studio-client-list { min-width: 0; width: 100%; flex: 1 1 0 !important; }
   .studio-client-pagination { flex-wrap: wrap; gap: 6px !important; }
   .studio-booking-detail, .studio-client-detail {
