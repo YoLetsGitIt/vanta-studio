@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { getStudioClients, getStudioClient, getClientConsents, getNotes, addNote, deleteNote, ensureStudioClient, patchStudioClient, generateConsentLink, listConsentTemplates, getClientConsentSubmissions, getBatchClientConsentSubmissions } from '@/lib/api';
+import { getStudioClients, getStudioClient, getClientConsents, getNotes, addNote, deleteNote, ensureStudioClient, patchStudioClient, updateStudioClientContact, generateConsentLink, listConsentTemplates, getClientConsentSubmissions, getBatchClientConsentSubmissions } from '@/lib/api';
 
 const TATTOO_STYLES = [
   'Traditional', 'Neo Traditional', 'Blackwork', 'Fine Line', 'Realism',
@@ -11,6 +11,8 @@ const TATTOO_STYLES = [
 ];
 import { statusColors, capitalise } from '@/lib/status';
 import { formatDob } from '@/lib/format';
+import { invalidate } from '@/lib/cache';
+import DateOfBirthInput from '@/components/ui/DateOfBirthInput';
 import { useLanguage } from '@/lib/i18n';
 import { showError } from '@/lib/feedback';
 import Button from '@/components/ui/Button';
@@ -315,6 +317,11 @@ function ClientsInner() {
             legacyConsent={selectedClient.email ? consents[selectedClient.email] : null}
             consentVersion={consentVersion}
             onSendConsentLink={handleSendConsentLink}
+            onContactSaved={updated => {
+              setSelectedClient(current => ({ ...current, ...updated }));
+              setContacts(list => list.map(c => (c.id === selected ? { ...c, ...updated } : c)));
+              invalidate('clients:contacts'); // booking panels re-read the contact book
+            }}
           />
         )}
       </div>
@@ -364,7 +371,53 @@ function MarketingBadge({ marketing }) {
   return null;
 }
 
-function ClientDetail({ client, marketing, onMarketingChange, clientKey, onClose, consentTemplates = [], legacyConsent = null, consentVersion, onSendConsentLink }) {
+// Edit name, email, phone and date of birth. A client with a Vanta account keeps the
+// name and email from their account.
+function ContactEditor({ client, onSave, onCancel }) {
+  const hasAccount = Boolean(client.user_id && client.user_id !== '00000000-0000-0000-0000-000000000000' && client.is_stub === false);
+  const [name, setName] = useState(client.name ?? '');
+  const [email, setEmail] = useState(client.email ?? '');
+  const [phone, setPhone] = useState(client.phone ?? '');
+  const [dob, setDob] = useState(client.dob ? String(client.dob).slice(0, 10) : '');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const emailBad = email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  const phoneBad = phone.trim() && phone.replace(/[^0-9]/g, '').length < 7;
+  const problem = !name.trim() ? 'Enter the client’s name.' : emailBad ? 'Enter a valid email address.' : phoneBad ? 'Enter a valid phone number.' : '';
+  const input = { width: '100%', boxSizing: 'border-box', minHeight: 44, padding: '0.6rem 0.75rem', borderRadius: 10, border: '1px solid var(--border-strong)', background: 'var(--bg-input)', color: 'var(--text)', font: 'inherit', fontSize: '0.95rem' };
+  const label = { fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-dim)' };
+  const field = { display: 'flex', flexDirection: 'column', gap: '0.35rem' };
+
+  async function save(event) {
+    event.preventDefault();
+    if (problem || saving) { setError(problem); return; }
+    setSaving(true); setError('');
+    try { await onSave({ name: name.trim(), email: email.trim(), phone: phone.trim(), dob }); }
+    catch (e) { setError(e.message); }
+    finally { setSaving(false); }
+  }
+
+  return (
+    <form onSubmit={save} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+      <label style={field}><span style={label}>Name</span>
+        <input style={input} value={name} onChange={e => setName(e.target.value)} disabled={hasAccount} autoComplete="off" /></label>
+      <label style={field}><span style={label}>Email</span>
+        <input style={input} type="email" value={email} onChange={e => setEmail(e.target.value)} disabled={hasAccount} autoComplete="off" /></label>
+      {hasAccount && <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '-0.4rem' }}>Name and email come from their Vanta account.</span>}
+      <label style={field}><span style={label}>Phone</span>
+        <input style={input} type="tel" value={phone} onChange={e => setPhone(e.target.value)} autoComplete="off" /></label>
+      <div style={field}><span style={label}>Date of birth</span>
+        <DateOfBirthInput style={input} required={false} value={dob} onChange={setDob} /></div>
+      {error && <p role="alert" style={{ margin: 0, fontSize: '0.85rem', color: 'var(--color-danger)' }}>{error}</p>}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+        <Button type="button" variant="secondary" size="sm" onClick={onCancel} disabled={saving}>Cancel</Button>
+        <Button type="submit" size="sm" loading={saving} loadingLabel="Saving…">Save</Button>
+      </div>
+    </form>
+  );
+}
+
+function ClientDetail({ client, marketing, onMarketingChange, clientKey, onClose, consentTemplates = [], legacyConsent = null, consentVersion, onSendConsentLink, onContactSaved }) {
   const { t } = useLanguage();
   const [linkGeneratingId, setLinkGeneratingId] = useState(null);
   const [linkSentId,       setLinkSentId]       = useState(null);
@@ -373,6 +426,9 @@ function ClientDetail({ client, marketing, onMarketingChange, clientKey, onClose
   const [noteInput,   setNoteInput]   = useState('');
   const [noteAdding,  setNoteAdding]  = useState(false);
   const [noteErr,     setNoteErr]     = useState('');
+
+  const [editingContact, setEditingContact] = useState(false);
+  useEffect(() => { setEditingContact(false); }, [client.id]);
 
   // Profile fields
   const [contactId,      setContactId]      = useState(client.contactId ?? null);
@@ -504,7 +560,30 @@ function ClientDetail({ client, marketing, onMarketingChange, clientKey, onClose
         </div>
 
         <div className={panelLayout.cards}>
+        {editingContact ? (
         <Section title="Contact">
+          <ContactEditor
+            client={client}
+            onCancel={() => setEditingContact(false)}
+            onSave={async fields => {
+              let id = contactId ?? client.id;
+              try {
+                await updateStudioClientContact(id, fields);
+              } catch (e) {
+                if (e.status !== 404) throw e;
+                // No contact-book record yet (e.g. a client known only from bookings): make one.
+                const { client: c } = await ensureStudioClient(client.name, client.email ?? '', client.phone ?? '');
+                id = c.id;
+                setContactId(id);
+                await updateStudioClientContact(id, fields);
+              }
+              onContactSaved?.({ name: fields.name, email: fields.email || null, phone: fields.phone || null, dob: fields.dob || null });
+              setEditingContact(false);
+            }}
+          />
+        </Section>
+        ) : (
+        <Section title="Contact" aside={<button type="button" style={detailStyles.textLink} onClick={() => setEditingContact(true)}>Edit</button>}>
           <Fact label="Email">{client.email || <span style={{ color: 'var(--text-muted)' }}>{t('clients_no_email')}</span>}</Fact>
           <Fact label="Phone">
             {client.phone ? (
@@ -515,6 +594,7 @@ function ClientDetail({ client, marketing, onMarketingChange, clientKey, onClose
           </Fact>
           {client.dob && <Fact label={t('clients_dob')}>{formatDob(client.dob)}</Fact>}
         </Section>
+        )}
 
         {(consentTemplates.length > 0 || (marketing && (client.email || client.phone))) && (
           <Section title="Consent">
