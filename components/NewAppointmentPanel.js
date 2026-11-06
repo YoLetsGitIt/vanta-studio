@@ -246,6 +246,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
     setStationId(initialSlot?.stationId || '');
     setScheduleTouched(Boolean(initialSlot?.date && initialSlot?.time));
     setPaymentFolded(false);
+    setFoldTried([]);
     setBookingType(null);
   }, [open, initialBookingType, initialSlot?.date, initialSlot?.time, initialSlot?.artistId, initialSlot?.stationId]);
 
@@ -389,17 +390,22 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
     // Ticked once there's a price; the deposit choice is optional.
     payment: quote > 0 && !depositInvalid,
   };
-  // Steps that have been started but aren't finished, and what they still need.
+  // What each step still needs. Shown (with an amber cross) only after someone folds the
+  // step before it's finished.
   const stepMissing = {
-    client: clientMode === 'manual' && (firstName || lastName || clientEmail || clientPhone || clientDob) ? [
-      !firstName.trim() && 'first name', !lastName.trim() && 'last name',
-      !clientEmail.trim() && !clientPhone.trim() && 'email or phone',
-      emailInvalid && 'a valid email', phoneInvalid && 'a valid phone',
-    ].filter(Boolean) : [],
-    appointment: (appointmentType || artistId) ? [!appointmentType && 'tattoo or piercing', !artistId && 'artist', artistConflict && 'a free artist'].filter(Boolean) : [],
-    schedule: scheduleTouched ? [!bookingDate && 'date', !startTime && 'time', !durationMins && 'duration', !stationId && 'station', (timeError || dateInPast) && 'a valid time'].filter(Boolean) : [],
-    payment: (depositMode || finalPrice) ? [!(quote > 0) && 'estimated price', depositInvalid && 'deposit amount'].filter(Boolean) : [],
+    type: [!bookingType && 'booking type'].filter(Boolean),
+    client: clientMode === 'search'
+      ? [!selectedClient && 'client']
+      : [
+          !firstName.trim() && 'first name', !lastName.trim() && 'last name',
+          !clientEmail.trim() && !clientPhone.trim() && 'email or phone',
+          emailInvalid && 'a valid email', phoneInvalid && 'a valid phone',
+        ].filter(Boolean),
+    appointment: [!appointmentType && 'tattoo or piercing', !artistId && 'artist', artistConflict && 'a free artist'].filter(Boolean),
+    schedule: [!bookingDate && 'date', !startTime && 'time', !durationMins && 'duration', !stationId && 'station', (timeError || dateInPast) && 'a valid time'].filter(Boolean),
+    payment: [!(quote > 0) && 'estimated price', depositInvalid && 'deposit amount'].filter(Boolean),
   };
+  for (const key of Object.keys(stepMissing)) stepMissing[key] = stepMissing[key].filter(Boolean);
   const canSubmit = !disabledReason;
   // Payment is required for every booking type and opens once the schedule is done.
   const paymentVisible = sectionDone.schedule;
@@ -411,6 +417,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
   // Payment has no clear end, so it never folds by itself: it stays open until folded by hand.
   const [paymentFolded, setPaymentFolded] = useState(false);
   const [foldedActive, setFoldedActive] = useState(null); // the current step, folded by hand
+  const [foldTried, setFoldTried] = useState([]); // steps folded before they were finished
   const isOpen = step => (step === activeStep && foldedActive !== step) || step === openStep || step === typingStep || (step === 'payment' && paymentVisible && !paymentFolded);
   const [pickedStep, setPickedStep] = useState(null);
   useEffect(() => {
@@ -418,9 +425,16 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
     if (pickedStep !== 'payment' && pickedStep === openStep && pickedStep !== activeStep && sectionDone[pickedStep]) setOpenStep(null);
     setPickedStep(null);
   }, [pickedStep]); // eslint-disable-line react-hooks/exhaustive-deps
+  const foldTriedFor = step => (foldTried.includes(step) ? stepMissing[step] : []);
   function toggleStep(step) {
-    if (step === 'payment') { setPaymentFolded(folded => !folded); setOpenStep(null); return; }
+    if (step === 'payment') {
+      if (!paymentFolded && !sectionDone.payment) setFoldTried(list => (list.includes(step) ? list : [...list, step]));
+      setPaymentFolded(folded => !folded); setOpenStep(null); return;
+    }
     if (isOpen(step)) {
+      // Folding a filled-in schedule counts as checking it.
+      if (step === 'schedule' && bookingDate && startTime && durationMins && stationId) setScheduleTouched(true);
+      else if (!sectionDone[step]) setFoldTried(list => (list.includes(step) ? list : [...list, step]));
       if (step === activeStep) setFoldedActive(step);
       setOpenStep(current => (current === step ? null : current));
       if (typingStep === step) setTypingStep(null);
@@ -467,7 +481,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
     setBookingDate(slot.date);
     setStartTime(slot.time);
     setDurationMins(0);
-    setStationId(''); setScheduleTouched(false); setPaymentFolded(false);
+    setStationId(''); setScheduleTouched(false); setPaymentFolded(false); setFoldTried([]);
     setSize(''); setSizeUnit('cm'); setRetouch(false); setAppointmentType(null);
     setFinalPrice(''); setDepositAmount(''); setDepositMode(null);
     setBookingType(null);
@@ -633,7 +647,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
           <form onSubmit={handleSubmit} style={bd.form}>
             <div ref={bodyRef} className={styles.body}>
               {/* ── BOOKING TYPE ── */}
-              <FormSection id="booking-type-label" step="type" title={t('nap_booking_type')} state={stepState('type')} done={sectionDone.type} summary={stepSummary.type} expanded={isOpen('type')} onToggle={() => toggleStep('type')} onTyping={trackTyping} onPicked={setPickedStep}>
+              <FormSection id="booking-type-label" step="type" title={t('nap_booking_type')} state={stepState('type')} done={sectionDone.type} summary={stepSummary.type} missing={foldTriedFor('type')} expanded={isOpen('type')} onToggle={() => toggleStep('type')} onTyping={trackTyping} onPicked={setPickedStep}>
                 <div className={styles.choices} role="radiogroup" aria-labelledby="booking-type-label" aria-describedby={bookingType ? 'booking-type-description' : undefined}>
                   {[
                     ['studio', t('nap_type_studio'), 'Studio appointment'],
@@ -652,7 +666,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
               </FormSection>
 
               {/* ── CLIENT ── */}
-              <FormSection id="client-section-title" step="client" title={t('nap_client')} state={stepState('client')} done={sectionDone.client} summary={stepSummary.client} missing={stepMissing.client} expanded={isOpen('client')} onToggle={() => toggleStep('client')} onTyping={trackTyping} onPicked={setPickedStep}>
+              <FormSection id="client-section-title" step="client" title={t('nap_client')} state={stepState('client')} done={sectionDone.client} summary={stepSummary.client} missing={foldTriedFor('client')} expanded={isOpen('client')} onToggle={() => toggleStep('client')} onTyping={trackTyping} onPicked={setPickedStep}>
 
                 <div className={styles.segmented} role="group" aria-label="Client">
                   <button
@@ -789,7 +803,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
                 </label>}
               </FormSection>
 
-              <FormSection id="appointment-section-title" step="appointment" title={t('nap_appointment')} state={stepState('appointment')} done={sectionDone.appointment} summary={stepSummary.appointment} missing={stepMissing.appointment} expanded={isOpen('appointment')} onToggle={() => toggleStep('appointment')} onTyping={trackTyping} onPicked={setPickedStep}>
+              <FormSection id="appointment-section-title" step="appointment" title={t('nap_appointment')} state={stepState('appointment')} done={sectionDone.appointment} summary={stepSummary.appointment} missing={foldTriedFor('appointment')} expanded={isOpen('appointment')} onToggle={() => toggleStep('appointment')} onTyping={trackTyping} onPicked={setPickedStep}>
                 <div className={styles.fieldRow}>
                   <div style={bd.field}>
                     <span id="new-appointment-type" style={bd.label}>Appointment type</span>
@@ -813,7 +827,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
                 {allStations.length === 0 && <p role="alert" style={bd.inlineError}>No active station was found. Reload the studio or add a station in Settings before creating an appointment.</p>}
               </FormSection>
 
-              <FormSection id="schedule-section-title" step="schedule" title={t('nav_schedule')} state={stepState('schedule')} done={sectionDone.schedule} summary={stepSummary.schedule} missing={stepMissing.schedule} expanded={isOpen('schedule')} onToggle={() => toggleStep('schedule')} onTyping={trackTyping} onPicked={setPickedStep}>
+              <FormSection id="schedule-section-title" step="schedule" title={t('nav_schedule')} state={stepState('schedule')} done={sectionDone.schedule} summary={stepSummary.schedule} missing={foldTriedFor('schedule')} expanded={isOpen('schedule')} onToggle={() => toggleStep('schedule')} onTyping={trackTyping} onPicked={setPickedStep}>
                 <div className={styles.fieldRow}>
                   <div style={bd.field}>
                     <label htmlFor="new-appointment-date" style={bd.label}>{t('sched_date')}</label>
@@ -860,7 +874,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
 
               {paymentVisible && <>
                 {/* ── PRICING ── */}
-                <FormSection id="payment-section-title" step="payment" title={t('bdp_payment')} state={stepState('payment')} done={sectionDone.payment} summary={stepSummary.payment} missing={stepMissing.payment} expanded={isOpen('payment')} onToggle={() => toggleStep('payment')} onTyping={trackTyping} onPicked={setPickedStep}>
+                <FormSection id="payment-section-title" step="payment" title={t('bdp_payment')} state={stepState('payment')} done={sectionDone.payment} summary={stepSummary.payment} missing={foldTriedFor('payment')} expanded={isOpen('payment')} onToggle={() => toggleStep('payment')} onTyping={trackTyping} onPicked={setPickedStep}>
                   <div style={bd.field}>
                     <span id="deposit-mode-label" style={bd.label}>Deposit</span>
                     <div className={styles.choices} role="radiogroup" aria-labelledby="deposit-mode-label">
