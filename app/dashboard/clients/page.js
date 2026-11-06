@@ -41,7 +41,6 @@ function byTime(field, newestFirst) {
 const CLIENT_SORTS = {
   recent: { label: 'Most recent booking', compare: byTime('lastBooking', true) },
   longest: { label: 'Longest since last booking', compare: byTime('lastBooking', false) },
-  added: { label: 'Newest clients', compare: byTime('addedAt', true) },
   sessions: { label: 'Most sessions', compare: (a, b) => b.bookingCount - a.bookingCount || a.name.localeCompare(b.name) },
   name: { label: 'Name (A–Z)', compare: (a, b) => a.name.localeCompare(b.name, 'en', { sensitivity: 'base' }) },
 };
@@ -102,7 +101,6 @@ function ClientsInner() {
         phone: contact.phone ?? null,
         bookingCount: Number(contact.booking_count ?? 0),
         lastBooking: contact.last_booking ?? null,
-        addedAt: contact.created_at ?? null,
         imported: contact.source === 'import' || contact.source === 'imported',
         contactId: contact.id,
         marketingKnown: contact.email_marketing_opt_in !== undefined,
