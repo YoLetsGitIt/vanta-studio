@@ -40,6 +40,18 @@ const OFFER_EMAIL_STATUS = {
   failed: { label: 'Failed to send', problem: true },
 };
 
+// "Today", "Tomorrow", "In 3 days", "Yesterday", "5 days ago" (calendar days).
+function relativeDay(date) {
+  const day = d => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const diff = Math.round((day(date) - day(new Date())) / 86400000);
+  if (diff === 0) return 'Today';
+  if (diff === 1) return 'Tomorrow';
+  if (diff === -1) return 'Yesterday';
+  if (diff > 1 && diff < 60) return `In ${diff} days`;
+  if (diff < -1 && diff > -60) return `${-diff} days ago`;
+  return null;
+}
+
 function fmtDate(iso) {
   if (!iso) return null;
   return new Date(iso).toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' });
@@ -506,7 +518,7 @@ export default function BookingDetailPanel({
           )}
           <div style={p.headerPills}>
             {status && <Pill colors={sc}>{statusLabel(displayStatus)}</Pill>}
-            {source && <Pill>{getBookingSourceLabel(source)}</Pill>}
+            {source && <span style={p.sourceText}>Booked via {getBookingSourceLabel(source)}</span>}
             {clientAge != null && clientAge < 18 && <Pill tone="warning">{t('bdp_minor')}</Pill>}
           </div>
         </div>
@@ -516,7 +528,7 @@ export default function BookingDetailPanel({
       <div className={`studio-bdp-body ${panelLayout.body}`} style={p.body}>
         {/* ── When / who summary ── */}
         <div className="studio-bdp-hero" style={p.hero}>
-          <span style={p.heroCaption}>{heroCaption}</span>
+          {heroCaption !== 'Appointment' && <span style={p.heroCaption}>{heroCaption}</span>}
           {offeredTimes ? (
             <ol aria-label="Offered times" style={{ margin: '0.25rem 0', padding: 0, listStyle: 'none', display: 'grid', gap: '0.35rem' }}>
               {offeredTimes.map((time, i) => (
@@ -525,8 +537,27 @@ export default function BookingDetailPanel({
                 </li>
               ))}
             </ol>
-          ) : (
-            <span style={p.heroTime}>{heroTime ? fmtDate(heroTime) : '—'}</span>
+          ) : heroTime ? (() => {
+            const start = new Date(heroTime);
+            const end = duration ? new Date(start.getTime() + duration * 60000) : null;
+            const clock = d => d.toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' });
+            return (
+              <div style={p.heroWhen}>
+                <div aria-hidden="true" style={p.dateTile}>
+                  <span style={p.dateTileMonth}>{start.toLocaleDateString('en-AU', { month: 'short' })}</span>
+                  <span style={p.dateTileDay}>{start.getDate()}</span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem', minWidth: 0 }}>
+                  <span style={p.heroDate}>
+                    {start.toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long', year: start.getFullYear() === new Date().getFullYear() ? undefined : 'numeric' })}
+                    {!ended && <span style={p.heroRelative}>{relativeDay(start)}</span>}
+                  </span>
+                  <span style={p.heroTime}>{clock(start)}{end ? ` – ${clock(end)}` : ''}</span>
+                </div>
+              </div>
+            );
+          })() : (
+            <span style={p.heroTime}>—</span>
           )}
           {offeredTimes && (currentOffer?.email_error ? (
             <span role="alert" style={p.heroNote}>
@@ -986,12 +1017,25 @@ const p = {
     display: 'flex', flexDirection: 'column', gap: '1rem',
   },
   hero: {
-    display: 'flex', flexDirection: 'column', gap: '0.2rem',
-    padding: '0.15rem 0 0.25rem',
+    display: 'flex', flexDirection: 'column', gap: '0.55rem',
+    padding: '1rem 1.1rem', borderRadius: 14,
+    background: 'var(--bg-card)', border: '1px solid var(--border)',
+    boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
   },
+  heroWhen: { display: 'flex', alignItems: 'center', gap: '0.9rem', minWidth: 0 },
+  dateTile: {
+    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+    width: 58, height: 62, flexShrink: 0, borderRadius: 12, overflow: 'hidden',
+    background: 'var(--bg-input)', border: '1px solid var(--border)',
+  },
+  dateTileMonth: { alignSelf: 'stretch', textAlign: 'center', padding: '0.15rem 0', fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-info)', background: 'var(--color-info-surface)', borderBottom: '1px solid var(--border)' },
+  dateTileDay: { flex: 1, display: 'flex', alignItems: 'center', fontSize: '1.45rem', fontWeight: 700, color: 'var(--text)', fontVariantNumeric: 'tabular-nums', lineHeight: 1 },
+  heroDate: { display: 'flex', alignItems: 'baseline', flexWrap: 'wrap', gap: '0.2rem 0.5rem', fontSize: '0.92rem', fontWeight: 600, color: 'var(--text-dim)' },
+  heroRelative: { fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-info)', background: 'var(--color-info-surface)', padding: '0.05rem 0.45rem', borderRadius: 99 },
+  sourceText: { fontSize: '0.8rem', color: 'var(--text-muted)' },
   heroCaption: { fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' },
-  heroTime: { fontSize: '1.6rem', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em', lineHeight: 1.2 },
-  heroMeta: { fontSize: '0.95rem', color: 'var(--text-dim)' },
+  heroTime: { fontSize: '1.5rem', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em', lineHeight: 1.2 },
+  heroMeta: { fontSize: '0.9rem', color: 'var(--text-dim)', paddingTop: '0.55rem', borderTop: '1px solid var(--border-faint, var(--border))' },
   contact: { display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap', marginTop: '-0.25rem', minWidth: 0 },
   contactLink: { background: 'none', border: 'none', padding: 0, color: 'var(--text-dim)', fontSize: '0.875rem', fontFamily: 'inherit', cursor: 'pointer', textDecoration: 'none', overflowWrap: 'anywhere', textAlign: 'left' },
   glance: { display: 'grid', gap: '0.5rem', alignItems: 'stretch' },
