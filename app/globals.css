@@ -489,7 +489,7 @@ textarea {
 }
 
 @media (max-width: 760px) {
-  .studio-settings-page { padding: 20px 16px 48px !important; min-width: 0; }
+  .studio-settings-page { padding: 20px 16px calc(48px + env(safe-area-inset-bottom, 0px)) !important; min-width: 0; }
   .studio-settings-header { flex-wrap: wrap; gap: 12px; }
 }
 

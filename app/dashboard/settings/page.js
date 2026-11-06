@@ -1782,14 +1782,13 @@ export default function SettingsPage() {
 
       </div>
       </>}
-      <div style={{ height: '2rem' }} />
     </div>
   );
 }
 
 const s = {
-  // One readable column, capped in width, rather than a ragged two-column grid.
-  page: { padding: '2rem 2.5rem 4rem', display: 'flex', flexDirection: 'column', gap: '1.25rem', minHeight: '100%', boxSizing: 'border-box', width: '100%', maxWidth: 1320 },
+  // Let Settings grow inside the dashboard scroller so the final card keeps its bottom padding.
+  page: { flex: '1 0 auto', padding: '2rem 2.5rem calc(4rem + env(safe-area-inset-bottom, 0px))', display: 'flex', flexDirection: 'column', gap: '1.25rem', minHeight: '100%', boxSizing: 'border-box', width: '100%', maxWidth: 1320 },
   tabIntroWrap: { display: 'flex', flexDirection: 'column', gap: '0.3rem', marginTop: '0.5rem' },
   tabIntroTitle: { margin: 0, fontSize: '1.2rem', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.01em' },
   tabIntro: { margin: 0, fontSize: '0.95rem', lineHeight: 1.5, color: 'var(--text-secondary)' },
