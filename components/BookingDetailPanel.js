@@ -561,7 +561,7 @@ export default function BookingDetailPanel({
             return delivery?.problem ? (
               <span role="alert" style={p.heroNote}>Emailed to {currentOffer.email_to} · {sentAt} — {delivery.label}</span>
             ) : (
-              <span style={{ ...p.heroMeta, fontSize: '0.85rem' }}>Emailed to {currentOffer.email_to} · {sentAt}{delivery ? ` · ${delivery.label}` : ''}</span>
+              <span style={p.hint}>Emailed to {currentOffer.email_to} · {sentAt}{delivery ? ` · ${delivery.label}` : ''}</span>
             );
           })() : null)}
           {offeredTimes ? (heroMeta && <span style={p.heroMeta}>{heroMeta}</span>) : (
@@ -594,18 +594,18 @@ export default function BookingDetailPanel({
           const consentTone = consentStatus === 'current' ? 'success' : consentStatus === 'outdated' ? 'warning' : 'danger';
           return (
             <div className={panelLayout.glance} style={{ ...p.glance, '--tiles': showConsent ? 2 : 1 }}>
-              <section style={p.summaryCard} aria-label="Payment">
+              <section style={p.summaryCard} aria-labelledby="bdp-payment-title">
+                <h3 id="bdp-payment-title" style={p.sectionTitle}>Payment</h3>
                 <div style={p.summaryRow}>
-                  <span style={p.glanceLabel}>{priceLabel}</span>
-                  <span style={{ ...p.summaryValue, ...(priceValue ? {} : p.summaryMuted) }}>{priceValue ?? 'Not set'}</span>
+                  <span style={p.factLabel}>{priceLabel}</span>
+                  <span style={priceValue ? { ...p.factValue, ...p.factStrong } : p.summaryMuted}>{priceValue ?? 'Not set'}</span>
                 </div>
-                <div style={p.summaryDivider} />
                 {/* Deposit on one line like the price: amount and status on the right. */}
                 <div style={p.summaryRow}>
-                  <span style={p.glanceLabel}>{t('bdp_deposit')}</span>
+                  <span style={p.factLabel}>{t('bdp_deposit')}</span>
                   {hasDeposit ? (
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.6rem' }}>
-                      {depositAmount != null && <span style={{ ...p.summaryValue, fontSize: '1rem' }}>{money(depositAmount)}</span>}
+                      {depositAmount != null && <span style={{ ...p.factValue, fontWeight: 700 }}>{money(depositAmount)}</span>}
                       <Pill tone={depositPill.tone}>{depositPill.text}</Pill>
                     </span>
                   ) : <span style={p.summaryMuted}>Not required</span>}
@@ -617,7 +617,7 @@ export default function BookingDetailPanel({
                       const fee = paidByStripe && depositAmount != null ? (Math.round(depositAmount * 0.03 * 100) + 50) / 100 : 0;
                       const when = depositPaidAt || depositConfirmedAt;
                       return (
-                        <span style={{ ...p.glanceSub, textAlign: 'right' }}>
+                        <span style={{ ...p.hint, textAlign: 'right' }}>
                           {[
                             `Paid${depositPaidVia ? ` by ${depositPaidVia}` : paidByStripe ? ' by card' : ''}`,
                             new Date(when).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }),
@@ -646,9 +646,9 @@ export default function BookingDetailPanel({
               </section>
 
               {showConsent && (
-                <section style={p.summaryCard} aria-label={t('bdp_consent')}>
+                <section style={p.summaryCard} aria-labelledby="bdp-consent-title">
                   <div style={p.summaryRow}>
-                    <span style={p.glanceLabel}>{t('bdp_consent')}</span>
+                    <h3 id="bdp-consent-title" style={p.sectionTitle}>{t('bdp_consent')}</h3>
                     {consentLoading || submissionsLoading ? <Pill>{t('loading')}</Pill> : <Pill tone={consentTone}>{consentLabel}</Pill>}
                   </div>
                   {(() => {
@@ -656,20 +656,19 @@ export default function BookingDetailPanel({
                     const sorted = [...consentSubmissions].sort((x, y) => new Date(y.submitted_at || 0) - new Date(x.submitted_at || 0));
                     const shown = showOlderForms ? sorted : sorted.slice(0, 1);
                     return <>
-                      <div style={p.summaryDivider} />
                       {!submissionsLoading && sorted.length > 0
                         ? shown.map(sub => <ConsentSubmissionCard key={sub.id} sub={sub} templates={consentTemplates} compact />)
                         : consent && !consentLoading && (
-                          <span style={p.glanceSub}>Signed {new Date(consent.agreed_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                          <span style={p.hint}>Signed {new Date(consent.agreed_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
                         )}
                       <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
                         {email && !consentLoading && (consentStatus === 'none' || consentStatus === 'outdated') && (
-                          <button onClick={() => handleSendConsentLink('__inline__')} disabled={linkGeneratingId === '__inline__'} style={{ ...p.textLink, fontSize: '0.8rem' }}>
+                          <button onClick={() => handleSendConsentLink('__inline__')} disabled={linkGeneratingId === '__inline__'} style={p.textLink}>
                             {linkSentId === '__inline__' ? 'Link sent ✓' : linkGeneratingId === '__inline__' ? 'Sending…' : 'Send consent link'}
                           </button>
                         )}
                         {sorted.length > 1 && (
-                          <button type="button" onClick={() => setShowOlderForms(v => !v)} style={{ ...p.textLink, fontSize: '0.8rem' }}>
+                          <button type="button" onClick={() => setShowOlderForms(v => !v)} style={p.textLink}>
                             {showOlderForms ? 'Hide earlier forms' : `${sorted.length - 1} earlier form${sorted.length === 2 ? '' : 's'}`}
                           </button>
                         )}
@@ -698,7 +697,7 @@ export default function BookingDetailPanel({
                 {showCompleted ? t('bdp_completed') : t('bdp_no_show_label')}
               </span>
               {outcomeAt && (
-                <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginLeft: 'auto' }}>
+                <span style={{ ...p.hint, marginLeft: 'auto' }}>
                   {new Date(outcomeAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}
                 </span>
               )}
@@ -748,7 +747,7 @@ export default function BookingDetailPanel({
           {allergies && (
             <div style={p.allergy}>
               <span style={p.allergyLabel}>{t('bdp_allergies')}</span>
-              <p style={{ margin: '0.2rem 0 0', fontSize: '0.95rem', color: 'var(--text)', lineHeight: 1.45 }}>{allergies}</p>
+              <p style={{ ...p.bodyText, marginTop: '0.2rem' }}>{allergies}</p>
             </div>
           )}
           {designPreferences.length > 0 && (
@@ -833,13 +832,13 @@ export default function BookingDetailPanel({
           <Section title={t('bdp_notes')}>
             {notes && (
               <div style={p.subCard}>
-                <p style={{ margin: 0, fontSize: '0.95rem', color: 'var(--text)', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{notes}</p>
+                <p style={p.bodyText}>{notes}</p>
                 <span style={p.hint}>On the booking{createdAt ? ` · ${new Date(createdAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}` : ''}</span>
               </div>
             )}
             {studioNotes !== null && studioNotes.map(n => (
               <div key={n.id} style={p.subCard}>
-                <p style={{ margin: 0, fontSize: '0.95rem', color: 'var(--text)', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{n.content}</p>
+                <p style={p.bodyText}>{n.content}</p>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={p.hint}>
                     Studio note · {new Date(n.created_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
@@ -890,7 +889,7 @@ export default function BookingDetailPanel({
             {holdExpiresAt && canConfirm && (
               <div style={p.holdBox}>
                 <span style={p.holdLabel}>{t('bdp_client_hold')}</span>
-                <span style={{ fontSize: '0.95rem', color: 'var(--text)' }}>{fmtDate(holdExpiresAt)}</span>
+                <span style={p.factValue}>{fmtDate(holdExpiresAt)}</span>
               </div>
             )}
           </Section>
@@ -910,8 +909,8 @@ export default function BookingDetailPanel({
               return (
                 <div key={bk.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem', minWidth: 0 }}>
-                    <span style={{ fontSize: '0.95rem', color: 'var(--text)', fontWeight: 600 }}>{parts.join(' · ') || 'Appointment'}</span>
-                    <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{date}</span>
+                    <span style={p.itemTitle}>{parts.join(' · ') || 'Appointment'}</span>
+                    <span style={p.hint}>{date}</span>
                   </div>
                   <Pill colors={bsc}>{statusLabel(bk.status)}</Pill>
                 </div>
@@ -1040,15 +1039,10 @@ const p = {
   contact: { display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap', marginTop: '-0.25rem', minWidth: 0 },
   contactLink: { background: 'none', border: 'none', padding: 0, color: 'var(--text-dim)', fontSize: '0.875rem', fontFamily: 'inherit', cursor: 'pointer', textDecoration: 'none', overflowWrap: 'anywhere', textAlign: 'left' },
   glance: { display: 'grid', gap: '0.5rem', alignItems: 'stretch' },
-  summaryCard: { display: 'flex', flexDirection: 'column', gap: '0.6rem', minWidth: 0, padding: '0.9rem 1rem', borderRadius: 12, background: 'var(--bg-card)', border: '1px solid var(--border)' },
+  summaryCard: { display: 'flex', flexDirection: 'column', gap: '0.7rem', minWidth: 0, padding: '1rem 1.1rem', borderRadius: 14, background: 'var(--bg-card)', border: '1px solid var(--border)' },
   summaryRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', minHeight: 26 },
-  summaryValue: { fontSize: '1.15rem', fontWeight: 700, color: 'var(--text)' },
-  summaryMuted: { fontSize: '0.95rem', fontWeight: 500, color: 'var(--text-muted)' },
+  summaryMuted: { fontSize: '0.9rem', fontWeight: 500, color: 'var(--text-muted)' },
   summaryDivider: { borderTop: '1px solid var(--border)' },
-  glanceTile: { display: 'flex', flexDirection: 'column', gap: '0.2rem', minWidth: 0, padding: '0.75rem 0.85rem', borderRadius: 12, background: 'var(--bg-card)', border: '1px solid var(--border)' },
-  glanceLabel: { fontSize: '0.75rem', color: 'var(--text-muted)' },
-  glanceValue: { fontSize: '1rem', lineHeight: 1.3, overflowWrap: 'anywhere' },
-  glanceSub: { fontSize: '0.75rem', color: 'var(--text-muted)' },
   heroNote: { marginTop: '0.4rem', fontSize: '0.9rem', color: 'var(--color-danger)', fontWeight: 600 },
   collapseHead: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', width: '100%', background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' },
   outcomeSub: { borderTop: '1px solid var(--border)', paddingTop: '0.7rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' },
@@ -1060,16 +1054,16 @@ const p = {
   },
   phoneBtn: { background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--color-info)', fontSize: '0.95rem', fontWeight: 600, fontFamily: 'inherit' },
   allergy: { background: 'var(--color-danger-surface)', border: '1px solid var(--color-danger-border)', borderRadius: 10, padding: '0.7rem 0.85rem' },
-  allergyLabel: { fontSize: '0.85rem', fontWeight: 700, color: 'var(--color-danger)' },
+  allergyLabel: { fontSize: '0.875rem', fontWeight: 700, color: 'var(--color-danger)' },
   timeline: { listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '0.85rem' },
   timelineItem: { position: 'relative', paddingLeft: '1.4rem', display: 'flex', flexDirection: 'column', gap: '0.1rem' },
   timelineDot: { position: 'absolute', left: 0, top: '0.35rem', width: 9, height: 9, borderRadius: '50%', background: 'var(--text-dim)' },
   timelineDotFuture: { background: 'transparent', border: '1.5px solid var(--text-ghost)', boxSizing: 'border-box' },
   timelineLine: { position: 'absolute', left: 4, top: '1.05rem', bottom: '-0.85rem', width: 1, background: 'var(--border-strong)' },
-  timelineLabel: { fontSize: '0.9rem', fontWeight: 600, lineHeight: 1.3 },
+  timelineLabel: { fontSize: '0.9rem', fontWeight: 600, lineHeight: 1.35 },
   timelineDate: { fontSize: '0.8rem', color: 'var(--text-muted)' },
   holdBox: { background: 'var(--color-info-surface)', border: '1px solid var(--color-info-border)', borderRadius: 10, padding: '0.7rem 0.85rem', display: 'flex', flexDirection: 'column', gap: '0.2rem' },
-  holdLabel: { fontSize: '0.85rem', fontWeight: 700, color: 'var(--color-info)' },
+  holdLabel: { fontSize: '0.875rem', fontWeight: 700, color: 'var(--color-info)' },
   actions: {
     display: 'flex', gap: '0.6rem', flexWrap: 'wrap',
     padding: '1rem 1.25rem', borderTop: '1px solid var(--border)', flexShrink: 0, background: 'var(--bg-panel)',
@@ -1078,7 +1072,7 @@ const p = {
     background: 'var(--color-info-surface)', border: '1px solid var(--color-info-border)',
     borderRadius: 12, padding: '0.9rem', display: 'flex', flexDirection: 'column', gap: '0.7rem',
   },
-  stationLabel: { fontSize: '0.95rem', fontWeight: 700, color: 'var(--text)', margin: 0 },
+  stationLabel: { fontSize: '0.9rem', fontWeight: 700, color: 'var(--text)', margin: 0 },
   stationBtn: {
     padding: '0.55rem 0.95rem', borderRadius: 8,
     border: '1px solid var(--border-strong)', background: 'var(--bg-card)',

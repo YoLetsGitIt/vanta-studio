@@ -50,7 +50,7 @@ export default function BookingSMS({ bookingId, divider = true }) {
   const pill = tone
     ? { background: `var(--color-${tone}-surface)`, color: `var(--color-${tone})`, border: `1px solid var(--color-${tone}-border)` }
     : { background: 'var(--bg-chip)', color: 'var(--text-dim)', border: '1px solid var(--border-strong)' };
-  const hint = { margin: 0, fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.45 };
+  const hint = { margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: 1.45 };
   const optedOut = data?.opted_out;
   return <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', ...(divider ? { padding: '0.85rem 0 0.15rem', borderTop: '1px solid var(--border)' } : {}) }}>
     <Fact label="SMS reminder" control>
