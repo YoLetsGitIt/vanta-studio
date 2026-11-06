@@ -1,9 +1,9 @@
 1:"$Sreact.fragment"
-3:I[15739,[],""]
-4:I[17959,[],""]
-c:I[929,[],""]
+3:I[35000,[],""]
+4:I[53518,[],""]
+c:I[96084,[],""]
 :HL["/_next/static/media/36966cca54120369-s.p.woff2","font",{"crossOrigin":"","type":"font/woff2"}]
-:HL["/_next/static/css/b1a2701423e414c5.css","style"]
+:HL["/_next/static/css/9ee2447f190ba277.css","style"]
 :HL["/_next/static/css/a5ea5c88a437d920.css","style"]
 :HL["/_next/static/css/6b2418ef483bdaa0.css","style"]
 2:T72f,(function () {
@@ -55,13 +55,13 @@ c:I[929,[],""]
       } catch (err) {}
     });
   }
-})();0:{"P":null,"b":"3rnnYeBzmRvyRwnNgiXM7","p":"","c":["","design","studio-walkthrough"],"i":false,"f":[[["",{"children":["design",{"children":["studio-walkthrough",{"children":["__PAGE__",{}]}]}]},"$undefined","$undefined",true],["",["$","$1","c",{"children":[[["$","link","0",{"rel":"stylesheet","href":"/_next/static/css/b1a2701423e414c5.css","precedence":"next","crossOrigin":"$undefined","nonce":"$undefined"}]],["$","html",null,{"lang":"en","suppressHydrationWarning":true,"children":[["$","head",null,{"children":["$","script",null,{"dangerouslySetInnerHTML":{"__html":"$2"}}]}],["$","body",null,{"className":"__variable_627500","children":[["$","script",null,{"dangerouslySetInnerHTML":{"__html":"(function(){var theme='dark';try{var saved=window.localStorage.getItem('vanta-theme');if(saved==='dark'||saved==='light'||saved==='nature')theme=saved;}catch(error){}document.documentElement.setAttribute('data-theme',theme);document.documentElement.style.colorScheme=theme==='dark'?'dark':'light';}());"}}],["$","$L3",null,{"parallelRouterKey":"children","error":"$undefined","errorStyles":"$undefined","errorScripts":"$undefined","template":["$","$L4",null,{}],"templateStyles":"$undefined","templateScripts":"$undefined","notFound":[[["$","title",null,{"children":"404: This page could not be found."}],["$","div",null,{"style":{"fontFamily":"system-ui,\"Segoe UI\",Roboto,Helvetica,Arial,sans-serif,\"Apple Color Emoji\",\"Segoe UI Emoji\"","height":"100vh","textAlign":"center","display":"flex","flexDirection":"column","alignItems":"center","justifyContent":"center"},"children":["$","div",null,{"children":[["$","style",null,{"dangerouslySetInnerHTML":{"__html":"body{color:#000;background:#fff;margin:0}.next-error-h1{border-right:1px solid rgba(0,0,0,.3)}@media (prefers-color-scheme:dark){body{color:#fff;background:#000}.next-error-h1{border-right:1px solid rgba(255,255,255,.3)}}"}}],"$L5","$L6"]}]}]],[]],"forbidden":"$undefined","unauthorized":"$undefined"}],"$L7"]}]]}]]}],{"children":["design","$L8",{"children":["studio-walkthrough","$L9",{"children":["__PAGE__","$La",{},null,false]},null,false]},null,false]},null,false],"$Lb",false]],"m":"$undefined","G":["$c",[]],"s":false,"S":true}
-d:I[87453,["7177","static/chunks/app/layout-a74f734555c50e2c.js"],"default"]
-e:I[59028,["795","static/chunks/795-7bdbce70cdb3f900.js","6075","static/chunks/app/design/studio-walkthrough/page-1e9c7999b50e7199.js"],"default"]
-f:I[84882,[],"OutletBoundary"]
-11:I[98535,[],"AsyncMetadataOutlet"]
-13:I[84882,[],"ViewportBoundary"]
-15:I[84882,[],"MetadataBoundary"]
+})();0:{"P":null,"b":"9gzFnkwhoZCT5pySZnHJ4","p":"","c":["","design","studio-walkthrough"],"i":false,"f":[[["",{"children":["design",{"children":["studio-walkthrough",{"children":["__PAGE__",{}]}]}]},"$undefined","$undefined",true],["",["$","$1","c",{"children":[[["$","link","0",{"rel":"stylesheet","href":"/_next/static/css/9ee2447f190ba277.css","precedence":"next","crossOrigin":"$undefined","nonce":"$undefined"}]],["$","html",null,{"lang":"en","suppressHydrationWarning":true,"children":[["$","head",null,{"children":["$","script",null,{"dangerouslySetInnerHTML":{"__html":"$2"}}]}],["$","body",null,{"className":"__variable_627500","children":[["$","script",null,{"dangerouslySetInnerHTML":{"__html":"(function(){var theme='dark';try{var saved=window.localStorage.getItem('vanta-theme');if(saved==='dark'||saved==='light'||saved==='nature')theme=saved;}catch(error){}document.documentElement.setAttribute('data-theme',theme);document.documentElement.style.colorScheme=theme==='dark'?'dark':'light';}());"}}],["$","$L3",null,{"parallelRouterKey":"children","error":"$undefined","errorStyles":"$undefined","errorScripts":"$undefined","template":["$","$L4",null,{}],"templateStyles":"$undefined","templateScripts":"$undefined","notFound":[[["$","title",null,{"children":"404: This page could not be found."}],["$","div",null,{"style":{"fontFamily":"system-ui,\"Segoe UI\",Roboto,Helvetica,Arial,sans-serif,\"Apple Color Emoji\",\"Segoe UI Emoji\"","height":"100vh","textAlign":"center","display":"flex","flexDirection":"column","alignItems":"center","justifyContent":"center"},"children":["$","div",null,{"children":[["$","style",null,{"dangerouslySetInnerHTML":{"__html":"body{color:#000;background:#fff;margin:0}.next-error-h1{border-right:1px solid rgba(0,0,0,.3)}@media (prefers-color-scheme:dark){body{color:#fff;background:#000}.next-error-h1{border-right:1px solid rgba(255,255,255,.3)}}"}}],"$L5","$L6"]}]}]],[]],"forbidden":"$undefined","unauthorized":"$undefined"}],"$L7"]}]]}]]}],{"children":["design","$L8",{"children":["studio-walkthrough","$L9",{"children":["__PAGE__","$La",{},null,false]},null,false]},null,false]},null,false],"$Lb",false]],"m":"$undefined","G":["$c",[]],"s":false,"S":true}
+d:I[71014,["7177","static/chunks/app/layout-2178a509deef4c7a.js"],"default"]
+e:I[35358,["7867","static/chunks/7867-526f2e55ad720653.js","6075","static/chunks/app/design/studio-walkthrough/page-7169438bdc349a4d.js"],"default"]
+f:I[96533,[],"OutletBoundary"]
+11:I[22400,[],"AsyncMetadataOutlet"]
+13:I[96533,[],"ViewportBoundary"]
+15:I[96533,[],"MetadataBoundary"]
 16:"$Sreact.suspense"
 5:["$","h1",null,{"className":"next-error-h1","style":{"display":"inline-block","margin":"0 20px 0 0","padding":"0 23px 0 0","fontSize":24,"fontWeight":500,"verticalAlign":"top","lineHeight":"49px"},"children":404}]
 6:["$","div",null,{"style":{"display":"inline-block"},"children":["$","h2",null,{"style":{"fontSize":14,"fontWeight":400,"lineHeight":"49px","margin":0},"children":"This page could not be found."}]}]
@@ -72,6 +72,6 @@ a:["$","$1","c",{"children":[["$","$Le",null,{"rendered":true}],[["$","link","0"
 b:["$","$1","h",{"children":[null,[["$","$L13",null,{"children":"$L14"}],["$","meta",null,{"name":"next-size-adjust","content":""}]],["$","$L15",null,{"children":["$","div",null,{"hidden":true,"children":["$","$16",null,{"fallback":null,"children":"$L17"}]}]}]]}]
 14:[["$","meta","0",{"charSet":"utf-8"}],["$","meta","1",{"name":"viewport","content":"width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content"}]]
 10:null
-18:I[21207,[],"IconMark"]
+18:I[26544,[],"IconMark"]
 12:{"metadata":[["$","title","0",{"children":"Step inside — Vanta Studio walkthrough"}],["$","meta","1",{"name":"description","content":"Studio management platform for Vanta artists."}],["$","link","2",{"rel":"manifest","href":"/manifest.webmanifest","crossOrigin":"$undefined"}],["$","meta","3",{"name":"robots","content":"noindex, nofollow"}],["$","meta","4",{"name":"mobile-web-app-capable","content":"yes"}],["$","meta","5",{"name":"apple-mobile-web-app-title","content":"Vanta Studio"}],["$","meta","6",{"name":"apple-mobile-web-app-status-bar-style","content":"black"}],["$","link","7",{"rel":"icon","href":"/favicon.ico"}],["$","link","8",{"rel":"apple-touch-icon","href":"/app/apple-touch-icon.png"}],["$","$L18","9",{}]],"error":null,"digest":"$undefined"}
 17:"$12:metadata"
