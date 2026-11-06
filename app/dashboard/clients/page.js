@@ -304,7 +304,7 @@ function ClientsInner() {
               </div>
               <button type="button" aria-label="Close client details" onClick={() => setSelected(null)} style={s.closeBtn}>✕</button>
             </div>
-            <div className={panelLayout.body} style={s.panelBody}><DetailSkeleton label="Loading client details…" stats /></div>
+            <div className={panelLayout.body} style={s.panelBody}><DetailSkeleton label="Loading client details…" /></div>
           </aside>
         )}
         {!detailLoading && selectedClient && (
@@ -563,6 +563,13 @@ function ClientDetail({ client, marketing, onMarketingChange, clientKey, onClose
       <div style={s.panelHeader}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', minWidth: 0 }}>
           <span style={s.panelTitle}>{client.name}</span>
+          <span style={s.headerStats}>
+            {client.bookings.length === 0 ? 'No bookings yet' : [
+              `${client.bookings.length} session${client.bookings.length === 1 ? '' : 's'}`,
+              `${completedCount} completed`,
+              lastVisit ? `last booked ${new Date(lastVisit).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: new Date(lastVisit).getFullYear() === new Date().getFullYear() ? undefined : 'numeric' })}` : null,
+            ].filter(Boolean).join(' · ')}
+          </span>
           <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
             {consentState && <Pill tone={consentTone}>{consentLabelText}</Pill>}
             {(marketing?.optIn || marketing?.smsOptIn) && <Pill tone="info">Marketing</Pill>}
@@ -572,12 +579,6 @@ function ClientDetail({ client, marketing, onMarketingChange, clientKey, onClose
         <button type="button" aria-label="Close client details" onClick={onClose} style={s.closeBtn}>✕</button>
       </div>
       <div className={panelLayout.body} style={s.panelBody}>
-        <div style={s.statRow}>
-          <div style={{ ...s.stat, ...s.statBlue }}><span style={s.statValue}>{client.bookings.length}</span><span style={s.statLabel}>{t('clients_total_sessions')}</span></div>
-          <div style={{ ...s.stat, ...s.statGreen }}><span style={s.statValue}>{completedCount}</span><span style={s.statLabel}>{t('status_completed')}</span></div>
-          <div style={s.stat}><span style={{ ...s.statValue, fontSize: '1rem' }}>{lastVisit ? new Date(lastVisit).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }) : '—'}</span><span style={s.statLabel}>Last booking</span></div>
-        </div>
-
         <div className={panelLayout.cards}>
         {editingContact ? (
         <Section title="Contact">
@@ -1038,12 +1039,7 @@ const s = {
     flexDirection: 'column',
     gap: '1rem',
   },
-  statRow: { display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '0.6rem' },
-  stat: { display: 'flex', flexDirection: 'column', gap: '0.2rem', padding: '0.8rem 0.9rem', borderRadius: 12, border: '1px solid var(--border)', background: 'var(--bg-card)' },
-  statBlue: { background: 'var(--color-info-surface)', borderColor: 'var(--color-info-border)' },
-  statGreen: { background: 'var(--color-success-surface)', borderColor: 'var(--color-success-border)' },
-  statValue: { fontSize: '1.5rem', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em', lineHeight: 1.1 },
-  statLabel: { fontSize: '0.8rem', color: 'var(--text-dim)', fontWeight: 600 },
+  headerStats: { fontSize: '0.9rem', color: 'var(--text-dim)', fontVariantNumeric: 'tabular-nums' },
   phoneBtn: { background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--color-info)', fontSize: '0.95rem', fontWeight: 600, fontFamily: 'inherit' },
   consentSection: {
     borderTop: '1px solid var(--border-faint)',
