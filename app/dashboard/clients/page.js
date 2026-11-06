@@ -20,7 +20,7 @@ import Button from '@/components/ui/Button';
 import MarketingConsent from '@/components/MarketingConsent';
 import ConsentSubmissionCard from '@/components/ConsentSubmissionCard';
 import ClientTemplateSend from '@/components/marketing/ClientTemplateSend';
-import { Pill, Section, CollapsibleSection, Fact, SkeletonBar, DetailSkeleton, PanelBackdrop, detailStyles } from '@/components/ui/DetailParts';
+import { Pill, Section, Fact, SkeletonBar, DetailSkeleton, PanelBackdrop, detailStyles } from '@/components/ui/DetailParts';
 
 import panelLayout from '@/components/ui/DetailPanelLayout.module.css';
 
@@ -90,7 +90,7 @@ function ClientsInner() {
   const marketingFor = useCallback(client => {
     if (!client || !client.marketingKnown) return null;
     const override = marketingOverrides[client.id];
-    return { optIn: override ?? client.marketingOptIn, smsOptIn: override ?? client.smsMarketingOptIn, unsubscribed: client.unsubscribed, smsOptedOut: client.smsOptedOut };
+    return { optIn: override?.optIn ?? client.marketingOptIn, smsOptIn: override?.smsOptIn ?? client.smsMarketingOptIn, unsubscribed: client.unsubscribed, smsOptedOut: client.smsOptedOut };
   }, [marketingOverrides]);
 
   const filtered = useMemo(() => {
@@ -311,7 +311,7 @@ function ClientsInner() {
           <ClientDetail
             client={selectedClient}
             marketing={marketingFor(clients.find(c => c.id === selected))}
-            onMarketingChange={optIn => setMarketingOverrides(current => ({ ...current, [selected]: optIn }))}
+            onMarketingChange={next => setMarketingOverrides(current => ({ ...current, [selected]: next }))}
             clientKey={selected}
             onClose={() => setSelected(null)}
             consentTemplates={consentTemplates}
@@ -445,7 +445,9 @@ function ClientDetail({ client, marketing, onMarketingChange, clientKey, onClose
   const [noteErr,     setNoteErr]     = useState('');
 
   const [editingContact, setEditingContact] = useState(false);
-  useEffect(() => { setEditingContact(false); }, [client.id]);
+  const [showOlderForms, setShowOlderForms] = useState(false);
+  const [showAllBookings, setShowAllBookings] = useState(false);
+  useEffect(() => { setEditingContact(false); setShowOlderForms(false); setShowAllBookings(false); }, [client.id]);
 
   // Profile fields
   const [contactId,      setContactId]      = useState(client.contactId ?? null);
@@ -613,38 +615,38 @@ function ClientDetail({ client, marketing, onMarketingChange, clientKey, onClose
         </Section>
         )}
 
-        {(consentTemplates.length > 0 || (marketing && (client.email || client.phone))) && (
-          <Section title="Consent">
-            {consentTemplates.length === 0 && consentState && (
-              <Fact label="Consent form"><Pill tone={consentTone}>{consentLabelText}</Pill></Fact>
-            )}
-            {consentTemplates.slice(0, 1).map(ct => {
-              const sentId = linkSentId === ct.id;
-              const loadingId = linkGeneratingId === ct.id;
-              return (
-                <div key={ct.id} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  <Fact label="Consent form" control>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                      <Pill tone={consentTone}>{consentLabelText}</Pill>
-                      {client.email && consentState !== 'current' && (
-                        <button onClick={() => handleSendLink(ct.id)} disabled={loadingId}
-                          style={{ ...detailStyles.smallAction, ...(sentId ? detailStyles.smallActionDone : {}) }}>
-                          {sentId ? 'Sent ✓' : loadingId ? '…' : 'Send link'}
-                        </button>
-                      )}
-                    </span>
-                  </Fact>
-                </div>
-              );
-            })}
+        {/* ── Consent: status, then the signed forms (newest first, each opens in a window) ── */}
+        {(consentState || submissions.length > 0) && (() => {
+          const sorted = [...submissions].sort((x, y) => new Date(y.submitted_at || 0) - new Date(x.submitted_at || 0));
+          const shown = showOlderForms ? sorted : sorted.slice(0, 1);
+          const template = consentTemplates[0];
+          return (
+            <Section title="Consent" aside={consentState && <Pill tone={consentTone}>{consentLabelText}</Pill>}>
+              {shown.map(sub => <ConsentSubmissionCard key={sub.id} sub={sub} templates={consentTemplates} compact />)}
+              {!sorted.length && legacyConsent?.agreed_at && (
+                <span style={detailStyles.hint}>Signed {new Date(legacyConsent.agreed_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+              )}
+              <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                {template && client.email && consentState !== 'current' && (
+                  <button type="button" onClick={() => handleSendLink(template.id)} disabled={linkGeneratingId === template.id} style={{ ...detailStyles.textLink, fontSize: '0.85rem' }}>
+                    {linkSentId === template.id ? 'Link sent ✓' : linkGeneratingId === template.id ? 'Sending…' : 'Send consent link'}
+                  </button>
+                )}
+                {sorted.length > 1 && (
+                  <button type="button" onClick={() => setShowOlderForms(v => !v)} style={{ ...detailStyles.textLink, fontSize: '0.85rem' }}>
+                    {showOlderForms ? 'Hide earlier forms' : `${sorted.length - 1} earlier form${sorted.length === 2 ? '' : 's'}`}
+                  </button>
+                )}
+              </div>
+            </Section>
+          );
+        })()}
+
+        {/* ── Marketing: email and SMS separately ── */}
+        {marketing && (client.email || client.phone) && (
+          <Section title="Marketing">
             <MarketingConsent email={client.email} phone={client.phone} clientKey={clientKey} marketing={marketing} onChange={onMarketingChange} />
           </Section>
-        )}
-
-        {submissions.length > 0 && (
-          <CollapsibleSection key={clientKey} title={`Signed consent forms (${submissions.length})`}>
-            {submissions.map(sub => <ConsentSubmissionCard key={sub.id} sub={sub} templates={consentTemplates} />)}
-          </CollapsibleSection>
         )}
 
         <Section title="Send an email">
@@ -786,7 +788,7 @@ function ClientDetail({ client, marketing, onMarketingChange, clientKey, onClose
 
         <Section title={`${t('clients_booking_history')}${sorted.length ? ` (${sorted.length})` : ''}`}>
           {sorted.length === 0 && <p style={{ ...detailStyles.hint, margin: 0 }}>No bookings yet.</p>}
-          {sorted.map(b => (
+          {(showAllBookings ? sorted : sorted.slice(0, 5)).map(b => (
             <button key={b.id} type="button" onClick={() => router.push(`/dashboard/appointments?booking=${b.id}`)} style={s.historyRow} aria-label={`Open booking from ${new Date(b.created_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}`}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem', minWidth: 0, textAlign: 'left' }}>
                 <span style={{ fontSize: '0.95rem', color: 'var(--text)', fontWeight: 600 }}>
@@ -802,6 +804,11 @@ function ClientDetail({ client, marketing, onMarketingChange, clientKey, onClose
               </span>
             </button>
           ))}
+          {sorted.length > 5 && (
+            <button type="button" onClick={() => setShowAllBookings(v => !v)} style={{ ...detailStyles.textLink, fontSize: '0.85rem', alignSelf: 'flex-start' }}>
+              {showAllBookings ? 'Show fewer' : `Show all ${sorted.length}`}
+            </button>
+          )}
         </Section>
         </div>
       </div>

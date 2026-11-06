@@ -796,7 +796,7 @@ export default function BookingDetailPanel({
               phone={phone}
               clientKey={clientProfile?.id}
               marketing={clientProfile && clientProfile.email_marketing_opt_in !== undefined
-                ? { optIn: marketingOverride ?? clientProfile.email_marketing_opt_in === true, smsOptIn: marketingOverride ?? clientProfile.sms_marketing_opt_in === true, unsubscribed: clientProfile.email_unsubscribed === true, smsOptedOut: clientProfile.sms_opted_out === true }
+                ? { optIn: marketingOverride?.optIn ?? clientProfile.email_marketing_opt_in === true, smsOptIn: marketingOverride?.smsOptIn ?? clientProfile.sms_marketing_opt_in === true, unsubscribed: clientProfile.email_unsubscribed === true, smsOptedOut: clientProfile.sms_opted_out === true }
                 : null}
               onChange={setMarketingOverride}
             />
