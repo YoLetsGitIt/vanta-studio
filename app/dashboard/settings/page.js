@@ -864,7 +864,7 @@ export default function SettingsPage() {
       )}
 
 
-      <div className="settings-bento">
+      <div className={`settings-bento ${tab === 'account' ? accountStyles.grid : ''}`}>
 
         {tab === 'studio' && <>
 
@@ -1652,7 +1652,7 @@ export default function SettingsPage() {
 
         {tab === 'account' && <>
 
-        <section className={`settings-span-12 ${accountStyles.identity}`} aria-labelledby="account-details-heading">
+        <section className={`settings-span-6 ${accountStyles.identity}`} aria-labelledby="account-details-heading">
           <div className={accountStyles.identityCopy}>
             <h2 id="account-details-heading">{t('account_details')}</h2>
             <p><span>{t('signed_in_as')}</span> <span className={accountStyles.email}>{email}</span></p>
@@ -1660,7 +1660,7 @@ export default function SettingsPage() {
           <button type="button" onClick={handleSignOut} className={accountStyles.signOut}>{t('sign_out')}</button>
         </section>
 
-        <section className="settings-span-12" style={s.card}>
+        <section className="settings-span-6" style={s.card}>
           <h2 style={s.sectionTitle}>Billing</h2>
           {isBillingExempt ? <div>
             <p style={s.sectionDesc}>This demo studio has complimentary access.</p>
@@ -1675,7 +1675,7 @@ export default function SettingsPage() {
 
           {billingNotice && <p style={{ fontSize: '0.82rem', color: 'var(--accent)', margin: 0 }}>{billingNotice}</p>}
 
-          <div style={s.stripeStatusRow}>
+          <div style={{ ...s.stripeStatusRow, flexWrap: 'wrap' }}>
             <div style={s.billingStatusDot(isCanceling ? 'canceling' : subscriptionStatus)} />
             <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               <span style={{ fontSize: '0.87rem', fontWeight: 600, color: 'var(--text)' }}>
@@ -1758,9 +1758,9 @@ export default function SettingsPage() {
           />
         )}
 
-        <div className="settings-span-12 settings-cell"><PushNotificationSettings /></div>
+        <div className="settings-span-6 settings-cell"><PushNotificationSettings /></div>
 
-        <section className="settings-span-12" style={s.card} aria-labelledby="account-preferences-heading">
+        <section className="settings-span-6" style={s.card} aria-labelledby="account-preferences-heading">
           <h2 id="account-preferences-heading" style={s.sectionTitle}>{t('preferences')}</h2>
           <div className={accountStyles.preferences}>
             <div className={accountStyles.appearance}>
@@ -1855,7 +1855,7 @@ const s = {
   paymentMethodRow: { display: 'flex', alignItems: 'center', gap: '0.7rem', background: 'var(--bg-base)', border: '1px solid var(--border-faint)', borderRadius: 10, padding: '0.7rem 0.9rem', flexWrap: 'wrap' },
   cardBadge: { fontSize: '0.7rem', fontWeight: 700, color: '#fff', textTransform: 'uppercase', letterSpacing: '0.04em', borderRadius: 5, padding: '0.3rem 0.45rem' },
   paymentMethodNumber: { fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-dim)', letterSpacing: '0.02em' },
-  billingActionsRow: { display: 'flex', alignItems: 'center', gap: '1.1rem', marginLeft: 'auto' },
+  billingActionsRow: { display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '1.1rem', marginLeft: 'auto' },
   updateCardBtn: { background: 'var(--bg-card)', border: '1px solid var(--border-faint)', borderRadius: 8, padding: '0.45rem 0.8rem', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-dim)', cursor: 'pointer', fontFamily: 'inherit' },
   // Hours
   hoursGrid: { display: 'flex', flexDirection: 'column', gap: 0 },
