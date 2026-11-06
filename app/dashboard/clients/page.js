@@ -12,7 +12,7 @@ const TATTOO_STYLES = [
 import { statusColors, capitalise } from '@/lib/status';
 import { formatDob } from '@/lib/format';
 import { invalidate } from '@/lib/cache';
-import DateOfBirthInput from '@/components/ui/DateOfBirthInput';
+import { COUNTRIES, splitPhone, joinPhone } from '@/lib/phoneCountries';
 import { useLanguage } from '@/lib/i18n';
 import { showError } from '@/lib/feedback';
 import Button from '@/components/ui/Button';
@@ -371,43 +371,56 @@ function MarketingBadge({ marketing }) {
   return null;
 }
 
-// Edit name, email, phone and date of birth. A client with a Vanta account keeps the
-// name and email from their account.
+// Edit first name, last name, email and phone (with its country code). A client with a
+// Vanta account keeps the name and email from their account. Date of birth isn't edited
+// here and is kept as it is.
 function ContactEditor({ client, onSave, onCancel }) {
   const hasAccount = Boolean(client.user_id && client.user_id !== '00000000-0000-0000-0000-000000000000' && client.is_stub === false);
-  const [name, setName] = useState(client.name ?? '');
+  const [firstName, setFirstName] = useState(() => (client.name ?? '').trim().split(/\s+/)[0] ?? '');
+  const [lastName, setLastName] = useState(() => (client.name ?? '').trim().split(/\s+/).slice(1).join(' '));
   const [email, setEmail] = useState(client.email ?? '');
-  const [phone, setPhone] = useState(client.phone ?? '');
-  const [dob, setDob] = useState(client.dob ? String(client.dob).slice(0, 10) : '');
+  const initialPhone = splitPhone(client.phone);
+  const [phoneCountry, setPhoneCountry] = useState(initialPhone.country);
+  const [phoneNumber, setPhoneNumber] = useState(initialPhone.number);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const phone = joinPhone(phoneCountry, phoneNumber);
   const emailBad = email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
-  const phoneBad = phone.trim() && phone.replace(/[^0-9]/g, '').length < 7;
-  const problem = !name.trim() ? 'Enter the client’s name.' : emailBad ? 'Enter a valid email address.' : phoneBad ? 'Enter a valid phone number.' : '';
+  const phoneBad = phoneNumber.trim() && phone.replace(/[^0-9]/g, '').length < 8;
+  const problem = !firstName.trim() ? 'Enter the client’s first name.' : emailBad ? 'Enter a valid email address.' : phoneBad ? 'Enter a valid phone number.' : '';
   const input = { width: '100%', boxSizing: 'border-box', minHeight: 44, padding: '0.6rem 0.75rem', borderRadius: 10, border: '1px solid var(--border-strong)', background: 'var(--bg-input)', color: 'var(--text)', font: 'inherit', fontSize: '0.95rem' };
   const label = { fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-dim)' };
-  const field = { display: 'flex', flexDirection: 'column', gap: '0.35rem' };
+  const field = { display: 'flex', flexDirection: 'column', gap: '0.35rem', minWidth: 0 };
 
   async function save(event) {
     event.preventDefault();
     if (problem || saving) { setError(problem); return; }
     setSaving(true); setError('');
-    try { await onSave({ name: name.trim(), email: email.trim(), phone: phone.trim(), dob }); }
+    const name = [firstName.trim(), lastName.trim()].filter(Boolean).join(' ');
+    try { await onSave({ name, email: email.trim(), phone, dob: client.dob ? String(client.dob).slice(0, 10) : '' }); }
     catch (e) { setError(e.message); }
     finally { setSaving(false); }
   }
 
   return (
     <form onSubmit={save} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-      <label style={field}><span style={label}>Name</span>
-        <input style={input} value={name} onChange={e => setName(e.target.value)} disabled={hasAccount} autoComplete="off" /></label>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.75rem' }}>
+        <label style={field}><span style={label}>First name</span>
+          <input style={input} value={firstName} onChange={e => setFirstName(e.target.value)} disabled={hasAccount} autoComplete="off" /></label>
+        <label style={field}><span style={label}>Last name</span>
+          <input style={input} value={lastName} onChange={e => setLastName(e.target.value)} disabled={hasAccount} autoComplete="off" /></label>
+      </div>
       <label style={field}><span style={label}>Email</span>
         <input style={input} type="email" value={email} onChange={e => setEmail(e.target.value)} disabled={hasAccount} autoComplete="off" /></label>
       {hasAccount && <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '-0.4rem' }}>Name and email come from their Vanta account.</span>}
-      <label style={field}><span style={label}>Phone</span>
-        <input style={input} type="tel" value={phone} onChange={e => setPhone(e.target.value)} autoComplete="off" /></label>
-      <div style={field}><span style={label}>Date of birth</span>
-        <DateOfBirthInput style={input} required={false} value={dob} onChange={setDob} /></div>
+      <div style={field}><span style={label} id="client-phone-label">Phone</span>
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <select aria-label="Phone country code" style={{ ...input, width: 'auto', flex: '0 0 auto', paddingRight: '1.8rem' }} value={phoneCountry} onChange={e => setPhoneCountry(e.target.value)}>
+            {COUNTRIES.map(c => <option key={c.id} value={c.id}>{c.flag} {c.dial}</option>)}
+          </select>
+          <input aria-labelledby="client-phone-label" style={{ ...input, flex: 1 }} type="tel" inputMode="tel" value={phoneNumber} onChange={e => setPhoneNumber(e.target.value)} placeholder="400 000 000" autoComplete="off" />
+        </div>
+      </div>
       {error && <p role="alert" style={{ margin: 0, fontSize: '0.85rem', color: 'var(--color-danger)' }}>{error}</p>}
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
         <Button type="button" variant="secondary" size="sm" onClick={onCancel} disabled={saving}>Cancel</Button>

@@ -7,7 +7,7 @@ import OfferTimesModal from '@/components/OfferTimesModal';
 import { useBookingManagement } from '@/lib/bookingManagement';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { getStations, getClientConsents, getNotes, addNote, deleteNote, getBookingConsentSubmissions, getClientConsentSubmissions, getStudioClients, generateConsentLink, getStudioBookingPayment, getDepositReceipt, getDepositStatus, getOfferedTimes, listConsentTemplates } from '@/lib/api';
+import { getStations, getClientConsents, getNotes, addNote, deleteNote, getBookingConsentSubmissions, getClientConsentSubmissions, getStudioClients, getStudioClient, generateConsentLink, getStudioBookingPayment, getDepositReceipt, getDepositStatus, getOfferedTimes, listConsentTemplates } from '@/lib/api';
 import { useStationAvailability } from '@/lib/useStationAvailability';
 import { statusColors, statusLabel, capitalise as cap } from '@/lib/status';
 import { formatDob as fmtDob, hasArtist } from '@/lib/format';
@@ -407,9 +407,23 @@ export default function BookingDetailPanel({
   }
 
   // ── Client history ─────────────────────────────────────────────────────────
-  const clientHistory = (allBookings ?? []).filter(
-    bk => bk.requester_email === email && bk.id !== bookingId
-  );
+  // The client's own booking list from the contact book, wherever the panel is opened;
+  // else whatever bookings the page has loaded.
+  const [historyLoaded, setHistoryLoaded] = useState(null); // { key, bookings }
+  const [showAllHistory, setShowAllHistory] = useState(false);
+  useEffect(() => { setShowAllHistory(false); }, [bookingId]);
+  useEffect(() => {
+    const key = clientProfile?.id;
+    if (!key) return;
+    let live = true;
+    getStudioClient(key)
+      .then(d => { if (live) setHistoryLoaded({ key, bookings: d.bookings ?? [] }); })
+      .catch(() => {});
+    return () => { live = false; };
+  }, [clientProfile?.id]);
+  const clientHistory = (historyLoaded && historyLoaded.key === clientProfile?.id ? historyLoaded.bookings : (allBookings ?? []).filter(bk => bk.requester_email === email))
+    .filter(bk => bk.id !== bookingId)
+    .sort((a, b) => new Date(b.chosen_time || b.proposed_time_primary || b.created_at || 0) - new Date(a.chosen_time || a.proposed_time_primary || a.created_at || 0));
 
   // ── Duration / time string ─────────────────────────────────────────────────
   const durationLabel = duration
@@ -614,35 +628,31 @@ export default function BookingDetailPanel({
                     <span style={p.glanceLabel}>{t('bdp_consent')}</span>
                     {consentLoading || submissionsLoading ? <Pill>{t('loading')}</Pill> : <Pill tone={consentTone}>{consentLabel}</Pill>}
                   </div>
-                  {consent && !consentLoading && (
-                    <span style={p.glanceSub}>
-                      Signed {new Date(consent.agreed_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
-                    </span>
-                  )}
-                  {email && !consentLoading && (consentStatus === 'none' || consentStatus === 'outdated') && (
-                    <button onClick={() => handleSendConsentLink('__inline__')} disabled={linkGeneratingId === '__inline__'}
-                      style={{ ...p.textLink, alignSelf: 'flex-start' }}>
-                      {linkSentId === '__inline__' ? 'Link sent ✓' : linkGeneratingId === '__inline__' ? 'Sending…' : 'Send consent link'}
-                    </button>
-                  )}
-                  {!submissionsLoading && consentSubmissions.length > 0 && (
-                    <>
+                  {(() => {
+                    // One line per signed form (newest first), each opening the full form.
+                    const sorted = [...consentSubmissions].sort((x, y) => new Date(y.submitted_at || 0) - new Date(x.submitted_at || 0));
+                    const shown = showOlderForms ? sorted : sorted.slice(0, 1);
+                    return <>
                       <div style={p.summaryDivider} />
-                      {(() => {
-                        // Newest first; older forms stay tucked away until asked for.
-                        const sorted = [...consentSubmissions].sort((x, y) => new Date(y.submitted_at || 0) - new Date(x.submitted_at || 0));
-                        const shown = showOlderForms ? sorted : sorted.slice(0, 1);
-                        return <>
-                          {shown.map(sub => <ConsentSubmissionCard key={sub.id} sub={sub} templates={consentTemplates} />)}
-                          {sorted.length > 1 && (
-                            <button type="button" onClick={() => setShowOlderForms(v => !v)} style={{ ...p.textLink, alignSelf: 'flex-start', fontSize: '0.8rem' }}>
-                              {showOlderForms ? 'Hide earlier forms' : `Show ${sorted.length - 1} earlier form${sorted.length === 2 ? '' : 's'}`}
-                            </button>
-                          )}
-                        </>;
-                      })()}
-                    </>
-                  )}
+                      {!submissionsLoading && sorted.length > 0
+                        ? shown.map(sub => <ConsentSubmissionCard key={sub.id} sub={sub} templates={consentTemplates} compact />)
+                        : consent && !consentLoading && (
+                          <span style={p.glanceSub}>Signed {new Date(consent.agreed_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                        )}
+                      <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                        {email && !consentLoading && (consentStatus === 'none' || consentStatus === 'outdated') && (
+                          <button onClick={() => handleSendConsentLink('__inline__')} disabled={linkGeneratingId === '__inline__'} style={{ ...p.textLink, fontSize: '0.8rem' }}>
+                            {linkSentId === '__inline__' ? 'Link sent ✓' : linkGeneratingId === '__inline__' ? 'Sending…' : 'Send consent link'}
+                          </button>
+                        )}
+                        {sorted.length > 1 && (
+                          <button type="button" onClick={() => setShowOlderForms(v => !v)} style={{ ...p.textLink, fontSize: '0.8rem' }}>
+                            {showOlderForms ? 'Hide earlier forms' : `${sorted.length - 1} earlier form${sorted.length === 2 ? '' : 's'}`}
+                          </button>
+                        )}
+                      </div>
+                    </>;
+                  })()}
                 </section>
               )}
             </div>
@@ -866,7 +876,7 @@ export default function BookingDetailPanel({
         {/* ── Other bookings ── */}
         {clientHistory.length > 0 && (
           <Section title={`${t('bdp_other_bookings')} (${clientHistory.length})`}>
-            {clientHistory.map(bk => {
+            {(showAllHistory ? clientHistory : clientHistory.slice(0, 5)).map(bk => {
               const bsc = statusColors(bk.status);
               const ds = bk.chosen_time || bk.proposed_time_primary;
               const date = ds ? new Date(ds).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
@@ -877,13 +887,18 @@ export default function BookingDetailPanel({
               return (
                 <div key={bk.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem', minWidth: 0 }}>
-                    <span style={{ fontSize: '0.95rem', color: 'var(--text)', fontWeight: 600 }}>{parts.join(' · ') || '—'}</span>
+                    <span style={{ fontSize: '0.95rem', color: 'var(--text)', fontWeight: 600 }}>{parts.join(' · ') || 'Appointment'}</span>
                     <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{date}</span>
                   </div>
                   <Pill colors={bsc}>{statusLabel(bk.status)}</Pill>
                 </div>
               );
             })}
+            {clientHistory.length > 5 && (
+              <button type="button" onClick={() => setShowAllHistory(v => !v)} style={{ ...p.textLink, alignSelf: 'flex-start' }}>
+                {showAllHistory ? 'Show fewer' : `Show all ${clientHistory.length}`}
+              </button>
+            )}
           </Section>
         )}
 
@@ -991,7 +1006,7 @@ const p = {
   heroMeta: { fontSize: '0.95rem', color: 'var(--text-dim)' },
   contact: { display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap', marginTop: '-0.25rem', minWidth: 0 },
   contactLink: { background: 'none', border: 'none', padding: 0, color: 'var(--text-dim)', fontSize: '0.875rem', fontFamily: 'inherit', cursor: 'pointer', textDecoration: 'none', overflowWrap: 'anywhere', textAlign: 'left' },
-  glance: { display: 'grid', gap: '0.5rem', alignItems: 'start' },
+  glance: { display: 'grid', gap: '0.5rem', alignItems: 'stretch' },
   summaryCard: { display: 'flex', flexDirection: 'column', gap: '0.6rem', minWidth: 0, padding: '0.9rem 1rem', borderRadius: 12, background: 'var(--bg-card)', border: '1px solid var(--border)' },
   summaryRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', minHeight: 26 },
   summaryValue: { fontSize: '1.15rem', fontWeight: 700, color: 'var(--text)' },

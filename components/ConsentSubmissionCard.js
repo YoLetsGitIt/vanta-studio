@@ -14,7 +14,8 @@ const signatureStyle = { maxWidth: '100%', height: 64, objectFit: 'contain', bor
 // question labels where the template still has them), photo ID, signatures and a PDF.
 // Shows its name and signing date; opening it shows the whole form in a window of its own,
 // so the side panel behind stays put.
-export default function ConsentSubmissionCard({ sub, templates = [] }) {
+// compact: one line (date, signer, View) for tight spaces like the booking panel.
+export default function ConsentSubmissionCard({ sub, templates = [], compact = false }) {
   const fields = templates.find(t => t.id === sub.template_id)?.fields ?? [];
   const labelFor = id => fields.find(f => f.id === id)?.label || id;
   const answers = Object.entries(sub.answers ?? {}).filter(([k, v]) => k !== '__agreed__' && v !== '' && v != null);
@@ -22,9 +23,18 @@ export default function ConsentSubmissionCard({ sub, templates = [] }) {
   const signed = `Signed ${new Date(sub.submitted_at).toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' })}${sub.signer_name ? ` by ${sub.signer_name}` : ''}`;
   const pdfName = `consent-${(sub.signer_name || 'form').replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.pdf`;
 
+  const trigger = compact ? (
+    <button type="button" onClick={() => setOpen(true)} aria-haspopup="dialog" aria-label={`View ${sub.template_name || 'consent form'}, ${signed}`}
+      style={{ ...headStyle, minHeight: 32, gap: '0.5rem' }}>
+      <span style={{ ...d.hint, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{signed}</span>
+      <span style={{ color: 'var(--color-info)', fontSize: '0.85rem', fontWeight: 600, flexShrink: 0 }}>View form</span>
+    </button>
+  ) : null;
+
   return (
-    <div style={d.subCard}>
-      <button type="button" onClick={() => setOpen(true)} aria-haspopup="dialog" style={headStyle}>
+    <div style={compact ? undefined : d.subCard}>
+      {trigger}
+      {!compact && <button type="button" onClick={() => setOpen(true)} aria-haspopup="dialog" style={headStyle}>
         <span style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', minWidth: 0 }}>
           <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
             <span style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text)' }}>{sub.template_name || 'Consent form'}</span>
@@ -33,7 +43,7 @@ export default function ConsentSubmissionCard({ sub, templates = [] }) {
           <span style={d.hint}>{signed}</span>
         </span>
         <span style={{ color: 'var(--color-info)', fontSize: '0.85rem', fontWeight: 600, flexShrink: 0 }}>View</span>
-      </button>
+      </button>}
       {open && (
       <Dialog
         title={sub.template_name || 'Consent form'}
