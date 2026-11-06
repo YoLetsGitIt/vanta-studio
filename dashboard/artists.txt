@@ -1,7 +1,7 @@
 1:"$Sreact.fragment"
-3:I[35000,[],""]
-4:I[53518,[],""]
-b:I[96084,[],""]
+3:I[15739,[],""]
+4:I[17959,[],""]
+b:I[929,[],""]
 :HL["/_next/static/media/36966cca54120369-s.p.woff2","font",{"crossOrigin":"","type":"font/woff2"}]
 :HL["/_next/static/css/9ee2447f190ba277.css","style"]
 :HL["/_next/static/css/56b4752bdce98879.css","style"]
@@ -55,16 +55,16 @@ b:I[96084,[],""]
       } catch (err) {}
     });
   }
-})();0:{"P":null,"b":"9gzFnkwhoZCT5pySZnHJ4","p":"","c":["","dashboard","artists"],"i":false,"f":[[["",{"children":["dashboard",{"children":["artists",{"children":["__PAGE__",{}]}]}]},"$undefined","$undefined",true],["",["$","$1","c",{"children":[[["$","link","0",{"rel":"stylesheet","href":"/_next/static/css/9ee2447f190ba277.css","precedence":"next","crossOrigin":"$undefined","nonce":"$undefined"}]],["$","html",null,{"lang":"en","suppressHydrationWarning":true,"children":[["$","head",null,{"children":["$","script",null,{"dangerouslySetInnerHTML":{"__html":"$2"}}]}],["$","body",null,{"className":"__variable_627500","children":[["$","script",null,{"dangerouslySetInnerHTML":{"__html":"(function(){var theme='dark';try{var saved=window.localStorage.getItem('vanta-theme');if(saved==='dark'||saved==='light'||saved==='nature')theme=saved;}catch(error){}document.documentElement.setAttribute('data-theme',theme);document.documentElement.style.colorScheme=theme==='dark'?'dark':'light';}());"}}],["$","$L3",null,{"parallelRouterKey":"children","error":"$undefined","errorStyles":"$undefined","errorScripts":"$undefined","template":["$","$L4",null,{}],"templateStyles":"$undefined","templateScripts":"$undefined","notFound":[[["$","title",null,{"children":"404: This page could not be found."}],["$","div",null,{"style":{"fontFamily":"system-ui,\"Segoe UI\",Roboto,Helvetica,Arial,sans-serif,\"Apple Color Emoji\",\"Segoe UI Emoji\"","height":"100vh","textAlign":"center","display":"flex","flexDirection":"column","alignItems":"center","justifyContent":"center"},"children":["$","div",null,{"children":[["$","style",null,{"dangerouslySetInnerHTML":{"__html":"body{color:#000;background:#fff;margin:0}.next-error-h1{border-right:1px solid rgba(0,0,0,.3)}@media (prefers-color-scheme:dark){body{color:#fff;background:#000}.next-error-h1{border-right:1px solid rgba(255,255,255,.3)}}"}}],["$","h1",null,{"className":"next-error-h1","style":{"display":"inline-block","margin":"0 20px 0 0","padding":"0 23px 0 0","fontSize":24,"fontWeight":500,"verticalAlign":"top","lineHeight":"49px"},"children":404}],"$L5"]}]}]],[]],"forbidden":"$undefined","unauthorized":"$undefined"}],"$L6"]}]]}]]}],{"children":["dashboard","$L7",{"children":["artists","$L8",{"children":["__PAGE__","$L9",{},null,false]},null,false]},null,false]},null,false],"$La",false]],"m":"$undefined","G":["$b",[]],"s":false,"S":true}
-c:I[71014,["7177","static/chunks/app/layout-2178a509deef4c7a.js"],"default"]
-d:I[54647,[],"ClientSegmentRoot"]
-e:I[35029,["627","static/chunks/9cd9d544-9930cd46e25d1113.js","1443","static/chunks/1443-84fbb862a5e1db0f.js","8441","static/chunks/8441-53bc7f1a9c00ae83.js","1923","static/chunks/1923-17bccb72dd36218c.js","7616","static/chunks/7616-9604caa015a60527.js","1819","static/chunks/1819-d498bdd44a3e51d7.js","5273","static/chunks/5273-d9072fc69eba2c0c.js","1954","static/chunks/app/dashboard/layout-5d2fc7c79e1111b0.js"],"default"]
-10:I[91813,[],"ClientPageRoot"]
-11:I[50197,["627","static/chunks/9cd9d544-9930cd46e25d1113.js","1443","static/chunks/1443-84fbb862a5e1db0f.js","6485","static/chunks/6485-14bc79dbaf4d47b7.js","1923","static/chunks/1923-17bccb72dd36218c.js","7616","static/chunks/7616-9604caa015a60527.js","7050","static/chunks/app/dashboard/artists/page-b9ce9f56eddd5a48.js"],"default"]
-14:I[96533,[],"OutletBoundary"]
-16:I[22400,[],"AsyncMetadataOutlet"]
-18:I[96533,[],"ViewportBoundary"]
-1a:I[96533,[],"MetadataBoundary"]
+})();0:{"P":null,"b":"yz1-VGCu0CExxldACSbyC","p":"","c":["","dashboard","artists"],"i":false,"f":[[["",{"children":["dashboard",{"children":["artists",{"children":["__PAGE__",{}]}]}]},"$undefined","$undefined",true],["",["$","$1","c",{"children":[[["$","link","0",{"rel":"stylesheet","href":"/_next/static/css/9ee2447f190ba277.css","precedence":"next","crossOrigin":"$undefined","nonce":"$undefined"}]],["$","html",null,{"lang":"en","suppressHydrationWarning":true,"children":[["$","head",null,{"children":["$","script",null,{"dangerouslySetInnerHTML":{"__html":"$2"}}]}],["$","body",null,{"className":"__variable_627500","children":[["$","script",null,{"dangerouslySetInnerHTML":{"__html":"(function(){var theme='dark';try{var saved=window.localStorage.getItem('vanta-theme');if(saved==='dark'||saved==='light'||saved==='nature')theme=saved;}catch(error){}document.documentElement.setAttribute('data-theme',theme);document.documentElement.style.colorScheme=theme==='dark'?'dark':'light';}());"}}],["$","$L3",null,{"parallelRouterKey":"children","error":"$undefined","errorStyles":"$undefined","errorScripts":"$undefined","template":["$","$L4",null,{}],"templateStyles":"$undefined","templateScripts":"$undefined","notFound":[[["$","title",null,{"children":"404: This page could not be found."}],["$","div",null,{"style":{"fontFamily":"system-ui,\"Segoe UI\",Roboto,Helvetica,Arial,sans-serif,\"Apple Color Emoji\",\"Segoe UI Emoji\"","height":"100vh","textAlign":"center","display":"flex","flexDirection":"column","alignItems":"center","justifyContent":"center"},"children":["$","div",null,{"children":[["$","style",null,{"dangerouslySetInnerHTML":{"__html":"body{color:#000;background:#fff;margin:0}.next-error-h1{border-right:1px solid rgba(0,0,0,.3)}@media (prefers-color-scheme:dark){body{color:#fff;background:#000}.next-error-h1{border-right:1px solid rgba(255,255,255,.3)}}"}}],["$","h1",null,{"className":"next-error-h1","style":{"display":"inline-block","margin":"0 20px 0 0","padding":"0 23px 0 0","fontSize":24,"fontWeight":500,"verticalAlign":"top","lineHeight":"49px"},"children":404}],"$L5"]}]}]],[]],"forbidden":"$undefined","unauthorized":"$undefined"}],"$L6"]}]]}]]}],{"children":["dashboard","$L7",{"children":["artists","$L8",{"children":["__PAGE__","$L9",{},null,false]},null,false]},null,false]},null,false],"$La",false]],"m":"$undefined","G":["$b",[]],"s":false,"S":true}
+c:I[87453,["7177","static/chunks/app/layout-a74f734555c50e2c.js"],"default"]
+d:I[75442,[],"ClientSegmentRoot"]
+e:I[81000,["9598","static/chunks/a88f6240-c4cee8dca7fed598.js","566","static/chunks/566-2614e9116d6711b4.js","6082","static/chunks/6082-e654e45ec66e3048.js","81","static/chunks/81-54f12aadb7145919.js","8573","static/chunks/8573-a240cdf52768942f.js","2774","static/chunks/2774-780fef6a51427ef7.js","344","static/chunks/344-f432886c5705b5a3.js","1954","static/chunks/app/dashboard/layout-d956500090a72b62.js"],"default"]
+10:I[17238,[],"ClientPageRoot"]
+11:I[88020,["9598","static/chunks/a88f6240-c4cee8dca7fed598.js","566","static/chunks/566-2614e9116d6711b4.js","3495","static/chunks/3495-8d15c7a0af645aa8.js","81","static/chunks/81-54f12aadb7145919.js","8573","static/chunks/8573-a240cdf52768942f.js","7050","static/chunks/app/dashboard/artists/page-f4c21233ab2d3866.js"],"default"]
+14:I[84882,[],"OutletBoundary"]
+16:I[98535,[],"AsyncMetadataOutlet"]
+18:I[84882,[],"ViewportBoundary"]
+1a:I[84882,[],"MetadataBoundary"]
 1b:"$Sreact.suspense"
 5:["$","div",null,{"style":{"display":"inline-block"},"children":["$","h2",null,{"style":{"fontSize":14,"fontWeight":400,"lineHeight":"49px","margin":0},"children":"This page could not be found."}]}]
 6:["$","$Lc",null,{}]
@@ -77,6 +77,6 @@ f:"$7:props:children:1:props:params"
 13:"$7:props:children:1:props:params"
 19:[["$","meta","0",{"charSet":"utf-8"}],["$","meta","1",{"name":"viewport","content":"width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content"}]]
 15:null
-1d:I[26544,[],"IconMark"]
+1d:I[21207,[],"IconMark"]
 17:{"metadata":[["$","title","0",{"children":"Vanta Studio"}],["$","meta","1",{"name":"description","content":"Studio management platform for Vanta artists."}],["$","link","2",{"rel":"manifest","href":"/manifest.webmanifest","crossOrigin":"$undefined"}],["$","meta","3",{"name":"mobile-web-app-capable","content":"yes"}],["$","meta","4",{"name":"apple-mobile-web-app-title","content":"Vanta Studio"}],["$","meta","5",{"name":"apple-mobile-web-app-status-bar-style","content":"black"}],["$","link","6",{"rel":"icon","href":"/favicon.ico"}],["$","link","7",{"rel":"apple-touch-icon","href":"/app/apple-touch-icon.png"}],["$","$L1d","8",{}]],"error":null,"digest":"$undefined"}
 1c:"$17:metadata"
