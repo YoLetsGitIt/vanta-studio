@@ -17,6 +17,7 @@ import DateOfBirthInput from '@/components/ui/DateOfBirthInput';
 import { useLanguage } from '@/lib/i18n';
 import { showError } from '@/lib/feedback';
 import Button from '@/components/ui/Button';
+import { Select } from '@/components/ui/Field';
 import MarketingConsent from '@/components/MarketingConsent';
 import ConsentSubmissionCard from '@/components/ConsentSubmissionCard';
 import ClientTemplateSend from '@/components/marketing/ClientTemplateSend';
@@ -26,6 +27,25 @@ import panelLayout from '@/components/ui/DetailPanelLayout.module.css';
 
 const CLIENTS_PER_PAGE = 25;
 
+// Client list orderings. Clients without the value being sorted on go last.
+const time = value => (value ? new Date(value).getTime() : NaN);
+function byTime(field, newestFirst) {
+  return (a, b) => {
+    const x = time(a[field]), y = time(b[field]);
+    if (Number.isNaN(x) && Number.isNaN(y)) return a.name.localeCompare(b.name);
+    if (Number.isNaN(x)) return 1;
+    if (Number.isNaN(y)) return -1;
+    return newestFirst ? y - x : x - y;
+  };
+}
+const CLIENT_SORTS = {
+  recent: { label: 'Most recent booking', compare: byTime('lastBooking', true) },
+  longest: { label: 'Longest since last booking', compare: byTime('lastBooking', false) },
+  added: { label: 'Newest clients', compare: byTime('addedAt', true) },
+  sessions: { label: 'Most sessions', compare: (a, b) => b.bookingCount - a.bookingCount || a.name.localeCompare(b.name) },
+  name: { label: 'Name (A–Z)', compare: (a, b) => a.name.localeCompare(b.name, 'en', { sensitivity: 'base' }) },
+};
+
 function ClientsInner() {
   const { t } = useLanguage();
   const params = useSearchParams();
@@ -34,6 +54,15 @@ function ClientsInner() {
   const [error, setError] = useState('');
   const [loadAttempt, setLoadAttempt] = useState(0);
   const [search, setSearch] = useState('');
+  const [sortBy, setSortBy] = useState('recent');
+  useEffect(() => {
+    const saved = window.localStorage.getItem('vanta:clients-sort');
+    if (saved && CLIENT_SORTS[saved]) setSortBy(saved);
+  }, []);
+  function changeSort(value) {
+    setSortBy(value);
+    window.localStorage.setItem('vanta:clients-sort', value);
+  }
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState(null);
   const [selectedClient, setSelectedClient] = useState(null);
@@ -73,6 +102,7 @@ function ClientsInner() {
         phone: contact.phone ?? null,
         bookingCount: Number(contact.booking_count ?? 0),
         lastBooking: contact.last_booking ?? null,
+        addedAt: contact.created_at ?? null,
         imported: contact.source === 'import' || contact.source === 'imported',
         contactId: contact.id,
         marketingKnown: contact.email_marketing_opt_in !== undefined,
@@ -80,12 +110,8 @@ function ClientsInner() {
         smsMarketingOptIn: contact.sms_marketing_opt_in === true,
         unsubscribed: contact.email_unsubscribed === true,
         smsOptedOut: contact.sms_opted_out === true,
-      })).sort((a, b) => {
-      if (!a.lastBooking) return 1;
-      if (!b.lastBooking) return -1;
-      return new Date(b.lastBooking) - new Date(a.lastBooking);
-    });
-  }, [contacts]);
+      })).sort(CLIENT_SORTS[sortBy]?.compare ?? CLIENT_SORTS.recent.compare);
+  }, [contacts, sortBy]);
 
   const marketingFor = useCallback(client => {
     if (!client || !client.marketingKnown) return null;
@@ -112,7 +138,7 @@ function ClientsInner() {
 
   useEffect(() => {
     setPage(1);
-  }, [search]);
+  }, [search, sortBy]);
 
   useEffect(() => {
     setPage(current => Math.min(current, pageCount));
@@ -214,6 +240,9 @@ function ClientsInner() {
             onChange={e => setSearch(e.target.value)}
             style={s.searchInput}
           />
+          <Select aria-label="Sort clients" value={sortBy} onChange={e => changeSort(e.target.value)} style={s.sortSelect}>
+            {Object.entries(CLIENT_SORTS).map(([value, option]) => <option key={value} value={value}>{option.label}</option>)}
+          </Select>
         </div>
       </div>
 
@@ -300,7 +329,7 @@ function ClientsInner() {
             <div style={s.panelHeader}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', minWidth: 0 }}>
                 <span style={s.panelTitle}>{clients.find(c => c.id === selected)?.name ?? <SkeletonBar w={180} h={22} />}</span>
-                <div style={{ display: 'flex', gap: '0.4rem' }}><SkeletonBar w={92} h={24} /><SkeletonBar w={70} h={24} /></div>
+                <SkeletonBar w={220} h={14} />
               </div>
               <button type="button" aria-label="Close client details" onClick={() => setSelected(null)} style={s.closeBtn}>✕</button>
             </div>
@@ -570,11 +599,6 @@ function ClientDetail({ client, marketing, onMarketingChange, clientKey, onClose
               lastVisit ? `last booked ${new Date(lastVisit).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: new Date(lastVisit).getFullYear() === new Date().getFullYear() ? undefined : 'numeric' })}` : null,
             ].filter(Boolean).join(' · ')}
           </span>
-          <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-            {consentState && <Pill tone={consentTone}>{consentLabelText}</Pill>}
-            {(marketing?.optIn || marketing?.smsOptIn) && <Pill tone="info">Marketing</Pill>}
-            {marketing?.unsubscribed && <Pill>Unsubscribed</Pill>}
-          </div>
         </div>
         <button type="button" aria-label="Close client details" onClick={onClose} style={s.closeBtn}>✕</button>
       </div>
@@ -852,10 +876,18 @@ const s = {
     cursor: 'pointer', whiteSpace: 'nowrap',
   },
   searchWrap: {
-    maxWidth: 440,
+    display: 'flex',
+    gap: '0.6rem',
+    flexWrap: 'wrap',
+  },
+  sortSelect: {
+    width: 'auto',
+    flex: '0 0 auto',
   },
   searchInput: {
-    width: '100%',
+    flex: '1 1 260px',
+    maxWidth: 440,
+    minWidth: 0,
     background: 'var(--bg-input)',
     border: '1px solid var(--border)',
     borderRadius: 10,
