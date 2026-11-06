@@ -257,3 +257,26 @@ button.sectionHead:hover .collapseIcon { background: var(--border-strong); color
 .choices button[aria-checked='true'] .radio::after { transform: scale(1); }
 @media (prefers-reduced-motion: reduce) { .choices button, .radio::after { transition: none; } .choices button:active { transform: none; } }
 @media (max-width: 420px) { .choices button { padding: 0 9px; gap: 7px; font-size: 0.82rem; } }
+
+/* Folded before it's finished: an amber cross, what's still needed, and a small shake. */
+.missingIcon {
+  display: inline-flex; align-items: center; justify-content: center; flex: none;
+  width: 20px; height: 20px; border-radius: 50%;
+  background: var(--color-warning); color: #fff;
+  animation: missingShake 420ms ease-out;
+}
+.sectionMissing {
+  font-size: 0.85rem; font-weight: 600; color: var(--color-warning); line-height: 1.35;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  animation: summaryIn 220ms ease-out;
+}
+.unfinished { opacity: 1; border-color: color-mix(in srgb, var(--color-warning) 45%, var(--border)); }
+@keyframes missingShake {
+  0% { transform: scale(0.4); opacity: 0; }
+  35% { transform: scale(1) translateX(0); opacity: 1; }
+  50% { transform: translateX(-3px); }
+  65% { transform: translateX(3px); }
+  80% { transform: translateX(-2px); }
+  100% { transform: translateX(0); }
+}
+@media (prefers-reduced-motion: reduce) { .missingIcon, .sectionMissing { animation: none; } }
