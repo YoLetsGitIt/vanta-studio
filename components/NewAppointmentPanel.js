@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { createManualBooking, generateConsentLink, getStudioSchedule } from '@/lib/api';
 import { useStationAvailability } from '@/lib/useStationAvailability';
 import { useNewAppointmentData } from '@/lib/useNewAppointmentData';
+import { DEPOSIT_METHODS } from '@/components/MarkDepositReceivedButton';
 import { invalidatePrefix } from '@/lib/cache';
 import { formatDob } from '@/lib/format';
 import { useLanguage } from '@/lib/i18n';
@@ -223,6 +224,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
   const [finalPrice, setFinalPrice] = useState('');
   const [depositAmount, setDepositAmount] = useState('');
   const [depositMode, setDepositMode] = useState(null); // 'none' | 'later' | 'paid'; nothing chosen means no deposit
+  const [depositMethod, setDepositMethod] = useState(null); // how an already-paid deposit was paid
   const [daySchedule, setDaySchedule] = useState([]);
   const [scheduleError, setScheduleError] = useState('');
 
@@ -378,6 +380,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
     : !durationMins ? 'Choose how long the appointment is.'
     : !stationId ? 'Select an available station.'
     : !(quote > 0) ? 'Enter an estimated price.'
+    : depositMode === 'paid' && !depositMethod ? 'Choose how the deposit was paid.'
     : '';
   const disabledReason = loadError || validationError || missingRequirement;
   const sectionDone = {
@@ -388,7 +391,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
     appointment: Boolean(appointmentType && artistId) && !artistConflict,
     schedule: scheduleTouched && Boolean(bookingDate && startTime && durationMins && stationId) && !timeError && !dateInPast && !artistConflict,
     // Ticked once there's a price; the deposit choice is optional.
-    payment: quote > 0 && !depositInvalid,
+    payment: quote > 0 && !depositInvalid && (depositMode !== 'paid' || Boolean(depositMethod)),
   };
   // What each step still needs. Shown (with an amber cross) only after someone folds the
   // step before it's finished.
@@ -403,7 +406,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
         ].filter(Boolean),
     appointment: [!appointmentType && 'tattoo or piercing', !artistId && 'artist', artistConflict && 'a free artist'].filter(Boolean),
     schedule: [!bookingDate && 'date', !startTime && 'time', !durationMins && 'duration', !stationId && 'station', (timeError || dateInPast) && 'a valid time'].filter(Boolean),
-    payment: [!(quote > 0) && 'estimated price', depositInvalid && 'deposit amount'].filter(Boolean),
+    payment: [!(quote > 0) && 'estimated price', depositInvalid && 'deposit amount', depositMode === 'paid' && !depositMethod && 'how the deposit was paid'].filter(Boolean),
   };
   for (const key of Object.keys(stepMissing)) stepMissing[key] = stepMissing[key].filter(Boolean);
   const canSubmit = !disabledReason;
@@ -450,7 +453,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
     client: clientName ? [clientName, ageOf(clientMode === 'search' ? selectedClient?.dob : clientDob), clientMode === 'search' ? (selectedClient?.email || selectedClient?.phone) : (clientEmail.trim() || clientPhone.trim())].filter(Boolean).join(' · ') : null,
     appointment: [appointmentType && (isPiercing ? 'Piercing' : 'Tattoo'), artistName].filter(Boolean).join(' · ') || null,
     schedule: sectionDone.schedule ? [chosenDateTime?.toLocaleString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }), durationName, stationName].filter(Boolean).join(' · ') : null,
-    payment: depositMode ? [{ none: 'No deposit', later: stripeConnected ? 'Deposit to collect' : 'Deposit due later', paid: 'Deposit paid' }[depositMode] + (depositEnabled && deposit > 0 ? ` $${deposit.toFixed(2)}` : ''), quote > 0 ? `$${quote.toFixed(2)} quoted` : null].filter(Boolean).join(' · ') : null,
+    payment: depositMode ? [{ none: 'No deposit', later: stripeConnected ? 'Deposit to collect' : 'Deposit due later', paid: `Deposit paid${depositMethod ? ` by ${DEPOSIT_METHODS.find(m => m.value === depositMethod)?.phrase}` : ''}` }[depositMode] + (depositEnabled && deposit > 0 ? ` $${deposit.toFixed(2)}` : ''), quote > 0 ? `$${quote.toFixed(2)} quoted` : null].filter(Boolean).join(' · ') : null,
   };
   const essentialsComplete = Boolean(clientName && artistId && bookingDate && startTime && durationMins && stationId && !timeError && !dateInPast && !artistConflict);
   // The station is picked automatically and the artist can come from the clicked slot, so
@@ -483,7 +486,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
     setDurationMins(0);
     setStationId(''); setScheduleTouched(false); setPaymentFolded(false); setFoldTried([]);
     setSize(''); setSizeUnit('cm'); setRetouch(false); setAppointmentType(null);
-    setFinalPrice(''); setDepositAmount(''); setDepositMode(null);
+    setFinalPrice(''); setDepositAmount(''); setDepositMode(null); setDepositMethod(null);
     setBookingType(null);
     setNotes(''); setError('');
   }
@@ -550,7 +553,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
       if (stationId) body.station_id = stationId;
       if (fp > 0) body.estimated_quote = fp;
       if (depositEnabled && da > 0) body.deposit_amount = da;
-      if (depositMode === 'paid') body.deposit_paid = true;
+      if (depositMode === 'paid') { body.deposit_paid = true; body.deposit_method = depositMethod; }
       if (notes.trim()) body.notes = notes.trim();
       body.source = bookingType;
       const createdBooking = await createManualBooking(body);
@@ -908,7 +911,18 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
                   </div>
                   {depositEnabled && <>
                     {depositMode === 'later' && <span style={bd.hint}>{stripeConnected ? 'This will appear as an unpaid deposit to collect.' : 'Record the external payment when it is received.'}</span>}
-                    {depositMode === 'paid' && <span style={bd.hint}>The deposit will be recorded as received now.</span>}
+                    {depositMode === 'paid' && (
+                      <div style={bd.field}>
+                        <span id="deposit-method-label" style={bd.label}>Paid by</span>
+                        <div className={styles.choices} role="radiogroup" aria-labelledby="deposit-method-label">
+                          {DEPOSIT_METHODS.map(m => (
+                            <button key={m.value} type="button" role="radio" aria-checked={depositMethod === m.value} onClick={() => setDepositMethod(m.value)}>
+                              <span aria-hidden="true" className={styles.radio} />{m.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                     {(() => {
                       const da = depositMode === 'later' && stripeCharges ? parseFloat(depositAmount) || 0 : 0;
                       if (da <= 0) return null;
