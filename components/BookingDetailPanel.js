@@ -119,6 +119,7 @@ export default function BookingDetailPanel({
 
   // ── Consent submissions (new template system) ──────────────────────────────
   const [consentSubmissions,  setConsentSubmissions]  = useState([]);
+  const [showOlderForms, setShowOlderForms] = useState(false);
   const [submissionsLoading,  setSubmissionsLoading]  = useState(false);
 
   // ── Normalise fields from booking (priority) with entry as fallback ────────
@@ -378,6 +379,7 @@ export default function BookingDetailPanel({
   useEffect(() => {
     let live = true;
     setConsentSubmissions([]);
+    setShowOlderForms(false);
     if (!bookingId) return;
     setSubmissionsLoading(true);
     getBookingConsentSubmissions(bookingId)
@@ -490,7 +492,7 @@ export default function BookingDetailPanel({
               {email && phone && <span aria-hidden="true" style={{ color: 'var(--text-ghost)' }}>·</span>}
               {phone && <a href={`sms:${phone}`} style={p.contactLink} title="Send a text">{phone}</a>}
               {clientAge != null && (email || phone) && <span aria-hidden="true" style={{ color: 'var(--text-ghost)' }}>·</span>}
-              {clientAge != null && <span style={{ ...p.contactLink, cursor: 'default' }} title={`Born ${fmtDob(String(clientDob).slice(0, 10))}`}>{clientAge} yrs</span>}
+              {clientAge != null && <span style={{ ...p.contactLink, cursor: 'default' }}>{fmtDob(String(clientDob).slice(0, 10))} ({clientAge} yrs)</span>}
               {(email || (clientName && clientName !== '—')) && (
                 <button type="button" style={{ ...p.textLink, marginLeft: '0.35rem' }} onClick={() => {
                   const key = email || clientName;
@@ -543,7 +545,7 @@ export default function BookingDetailPanel({
 
         {/* ── Payment and consent ── */}
         {(() => {
-          const money = n => `$${Number(n).toLocaleString('en-AU', { maximumFractionDigits: 2 })}`;
+          const money = n => `$${Number(n).toLocaleString('en-AU', { minimumFractionDigits: Number(n) % 1 ? 2 : 0, maximumFractionDigits: 2 })}`;
           const priceLabel = showCompleted && finalPrice != null ? t('bdp_final_price') : t('bdp_quoted');
           const priceValue = showCompleted && finalPrice != null ? money(finalPrice) : quote != null ? money(quote) : null;
           const hasDeposit = depositRequired || depositPaid;
@@ -561,27 +563,30 @@ export default function BookingDetailPanel({
                   <span style={{ ...p.summaryValue, ...(priceValue ? {} : p.summaryMuted) }}>{priceValue ?? 'Not set'}</span>
                 </div>
                 <div style={p.summaryDivider} />
+                {/* Deposit on one line like the price: amount and status on the right. */}
                 <div style={p.summaryRow}>
                   <span style={p.glanceLabel}>{t('bdp_deposit')}</span>
-                  {hasDeposit
-                    ? <Pill tone={depositPill.tone}>{depositPill.text}</Pill>
-                    : <span style={p.summaryMuted}>Not required</span>}
+                  {hasDeposit ? (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.6rem' }}>
+                      {depositAmount != null && <span style={{ ...p.summaryValue, fontSize: '1rem' }}>{money(depositAmount)}</span>}
+                      <Pill tone={depositPill.tone}>{depositPill.text}</Pill>
+                    </span>
+                  ) : <span style={p.summaryMuted}>Not required</span>}
                 </div>
                 {hasDeposit && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    {depositAmount != null && (() => {
-                      const feeCents = Math.round(depositAmount * 0.03 * 100) + 50;
-                      const total = depositAmount + feeCents / 100;
+                    {(depositPaidAt || depositConfirmedAt) && (() => {
+                      // Only card payments through Stripe carry a fee.
+                      const fee = paidByStripe && depositAmount != null ? (Math.round(depositAmount * 0.03 * 100) + 50) / 100 : 0;
+                      const when = depositPaidAt || depositConfirmedAt;
                       return (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
-                          <span style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text)' }}>${depositAmount.toFixed(2)}</span>
-                          {/* Only card payments through Stripe carry a fee. */}
-                          {paidByStripe && (
-                            <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                              + ${(feeCents / 100).toFixed(2)} card fee = ${total.toFixed(2)} charged to client
-                            </span>
-                          )}
-                        </div>
+                        <span style={{ ...p.glanceSub, textAlign: 'right' }}>
+                          {[
+                            `Paid${depositPaidVia ? ` by ${depositPaidVia}` : paidByStripe ? ' by card' : ''}`,
+                            new Date(when).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }),
+                            fee ? `client charged ${money(depositAmount + fee)} incl. ${money(fee)} card fee` : null,
+                          ].filter(Boolean).join(' · ')}
+                        </span>
                       );
                     })()}
                     {clientSaysPaid && (
@@ -598,11 +603,6 @@ export default function BookingDetailPanel({
                           <CancelDepositButton bookingId={bookingId} onCancelled={() => setCancelledDepositId(bookingId)} disabled={actionLoading} />
                         )}
                       </div>
-                    )}
-                    {depositPaidAt && (
-                      <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                        Paid {depositPaidVia ? `by ${depositPaidVia} · ` : paidByStripe ? 'by card · ' : ''}{new Date(depositPaidAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
-                      </span>
                     )}
                   </div>
                 )}
@@ -628,10 +628,19 @@ export default function BookingDetailPanel({
                   {!submissionsLoading && consentSubmissions.length > 0 && (
                     <>
                       <div style={p.summaryDivider} />
-                      <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)' }}>
-                        Signed form{consentSubmissions.length === 1 ? '' : 's'} · open to read the full form
-                      </span>
-                      {consentSubmissions.map(sub => <ConsentSubmissionCard key={sub.id} sub={sub} templates={consentTemplates} />)}
+                      {(() => {
+                        // Newest first; older forms stay tucked away until asked for.
+                        const sorted = [...consentSubmissions].sort((x, y) => new Date(y.submitted_at || 0) - new Date(x.submitted_at || 0));
+                        const shown = showOlderForms ? sorted : sorted.slice(0, 1);
+                        return <>
+                          {shown.map(sub => <ConsentSubmissionCard key={sub.id} sub={sub} templates={consentTemplates} />)}
+                          {sorted.length > 1 && (
+                            <button type="button" onClick={() => setShowOlderForms(v => !v)} style={{ ...p.textLink, alignSelf: 'flex-start', fontSize: '0.8rem' }}>
+                              {showOlderForms ? 'Hide earlier forms' : `Show ${sorted.length - 1} earlier form${sorted.length === 2 ? '' : 's'}`}
+                            </button>
+                          )}
+                        </>;
+                      })()}
                     </>
                   )}
                 </section>
@@ -982,7 +991,7 @@ const p = {
   heroMeta: { fontSize: '0.95rem', color: 'var(--text-dim)' },
   contact: { display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap', marginTop: '-0.25rem', minWidth: 0 },
   contactLink: { background: 'none', border: 'none', padding: 0, color: 'var(--text-dim)', fontSize: '0.875rem', fontFamily: 'inherit', cursor: 'pointer', textDecoration: 'none', overflowWrap: 'anywhere', textAlign: 'left' },
-  glance: { display: 'grid', gap: '0.5rem' },
+  glance: { display: 'grid', gap: '0.5rem', alignItems: 'start' },
   summaryCard: { display: 'flex', flexDirection: 'column', gap: '0.6rem', minWidth: 0, padding: '0.9rem 1rem', borderRadius: 12, background: 'var(--bg-card)', border: '1px solid var(--border)' },
   summaryRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', minHeight: 26 },
   summaryValue: { fontSize: '1.15rem', fontWeight: 700, color: 'var(--text)' },
