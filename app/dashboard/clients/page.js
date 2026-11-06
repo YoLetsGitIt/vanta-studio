@@ -76,6 +76,7 @@ function ClientsInner() {
         marketingOptIn: contact.email_marketing_opt_in === true,
         smsMarketingOptIn: contact.sms_marketing_opt_in === true,
         unsubscribed: contact.email_unsubscribed === true,
+        smsOptedOut: contact.sms_opted_out === true,
       })).sort((a, b) => {
       if (!a.lastBooking) return 1;
       if (!b.lastBooking) return -1;
@@ -86,7 +87,7 @@ function ClientsInner() {
   const marketingFor = useCallback(client => {
     if (!client || !client.marketingKnown) return null;
     const override = marketingOverrides[client.id];
-    return { optIn: override ?? client.marketingOptIn, smsOptIn: override ?? client.smsMarketingOptIn, unsubscribed: client.unsubscribed };
+    return { optIn: override ?? client.marketingOptIn, smsOptIn: override ?? client.smsMarketingOptIn, unsubscribed: client.unsubscribed, smsOptedOut: client.smsOptedOut };
   }, [marketingOverrides]);
 
   const filtered = useMemo(() => {

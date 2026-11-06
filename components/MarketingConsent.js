@@ -3,11 +3,14 @@
 import { useEffect, useState } from 'react';
 import { setClientMarketingConsent } from '@/lib/api';
 import { showError } from '@/lib/feedback';
-import { Fact, Switch } from '@/components/ui/DetailParts';
+import { Fact, Pill, Switch } from '@/components/ui/DetailParts';
 
 /**
- * One row: "Marketing" for email and SMS with an on/off switch. Used by both the client and booking panels.
- * `clientKey` is the directory client id; `marketing` is { optIn, unsubscribed } or null when unknown.
+ * One row: marketing by email and SMS, on or off. Used by the client and booking panels.
+ * `clientKey` is the directory client id; `marketing` is
+ * { optIn, smsOptIn, unsubscribed, smsOptedOut } or null when unknown.
+ * Once a client has opted out themselves (email unsubscribe or an SMS STOP), the studio
+ * can't turn marketing back on: only the client can.
  */
 export default function MarketingConsent({ email, phone, clientKey, marketing, onChange }) {
   const [saving, setSaving] = useState(false);
@@ -27,23 +30,19 @@ export default function MarketingConsent({ email, phone, clientKey, marketing, o
     } finally { setSaving(false); }
   }
 
-  const channels = email && phone ? 'Email & SMS' : email ? 'Email' : 'SMS';
-  const status = marketing.unsubscribed
-    ? 'Email unsubscribed'
-    : marketing.optIn && !marketing.smsOptIn && phone ? 'Email only'
-    : marketing.smsOptIn && !marketing.optIn && email ? 'SMS only' : channels;
+  const optedOut = marketing.unsubscribed || marketing.smsOptedOut;
   return (
     <Fact label="Marketing" control>
-      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.6rem' }}>
-        <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>{status}</span>
+      {optedOut ? (
+        <span title="The client opted out. Only they can opt back in."><Pill>Opted out</Pill></span>
+      ) : (
         <Switch
           aria-label="Client has agreed to marketing by email and SMS"
-          title="Enable only with the client’s permission for marketing by email and SMS. Existing unsubscribes are respected."
           checked={checked}
-          disabled={saving || (marketing.unsubscribed && !checked)}
+          disabled={saving}
           onChange={toggle}
         />
-      </span>
+      )}
     </Fact>
   );
 }

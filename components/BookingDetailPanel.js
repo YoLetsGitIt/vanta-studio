@@ -7,7 +7,7 @@ import OfferTimesModal from '@/components/OfferTimesModal';
 import { useBookingManagement } from '@/lib/bookingManagement';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { getStations, getClientConsents, getNotes, addNote, deleteNote, getBookingConsentSubmissions, getStudioClients, generateConsentLink, getStudioBookingPayment, getDepositReceipt, getDepositStatus, getOfferedTimes, listConsentTemplates } from '@/lib/api';
+import { getStations, getClientConsents, getNotes, addNote, deleteNote, getBookingConsentSubmissions, getClientConsentSubmissions, getStudioClients, generateConsentLink, getStudioBookingPayment, getDepositReceipt, getDepositStatus, getOfferedTimes, listConsentTemplates } from '@/lib/api';
 import { useStationAvailability } from '@/lib/useStationAvailability';
 import { statusColors, statusLabel, capitalise as cap } from '@/lib/status';
 import { formatDob as fmtDob, hasArtist } from '@/lib/format';
@@ -120,7 +120,6 @@ export default function BookingDetailPanel({
   // ── Consent submissions (new template system) ──────────────────────────────
   const [consentSubmissions,  setConsentSubmissions]  = useState([]);
   const [submissionsLoading,  setSubmissionsLoading]  = useState(false);
-  const [submissionsExpanded, setSubmissionsExpanded] = useState(false);
 
   // ── Normalise fields from booking (priority) with entry as fallback ────────
   const [cancelledDepositId, setCancelledDepositId] = useState(null);
@@ -243,11 +242,13 @@ export default function BookingDetailPanel({
     if (depositReceived?.method) { setDepositReceipt({ booking: bookingId, method: depositReceived.method }); return; }
     let live = true;
     getDepositReceipt(bookingId)
-      .then(r => { if (live) setDepositReceipt(r ? { booking: bookingId, method: r.method } : null); })
+      .then(r => { if (live) setDepositReceipt({ booking: bookingId, method: r?.method ?? null }); })
       .catch(() => { if (live) setDepositReceipt(null); });
     return () => { live = false; };
   }, [bookingId, depositPaidAt, depositReceived?.method]);
   const depositPaidVia = bookingId && depositReceipt?.booking === bookingId ? depositMethodLabel(depositReceipt.method) : null;
+  // Paid with no PayID / bank / cash record means it went through Stripe, which adds a card fee.
+  const paidByStripe = Boolean(depositPaidAt && depositReceipt?.booking === bookingId && !depositReceipt.method);
 
   // The client says they paid by PayID / bank transfer: the studio checks it arrived.
   const [depositClaim, setDepositClaim] = useState(null);
@@ -349,7 +350,9 @@ export default function BookingDetailPanel({
       .catch(() => {});
   }, [stationId, entry?.stationName]);
 
-  const clientAge         = ageFromDob(dob);
+  // Date of birth from the booking, or else from the client's saved profile.
+  const clientDob         = dob || clientProfile?.dob || null;
+  const clientAge         = ageFromDob(clientDob ? String(clientDob).slice(0, 10) : null);
   const designPreferences = parseStyles(clientProfile?.design_preferences);
   const allergies         = clientProfile?.allergies || null;
   const painTolerance     = clientProfile?.pain_tolerance || null;
@@ -371,15 +374,22 @@ export default function BookingDetailPanel({
   }
 
   // ── Load consent submissions ───────────────────────────────────────────────
+  // Forms signed for this booking; if none, the forms this client signed with the studio.
   useEffect(() => {
+    let live = true;
     setConsentSubmissions([]);
     if (!bookingId) return;
     setSubmissionsLoading(true);
     getBookingConsentSubmissions(bookingId)
-      .then(d => setConsentSubmissions(d.submissions ?? []))
+      .then(async d => {
+        let subs = d.submissions ?? [];
+        if (!subs.length && email) subs = (await getClientConsentSubmissions(email).catch(() => ({}))).submissions ?? [];
+        if (live) setConsentSubmissions(subs);
+      })
       .catch(() => {})
-      .finally(() => setSubmissionsLoading(false));
-  }, [bookingId]);
+      .finally(() => { if (live) setSubmissionsLoading(false); });
+    return () => { live = false; };
+  }, [bookingId, email]);
 
   // ── Station picker ─────────────────────────────────────────────────────────
   function handleAcceptClick() {
@@ -469,7 +479,7 @@ export default function BookingDetailPanel({
       <div className="studio-bdp-header" style={p.header}>
         <div className="studio-bdp-headtext" style={p.headerText}>
           <span style={p.title}>{clientName}</span>
-          {(email || phone || dob) && (
+          {(email || phone || clientAge != null) && (
             <div style={p.contact}>
               {email && (
                 <button type="button" style={p.contactLink} title="Copy email"
@@ -479,8 +489,8 @@ export default function BookingDetailPanel({
               )}
               {email && phone && <span aria-hidden="true" style={{ color: 'var(--text-ghost)' }}>·</span>}
               {phone && <a href={`sms:${phone}`} style={p.contactLink} title="Send a text">{phone}</a>}
-              {dob && (email || phone) && <span aria-hidden="true" style={{ color: 'var(--text-ghost)' }}>·</span>}
-              {dob && <span style={{ ...p.contactLink, cursor: 'default' }}>{fmtDob(dob)}{clientAge != null && ` (${clientAge})`}</span>}
+              {clientAge != null && (email || phone) && <span aria-hidden="true" style={{ color: 'var(--text-ghost)' }}>·</span>}
+              {clientAge != null && <span style={{ ...p.contactLink, cursor: 'default' }} title={`Born ${fmtDob(String(clientDob).slice(0, 10))}`}>{clientAge} yrs</span>}
               {(email || (clientName && clientName !== '—')) && (
                 <button type="button" style={{ ...p.textLink, marginLeft: '0.35rem' }} onClick={() => {
                   const key = email || clientName;
@@ -565,9 +575,12 @@ export default function BookingDetailPanel({
                       return (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
                           <span style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text)' }}>${depositAmount.toFixed(2)}</span>
-                          <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                            + ${(feeCents / 100).toFixed(2)} fee = ${total.toFixed(2)} charged to client
-                          </span>
+                          {/* Only card payments through Stripe carry a fee. */}
+                          {paidByStripe && (
+                            <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                              + ${(feeCents / 100).toFixed(2)} card fee = ${total.toFixed(2)} charged to client
+                            </span>
+                          )}
                         </div>
                       );
                     })()}
@@ -588,7 +601,7 @@ export default function BookingDetailPanel({
                     )}
                     {depositPaidAt && (
                       <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                        Paid {depositPaidVia ? `by ${depositPaidVia} · ` : ''}{new Date(depositPaidAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        Paid {depositPaidVia ? `by ${depositPaidVia} · ` : paidByStripe ? 'by card · ' : ''}{new Date(depositPaidAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
                       </span>
                     )}
                   </div>
@@ -603,7 +616,7 @@ export default function BookingDetailPanel({
                   </div>
                   {consent && !consentLoading && (
                     <span style={p.glanceSub}>
-                      Signed v{consent.consent_version} on {new Date(consent.agreed_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      Signed {new Date(consent.agreed_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
                     </span>
                   )}
                   {email && !consentLoading && (consentStatus === 'none' || consentStatus === 'outdated') && (
@@ -615,15 +628,10 @@ export default function BookingDetailPanel({
                   {!submissionsLoading && consentSubmissions.length > 0 && (
                     <>
                       <div style={p.summaryDivider} />
-                      <button style={p.collapseHead} aria-expanded={submissionsExpanded} onClick={() => setSubmissionsExpanded(x => !x)}>
-                        <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text)' }}>{t('bdp_consent_forms')} ({consentSubmissions.length})</span>
-                        <span aria-hidden="true" style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>{submissionsExpanded ? '▲' : '▼'}</span>
-                      </button>
-                      {submissionsExpanded && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-                          {consentSubmissions.map(sub => <ConsentSubmissionCard key={sub.id} sub={sub} templates={consentTemplates} />)}
-                        </div>
-                      )}
+                      <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+                        Signed form{consentSubmissions.length === 1 ? '' : 's'} · open to read the full form
+                      </span>
+                      {consentSubmissions.map(sub => <ConsentSubmissionCard key={sub.id} sub={sub} templates={consentTemplates} />)}
                     </>
                   )}
                 </section>
@@ -769,7 +777,7 @@ export default function BookingDetailPanel({
               phone={phone}
               clientKey={clientProfile?.id}
               marketing={clientProfile && clientProfile.email_marketing_opt_in !== undefined
-                ? { optIn: marketingOverride ?? clientProfile.email_marketing_opt_in === true, smsOptIn: marketingOverride ?? clientProfile.sms_marketing_opt_in === true, unsubscribed: clientProfile.email_unsubscribed === true }
+                ? { optIn: marketingOverride ?? clientProfile.email_marketing_opt_in === true, smsOptIn: marketingOverride ?? clientProfile.sms_marketing_opt_in === true, unsubscribed: clientProfile.email_unsubscribed === true, smsOptedOut: clientProfile.sms_opted_out === true }
                 : null}
               onChange={setMarketingOverride}
             />
