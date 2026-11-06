@@ -714,14 +714,13 @@ export default function BookingDetailPanel({
         )}
 
         {/* ── Tattoo ── */}
-        {(sessionType || placement || size || color || design || notes || refImages.length > 0) && (
+        {(sessionType || placement || size || color || design || refImages.length > 0) && (
           <Section title={booking?.session_type === 'piercing' ? 'Piercing' : 'Tattoo'}>
             {sessionType && <Fact label={t('bdp_session')}>{cap(sessionType.replace(/_/g, ' '))}</Fact>}
             {placement   && <Fact label={t('bdp_placement')}>{placement}</Fact>}
             {size        && <Fact label={t('bdp_size')}>{size}</Fact>}
             {color       && <Fact label={t('bdp_style')}>{color.replace(/^Color\b/, 'Colour')}</Fact>}
             {design      && <Fact label={t('bdp_design')} block>{design}</Fact>}
-            {notes       && <Fact label={t('bdp_notes')} block>{notes}</Fact>}
             {earliestDate && <Fact label="Earliest date">{earliestDate}</Fact>}
             {availability.length > 0 && (
               <Fact label="Weekly availability" block>
@@ -779,29 +778,21 @@ export default function BookingDetailPanel({
           </Section>
         )}
 
-        {/* ── Studio notes ── */}
-        {bookingId && (
-          <Section title={t('bdp_studio_notes')}>
-            <textarea
-              aria-label={t('clients_add_note')}
-              value={noteInput}
-              onChange={e => setNoteInput(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleAddNote(); }}
-              placeholder={t('bdp_note_placeholder')}
-              rows={3}
-              style={p.noteInput}
-            />
-            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <Button size="sm" variant="secondary" onClick={handleAddNote} disabled={noteAdding || !noteInput.trim()}>
-                {noteAdding ? t('saving') : t('clients_add_note_btn')}
-              </Button>
-            </div>
+        {/* ── Notes: the booking's own notes, the studio's notes, and a box to add one ── */}
+        {(bookingId || notes) && (
+          <Section title={t('bdp_notes')}>
+            {notes && (
+              <div style={p.subCard}>
+                <p style={{ margin: 0, fontSize: '0.95rem', color: 'var(--text)', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{notes}</p>
+                <span style={p.hint}>On the booking{createdAt ? ` · ${new Date(createdAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}` : ''}</span>
+              </div>
+            )}
             {studioNotes !== null && studioNotes.map(n => (
               <div key={n.id} style={p.subCard}>
                 <p style={{ margin: 0, fontSize: '0.95rem', color: 'var(--text)', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{n.content}</p>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={p.hint}>
-                    {new Date(n.created_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    Studio note · {new Date(n.created_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
                   </span>
                   <button onClick={() => handleDeleteNote(n.id)} style={{ ...p.textLink, color: 'var(--color-danger)' }}>
                     {t('delete')}
@@ -809,6 +800,22 @@ export default function BookingDetailPanel({
                 </div>
               </div>
             ))}
+            {bookingId && <>
+              <textarea
+                aria-label={t('clients_add_note')}
+                value={noteInput}
+                onChange={e => setNoteInput(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleAddNote(); }}
+                placeholder={t('bdp_note_placeholder')}
+                rows={3}
+                style={p.noteInput}
+              />
+              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <Button size="sm" variant="secondary" onClick={handleAddNote} disabled={noteAdding || !noteInput.trim()}>
+                  {noteAdding ? t('saving') : t('clients_add_note_btn')}
+                </Button>
+              </div>
+            </>}
           </Section>
         )}
         </div>

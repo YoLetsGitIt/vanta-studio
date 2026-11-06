@@ -875,6 +875,16 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
               {paymentVisible && <>
                 {/* ── PRICING ── */}
                 <FormSection id="payment-section-title" step="payment" title={t('bdp_payment')} state={stepState('payment')} done={sectionDone.payment} summary={stepSummary.payment} missing={foldTriedFor('payment')} expanded={isOpen('payment')} onToggle={() => toggleStep('payment')} onTyping={trackTyping} onPicked={setPickedStep}>
+                  {/* Price first, then the deposit (amount appears once a deposit is chosen). */}
+                  <div className={styles.fieldRow}>
+                    <div style={bd.field}>
+                      <label htmlFor="new-appointment-estimate" style={bd.label}>Estimated price</label>
+                      <div style={bd.prefixWrap}>
+                        <span style={bd.prefix}>$</span>
+                        <input style={{ ...bd.input, paddingLeft: '1.75rem' }} type="number" min="0" step="0.01" id="new-appointment-estimate" value={finalPrice} onChange={e => setFinalPrice(e.target.value)} placeholder="0.00" />
+                      </div>
+                    </div>
+                  </div>
                   <div style={bd.field}>
                     <span id="deposit-mode-label" style={bd.label}>Deposit</span>
                     <div className={styles.choices} role="radiogroup" aria-labelledby="deposit-mode-label">
@@ -886,13 +896,6 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
                     </div>
                   </div>
                   <div className={styles.fieldRow}>
-                    <div style={bd.field}>
-                      <label htmlFor="new-appointment-estimate" style={bd.label}>Estimated price</label>
-                      <div style={bd.prefixWrap}>
-                        <span style={bd.prefix}>$</span>
-                        <input style={{ ...bd.input, paddingLeft: '1.75rem' }} type="number" min="0" step="0.01" id="new-appointment-estimate" value={finalPrice} onChange={e => setFinalPrice(e.target.value)} placeholder="0.00" />
-                      </div>
-                    </div>
                     {depositEnabled && (
                       <div style={bd.field}>
                         <label htmlFor="new-appointment-deposit" style={bd.label}>Deposit amount</label>
