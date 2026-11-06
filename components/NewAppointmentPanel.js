@@ -8,7 +8,7 @@ import { useStationAvailability } from '@/lib/useStationAvailability';
 import { useNewAppointmentData } from '@/lib/useNewAppointmentData';
 import { DEPOSIT_METHODS } from '@/components/MarkDepositReceivedButton';
 import { invalidatePrefix } from '@/lib/cache';
-import { formatDob } from '@/lib/format';
+import { formatDob, ageFromDob } from '@/lib/format';
 import { useLanguage } from '@/lib/i18n';
 import { requestConfirmation, showError, showFeedback } from '@/lib/feedback';
 import { bookingActions } from '@/lib/bookingActions';
@@ -166,12 +166,8 @@ function FormSection({ id, step, title, state, done, summary, missing = [], expa
 
 // "1999-09-09" → "27 yrs", or null without a valid date of birth.
 function ageOf(dob) {
-  const born = dob ? new Date(`${String(dob).slice(0, 10)}T00:00:00`) : null;
-  if (!born || !Number.isFinite(born.getTime())) return null;
-  const now = new Date();
-  let age = now.getFullYear() - born.getFullYear();
-  if (now.getMonth() < born.getMonth() || (now.getMonth() === born.getMonth() && now.getDate() < born.getDate())) age -= 1;
-  return age >= 0 && age < 130 ? `${age} yrs` : null;
+  const age = ageFromDob(dob);
+  return age == null ? null : `${age} yrs`;
 }
 
 // "09:00:00" → "9:00 am"

@@ -10,7 +10,7 @@ import { useRouter } from 'next/navigation';
 import { getStations, getClientConsents, getNotes, addNote, deleteNote, getBookingConsentSubmissions, getClientConsentSubmissions, getStudioClients, getStudioClient, generateConsentLink, getStudioBookingPayment, getDepositReceipt, getDepositStatus, getOfferedTimes, listConsentTemplates } from '@/lib/api';
 import { useStationAvailability } from '@/lib/useStationAvailability';
 import { statusColors, statusLabel, capitalise as cap } from '@/lib/status';
-import { formatDob as fmtDob, hasArtist } from '@/lib/format';
+import { formatDob as fmtDob, hasArtist, ageFromDob } from '@/lib/format';
 import { getCached, setCached } from '@/lib/cache';
 import { useLanguage } from '@/lib/i18n';
 import { showError, showFeedback } from '@/lib/feedback';
@@ -43,18 +43,6 @@ const OFFER_EMAIL_STATUS = {
 function fmtDate(iso) {
   if (!iso) return null;
   return new Date(iso).toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' });
-}
-
-// Age in whole years from a YYYY-MM-DD date of birth.
-function ageFromDob(dob) {
-  if (!dob) return null;
-  const birth = new Date(dob + 'T00:00:00');
-  if (isNaN(birth)) return null;
-  const now = new Date();
-  let age = now.getFullYear() - birth.getFullYear();
-  const m = now.getMonth() - birth.getMonth();
-  if (m < 0 || (m === 0 && now.getDate() < birth.getDate())) age--;
-  return age >= 0 && age < 130 ? age : null;
 }
 
 function parseStyles(raw) {

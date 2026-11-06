@@ -10,7 +10,7 @@ const TATTOO_STYLES = [
   'Illustrative', 'New School', 'Biomechanical', 'Lettering', 'Minimalist',
 ];
 import { statusColors, capitalise } from '@/lib/status';
-import { formatDob } from '@/lib/format';
+import { formatDob, ageFromDob } from '@/lib/format';
 import { invalidate } from '@/lib/cache';
 import { COUNTRIES, splitPhone, joinPhone } from '@/lib/phoneCountries';
 import DateOfBirthInput from '@/components/ui/DateOfBirthInput';
@@ -107,6 +107,7 @@ function ClientsInner() {
         phone: contact.phone ?? null,
         bookingCount: Number(contact.booking_count ?? 0),
         lastBooking: contact.last_booking ?? null,
+        age: ageFromDob(contact.dob),
         imported: contact.source === 'import' || contact.source === 'imported',
         contactId: contact.id,
         marketingKnown: contact.email_marketing_opt_in !== undefined,
@@ -286,6 +287,8 @@ function ClientsInner() {
                 <div style={s.clientInfo}>
                   <div style={s.clientNameLine}>
                     <span style={s.clientName}>{client.name}</span>
+                    {client.age != null && <span style={s.clientAge}>{client.age} yrs</span>}
+                    {client.age != null && client.age < 18 && <span style={{ ...s.badge, ...s.badgeYellow }}>Under 18</span>}
                     <ConsentBadge status={consentStatus} />
                     <MarketingBadge marketing={marketingFor(client)} />
                     {client.imported && <span style={{ ...s.badge, ...s.badgeGrey }}>{t('clients_imported')}</span>}
@@ -598,6 +601,7 @@ function ClientDetail({ client, marketing, onMarketingChange, clientKey, onClose
   const router = useRouter();
   const completedCount = client.bookings.filter(b => b.outcome === 'completed').length;
   const lastVisit = sorted[0]?.created_at ?? null;
+  const age = ageFromDob(client.dob);
 
   return (
     <aside id="client-detail" className={`studio-client-detail ${panelLayout.panel}`} aria-label={`${client.name} details`} style={s.panel}>
@@ -605,12 +609,16 @@ function ClientDetail({ client, marketing, onMarketingChange, clientKey, onClose
         <div style={s.headerIdentity}>
           <div aria-hidden="true" style={s.headerAvatar}>{client.name.charAt(0).toUpperCase()}</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', minWidth: 0 }}>
-            <span style={s.panelTitle}>{client.name}</span>
-            {client.bookings.length === 0 ? (
+            <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <span style={s.panelTitle}>{client.name}</span>
+              {age != null && age < 18 && <Pill tone="warning">Under 18</Pill>}
+            </div>
+            {client.bookings.length === 0 && age == null ? (
               <span style={s.headerStatLabel}>No bookings yet</span>
             ) : (
               <dl style={s.headerStats}>
                 {[
+                  age != null && [age, 'Age'],
                   [client.bookings.length, client.bookings.length === 1 ? 'Session' : 'Sessions'],
                   [completedCount, 'Completed'],
                   lastVisit && [new Date(lastVisit).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: new Date(lastVisit).getFullYear() === new Date().getFullYear() ? undefined : 'numeric' }), 'Last booked'],
@@ -660,7 +668,7 @@ function ClientDetail({ client, marketing, onMarketingChange, clientKey, onClose
               </button>
             ) : <span style={{ color: 'var(--text-muted)' }}>{t('clients_no_phone')}</span>}
           </Fact>
-          {client.dob && <Fact label={t('clients_dob')}>{formatDob(client.dob)}</Fact>}
+          {client.dob && <Fact label={t('clients_dob')}>{formatDob(String(client.dob).slice(0, 10))}{age != null ? ` (${age} yrs)` : ''}</Fact>}
         </Section>
         )}
 
@@ -1003,6 +1011,12 @@ const s = {
     flexDirection: 'column',
     gap: '0.3rem',
     minWidth: 0,
+  },
+  clientAge: {
+    fontSize: '0.85rem',
+    fontWeight: 600,
+    color: 'var(--text-dim)',
+    fontVariantNumeric: 'tabular-nums',
   },
   clientNameLine: {
     display: 'flex',
