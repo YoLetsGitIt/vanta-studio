@@ -13,6 +13,7 @@ import { statusColors, capitalise } from '@/lib/status';
 import { formatDob } from '@/lib/format';
 import { invalidate } from '@/lib/cache';
 import { COUNTRIES, splitPhone, joinPhone } from '@/lib/phoneCountries';
+import DateOfBirthInput from '@/components/ui/DateOfBirthInput';
 import { useLanguage } from '@/lib/i18n';
 import { showError } from '@/lib/feedback';
 import Button from '@/components/ui/Button';
@@ -371,9 +372,9 @@ function MarketingBadge({ marketing }) {
   return null;
 }
 
-// Edit first name, last name, email and phone (with its country code). A client with a
-// Vanta account keeps the name and email from their account. Date of birth isn't edited
-// here and is kept as it is.
+// Edit first name, last name, email, phone (with its country code) and date of birth.
+// A client with a Vanta account keeps the email from their account; renaming them only
+// changes the studio's name for them.
 function ContactEditor({ client, onSave, onCancel }) {
   const hasAccount = Boolean(client.user_id && client.user_id !== '00000000-0000-0000-0000-000000000000' && client.is_stub === false);
   const [firstName, setFirstName] = useState(() => (client.name ?? '').trim().split(/\s+/)[0] ?? '');
@@ -382,6 +383,7 @@ function ContactEditor({ client, onSave, onCancel }) {
   const initialPhone = splitPhone(client.phone);
   const [phoneCountry, setPhoneCountry] = useState(initialPhone.country);
   const [phoneNumber, setPhoneNumber] = useState(initialPhone.number);
+  const [dob, setDob] = useState(client.dob ? String(client.dob).slice(0, 10) : '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const phone = joinPhone(phoneCountry, phoneNumber);
@@ -397,7 +399,7 @@ function ContactEditor({ client, onSave, onCancel }) {
     if (problem || saving) { setError(problem); return; }
     setSaving(true); setError('');
     const name = [firstName.trim(), lastName.trim()].filter(Boolean).join(' ');
-    try { await onSave({ name, email: email.trim(), phone, dob: client.dob ? String(client.dob).slice(0, 10) : '' }); }
+    try { await onSave({ name, email: email.trim(), phone, dob }); }
     catch (e) { setError(e.message); }
     finally { setSaving(false); }
   }
@@ -406,13 +408,13 @@ function ContactEditor({ client, onSave, onCancel }) {
     <form onSubmit={save} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.75rem' }}>
         <label style={field}><span style={label}>First name</span>
-          <input style={input} value={firstName} onChange={e => setFirstName(e.target.value)} disabled={hasAccount} autoComplete="off" /></label>
+          <input style={input} value={firstName} onChange={e => setFirstName(e.target.value)} autoComplete="off" /></label>
         <label style={field}><span style={label}>Last name</span>
-          <input style={input} value={lastName} onChange={e => setLastName(e.target.value)} disabled={hasAccount} autoComplete="off" /></label>
+          <input style={input} value={lastName} onChange={e => setLastName(e.target.value)} autoComplete="off" /></label>
       </div>
       <label style={field}><span style={label}>Email</span>
         <input style={input} type="email" value={email} onChange={e => setEmail(e.target.value)} disabled={hasAccount} autoComplete="off" /></label>
-      {hasAccount && <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '-0.4rem' }}>Name and email come from their Vanta account.</span>}
+      {hasAccount && <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '-0.4rem' }}>Their email comes from their Vanta account.</span>}
       <div style={field}><span style={label} id="client-phone-label">Phone</span>
         <div style={{ display: 'flex', gap: '0.5rem' }}>
           <select aria-label="Phone country code" style={{ ...input, width: 'auto', flex: '0 0 auto', paddingRight: '1.8rem' }} value={phoneCountry} onChange={e => setPhoneCountry(e.target.value)}>
@@ -421,6 +423,8 @@ function ContactEditor({ client, onSave, onCancel }) {
           <input aria-labelledby="client-phone-label" style={{ ...input, flex: 1 }} type="tel" inputMode="tel" value={phoneNumber} onChange={e => setPhoneNumber(e.target.value)} placeholder="400 000 000" autoComplete="off" />
         </div>
       </div>
+      <div style={field}><span style={label}>Date of birth</span>
+        <DateOfBirthInput style={input} required={false} value={dob} onChange={setDob} /></div>
       {error && <p role="alert" style={{ margin: 0, fontSize: '0.85rem', color: 'var(--color-danger)' }}>{error}</p>}
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
         <Button type="button" variant="secondary" size="sm" onClick={onCancel} disabled={saving}>Cancel</Button>
