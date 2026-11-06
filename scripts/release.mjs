@@ -10,11 +10,10 @@
 //    (-a), which keeps the live pages that aren't in this code (signup, demos).
 // 5. Waits until the live site serves the new build.
 import { execSync } from 'node:child_process';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { createInterface } from 'node:readline/promises';
 
 const SITE = 'https://studio.vanta.tattoo';
-const CHECK_PAGE = '/dashboard/schedule';
 
 const run = (cmd, opts = {}) => execSync(cmd, { stdio: 'inherit', ...opts });
 const out = cmd => execSync(cmd, { encoding: 'utf8' }).trim();
@@ -89,19 +88,39 @@ step('Publishing to studio.vanta.tattoo');
 run(`npx gh-pages -d out -t -a -m ${JSON.stringify(`Deploy ${sha}: ${subject}`)}`);
 
 // ── 5. Wait for it to go live ───────────────────────────────────────────────
+// Check every dashboard page, not just one: a page that didn't change in this release
+// would pass even while GitHub Pages is still serving the old build. GitHub Pages
+// sometimes stalls; if pages are still stale after 2 minutes, publish a small marker
+// file to make it rebuild (this has unstuck it every time so far).
 step('Waiting for the live site to update');
-const chunk = html => html.match(/\/_next\/static\/chunks\/app\/dashboard\/schedule\/page-[a-z0-9]+\.js/)?.[0];
-const expected = chunk(readFileSync('out/dashboard/schedule.html', 'utf8'));
-for (let i = 0; i < 20; i++) {
-  try {
-    const html = await (await fetch(`${SITE}${CHECK_PAGE}?release=${Date.now()}`)).text();
-    if (expected && chunk(html) === expected) {
-      console.log(`\n✓ Live: ${sha} "${subject}". Hard-refresh (Cmd + Shift + R) to see it.`);
-      process.exit(0);
-    }
-  } catch { /* offline for a moment; try again */ }
+const pages = readdirSync('out/dashboard').filter(f => f.endsWith('.html')).map(f => f.slice(0, -5));
+const chunkFor = (html, page) => html.match(new RegExp(`/_next/static/chunks/app/dashboard/${page}/page-[a-z0-9]+\\.js`))?.[0];
+const expected = Object.fromEntries(pages.map(p => [p, chunkFor(readFileSync(`out/dashboard/${p}.html`, 'utf8'), p)]).filter(([, c]) => c));
+async function stalePages() {
+  const stale = [];
+  for (const [page, want] of Object.entries(expected)) {
+    try {
+      const html = await (await fetch(`${SITE}/dashboard/${page}?release=${Date.now()}`)).text();
+      if (chunkFor(html, page) !== want) stale.push(page);
+    } catch { stale.push(page); }
+  }
+  return stale;
+}
+let nudged = false;
+for (let i = 0; i < 24; i++) {
+  const stale = await stalePages();
+  if (!stale.length) {
+    console.log(`\n✓ Live: ${sha} "${subject}" (all ${Object.keys(expected).length} dashboard pages checked). Hard-refresh (Cmd + Shift + R) to see it.`);
+    process.exit(0);
+  }
+  if (i === 8 && !nudged) {
+    console.log(`  Still old after 2 minutes (${stale.join(', ')}). Nudging GitHub Pages to rebuild…`);
+    writeFileSync('out/deploy-marker.txt', `redeploy ${sha} ${new Date().toISOString()}\n`);
+    run(`npx gh-pages -d out -t -a -m ${JSON.stringify(`Redeploy ${sha} (Pages build stalled)`)}`);
+    nudged = true;
+  }
   await new Promise(r => setTimeout(r, 15000));
 }
-console.log('\n⚠ Published, but the live site still shows the old build after 5 minutes.');
-console.log('  GitHub Pages sometimes stalls. Run  npm run release -- "Retry deploy"  after a small change, or ask Claude.');
+console.log('\n⚠ Published, but some pages still show the old build after 6 minutes.');
+console.log('  Wait a few minutes and hard-refresh, or ask Claude to check the deploy.');
 process.exit(1);
