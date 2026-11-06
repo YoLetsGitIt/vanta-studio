@@ -678,7 +678,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
                       <div style={{ minWidth: 0 }}>
                         <span style={bd.selectedClientName}>{selectedClient.name}</span>
                         <span style={bd.selectedClientSub}>
-                          {[selectedClient.email, selectedClient.phone, selectedClient.dob ? formatDob(selectedClient.dob) : null].filter(Boolean).join(' · ')}
+                          {[selectedClient.email, selectedClient.phone, selectedClient.dob ? `${formatDob(selectedClient.dob)}${ageOf(selectedClient.dob) ? ` (${ageOf(selectedClient.dob)})` : ''}` : null].filter(Boolean).join(' · ')}
                         </span>
                       </div>
                       <button type="button" style={bd.deselectBtn} onClick={clearSelectedClient} aria-label="Remove selected client">✕</button>
@@ -713,7 +713,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
                           {filteredClients.map((c, i) => (
                             <button key={c.id ?? c.email ?? `${c.name}-${i}`} type="button" style={bd.dropdownItem} onClick={() => pickClient(c)}>
                               <span style={bd.dropdownName}>{c.name}</span>
-                              <span style={bd.dropdownSub}>{[c.email, c.phone].filter(Boolean).join(' · ')}</span>
+                              <span style={bd.dropdownSub}>{[c.email, c.phone, ageOf(c.dob)].filter(Boolean).join(' · ')}</span>
                             </button>
                           ))}
                         </div>
