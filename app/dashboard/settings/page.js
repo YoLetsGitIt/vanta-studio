@@ -926,9 +926,11 @@ export default function SettingsPage() {
       <div className={`settings-bento ${tab === 'account' ? accountStyles.grid : ''}`}>
 
         {tab === 'studio' && <>
-
-        <section className="settings-span-7" style={s.card}>
+        {/* Two columns that stack their own cards, so short cards don't stretch. */}
+        <div className="settings-span-7 settings-column">
+        <section style={s.card}>
           <h2 style={s.sectionTitle}>{t('profile')}</h2>
+          <p style={s.sectionDesc}>Your studio’s name and address, as clients see them.</p>
           <form onSubmit={handleSaveProfile} style={s.form}>
             <div style={s.field}>
               <label htmlFor="studio-name" style={s.label}>Studio Name</label>
@@ -989,38 +991,7 @@ export default function SettingsPage() {
           </form>
         </section>
 
-        <section className="settings-span-5" style={s.card} aria-labelledby="branding-title">
-          <h2 id="branding-title" style={s.sectionTitle}>Logo and colours</h2>
-          <p style={s.sectionDesc}>Used on your booking form and website widget, walk-in form and consent form.</p>
-          <StudioLogoUpload logoUrl={logoUrl} studioName={name} onChange={setLogoUrl} />
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>
-            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '1rem' }}>
-              <h3 style={{ ...s.label, margin: 0 }}>Form colours</h3>
-              <span role="status" style={{ fontSize: '0.8rem', color: formStyleState === 'error' ? 'var(--color-danger)' : 'var(--text-muted)' }}>
-                {formStyleState === 'saving' ? 'Saving…' : formStyleState === 'saved' ? 'Saved' : formStyleState === 'error' ? 'Couldn’t save' : 'Saves as you go'}
-              </span>
-            </div>
-            <div className="studio-form-row" style={s.colorRow}>
-              {[['Background', widgetBgColor, setWidgetBgColor], ['Highlight', widgetAccentColor, setWidgetAccentColor]].map(([label, value, setter]) => (
-                <div key={label} style={s.colorField}>
-                  <label style={s.label}>{label}</label>
-                  <div style={s.colorInputWrap}>
-                    <input aria-label={`Form ${label.toLowerCase()} colour`} type="color" value={validHex(value) ? value : '#000000'} onChange={e => changeFormColour(setter)(e.target.value)} style={s.colorSwatch} />
-                    <input aria-label={`Form ${label.toLowerCase()} hex colour`} style={{ ...s.input, fontFamily: 'ui-monospace,monospace', fontSize: '0.82rem' }} value={value} maxLength={7} onChange={e => changeFormColour(setter)(e.target.value)} />
-                  </div>
-                </div>
-              ))}
-            </div>
-            {/* A small sample of how the forms look in these colours. */}
-            <div aria-hidden="true" style={{ ...s.colourSample, background: validHex(widgetBgColor) ? widgetBgColor : '#111111' }}>
-              <span style={{ fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: validHex(widgetAccentColor) ? widgetAccentColor : '#d5d0c7' }}>{name || 'Your studio'}</span>
-              <span style={{ fontSize: '0.95rem', fontWeight: 700, color: '#fff' }}>Book an appointment</span>
-              <span style={{ ...s.colourSampleButton, background: validHex(widgetAccentColor) ? widgetAccentColor : '#d5d0c7', color: isLightColorHex(validHex(widgetAccentColor) ? widgetAccentColor : '#d5d0c7') ? '#11151b' : '#fff' }}>Request booking</span>
-            </div>
-          </div>
-        </section>
-
-        <section className="settings-span-7" style={s.card}>
+        <section style={s.card}>
           <h2 style={s.sectionTitle}>{t('hours')}</h2>
           <div style={s.hoursGrid}>
             {hours.map((day, i) => (
@@ -1064,7 +1035,135 @@ export default function SettingsPage() {
             {hoursSaving ? t('saving') : hoursSaved ? t('saved') : t('save_hours')}
           </button>
         </section>
+        </div>
+        <div className="settings-span-5 settings-column">
+        <section style={s.card} aria-labelledby="branding-title">
+          <h2 id="branding-title" style={s.sectionTitle}>Logo and colours</h2>
+          <p style={s.sectionDesc}>Used on your booking form and website widget, walk-in form and consent form.</p>
+          <StudioLogoUpload logoUrl={logoUrl} studioName={name} onChange={setLogoUrl} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '1rem' }}>
+              <h3 style={{ ...s.label, margin: 0 }}>Form colours</h3>
+              <span role="status" style={{ fontSize: '0.8rem', color: formStyleState === 'error' ? 'var(--color-danger)' : 'var(--text-muted)' }}>
+                {formStyleState === 'saving' ? 'Saving…' : formStyleState === 'saved' ? 'Saved' : formStyleState === 'error' ? 'Couldn’t save' : 'Saves as you go'}
+              </span>
+            </div>
+            <div className="studio-form-row" style={s.colorRow}>
+              {[['Background', widgetBgColor, setWidgetBgColor], ['Highlight', widgetAccentColor, setWidgetAccentColor]].map(([label, value, setter]) => (
+                <div key={label} style={s.colorField}>
+                  <label style={s.label}>{label}</label>
+                  <div style={s.colorInputWrap}>
+                    <input aria-label={`Form ${label.toLowerCase()} colour`} type="color" value={validHex(value) ? value : '#000000'} onChange={e => changeFormColour(setter)(e.target.value)} style={s.colorSwatch} />
+                    <input aria-label={`Form ${label.toLowerCase()} hex colour`} style={{ ...s.input, fontFamily: 'ui-monospace,monospace', fontSize: '0.82rem' }} value={value} maxLength={7} onChange={e => changeFormColour(setter)(e.target.value)} />
+                  </div>
+                </div>
+              ))}
+            </div>
+            {/* A small sample of how the forms look in these colours. */}
+            <div aria-hidden="true" style={{ ...s.colourSample, background: validHex(widgetBgColor) ? widgetBgColor : '#111111' }}>
+              <span style={{ fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: validHex(widgetAccentColor) ? widgetAccentColor : '#d5d0c7' }}>{name || 'Your studio'}</span>
+              <span style={{ fontSize: '0.95rem', fontWeight: 700, color: '#fff' }}>Book an appointment</span>
+              <span style={{ ...s.colourSampleButton, background: validHex(widgetAccentColor) ? widgetAccentColor : '#d5d0c7', color: isLightColorHex(validHex(widgetAccentColor) ? widgetAccentColor : '#d5d0c7') ? '#11151b' : '#fff' }}>Request booking</span>
+            </div>
+          </div>
+        </section>
 
+        <section style={s.card}>
+          <h2 style={s.sectionTitle}>{t('stations')}</h2>
+          <p style={s.sectionDesc}>Artists are assigned to a free station when a booking is accepted. Every studio must keep at least one active station.</p>
+          {stationLastDayTarget && (
+            <StationLastDayModal
+              saving={stationLoading}
+              existingEndDate={stationLastDayTarget.endDate}
+              onConfirm={confirmStationLastDay}
+              onCancel={() => setStationLastDayTarget(null)}
+            />
+          )}
+          <div style={s.stationList}>
+            {stations.map(st => (
+              <div key={st.id} style={s.stationRow}>
+                {renaming?.id === st.id ? (
+                  <form style={s.stationTop} onSubmit={e => { e.preventDefault(); saveStationName(); }}>
+                    <input
+                      aria-label="Station name"
+                      className="studio-control"
+                      value={renaming.name}
+                      maxLength={40}
+                      autoFocus
+                      onFocus={e => e.target.select()}
+                      onChange={e => setRenaming(r => ({ ...r, name: e.target.value }))}
+                      onKeyDown={e => { if (e.key === 'Escape') setRenaming(null); }}
+                      style={s.stationNameInput}
+                    />
+                    <div style={s.stationActions}>
+                      <Button size="sm" type="submit" loading={stationLoading} disabled={!renaming.name.trim()}>Save</Button>
+                      <Button size="sm" variant="ghost" onClick={() => setRenaming(null)}>Cancel</Button>
+                    </div>
+                  </form>
+                ) : (
+                  <div className="studio-wrap-row" style={s.stationTop}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', minWidth: 0 }}>
+                      <span style={s.stationName}>{st.name}</span>
+                      {st.endDate && (
+                        <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#f59e3a', background: 'rgba(245,158,58,0.1)', border: '1px solid rgba(245,158,58,0.25)', borderRadius: 20, padding: '0.12rem 0.5rem', whiteSpace: 'nowrap' }}>
+                          Last day {new Date(st.endDate + 'T00:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}
+                        </span>
+                      )}
+                    </div>
+                    <div style={s.stationActions}>
+                      <Button size="sm" variant="ghost" onClick={() => setRenaming({ id: st.id, name: st.name })} disabled={stationLoading}>Rename</Button>
+                      <Button size="sm" variant="ghost" onClick={() => setStationLastDayTarget({ id: st.id, endDate: st.endDate ?? null })}
+                        disabled={stationLoading || stations.length <= 1}
+                        title={stations.length <= 1 ? 'Add another station before setting this station’s last day.' : undefined}>
+                        {st.endDate ? 'Change last day' : 'Set last day'}
+                      </Button>
+                      <Button size="sm" variant="ghost" className="studio-danger-ghost" onClick={() => handleRemoveStation(st.id)}
+                        disabled={stationLoading || stations.length <= 1}
+                        title={stations.length <= 1 ? 'A studio must have at least one station.' : undefined}>
+                        Remove
+                      </Button>
+                    </div>
+                  </div>
+                )}
+                {/* Unavailability panel — re-enable with button above
+                {expandedStation === st.id && (
+                  <div style={s.unavailPanel}>
+                    <div className="studio-wrap-row" style={s.unavailAdd}>
+                      <input
+                        type="date"
+                        value={unavailDate}
+                        onChange={e => setUnavailDate(e.target.value)}
+                        style={s.dateInput}
+                      />
+                      <button
+                        style={s.saveBtn}
+                        onClick={() => handleSetUnavailable(st.id)}
+                        disabled={!unavailDate}
+                      >
+                        Mark unavailable
+                      </button>
+                    </div>
+                    {st.unavailability?.length > 0 && (
+                      <div style={s.unavailList}>
+                        {st.unavailability.map(u => (
+                          <div key={u.date} style={s.unavailItem}>
+                            <span style={s.unavailDate}>{u.date.split('T')[0]}</span>
+                            <button style={s.clearBtn} onClick={() => handleClearUnavailable(st.id, u.date)}>✕</button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+                */}
+              </div>
+            ))}
+          </div>
+          <button onClick={handleAddStation} style={s.saveBtn} disabled={stationLoading}>
+            {t('add_station')}
+          </button>
+        </section>
+        </div>
         </>}
 
         {tab === 'payments' && <>
@@ -1200,104 +1299,6 @@ export default function SettingsPage() {
 
         </>}
 
-        {tab === 'studio' && <>
-        <section className="settings-span-5" style={s.card}>
-          <h2 style={s.sectionTitle}>{t('stations')}</h2>
-          <p style={s.sectionDesc}>Artists are assigned to a free station when a booking is accepted. Every studio must keep at least one active station.</p>
-          {stationLastDayTarget && (
-            <StationLastDayModal
-              saving={stationLoading}
-              existingEndDate={stationLastDayTarget.endDate}
-              onConfirm={confirmStationLastDay}
-              onCancel={() => setStationLastDayTarget(null)}
-            />
-          )}
-          <div style={s.stationList}>
-            {stations.map(st => (
-              <div key={st.id} style={s.stationRow}>
-                {renaming?.id === st.id ? (
-                  <form style={s.stationTop} onSubmit={e => { e.preventDefault(); saveStationName(); }}>
-                    <input
-                      aria-label="Station name"
-                      className="studio-control"
-                      value={renaming.name}
-                      maxLength={40}
-                      autoFocus
-                      onFocus={e => e.target.select()}
-                      onChange={e => setRenaming(r => ({ ...r, name: e.target.value }))}
-                      onKeyDown={e => { if (e.key === 'Escape') setRenaming(null); }}
-                      style={s.stationNameInput}
-                    />
-                    <div style={s.stationActions}>
-                      <Button size="sm" type="submit" loading={stationLoading} disabled={!renaming.name.trim()}>Save</Button>
-                      <Button size="sm" variant="ghost" onClick={() => setRenaming(null)}>Cancel</Button>
-                    </div>
-                  </form>
-                ) : (
-                  <div className="studio-wrap-row" style={s.stationTop}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', minWidth: 0 }}>
-                      <span style={s.stationName}>{st.name}</span>
-                      {st.endDate && (
-                        <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#f59e3a', background: 'rgba(245,158,58,0.1)', border: '1px solid rgba(245,158,58,0.25)', borderRadius: 20, padding: '0.12rem 0.5rem', whiteSpace: 'nowrap' }}>
-                          Last day {new Date(st.endDate + 'T00:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}
-                        </span>
-                      )}
-                    </div>
-                    <div style={s.stationActions}>
-                      <Button size="sm" variant="ghost" onClick={() => setRenaming({ id: st.id, name: st.name })} disabled={stationLoading}>Rename</Button>
-                      <Button size="sm" variant="ghost" onClick={() => setStationLastDayTarget({ id: st.id, endDate: st.endDate ?? null })}
-                        disabled={stationLoading || stations.length <= 1}
-                        title={stations.length <= 1 ? 'Add another station before setting this station’s last day.' : undefined}>
-                        {st.endDate ? 'Change last day' : 'Set last day'}
-                      </Button>
-                      <Button size="sm" variant="ghost" className="studio-danger-ghost" onClick={() => handleRemoveStation(st.id)}
-                        disabled={stationLoading || stations.length <= 1}
-                        title={stations.length <= 1 ? 'A studio must have at least one station.' : undefined}>
-                        Remove
-                      </Button>
-                    </div>
-                  </div>
-                )}
-                {/* Unavailability panel — re-enable with button above
-                {expandedStation === st.id && (
-                  <div style={s.unavailPanel}>
-                    <div className="studio-wrap-row" style={s.unavailAdd}>
-                      <input
-                        type="date"
-                        value={unavailDate}
-                        onChange={e => setUnavailDate(e.target.value)}
-                        style={s.dateInput}
-                      />
-                      <button
-                        style={s.saveBtn}
-                        onClick={() => handleSetUnavailable(st.id)}
-                        disabled={!unavailDate}
-                      >
-                        Mark unavailable
-                      </button>
-                    </div>
-                    {st.unavailability?.length > 0 && (
-                      <div style={s.unavailList}>
-                        {st.unavailability.map(u => (
-                          <div key={u.date} style={s.unavailItem}>
-                            <span style={s.unavailDate}>{u.date.split('T')[0]}</span>
-                            <button style={s.clearBtn} onClick={() => handleClearUnavailable(st.id, u.date)}>✕</button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-                */}
-              </div>
-            ))}
-          </div>
-          <button onClick={handleAddStation} style={s.saveBtn} disabled={stationLoading}>
-            {t('add_station')}
-          </button>
-        </section>
-
-        </>}
 
         {tab === 'types' && <AppointmentTypesSettings styles={s} />}
 
