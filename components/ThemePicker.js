@@ -13,6 +13,7 @@ export default function ThemePicker({ value, onChange }) {
         <button key={theme} type="button" className={styles.option} aria-pressed={value === theme} onClick={() => onChange(theme)}>
           <span className={styles.preview} data-theme={theme} aria-hidden="true">
             {theme === 'space' && <SpaceAccent preview />}
+            {theme === 'nature' && <img className={styles.plant} src="/themes/nature-sprig.svg" alt="" aria-hidden="true" />}
             <span className={styles.sidebar} /><span className={styles.card}><i /><i /><b /></span>
           </span>
           <span className={styles.label}>{t(`theme_${theme}`)}<span aria-hidden="true">{value === theme ? '✓' : ''}</span></span>

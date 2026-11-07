@@ -206,6 +206,34 @@
   --shadow-modal: 0 28px 80px rgba(23,36,28,0.28);
 }
 
+/* Botanical ornaments sit in the surrounding chrome and page gutters. */
+html[data-theme="nature"] .studio-brand::after {
+  content: ''; position: absolute; top: -20px; right: -8px; width: 52px; height: 32px;
+  background: url('/themes/nature-sprig.svg') center / contain no-repeat;
+  opacity: .65; pointer-events: none;
+}
+html[data-theme="nature"] .studio-dashboard-sidebar { position: relative; }
+html[data-theme="nature"] .studio-dashboard-sidebar::after {
+  content: ''; position: absolute; right: 0; bottom: 110px; width: 44px; height: 280px;
+  background: url('/themes/nature-vine.svg') right center / contain no-repeat;
+  opacity: .3; pointer-events: none;
+}
+html[data-theme="nature"] .studio-settings-page { position: relative; }
+html[data-theme="nature"] .studio-settings-page::before {
+  content: ''; position: absolute; right: 4px; top: 110px; width: 30px; height: 250px;
+  background: url('/themes/nature-vine.svg') center / contain no-repeat;
+  opacity: .28; pointer-events: none; transform: scaleX(-1);
+}
+html[data-theme="nature"] #account-preferences-heading { position: relative; }
+html[data-theme="nature"] #account-preferences-heading::after {
+  content: ''; position: absolute; right: 0; top: -12px; width: 64px; height: 40px;
+  background: url('/themes/nature-sprig.svg') center / contain no-repeat;
+  opacity: .55; pointer-events: none;
+}
+@media (max-width: 760px) {
+  html[data-theme="nature"] .studio-settings-page::before { right: 0; width: 14px; height: 170px; opacity: .24; }
+}
+
 /* Space follows VantaPalette.space on the phone: cosmic ink and starlight.
    Lift the shared accent for readable links as well as filled controls. */
 [data-theme="space"] {

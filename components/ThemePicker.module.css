@@ -11,3 +11,5 @@
 .card b { width: 45%; height: 9px; background: var(--accent); border-radius: 2px; margin-top: auto; }
 .label { display: flex; justify-content: space-between; align-items: center; gap: 4px; padding: 8px 4px 4px; font-size: 0.85rem; font-weight: 600; }
 @media (max-width: 400px) { .options { gap: 6px; } .preview { padding: 6px; gap: 4px; } }
+
+.plant { position: absolute; width: 62px; height: 38px; right: 1px; bottom: 0; opacity: .8; pointer-events: none; }
