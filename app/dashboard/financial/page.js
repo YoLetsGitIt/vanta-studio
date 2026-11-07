@@ -312,13 +312,27 @@ function FinancialContent({ s, weeklyChart, daily, startDate, endDate, isLight }
           const atAppointments = s?.remaining_balances ?? 0;
           const fromDeposits = Math.max((s?.gross_sales ?? 0) - atAppointments, 0);
           return (
-            <div className="studio-kpi-grid" style={st.kpiGrid}>
-              <KpiCard label={t('revenue_gross_sales')} value={fmt(s?.gross_sales)} tone="success"
-                hint={sessions ? `From ${sessions} completed ${sessions === 1 ? 'session' : 'sessions'}` : 'No completed sessions yet'}
-                breakdown={sessions ? [['Deposits', fmt(fromDeposits), 'var(--color-info)'], ['Paid on the day', fmt(atAppointments), 'var(--color-success)']] : null} />
-              {showNet && <KpiCard label={t('revenue_net_sales')} value={fmt(s?.net_sales)} tone="success" hint="After refunds and discounts" />}
-              <KpiCard label={t('revenue_deposits')} value={fmt(s?.deposits_collected)} tone="info"
-                hint="Taken this period for any booking, mostly ones still to come. Not in Sales until the session is done." />
+            <div className="studio-revenue-summary" style={st.summaryPanel}>
+              <div style={st.summaryCol}>
+                <span style={st.summaryLabel}>{t('revenue_gross_sales')}</span>
+                <span style={st.summaryValue}>{fmt(s?.gross_sales)}</span>
+                <span style={st.summaryHint}>{sessions ? `From ${sessions} completed ${sessions === 1 ? 'session' : 'sessions'}` : 'No completed sessions in this period'}</span>
+                {sessions > 0 && (
+                  <dl style={st.summaryRows}>
+                    <div style={st.summaryRow}><dt style={st.summaryRowLabel}><span aria-hidden="true" style={{ ...st.summaryDot, background: 'var(--color-info)' }} />Paid upfront as deposits</dt><dd style={st.summaryRowValue}>{fmt(fromDeposits)}</dd></div>
+                    <div style={st.summaryRow}><dt style={st.summaryRowLabel}><span aria-hidden="true" style={{ ...st.summaryDot, background: 'var(--color-success)' }} />Paid on the day</dt><dd style={st.summaryRowValue}>{fmt(atAppointments)}</dd></div>
+                  </dl>
+                )}
+                {showNet && <span style={st.summaryHint}>{t('revenue_net_sales')}: {fmt(s?.net_sales)} after refunds and discounts</span>}
+              </div>
+              <div className="studio-revenue-summary-divider" style={st.summaryDivider} aria-hidden="true" />
+              <div style={st.summaryCol}>
+                <span style={st.summaryLabel}>{t('revenue_deposits')}</span>
+                <span style={st.summaryValue}>{fmt(s?.deposits_collected)}</span>
+                <span style={st.summaryHint}>
+                  Every deposit clients paid in this period, for any booking. Most are for appointments still to come, so they’re not in Sales until the session is done.
+                </span>
+              </div>
             </div>
           );
         })()}
@@ -342,25 +356,25 @@ function FinancialContent({ s, weeklyChart, daily, startDate, endDate, isLight }
                       <div style={{ background: tooltipBg, border: `1px solid ${tooltipBorder}`, borderRadius: 8, fontSize: 12, color: tooltipColor, padding: '0.5rem 0.65rem', minWidth: 170 }}>
                         <div style={{ color: tickColor, marginBottom: 4 }}>{daily ? label : `Week of ${label}`}</div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontWeight: 700 }}><span>Sales</span><span>{fmt(row.gross)}</span></div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span>Deposits</span><span>{fmt(row.fromDeposits)}</span></div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span>Paid upfront</span><span>{fmt(row.fromDeposits)}</span></div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span>Paid on the day</span><span>{fmt(row.onTheDay)}</span></div>
                       </div>
                     );
                   }}
                 />
-                <Bar dataKey="fromDeposits" stackId="sales" fill="var(--color-info)" name="Deposits" />
+                <Bar dataKey="fromDeposits" stackId="sales" fill="var(--color-info)" name="Paid upfront" />
                 <Bar dataKey="onTheDay" stackId="sales" fill="var(--color-success)" radius={[4,4,0,0]} name="Paid on the day" />
               </BarChart>
             </ResponsiveContainer>
             <div style={st.legend}>
-              <LegendDot color="var(--color-info)" label="Deposits" />
+              <LegendDot color="var(--color-info)" label="Paid upfront as deposits" />
               <LegendDot color="var(--color-success)" label="Paid on the day" />
             </div>
             <details style={{ marginTop: 16 }}>
               <summary style={{ cursor: 'pointer', minHeight: 44, lineHeight: '44px' }}>View chart data</summary>
               <table style={{ width: '100%', textAlign: 'left', fontSize: 14 }}>
                 <caption style={{ textAlign: 'left', padding: '8px 0' }}>{daily ? 'Daily sales' : 'Weekly sales'}</caption>
-                <thead><tr><th scope="col">{daily ? 'Day' : 'Week'}</th><th scope="col">Sales</th><th scope="col">Deposits</th><th scope="col">Paid on the day</th></tr></thead>
+                <thead><tr><th scope="col">{daily ? 'Day' : 'Week'}</th><th scope="col">Sales</th><th scope="col">Paid upfront</th><th scope="col">Paid on the day</th></tr></thead>
                 <tbody>{weeklyChart.map(row => <tr key={row.week}><th scope="row">{row.week}</th><td>{fmt(row.gross)}</td><td>{fmt(row.fromDeposits)}</td><td>{fmt(row.onTheDay)}</td></tr>)}</tbody>
               </table>
             </details>
@@ -463,28 +477,6 @@ function rangeLabel(start, end) {
   const sameYear = a.getFullYear() === b.getFullYear();
   const startText = a.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', ...(sameYear ? {} : { year: 'numeric' }) });
   return `${startText} – ${b.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}`;
-}
-
-function KpiCard({ label, value, tone = 'neutral', hint, breakdown }) {
-  const toned = tone !== 'neutral';
-  return (
-    <div style={{
-      ...st.kpiCard,
-      ...(toned ? { background: `var(--color-${tone}-surface)`, borderColor: `var(--color-${tone}-border)` } : {}),
-      borderLeft: `4px solid ${toned ? `var(--color-${tone})` : 'var(--text-ghost)'}`,
-    }}>
-      <span style={st.kpiLabel}>{label}</span>
-      <span style={{ ...st.kpiVal, color: toned ? `var(--color-${tone})` : 'var(--text)' }}>{value}</span>
-      {hint && <span style={st.kpiHint}>{hint}</span>}
-      {breakdown && (
-        <dl style={st.kpiBreakdown}>
-          {breakdown.map(([k, v, dot]) => (
-            <div key={k} style={st.kpiBreakdownRow}><dt style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', whiteSpace: 'nowrap' }}>{dot && <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: 2, background: dot }} />}{k}</dt><dd style={{ margin: 0, fontWeight: 600, color: 'var(--text)' }}>{v}</dd></div>
-          ))}
-        </dl>
-      )}
-    </div>
-  );
 }
 
 function LegendDot({ color, label }) {
@@ -1046,7 +1038,18 @@ const st = {
   kpiBreakdown: { margin: '0.35rem 0 0', paddingTop: '0.55rem', borderTop: '1px dashed var(--border)', display: 'flex', flexDirection: 'column', gap: '0.3rem' },
   kpiBreakdownRow: { display: 'flex', justifyContent: 'space-between', gap: '0.75rem', fontSize: '0.85rem', color: 'var(--text-dim)' },
   kpiHint: { fontSize: '0.8rem', lineHeight: 1.35, color: 'var(--text-dim)' },
-  comingSoon: { margin: '0.25rem 0 0', fontSize: '0.85rem', color: 'var(--text-muted)' },
+  comingSoon: { margin: '0.75rem 0 0', fontSize: '0.82rem', color: 'var(--text-muted)' },
+  summaryPanel: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 1px minmax(0, 1fr)', gap: '1.75rem', padding: '1.4rem 1.6rem', borderRadius: 14, border: '1px solid var(--border)', background: 'var(--bg-card)' },
+  summaryCol: { display: 'flex', flexDirection: 'column', gap: '0.35rem', minWidth: 0 },
+  summaryDivider: { background: 'var(--border)' },
+  summaryLabel: { fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-dim)' },
+  summaryValue: { fontSize: '2rem', fontWeight: 700, letterSpacing: '-0.03em', color: 'var(--text)', fontVariantNumeric: 'tabular-nums', lineHeight: 1.15 },
+  summaryHint: { fontSize: '0.85rem', lineHeight: 1.45, color: 'var(--text-muted)', maxWidth: '42ch' },
+  summaryRows: { margin: '0.6rem 0 0', paddingTop: '0.7rem', borderTop: '1px solid var(--border-faint)', display: 'flex', flexDirection: 'column', gap: '0.45rem', maxWidth: 360 },
+  summaryRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', fontSize: '0.88rem' },
+  summaryRowLabel: { display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-dim)', minWidth: 0 },
+  summaryRowValue: { margin: 0, fontWeight: 600, color: 'var(--text)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' },
+  summaryDot: { width: 8, height: 8, borderRadius: 2, flexShrink: 0 },
   kpiCard: {
     background: 'var(--bg-card)', border: '1px solid var(--border)',
     borderRadius: 12, padding: '1.1rem 1.2rem', display: 'flex', flexDirection: 'column', gap: '0.4rem',

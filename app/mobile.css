@@ -381,3 +381,9 @@
   .studio-bdp-action--main { flex-grow: 1.4; min-width: 0; }
   .studio-bdp-action--danger { flex: 0 0 auto; margin-right: 0; }
 }
+
+/* Financials summary: stack the two halves on phones. */
+@media (max-width: 720px) {
+  .studio-revenue-summary { grid-template-columns: 1fr !important; gap: 1.1rem !important; padding: 1.1rem !important; }
+  .studio-revenue-summary-divider { height: 1px; }
+}
