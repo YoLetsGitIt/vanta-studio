@@ -15,6 +15,7 @@ import { uploadPhotoIdAnswers, signStudioPhotoId } from '@/lib/photoId';
 import { getStudioPublic, createWalkIn, createGuestStudioBooking, createWalkInBooking, getWalkInFormConfigPublic, getStudioHoursPublic, walkinUploadSign, signatureUploadSign, getStudioConsentTemplates, getFormConfigPublic } from '@/lib/api';
 
 import { COUNTRIES, detectCountry } from '@/lib/phoneCountries';
+import { formTheme } from '@/lib/formTheme';
 
 const PIERCING_PLACEMENTS = ['Earlobe', 'Helix', 'Tragus', 'Conch', 'Daith', 'Rook', 'Industrial', 'Nostril', 'Septum', 'Eyebrow', 'Lip', 'Tongue', 'Navel', 'Nipple', 'Other'];
 
@@ -27,7 +28,7 @@ const PLACEMENTS = [
 // One intake form, two entry points:
 //   mode="booking" — studio booking link: guest or sign-in, request reviewed by the studio.
 //   mode="walkin"  — walk-in link / QR: guest only, choose an artist, booked in straight away.
-function IntakeInner({ mode }) {
+function IntakeInner({ mode, onStyle }) {
   const walkIn = mode === 'walkin';
   const params = useSearchParams();
   const studioId = params.get('s');
@@ -167,6 +168,7 @@ function IntakeInner({ mode }) {
     ]).then(([studioData, configData, consentData, hoursData]) => {
       setStudioHours(hoursData.hours ?? []);
       setStudio(studioData);
+      onStyle?.(studioData?.form_style ?? null);
       setFormConfig(configData.fields ?? {});
       setConsentTemplates(consentData.templates ?? []);
     }).catch(e => setStudioErr(e.message));
@@ -583,7 +585,7 @@ function IntakeInner({ mode }) {
 
             {!isPiercing && field('retouch').enabled && (
               <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: 'var(--text-dim)', cursor: 'pointer' }}>
-                <input type="checkbox" checked={retouch} onChange={e => setRetouch(e.target.checked)} style={{ width: 16, height: 16, accentColor: '#d5d0c7', cursor: 'pointer' }} />
+                <input type="checkbox" checked={retouch} onChange={e => setRetouch(e.target.checked)} style={{ width: 16, height: 16, accentColor: 'var(--cf-accent)', cursor: 'pointer' }} />
                 This is a touch-up / retouch
               </label>
             )}
@@ -630,7 +632,7 @@ function IntakeInner({ mode }) {
             {field('allergies').enabled && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: 'var(--text-dim)', cursor: 'pointer' }}>
-                  <input type="checkbox" checked={hasAllergies} onChange={e => { setHasAllergies(e.target.checked); if (!e.target.checked) setAllergyDetails(''); }} style={{ width: 16, height: 16, accentColor: '#d5d0c7', cursor: 'pointer' }} />
+                  <input type="checkbox" checked={hasAllergies} onChange={e => { setHasAllergies(e.target.checked); if (!e.target.checked) setAllergyDetails(''); }} style={{ width: 16, height: 16, accentColor: 'var(--cf-accent)', cursor: 'pointer' }} />
                   I have allergies or sensitivities{field('allergies').required ? '' : ' (optional)'}
                 </label>
                 {hasAllergies && (
@@ -704,7 +706,7 @@ function IntakeInner({ mode }) {
                         type="checkbox"
                         checked={!!ts.answers?.__agreed__}
                         onChange={e => setTemplateAnswer(t.id, '__agreed__', e.target.checked ? 'true' : '')}
-                        style={{ accentColor: '#d5d0c7', flexShrink: 0, marginTop: 2 }}
+                        style={{ accentColor: 'var(--cf-accent)', flexShrink: 0, marginTop: 2 }}
                       />
                       <span style={{ fontSize: '0.8rem', color: 'var(--text-dim)', lineHeight: 1.5 }}>
                         I have read and agreed to the above <span style={{ color: 'var(--color-danger)' }}>*</span>
@@ -786,14 +788,14 @@ function ConsentFormField({ field, value, onChange }) {
   };
   switch (field.type) {
     case 'heading':
-      return <p style={{ fontSize: '0.9rem', fontWeight: 700, color: '#d5d0c7', margin: 0 }}>{field.label}</p>;
+      return <p style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--cf-accent)', margin: 0 }}>{field.label}</p>;
     case 'paragraph':
       return <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0, lineHeight: 1.65, maxHeight: 160, overflowY: 'auto', whiteSpace: 'pre-wrap' }}>{field.label}</p>;
     case 'checkbox':
       return (
         <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6rem', cursor: 'pointer' }}>
           <input type="checkbox" checked={!!value} onChange={e => onChange(e.target.checked ? 'true' : '')}
-            style={{ accentColor: '#d5d0c7', flexShrink: 0, marginTop: 2 }} />
+            style={{ accentColor: 'var(--cf-accent)', flexShrink: 0, marginTop: 2 }} />
           <span style={{ fontSize: '0.8rem', color: 'var(--text-dim)', lineHeight: 1.5 }}>
             {field.label}{field.required && <span style={{ color: 'var(--color-danger)', marginLeft: 2 }}>*</span>}
           </span>
@@ -813,9 +815,9 @@ function ConsentFormField({ field, value, onChange }) {
                 onClick={() => onChange(opt)}
                 style={{
                   padding: '0.45rem 1.2rem', borderRadius: 8,
-                  border: `1px solid ${value === opt ? '#d5d0c7' : 'rgba(255,255,255,0.12)'}`,
-                  background: value === opt ? 'rgba(213,208,199,0.12)' : 'rgba(255,255,255,0.04)',
-                  color: value === opt ? '#d5d0c7' : 'rgba(255,255,255,0.5)',
+                  border: `1px solid ${value === opt ? 'var(--cf-accent)' : 'rgba(255,255,255,0.12)'}`,
+                  background: value === opt ? 'var(--cf-accent-soft)' : 'rgba(255,255,255,0.04)',
+                  color: value === opt ? 'var(--cf-accent)' : 'rgba(255,255,255,0.5)',
                   fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
                 }}>{opt}</button>
             ))}
@@ -873,7 +875,8 @@ function SignaturePad({ onCapture, label = 'Client signature' }) {
     const { x, y } = getPos(e);
     const ctx = canvasRef.current.getContext('2d');
     ctx.lineTo(x, y);
-    ctx.strokeStyle = '#d5d0c7';
+    // The signature is drawn in the studio's highlight colour (canvas can't read CSS variables).
+    ctx.strokeStyle = getComputedStyle(canvasRef.current).getPropertyValue('--cf-accent').trim() || '#d5d0c7';
     ctx.lineWidth = 2;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
@@ -932,8 +935,8 @@ function ArtistChoice({ artists, value, onChange }) {
           return (
             <label key={a.artistId} className="walkin-artist-card" style={{
               position: 'relative', display: 'flex', alignItems: 'center', gap: '0.6rem', minHeight: 52, padding: '0.55rem 0.7rem', borderRadius: 10, cursor: 'pointer',
-              background: on ? 'rgba(213,208,199,0.12)' : 'rgba(255,255,255,0.05)',
-              border: `1px solid ${on ? '#d5d0c7' : 'rgba(255,255,255,0.1)'}`,
+              background: on ? 'var(--cf-accent-soft)' : 'rgba(255,255,255,0.05)',
+              border: `1px solid ${on ? 'var(--cf-accent)' : 'rgba(255,255,255,0.1)'}`,
               WebkitTapHighlightColor: 'transparent',
             }}>
               <input type="radio" name="walkin-artist" value={a.artistId} checked={on} required onChange={() => onChange(a.artistId)}
@@ -945,7 +948,7 @@ function ArtistChoice({ artists, value, onChange }) {
                 <span style={{ fontSize: '0.9rem', fontWeight: 600, color: '#fff', overflowWrap: 'anywhere' }}>{a.name}</span>
                 {a.studioType === 'guest' && <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Guest artist</span>}
               </span>
-              <span aria-hidden="true" style={{ width: 18, height: 18, borderRadius: '50%', flexShrink: 0, border: `2px solid ${on ? '#d5d0c7' : 'rgba(255,255,255,0.3)'}`, background: on ? '#d5d0c7' : 'transparent', boxShadow: on ? 'inset 0 0 0 3px #1a1a1a' : 'none' }} />
+              <span aria-hidden="true" style={{ width: 18, height: 18, borderRadius: '50%', flexShrink: 0, border: `2px solid ${on ? 'var(--cf-accent)' : 'rgba(255,255,255,0.3)'}`, background: on ? 'var(--cf-accent)' : 'transparent', boxShadow: on ? 'inset 0 0 0 3px #1a1a1a' : 'none' }} />
             </label>
           );
         })}
@@ -973,10 +976,12 @@ function Section({ title, children, first = false }) {
 }
 
 export default function BookingIntakePage({ mode = 'booking' }) {
+  // The studio's form colours, once its details load.
+  const [style, setStyle] = useState(null);
   return (
-    <div style={s.page}>
+    <div style={{ ...s.page, ...formTheme(style, { card: 'rgba(255,255,255,0.03)', page: '#0e0e0e', accent: '#d5d0c7' }) }}>
       <Suspense fallback={<p style={s.msg}>Loading…</p>}>
-        <IntakeInner mode={mode} />
+        <IntakeInner mode={mode} onStyle={setStyle} />
       </Suspense>
     </div>
   );
@@ -985,7 +990,7 @@ export default function BookingIntakePage({ mode = 'booking' }) {
 const s = {
   page: {
     minHeight: '100vh',
-    background: '#0e0e0e',
+    background: 'var(--cf-page)',
     display: 'flex',
     alignItems: 'flex-start',
     justifyContent: 'center',
@@ -995,7 +1000,7 @@ const s = {
   card: {
     width: '100%',
     maxWidth: 480,
-    background: 'rgba(255,255,255,0.03)',
+    background: 'var(--cf-card)',
     border: '1px solid rgba(255,255,255,0.08)',
     borderRadius: 16,
     padding: '2rem',
@@ -1091,9 +1096,9 @@ const s = {
     fontFamily: 'inherit',
   },
   placementChipActive: {
-    background: 'rgba(213,208,199,0.12)',
-    border: '1px solid rgba(213,208,199,0.35)',
-    color: '#d5d0c7',
+    background: 'var(--cf-accent-soft)',
+    border: '1px solid var(--cf-accent-line)',
+    color: 'var(--cf-accent)',
   },
   placementChipDisabled: {
     opacity: 0.3,
@@ -1115,15 +1120,15 @@ const s = {
   consentCheck: { display: 'flex', alignItems: 'flex-start', gap: '0.6rem', fontSize: '0.8rem', color: 'var(--text-dim)', cursor: 'pointer' },
   formTypeBadge: { fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', padding: '0.15rem 0.5rem', borderRadius: 4 },
   formTypeBadgeColors: {
-    consent: { background: 'rgba(213,208,199,0.1)', color: '#d5d0c7' },
+    consent: { background: 'var(--cf-accent-soft)', color: 'var(--cf-accent)' },
     waiver:  { background: 'rgba(232,111,111,0.12)', color: 'var(--color-danger)' },
     health:  { background: 'rgba(76,201,138,0.12)', color: 'var(--color-success)' },
   },
   guardianBox: {
-    background: 'rgba(213,208,199,0.04)', border: '1px solid rgba(213,208,199,0.12)',
+    background: 'var(--cf-accent-soft)', border: '1px solid var(--cf-accent-line)',
     borderRadius: 10, padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.65rem',
   },
-  guardianTitle: { fontSize: '0.8rem', fontWeight: 700, color: '#d5d0c7', margin: 0 },
+  guardianTitle: { fontSize: '0.8rem', fontWeight: 700, color: 'var(--cf-accent)', margin: 0 },
   switchLink: {
     background: 'none', border: 'none',
     color: 'var(--text-muted)',

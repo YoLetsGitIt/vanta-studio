@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { getSupabase } from '@/lib/supabase';
 import { getStudioPublic, getStudioConsentTemplates } from '@/lib/api';
+import { formTheme } from '@/lib/formTheme';
 import DateOfBirthInput from '@/components/ui/DateOfBirthInput';
 import ClientAccountActions from '@/components/ClientAccountActions';
 import ClientAuthGate from '@/components/ClientAuthGate';
@@ -117,7 +118,7 @@ function ConsentForm({ onStyle }) {
     if (!studioId) { setLoadErr('This consent link is missing its studio.'); return; }
     Promise.all([getStudioPublic(studioId), getStudioConsentTemplates(studioId, true)])
       .then(([studio, tpl]) => {
-        onStyle?.(studio.consent_style ?? null);
+        onStyle?.(studio.form_style ?? studio.consent_style ?? null);
         setInfo({ studio_id: studioId, studio_name: studio.name, logo_url: studio.logo_url ?? '', templates: tpl.templates ?? [] });
       })
       .catch(() => setLoadErr('This consent link is invalid.'));
@@ -580,30 +581,9 @@ export default function ConsentPage() {
   );
 }
 
-// The studio's consent form colours (Settings → Consent form) as CSS variables: the
-// card background, a slightly darker page behind it, and the highlight for buttons,
-// ticks and chosen answers (with readable text on it).
-const DEFAULT_CARD = '#1a2026';
-const DEFAULT_ACCENT = '#f5ecd9';
-function rgb(hex) {
-  const m = /^#?([0-9a-f]{6})$/i.exec(hex || '');
-  if (!m) return null;
-  const n = parseInt(m[1], 16);
-  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
-}
+// The studio's form colours, with the consent page's own look as the default.
 function consentTheme(style) {
-  const card = rgb(style?.bg_color) ? style.bg_color : DEFAULT_CARD;
-  const accent = rgb(style?.accent_color) ? style.accent_color : DEFAULT_ACCENT;
-  const [r, g, b] = rgb(card);
-  const [ar, ag, ab] = rgb(accent);
-  const light = (0.299 * ar + 0.587 * ag + 0.114 * ab) / 255 > 0.6;
-  return {
-    '--cf-card': card,
-    '--cf-page': `rgb(${Math.round(r * 0.72)}, ${Math.round(g * 0.72)}, ${Math.round(b * 0.72)})`,
-    '--cf-accent': accent,
-    '--cf-accent-soft': `rgba(${ar}, ${ag}, ${ab}, 0.12)`,
-    '--cf-accent-text': light ? '#11151b' : '#ffffff',
-  };
+  return formTheme(style, { card: '#1a2026', page: '#11151b', accent: '#f5ecd9' });
 }
 
 const s = {

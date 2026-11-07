@@ -3,6 +3,7 @@
 import Dialog from '@/components/ui/Dialog';
 import Button from '@/components/ui/Button';
 import { WidgetPreview, ConsentFormPreview, CONSENT_DEFAULT_BG, CONSENT_DEFAULT_ACCENT } from '@/components/forms/FormPreviews';
+import { isLightHex as isLightColorHex } from '@/lib/formTheme';
 import StudioLogoUpload from '@/components/StudioLogoUpload';
 // import SmartSchedulingSettings from '@/components/SmartSchedulingSettings'; // smart scheduling temporarily hidden
 import SMSSettings from '@/components/SMSSettings';
@@ -16,7 +17,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import {
   getMyStudioAccount, updateStudioProfile,
   getStudioHours, updateStudioHours,
-  getStations, addStation, removeStation, renameStation, setStationLastDay, getConsentStyle, updateConsentStyle,
+  getStations, addStation, removeStation, renameStation, setStationLastDay, updateFormStyle,
   setStationUnavailability, clearStationUnavailability,
   listConsentTemplates, createConsentTemplate, updateConsentTemplate,
   getStripeStatus, startStripeOnboarding, disconnectStripe,
@@ -261,31 +262,23 @@ export default function SettingsPage() {
   const [payForfeitedDeposits, setPayForfeitedDeposits] = useState(false);
   // Artist's share of a forfeited deposit, as typed; '' = their usual commission share.
   const [forfeitPct, setForfeitPct] = useState('');
-  // The consent form's own colours; saved a moment after the last change.
-  const [consentBg, setConsentBg] = useState(CONSENT_DEFAULT_BG);
-  const [consentAccent, setConsentAccent] = useState(CONSENT_DEFAULT_ACCENT);
-  const [consentStyleState, setConsentStyleState] = useState('idle'); // idle | saving | saved | error
-  const consentStyleTouched = useRef(false);
+  // The studio's form colours (booking form + website widget, walk-in form, consent
+  // form), edited in Studio → Logo and colours and saved a moment after the last change.
+  const [formStyleState, setFormStyleState] = useState('idle'); // idle | saving | saved | error
+  const formStyleTouched = useRef(false);
   useEffect(() => {
-    getConsentStyle().then(st => {
-      if (st?.bg_color) setConsentBg(st.bg_color);
-      if (st?.accent_color) setConsentAccent(st.accent_color);
-    }).catch(() => {});
-  }, []);
-  useEffect(() => {
-    if (!consentStyleTouched.current) return undefined;
+    if (!formStyleTouched.current) return undefined;
     const valid = v => /^#[0-9a-f]{6}$/i.test(v);
-    if (!valid(consentBg) || !valid(consentAccent)) return undefined;
-    setConsentStyleState('saving');
+    if (!valid(widgetBgColor) || !valid(widgetAccentColor)) return undefined;
+    setFormStyleState('saving');
     const timer = setTimeout(() => {
-      updateConsentStyle({
-        bg_color: consentBg.toLowerCase() === CONSENT_DEFAULT_BG ? null : consentBg,
-        accent_color: consentAccent.toLowerCase() === CONSENT_DEFAULT_ACCENT ? null : consentAccent,
-      }).then(() => setConsentStyleState('saved')).catch(() => setConsentStyleState('error'));
+      updateFormStyle({ bg_color: widgetBgColor, accent_color: widgetAccentColor })
+        .then(() => setFormStyleState('saved')).catch(() => setFormStyleState('error'));
     }, 600);
     return () => clearTimeout(timer);
-  }, [consentBg, consentAccent]);
-  const changeConsentColour = setter => value => { consentStyleTouched.current = true; setter(value); };
+  }, [widgetBgColor, widgetAccentColor]);
+  const changeFormColour = setter => value => { formStyleTouched.current = true; setter(value); };
+  const validHex = v => /^#[0-9a-f]{6}$/i.test(v);
   const [sendReminder7d, setSendReminder7d] = useState(true);
   const [sendReminder3d, setSendReminder3d] = useState(false);
   const [sendReminder24h, setSendReminder24h] = useState(true);
@@ -489,7 +482,7 @@ export default function SettingsPage() {
       const pc = parseFloat(personalCut);
       const fp = forfeitPct.trim() === '' ? null : parseFloat(forfeitPct);
       if (fp != null && !(fp >= 0 && fp <= 100)) { setProfileError('The artist’s share of forfeited deposits must be between 0 and 100%.'); setSaving(false); return; }
-      await updateStudioProfile(name.trim(), address.trim(), widgetBgColor, widgetAccentColor, isNaN(wc) ? 0 : wc, isNaN(pc) ? 0 : pc, aftercareInstructions, timezone, addressLat, addressLng, paymentRecordingReq, undefined, widgetConsentTemplateId || null, sendReminder7d, sendReminder24h, payForfeitedDeposits, schedulingMode, piercingAftercareInstructions, sendReminder3d, fp);
+      await updateStudioProfile(name.trim(), address.trim(), undefined, undefined, isNaN(wc) ? 0 : wc, isNaN(pc) ? 0 : pc, aftercareInstructions, timezone, addressLat, addressLng, paymentRecordingReq, undefined, widgetConsentTemplateId || null, sendReminder7d, sendReminder24h, payForfeitedDeposits, schedulingMode, piercingAftercareInstructions, sendReminder3d, fp);
       invalidate('studio-account');
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
@@ -996,10 +989,35 @@ export default function SettingsPage() {
           </form>
         </section>
 
-        <section className="settings-span-5" style={s.card}>
-          <h2 style={s.sectionTitle}>Studio logo</h2>
-          <p style={s.sectionDesc}>Shown at the top of your booking and consent forms.</p>
+        <section className="settings-span-5" style={s.card} aria-labelledby="branding-title">
+          <h2 id="branding-title" style={s.sectionTitle}>Logo and colours</h2>
+          <p style={s.sectionDesc}>Used on your booking form and website widget, walk-in form and consent form.</p>
           <StudioLogoUpload logoUrl={logoUrl} studioName={name} onChange={setLogoUrl} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '1rem' }}>
+              <h3 style={{ ...s.label, margin: 0 }}>Form colours</h3>
+              <span role="status" style={{ fontSize: '0.8rem', color: formStyleState === 'error' ? 'var(--color-danger)' : 'var(--text-muted)' }}>
+                {formStyleState === 'saving' ? 'Saving…' : formStyleState === 'saved' ? 'Saved' : formStyleState === 'error' ? 'Couldn’t save' : 'Saves as you go'}
+              </span>
+            </div>
+            <div className="studio-form-row" style={s.colorRow}>
+              {[['Background', widgetBgColor, setWidgetBgColor], ['Highlight', widgetAccentColor, setWidgetAccentColor]].map(([label, value, setter]) => (
+                <div key={label} style={s.colorField}>
+                  <label style={s.label}>{label}</label>
+                  <div style={s.colorInputWrap}>
+                    <input aria-label={`Form ${label.toLowerCase()} colour`} type="color" value={validHex(value) ? value : '#000000'} onChange={e => changeFormColour(setter)(e.target.value)} style={s.colorSwatch} />
+                    <input aria-label={`Form ${label.toLowerCase()} hex colour`} style={{ ...s.input, fontFamily: 'ui-monospace,monospace', fontSize: '0.82rem' }} value={value} maxLength={7} onChange={e => changeFormColour(setter)(e.target.value)} />
+                  </div>
+                </div>
+              ))}
+            </div>
+            {/* A small sample of how the forms look in these colours. */}
+            <div aria-hidden="true" style={{ ...s.colourSample, background: validHex(widgetBgColor) ? widgetBgColor : '#111111' }}>
+              <span style={{ fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: validHex(widgetAccentColor) ? widgetAccentColor : '#d5d0c7' }}>{name || 'Your studio'}</span>
+              <span style={{ fontSize: '0.95rem', fontWeight: 700, color: '#fff' }}>Book an appointment</span>
+              <span style={{ ...s.colourSampleButton, background: validHex(widgetAccentColor) ? widgetAccentColor : '#d5d0c7', color: isLightColorHex(validHex(widgetAccentColor) ? widgetAccentColor : '#d5d0c7') ? '#11151b' : '#fff' }}>Request booking</span>
+            </div>
+          </div>
         </section>
 
         <section className="settings-span-7" style={s.card}>
@@ -1288,7 +1306,51 @@ export default function SettingsPage() {
 
 
 
-        <div className="settings-span-6 settings-cell"><BookingManagementSettings styles={s} availabilityRequired={!!(formFields?.availability_windows?.enabled && formFields?.availability_windows?.required)} /></div>
+        <section className="settings-span-12" style={s.card} aria-labelledby="booking-link-title">
+          <h2 id="booking-link-title" style={s.sectionTitle}>{t('booking_link')}</h2>
+          <p style={s.sectionDesc}>Share this link or QR code so clients can send you booking requests.</p>
+          <div style={s.linkBlock}>
+            <DownloadableQR value={walkInUrl} id="booking-qr" filename="booking-qr" displaySize={84} hideButton />
+            <div style={s.linkMain}>
+              <span style={s.linkUrl}>{walkInUrl.replace(/^https?:\/\//, '')}</span>
+              <div style={s.linkActions}>
+                <Button size="sm" onClick={copyLink}>{copied ? t('copied') : t('copy_link')}</Button>
+                <Button size="sm" variant="secondary" onClick={() => downloadQR('booking-qr', 'booking-qr')}>Download QR</Button>
+                {bookingSlug && !editingSlug && (
+                  <Button size="sm" variant="ghost" onClick={() => { setSlugDraft(bookingSlug); setSlugCheck(null); setSlugError(''); setEditingSlug(true); }}>Change link</Button>
+                )}
+              </div>
+            </div>
+          </div>
+          {bookingSlug && editingSlug && (
+            <form onSubmit={saveBookingSlug} style={s.slugForm}>
+              <label htmlFor="booking-slug" style={s.label}>New link</label>
+              <div className="studio-slug-field" style={s.slugField}>
+                <span aria-hidden="true" style={s.slugPrefix}>vanta.tattoo/b/</span>
+                <input id="booking-slug" value={slugDraft} autoFocus
+                  onChange={e => setSlugDraft(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+                  onKeyDown={e => { if (e.key === 'Escape') setEditingSlug(false); }}
+                  maxLength={40} autoCapitalize="none" autoCorrect="off" spellCheck={false} style={s.slugInput} />
+              </div>
+              <div aria-live="polite" style={{ minHeight: '1.15rem' }}>
+                {slugError ? <p role="alert" style={{ ...s.slugNote, color: 'var(--color-danger)' }}>{slugError}</p>
+                  : slugCheck?.state === 'short' ? <p style={s.slugNote}>Use at least 3 letters or numbers.</p>
+                  : slugCheck?.state === 'checking' ? <p style={s.slugNote}>Checking…</p>
+                  : slugCheck?.state === 'error' ? <p style={{ ...s.slugNote, color: 'var(--color-danger)' }}>Couldn’t check right now. Try again.</p>
+                  : slugCheck?.state === 'available' ? <p style={{ ...s.slugNote, color: 'var(--color-success)' }}>✓ Available</p>
+                  : slugCheck?.state === 'taken' ? <p style={{ ...s.slugNote, color: 'var(--color-danger)' }}>{slugCheck.message === 'that link is already taken' ? 'Another studio already uses this link. Try a different name.' : `${slugCheck.message.charAt(0).toUpperCase()}${slugCheck.message.slice(1)}.`}</p>
+                  : null}
+              </div>
+              <div style={s.linkActions}>
+                <Button size="sm" type="submit" loading={slugSaving} loadingLabel="Saving…" disabled={slugDraft === bookingSlug || slugCheck?.state !== 'available'}>Save link</Button>
+                <Button size="sm" variant="ghost" onClick={() => setEditingSlug(false)}>Cancel</Button>
+              </div>
+              <p style={{ ...s.slugNote, color: 'var(--text-ghost)' }}>Your old link and printed QR codes will stop working.</p>
+            </form>
+          )}
+        </section>
+
+        <div className="settings-span-12 settings-cell"><BookingManagementSettings styles={s} availabilityRequired={!!(formFields?.availability_windows?.enabled && formFields?.availability_windows?.required)} /></div>
 
         <section className="settings-span-12" style={s.card} aria-labelledby="booking-form-title">
           <h2 id="booking-form-title" style={s.sectionTitle}>Booking form</h2>
@@ -1390,40 +1452,7 @@ export default function SettingsPage() {
                 )}
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>
-                <div>
-                  <h3 style={{ ...s.label, margin: 0 }}>Website widget colours</h3>
-                  <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '0.25rem 0 0' }}>Match the widget to your website. The preview updates as you go.</p>
-                </div>
-                <div className="studio-form-row" style={s.colorRow}>
-                  <div style={s.colorField}>
-                    <label style={s.label}>Background</label>
-                    <div style={s.colorInputWrap}>
-                      <input aria-label="Widget background colour" type="color" value={widgetBgColor} onChange={e => setWidgetBgColor(e.target.value)} style={s.colorSwatch} />
-                      <input
-                        aria-label="Widget background hex colour"
-                        style={{ ...s.input, fontFamily: 'ui-monospace,monospace', fontSize: '0.82rem' }}
-                        value={widgetBgColor}
-                        onChange={e => setWidgetBgColor(e.target.value)}
-                        maxLength={7}
-                      />
-                    </div>
-                  </div>
-                  <div style={s.colorField}>
-                    <label style={s.label}>Highlight</label>
-                    <div style={s.colorInputWrap}>
-                      <input aria-label="Widget highlight colour" type="color" value={widgetAccentColor} onChange={e => setWidgetAccentColor(e.target.value)} style={s.colorSwatch} />
-                      <input
-                        aria-label="Widget highlight hex colour"
-                        style={{ ...s.input, fontFamily: 'ui-monospace,monospace', fontSize: '0.82rem' }}
-                        value={widgetAccentColor}
-                        onChange={e => setWidgetAccentColor(e.target.value)}
-                        maxLength={7}
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <p style={s.colourNote}>Colours and logo are set once for all your forms in <a href="/dashboard/settings?tab=studio" style={s.colourNoteLink}>Studio → Logo and colours</a>.</p>
 
               <button onClick={saveProfile} style={s.saveBtn} disabled={saving}>
                 {saving ? t('saving') : saved ? t('saved') : t('save')}
@@ -1442,49 +1471,6 @@ export default function SettingsPage() {
           </div>
         </section>
 
-        <section className="settings-span-6" style={s.card} aria-labelledby="booking-link-title">
-          <h2 id="booking-link-title" style={s.sectionTitle}>{t('booking_link')}</h2>
-          <p style={s.sectionDesc}>Share this link or QR code so clients can send you booking requests.</p>
-          <div style={s.linkBlock}>
-            <DownloadableQR value={walkInUrl} id="booking-qr" filename="booking-qr" displaySize={84} hideButton />
-            <div style={s.linkMain}>
-              <span style={s.linkUrl}>{walkInUrl.replace(/^https?:\/\//, '')}</span>
-              <div style={s.linkActions}>
-                <Button size="sm" onClick={copyLink}>{copied ? t('copied') : t('copy_link')}</Button>
-                <Button size="sm" variant="secondary" onClick={() => downloadQR('booking-qr', 'booking-qr')}>Download QR</Button>
-                {bookingSlug && !editingSlug && (
-                  <Button size="sm" variant="ghost" onClick={() => { setSlugDraft(bookingSlug); setSlugCheck(null); setSlugError(''); setEditingSlug(true); }}>Change link</Button>
-                )}
-              </div>
-            </div>
-          </div>
-          {bookingSlug && editingSlug && (
-            <form onSubmit={saveBookingSlug} style={s.slugForm}>
-              <label htmlFor="booking-slug" style={s.label}>New link</label>
-              <div className="studio-slug-field" style={s.slugField}>
-                <span aria-hidden="true" style={s.slugPrefix}>vanta.tattoo/b/</span>
-                <input id="booking-slug" value={slugDraft} autoFocus
-                  onChange={e => setSlugDraft(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
-                  onKeyDown={e => { if (e.key === 'Escape') setEditingSlug(false); }}
-                  maxLength={40} autoCapitalize="none" autoCorrect="off" spellCheck={false} style={s.slugInput} />
-              </div>
-              <div aria-live="polite" style={{ minHeight: '1.15rem' }}>
-                {slugError ? <p role="alert" style={{ ...s.slugNote, color: 'var(--color-danger)' }}>{slugError}</p>
-                  : slugCheck?.state === 'short' ? <p style={s.slugNote}>Use at least 3 letters or numbers.</p>
-                  : slugCheck?.state === 'checking' ? <p style={s.slugNote}>Checking…</p>
-                  : slugCheck?.state === 'error' ? <p style={{ ...s.slugNote, color: 'var(--color-danger)' }}>Couldn’t check right now. Try again.</p>
-                  : slugCheck?.state === 'available' ? <p style={{ ...s.slugNote, color: 'var(--color-success)' }}>✓ Available</p>
-                  : slugCheck?.state === 'taken' ? <p style={{ ...s.slugNote, color: 'var(--color-danger)' }}>{slugCheck.message === 'that link is already taken' ? 'Another studio already uses this link. Try a different name.' : `${slugCheck.message.charAt(0).toUpperCase()}${slugCheck.message.slice(1)}.`}</p>
-                  : null}
-              </div>
-              <div style={s.linkActions}>
-                <Button size="sm" type="submit" loading={slugSaving} loadingLabel="Saving…" disabled={slugDraft === bookingSlug || slugCheck?.state !== 'available'}>Save link</Button>
-                <Button size="sm" variant="ghost" onClick={() => setEditingSlug(false)}>Cancel</Button>
-              </div>
-              <p style={{ ...s.slugNote, color: 'var(--text-ghost)' }}>Your old link and printed QR codes will stop working.</p>
-            </form>
-          )}
-        </section>
 
 
         {/* Smart scheduling — temporarily hidden
@@ -1501,7 +1487,7 @@ export default function SettingsPage() {
         </>}
 
         {tab === 'walkins' && <>
-        <div className="settings-span-12 settings-cell"><WalkInFormSettings styles={s} studioName={name} logoUrl={logoUrl} consentTemplates={consentTemplates} url={bookingSlug ? `${SHORT_LINK_BASE}/w/${bookingSlug}` : studioId ? `${typeof window === 'undefined' ? '' : window.location.origin}/walkin?s=${studioId}` : ''} /></div>
+        <div className="settings-span-12 settings-cell"><WalkInFormSettings styles={s} bg={validHex(widgetBgColor) ? widgetBgColor : undefined} accent={validHex(widgetAccentColor) ? widgetAccentColor : undefined} studioName={name} logoUrl={logoUrl} consentTemplates={consentTemplates} url={bookingSlug ? `${SHORT_LINK_BASE}/w/${bookingSlug}` : studioId ? `${typeof window === 'undefined' ? '' : window.location.origin}/walkin?s=${studioId}` : ''} /></div>
 
         </>}
 
@@ -1592,34 +1578,7 @@ export default function SettingsPage() {
                     ))}
                   </div>
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '1rem' }}>
-                      <div>
-                        <h3 style={{ ...s.label, margin: 0 }}>Form colours</h3>
-                        <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '0.25rem 0 0' }}>Match the consent form to your studio. Saves as you go.</p>
-                      </div>
-                      <span role="status" style={{ fontSize: '0.8rem', color: consentStyleState === 'error' ? 'var(--color-danger)' : 'var(--text-muted)', whiteSpace: 'nowrap' }}>
-                        {consentStyleState === 'saving' ? 'Saving…' : consentStyleState === 'saved' ? 'Saved' : consentStyleState === 'error' ? 'Couldn’t save' : ''}
-                      </span>
-                    </div>
-                    <div className="studio-form-row" style={s.colorRow}>
-                      {[['Background', consentBg, setConsentBg], ['Highlight', consentAccent, setConsentAccent]].map(([label, value, setter]) => (
-                        <div key={label} style={s.colorField}>
-                          <label style={s.label}>{label}</label>
-                          <div style={s.colorInputWrap}>
-                            <input aria-label={`Consent form ${label.toLowerCase()} colour`} type="color" value={/^#[0-9a-f]{6}$/i.test(value) ? value : '#000000'} onChange={e => changeConsentColour(setter)(e.target.value)} style={s.colorSwatch} />
-                            <input aria-label={`Consent form ${label.toLowerCase()} hex colour`} style={{ ...s.input, fontFamily: 'ui-monospace,monospace', fontSize: '0.82rem' }} value={value} maxLength={7} onChange={e => changeConsentColour(setter)(e.target.value)} />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                    {(consentBg.toLowerCase() !== CONSENT_DEFAULT_BG || consentAccent.toLowerCase() !== CONSENT_DEFAULT_ACCENT) && (
-                      <button type="button" className="studio-link-button" style={{ alignSelf: 'flex-start', fontSize: '0.82rem' }}
-                        onClick={() => { consentStyleTouched.current = true; setConsentBg(CONSENT_DEFAULT_BG); setConsentAccent(CONSENT_DEFAULT_ACCENT); }}>
-                        Use the default colours
-                      </button>
-                    )}
-                  </div>
+                  <p style={{ ...s.colourNote, borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>Colours and logo are set once for all your forms in <a href="/dashboard/settings?tab=studio" style={s.colourNoteLink}>Studio → Logo and colours</a>.</p>
                 </div>
 
                 {/* Right — preview */}
@@ -1629,8 +1588,8 @@ export default function SettingsPage() {
                     fields={templateFields}
                     requiresSig={templateRequiresSig}
                     requiresGuardian={templateRequiresGuardian}
-                    bg={/^#[0-9a-f]{6}$/i.test(consentBg) ? consentBg : CONSENT_DEFAULT_BG}
-                    accent={/^#[0-9a-f]{6}$/i.test(consentAccent) ? consentAccent : CONSENT_DEFAULT_ACCENT}
+                    bg={validHex(widgetBgColor) ? widgetBgColor : CONSENT_DEFAULT_BG}
+                    accent={validHex(widgetAccentColor) ? widgetAccentColor : CONSENT_DEFAULT_ACCENT}
                     studioName={name}
                   />
                 </div>
@@ -2013,6 +1972,10 @@ const s = {
   copyBtn: { alignSelf: 'flex-start', background: 'var(--accent-tint)', border: '1px solid var(--accent-tint-border)', borderRadius: 6, padding: '0.35rem 0.85rem', fontSize: '0.85rem', fontWeight: 600, color: 'var(--accent)', cursor: 'pointer' },
   qrWrap: { flexShrink: 0, padding: '0.5rem', background: 'var(--bg-card)', borderRadius: 8 },
   // Widget appearance
+  colourNote: { margin: 0, fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.5 },
+  colourNoteLink: { color: 'var(--accent)', fontWeight: 600, textDecoration: 'underline', textUnderlineOffset: 2 },
+  colourSample: { display: 'flex', flexDirection: 'column', gap: '0.35rem', padding: '1rem 1.1rem', borderRadius: 12, border: '1px solid var(--border-faint)', transition: 'background-color 0.2s ease' },
+  colourSampleButton: { alignSelf: 'flex-start', marginTop: '0.35rem', padding: '0.45rem 0.9rem', borderRadius: 8, fontSize: '0.8rem', fontWeight: 700, transition: 'background-color 0.2s ease, color 0.2s ease' },
   colorRow: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' },
   colorField: { display: 'flex', flexDirection: 'column', gap: '0.4rem' },
   colorInputWrap: { display: 'flex', alignItems: 'center', gap: '0.5rem' },

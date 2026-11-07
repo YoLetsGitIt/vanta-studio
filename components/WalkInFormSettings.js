@@ -18,7 +18,7 @@ const FIELDS = [
   { key: 'notes', label: 'Additional notes' },
 ];
 
-export default function WalkInFormSettings({ styles: s, url, studioName, logoUrl, consentTemplates }) {
+export default function WalkInFormSettings({ styles: s, url, studioName, logoUrl, consentTemplates, bg = '#111111', accent = '#d5d0c7' }) {
   const [fields, setFields] = useState(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -90,10 +90,10 @@ export default function WalkInFormSettings({ styles: s, url, studioName, logoUrl
           );
         })}
         {error && <p role="alert" style={{ margin: 0, fontSize: '0.85rem', color: 'var(--color-danger)' }}>{error}</p>}
-        {fields !== null && !error && <p style={{ margin: '0.35rem 0 0', fontSize: '0.8rem', color: 'var(--text-ghost)' }}>Changes save straight away.</p>}
+        {fields !== null && !error && <p style={{ margin: '0.35rem 0 0', fontSize: '0.8rem', color: 'var(--text-ghost)' }}>Changes save straight away. Colours and logo are set in <a href="/dashboard/settings?tab=studio" style={{ color: 'var(--accent)', fontWeight: 600 }}>Studio → Logo and colours</a>.</p>}
       </div>
-      {/* The walk-in page uses Studio's own colours, not the website widget's. */}
-      <WalkInPreview bg="#111111" accent="#d5d0c7" studioName={studioName || 'Your Studio'} logoUrl={logoUrl} fields={fields} consentTemplates={consentTemplates} />
+      {/* The studio's form colours (Studio → Logo and colours). */}
+      <WalkInPreview bg={bg} accent={accent} studioName={studioName || 'Your Studio'} logoUrl={logoUrl} fields={fields} consentTemplates={consentTemplates} />
       </div>
     </section>
   );
