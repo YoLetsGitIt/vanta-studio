@@ -1,9 +1,9 @@
 .hint { margin: 0 0 12px; color: var(--text-muted); font-size: 0.85rem; }
-.options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .option { padding: 5px; min-width: 0; border-radius: 10px; border: 2px solid var(--border-strong); background: var(--bg-card); color: var(--text); text-align: left; }
 .option[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-tint); }
 .option:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 3px; }
-.preview { display: flex; gap: 7px; height: 66px; overflow: hidden; border-radius: 5px; padding: 9px; background: var(--bg-base); }
+.preview { position: relative; display: flex; gap: 7px; height: 66px; overflow: hidden; border-radius: 5px; padding: 9px; background: var(--bg-base); }
 .sidebar { width: 18%; border-radius: 2px; background: var(--bg-sidebar); border-right: 2px solid var(--accent); }
 .card { display: flex; flex: 1; flex-direction: column; gap: 5px; min-width: 0; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-card); padding: 7px; }
 .card i { height: 3px; width: 80%; background: var(--text-muted); border-radius: 2px; }

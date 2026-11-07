@@ -17,6 +17,7 @@ import { useHideHeaderOnScroll } from '@/lib/useHideHeaderOnScroll';
 import SidebarCalendar from '@/components/SidebarCalendar';
 import SidebarNeedsAction from '@/components/SidebarNeedsAction';
 import GlobalBookingPanel from '@/components/GlobalBookingPanel';
+import SpaceAccent from '@/components/SpaceAccent';
 
 const NAV = [
   { href: '/dashboard/schedule',     tKey: 'nav_schedule',  icon: GridCalIcon },
@@ -272,7 +273,8 @@ function DashboardShell({ children }) {
   return (
     <div ref={shellRef} className="studio-dashboard-shell" style={s.shell}>
       <header ref={headerRef} className="studio-mobile-header">
-        <Link href="/dashboard/schedule" aria-label="Vanta Studio home" style={s.logo}>
+        <Link href="/dashboard/schedule" aria-label="Vanta Studio home" style={s.logo} className="studio-brand">
+          <SpaceAccent />
           <span style={s.logoMark}>vanta</span><span style={s.logoSub}>studio</span>
         </Link>
         <button type="button" className="studio-button studio-button--sm" onClick={() => { setAppointmentType('walkin'); setAppointmentSlot(null); setAppointmentPanelOpen(true); }}>
@@ -283,7 +285,8 @@ function DashboardShell({ children }) {
       <div className="studio-dashboard-body" style={s.body}>
         <aside className="studio-dashboard-sidebar" style={s.sidebar}>
           <div className="studio-dashboard-sidebar-top" style={s.sidebarTop}>
-            <Link href="/dashboard/schedule" style={s.logo}>
+            <Link href="/dashboard/schedule" style={s.logo} className="studio-brand">
+              <SpaceAccent />
               <span style={s.logoMark}>vanta</span>
               <span style={s.logoSub}>studio</span>
             </Link>
