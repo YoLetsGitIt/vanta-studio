@@ -146,17 +146,18 @@ export default function FinancialPage() {
     const rows = [];
     for (let at = startAt; at <= last && rows.length < 400; at = new Date(at.getTime() + step)) {
       const p = source.get(at.toISOString().slice(0, 10));
-      // Each bar is the period's sales: the part paid upfront as deposits plus the
-      // part paid on the day.
+      // Each bar is the money that came in that day (or week): deposits on the day
+      // they were paid, and balances on the day the session was completed.
       const gross = p?.gross_sales ?? 0;
-      const fromDeposits = Math.min(p?.sales_from_deposits ?? 0, gross);
+      const deposits = p?.deposits_collected ?? 0;
+      const onTheDay = Math.max(gross - Math.min(p?.sales_from_deposits ?? 0, gross), 0);
       // A week's label is its first day inside the chosen range.
       const labelDate = at < first ? first : at;
       rows.push({
         week: labelDate.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', timeZone: 'UTC' }),
-        gross,
-        fromDeposits,
-        onTheDay: gross - fromDeposits,
+        total: deposits + onTheDay,
+        deposits,
+        onTheDay,
       });
     }
     return { rows, daily };
@@ -319,7 +320,7 @@ function FinancialContent({ s, weeklyChart, daily, startDate, endDate, isLight }
                 <span style={st.summaryHint}>{sessions ? `From ${sessions} completed ${sessions === 1 ? 'session' : 'sessions'}` : 'No completed sessions in this period'}</span>
                 {sessions > 0 && (
                   <dl style={st.summaryRows}>
-                    <div style={st.summaryRow}><dt style={st.summaryRowLabel}><span aria-hidden="true" style={{ ...st.summaryDot, background: 'var(--color-info)' }} />Paid upfront as deposits</dt><dd style={st.summaryRowValue}>{fmt(fromDeposits)}</dd></div>
+                    <div style={st.summaryRow}><dt style={{ ...st.summaryRowLabel, paddingLeft: 'calc(8px + 0.5rem)' }}>Paid upfront as deposits</dt><dd style={st.summaryRowValue}>{fmt(fromDeposits)}</dd></div>
                     <div style={st.summaryRow}><dt style={st.summaryRowLabel}><span aria-hidden="true" style={{ ...st.summaryDot, background: 'var(--color-success)' }} />Paid on the day</dt><dd style={st.summaryRowValue}>{fmt(atAppointments)}</dd></div>
                   </dl>
                 )}
@@ -327,10 +328,10 @@ function FinancialContent({ s, weeklyChart, daily, startDate, endDate, isLight }
               </div>
               <div className="studio-revenue-summary-divider" style={st.summaryDivider} aria-hidden="true" />
               <div style={st.summaryCol}>
-                <span style={st.summaryLabel}>{t('revenue_deposits')}</span>
+                <span style={{ ...st.summaryLabel, display: 'flex', alignItems: 'center', gap: '0.5rem' }}><span aria-hidden="true" style={{ ...st.summaryDot, background: 'var(--color-info)' }} />{t('revenue_deposits')}</span>
                 <span style={st.summaryValue}>{fmt(s?.deposits_collected)}</span>
                 <span style={st.summaryHint}>
-                  Every deposit clients paid in this period, for any booking. Most are for appointments still to come, so they’re not in Sales until the session is done.
+                  Every deposit clients paid in this period, on the day they paid it. Most are for appointments still to come, so they’re not in Sales until the session is done.
                 </span>
               </div>
             </div>
@@ -339,7 +340,7 @@ function FinancialContent({ s, weeklyChart, daily, startDate, endDate, isLight }
         <p style={st.comingSoon}>Refunds, discounts, taxes, gift cards and tips will appear here once they’re available.</p>
       </Section>
 
-      <Section title={daily ? 'Daily sales' : t('revenue_weekly_gross')}>
+      <Section title={daily ? 'Money received each day' : 'Money received each week'}>
         {weeklyChart.length > 0 ? (
           <div style={st.chartWrap}>
             <ResponsiveContainer width="100%" height={200}>
@@ -355,27 +356,27 @@ function FinancialContent({ s, weeklyChart, daily, startDate, endDate, isLight }
                     return (
                       <div style={{ background: tooltipBg, border: `1px solid ${tooltipBorder}`, borderRadius: 8, fontSize: 12, color: tooltipColor, padding: '0.5rem 0.65rem', minWidth: 170 }}>
                         <div style={{ color: tickColor, marginBottom: 4 }}>{daily ? label : `Week of ${label}`}</div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontWeight: 700 }}><span>Sales</span><span>{fmt(row.gross)}</span></div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span>Paid upfront</span><span>{fmt(row.fromDeposits)}</span></div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontWeight: 700 }}><span>Received</span><span>{fmt(row.total)}</span></div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span>Deposits</span><span>{fmt(row.deposits)}</span></div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span>Paid on the day</span><span>{fmt(row.onTheDay)}</span></div>
                       </div>
                     );
                   }}
                 />
-                <Bar dataKey="fromDeposits" stackId="sales" fill="var(--color-info)" name="Paid upfront" />
+                <Bar dataKey="deposits" stackId="sales" fill="var(--color-info)" name="Deposits" />
                 <Bar dataKey="onTheDay" stackId="sales" fill="var(--color-success)" radius={[4,4,0,0]} name="Paid on the day" />
               </BarChart>
             </ResponsiveContainer>
             <div style={st.legend}>
-              <LegendDot color="var(--color-info)" label="Paid upfront as deposits" />
+              <LegendDot color="var(--color-info)" label="Deposits received" />
               <LegendDot color="var(--color-success)" label="Paid on the day" />
             </div>
             <details style={{ marginTop: 16 }}>
               <summary style={{ cursor: 'pointer', minHeight: 44, lineHeight: '44px' }}>View chart data</summary>
               <table style={{ width: '100%', textAlign: 'left', fontSize: 14 }}>
-                <caption style={{ textAlign: 'left', padding: '8px 0' }}>{daily ? 'Daily sales' : 'Weekly sales'}</caption>
-                <thead><tr><th scope="col">{daily ? 'Day' : 'Week'}</th><th scope="col">Sales</th><th scope="col">Paid upfront</th><th scope="col">Paid on the day</th></tr></thead>
-                <tbody>{weeklyChart.map(row => <tr key={row.week}><th scope="row">{row.week}</th><td>{fmt(row.gross)}</td><td>{fmt(row.fromDeposits)}</td><td>{fmt(row.onTheDay)}</td></tr>)}</tbody>
+                <caption style={{ textAlign: 'left', padding: '8px 0' }}>{daily ? 'Money received each day' : 'Money received each week'}</caption>
+                <thead><tr><th scope="col">{daily ? 'Day' : 'Week'}</th><th scope="col">Received</th><th scope="col">Deposits</th><th scope="col">Paid on the day</th></tr></thead>
+                <tbody>{weeklyChart.map(row => <tr key={row.week}><th scope="row">{row.week}</th><td>{fmt(row.total)}</td><td>{fmt(row.deposits)}</td><td>{fmt(row.onTheDay)}</td></tr>)}</tbody>
               </table>
             </details>
           </div>
