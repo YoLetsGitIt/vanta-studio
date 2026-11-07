@@ -8,6 +8,8 @@ import { usePathname } from 'next/navigation';
 import { getDashboardAttention, getDepositStatus } from '@/lib/api';
 import { openBookingPanel, ATTENTION_CHANGED_EVENT } from '@/components/GlobalBookingPanel';
 import { normalizeBookingSource } from '@/lib/bookingType';
+import { useBookingManagement } from '@/lib/bookingManagement';
+import { hasArtist } from '@/lib/format';
 import styles from './SidebarNeedsAction.module.css';
 
 const INACTIVE = ['completed', 'cancelled', 'rejected', 'declined', 'timed_out', 'no_show'];
@@ -41,6 +43,7 @@ const bookingItem = (b, lines) => ({ id: b.id, title: b.requester_name ?? 'Clien
 // an outcome when the studio records payments.
 export default function SidebarNeedsAction({ paymentRecording, onNavigate }) {
   const pathname = usePathname();
+  const bookingManagement = useBookingManagement();
   const [data, setData] = useState(null);
   const [open, setOpen] = useState({});
 
@@ -62,11 +65,15 @@ export default function SidebarNeedsAction({ paymentRecording, onNavigate }) {
 
   if (!data) return null;
   const bookings = data.bookings ?? [];
+  // "Artists confirm": a request handed to an artist waits on them, not the studio.
+  const withArtist = b => bookingManagement === 'artist' && normalizeBookingSource(b.source) === 'studio' && hasArtist(b.artist_id);
+  // Waiting on the client to send their availability: nothing for the studio to do yet.
+  const awaitingClient = new Set(data.awaiting_availability ?? []);
   const now = Date.now();
   const claims = data.claims ?? {};
   const recordsOutcomes = paymentRecording && paymentRecording !== 'none' && paymentRecording !== 'artist_only';
   const groups = [
-    { key: 'pending', title: 'Pending requests', tone: 'warning', items: bookings.filter(b => b.status === 'pending').map(b => bookingItem(b, [when(b)])) },
+    { key: 'pending', title: 'Pending requests', tone: 'warning', items: bookings.filter(b => b.status === 'pending' && !withArtist(b) && !awaitingClient.has(b.id)).map(b => bookingItem(b, [when(b)])) },
     { key: 'confirm', title: 'To confirm', tone: 'info', items: bookings.filter(b => b.status === 'requires_confirmation').map(b => bookingItem(b, [when(b)])) },
     { key: 'check', title: 'Deposits to check', tone: 'info', items: bookings.filter(b => needsDeposit(b) && claims[b.id]).map(b => bookingItem(b, [`Says paid by ${claims[b.id].method === 'payid' ? 'PayID' : 'bank transfer'}${claims[b.id].recorded_at ? ` · ${shortDate(claims[b.id].recorded_at)}` : ''}`, `Appointment: ${shortDate(b.chosen_time)}`])) },
     { key: 'deposit', title: 'Unpaid deposits', tone: 'danger', items: bookings.filter(b => needsDeposit(b) && !claims[b.id]).map(b => bookingItem(b, [`Appointment: ${shortDate(b.chosen_time)}`])) },

@@ -1263,7 +1263,7 @@ export default function SettingsPage() {
 
 
 
-        <div className="settings-span-6 settings-cell"><BookingManagementSettings styles={s} /></div>
+        <div className="settings-span-6 settings-cell"><BookingManagementSettings styles={s} availabilityRequired={!!(formFields?.availability_windows?.enabled && formFields?.availability_windows?.required)} /></div>
 
         <section className="settings-span-12" style={s.card} aria-labelledby="booking-form-title">
           <h2 id="booking-form-title" style={s.sectionTitle}>Booking form</h2>

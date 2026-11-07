@@ -704,3 +704,7 @@ textarea {
   .studio-toast-timer { display: none; }
 }
 @keyframes toastFade { from { opacity: 0; } }
+
+/* A text button inside a sentence ("Resend"). */
+.studio-link-button { padding: 0; border: 0; background: none; font: inherit; font-weight: 600; color: var(--accent); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.studio-link-button:disabled { opacity: 0.6; cursor: default; }

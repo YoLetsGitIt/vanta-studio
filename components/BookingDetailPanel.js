@@ -4,10 +4,12 @@ import CancelDepositButton from '@/components/CancelDepositButton';
 import MarkDepositReceivedButton, { depositMethodLabel } from '@/components/MarkDepositReceivedButton';
 import BookTimeModal from '@/components/BookTimeModal';
 import OfferTimesModal from '@/components/OfferTimesModal';
+import AssignArtistModal from '@/components/AssignArtistModal';
+import SendQuoteModal from '@/components/SendQuoteModal';
 import { useBookingManagement } from '@/lib/bookingManagement';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { setBookingAppointmentType, getStations, getStudioArtists, getClientConsents, getNotes, addNote, deleteNote, getBookingConsentSubmissions, getClientConsentSubmissions, getStudioClients, getStudioClient, generateConsentLink, getStudioBookingPayment, getDepositReceipt, getDepositStatus, getOfferedTimes, listConsentTemplates } from '@/lib/api';
+import { setBookingAppointmentType, getStations, getStudioArtists, getClientConsents, getNotes, addNote, deleteNote, getBookingConsentSubmissions, getClientConsentSubmissions, getStudioClients, getStudioClient, generateConsentLink, getStudioBookingPayment, getDepositReceipt, getDepositStatus, getOfferedTimes, listConsentTemplates, requestAvailability } from '@/lib/api';
 import { useStationAvailability } from '@/lib/useStationAvailability';
 import { statusColors, statusLabel, capitalise as cap } from '@/lib/status';
 import { formatDob as fmtDob, hasArtist, ageFromDob } from '@/lib/format';
@@ -111,6 +113,9 @@ export default function BookingDetailPanel({
   const [stationStep,  setStationStep]  = useState(false);
   const [stationError, setStationError] = useState('');
   const [bookTimeOpen, setBookTimeOpen] = useState(false);
+  const [assignOpen, setAssignOpen] = useState(false);
+  const [quoteOpen, setQuoteOpen] = useState(false);
+  const [resending, setResending] = useState(false);
   const [offerOpen, setOfferOpen] = useState(false);
   const [offer, setOffer] = useState(null); // { booking, data } — times the studio offered the client
   const bookingManagement = useBookingManagement();
@@ -224,7 +229,13 @@ export default function BookingDetailPanel({
   const canAccept         = false; // Accept removed for pending/awaiting_payment — use Send Link flow
   const canComplete       = status === 'confirmed' && chosenDate && chosenDate <= today;
   const canReject         = status === 'pending' || status === 'awaiting_payment';
-  const canSendLink       = status === 'pending' || status === 'awaiting_payment';
+  // "Artists confirm" studios: the studio assigns a request to an artist, who sends the
+  // client times, a quote and the session length from the app. No "choose a time" link.
+  const isStudioRequest   = normalizeBookingSource(booking?.source ?? entry?.source) === 'studio';
+  const artistSendsTimes  = bookingManagement === 'artist' && isStudioRequest;
+  // Studio requests follow the studio's flow (send a quote / assign an artist, then times);
+  // the "choose a time" link is for other bookings.
+  const canSendLink       = (status === 'pending' || status === 'awaiting_payment') && !isStudioRequest;
   const canAcceptReject   = canAccept || canReject; // kept for layout gate
   const canConfirm        = status === 'requires_confirmation';
   const canReschedule     = status === 'confirmed' && chosenDate && chosenDate > today;
@@ -241,6 +252,13 @@ export default function BookingDetailPanel({
   // Also replaces an unanswered "choose a time" link (awaiting payment, no time yet).
   const canOfferTimes     = bookingManagement === 'studio' && Boolean(bookTimeArtists) && hasAvailabilityWindows
     && (status === 'pending' || (status === 'awaiting_payment' && !chosenTime));
+  const canAssignArtist   = artistSendsTimes && status === 'pending' && !hasArtist(artistId) && Boolean(bookTimeArtists);
+  const waitingOnArtist   = artistSendsTimes && status === 'pending' && hasArtist(artistId);
+  // No weekly availability yet: the client is (or will be) asked for it by email.
+  const availabilityRequest = booking?.availability_request ?? null;
+  const waitingOnAvailability = status === 'pending' && isStudioRequest && !hasAvailabilityWindows && Boolean(availabilityRequest?.requested_at) && !availabilityRequest?.received_at;
+  const canSendQuote      = bookingManagement === 'studio' && isStudioRequest && status === 'pending' && !hasAvailabilityWindows && Boolean(booking?.requester_email);
+  const clientFirst       = (booking?.requester_name ?? entry?.clientName ?? 'The client').split(' ')[0];
 
   const displayStatus = isNoShow ? 'no_show' : status;
   const sc = statusColors(displayStatus);
@@ -267,7 +285,7 @@ export default function BookingDetailPanel({
   useEffect(() => {
     // Offered times wait in Awaiting payment until the client picks one.
     const waiting = status === 'pending' || (status === 'awaiting_payment' && !chosenTime);
-    if (!bookingId || !waiting || bookingManagement !== 'studio') { setOffer(null); return; }
+    if (!bookingId || !waiting || !bookingManagement) { setOffer(null); return; }
     let live = true;
     getOfferedTimes(bookingId)
       .then(data => { if (live) setOffer({ booking: bookingId, data }); })
@@ -681,7 +699,7 @@ export default function BookingDetailPanel({
           )}
           {offeredTimes && (currentOffer?.email_error ? (
             <span role="alert" style={p.heroNote}>
-              The email to {currentOffer.email_to || 'the client'} didn’t send: {currentOffer.email_error}. Use Edit times to send it again.
+              The email to {currentOffer.email_to || 'the client'} didn’t send: {currentOffer.email_error}. {artistSendsTimes ? 'Ask the artist to send the times again.' : 'Use Edit times to send it again.'}
             </span>
           ) : currentOffer?.email_sent_at ? (() => {
             const delivery = OFFER_EMAIL_STATUS[currentOffer.email_status];
@@ -692,6 +710,18 @@ export default function BookingDetailPanel({
               <span style={p.hint}>Emailed to {currentOffer.email_to} · {sentAt}{delivery ? ` · ${delivery.label}` : ''}</span>
             );
           })() : null)}
+          {waitingOnAvailability ? (
+            <span role="status" style={p.hint}>
+              {bookingManagement === 'studio' ? 'Quote sent' : 'Asked for availability'} {new Date(availabilityRequest.requested_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}. Waiting for {clientFirst} to send their availability{waitingOnArtist ? `, then ${artistName || 'the artist'} sends times` : ''}.{' '}
+              <button type="button" className="studio-link-button" disabled={resending} onClick={async () => {
+                setResending(true);
+                try { await requestAvailability(bookingId); showFeedback(`Sent ${clientFirst} the link again`, 'success'); }
+                catch (e) { showError(e); } finally { setResending(false); }
+              }}>{resending ? 'Sending…' : 'Resend'}</button>
+            </span>
+          ) : waitingOnArtist && (
+            <span role="status" style={p.hint}>Waiting for {artistName || 'the artist'} to send times, a quote and the session length.</span>
+          )}
           {offeredTimes ? (heroMeta && <span style={p.heroMeta}>{heroMeta}</span>) : (
             <div style={p.heroPeople}>
               {hasArtist(artistId) ? (
@@ -1129,10 +1159,24 @@ export default function BookingDetailPanel({
         <BookTimeModal booking={booking} artists={bookTimeArtists} depositsReady={depositsReady} onClose={() => setBookTimeOpen(false)}
           onBooked={async id => { showFeedback('Booked in', 'success'); await onBooked?.(id); }} />
       )}
-      {!stationStep && (canAcceptReject || canComplete || isFutureConfirmed || canSendLink || canConfirm || canReschedule || canBookTime) && (
+      {quoteOpen && booking && (
+        <SendQuoteModal booking={booking} onClose={() => setQuoteOpen(false)}
+          onSent={async () => { showFeedback(`Quote sent. ${clientFirst} has been asked for their availability`, 'success'); forgetBookings(); await onBooked?.(bookingId); }} />
+      )}
+      {assignOpen && booking && (
+        <AssignArtistModal booking={booking} artists={bookTimeArtists} onClose={() => setAssignOpen(false)}
+          onAssigned={async name => { showFeedback(`Sent to ${name} to send times`, 'success'); forgetBookings(); await onBooked?.(bookingId); }} />
+      )}
+      {!stationStep && (canAcceptReject || canComplete || isFutureConfirmed || canSendLink || canConfirm || canReschedule || canBookTime || canAssignArtist || canSendQuote) && (
         <div className="studio-bdp-actions" style={p.actions}>
+          {canAssignArtist && (
+            <Btn onClick={() => setAssignOpen(true)} disabled={actionLoading} variant="primary">Assign artist</Btn>
+          )}
+          {canSendQuote && (
+            <Btn onClick={() => setQuoteOpen(true)} disabled={actionLoading} variant={waitingOnAvailability ? 'neutral' : 'primary'}>{waitingOnAvailability ? 'Change quote' : 'Send quote'}</Btn>
+          )}
           {canBookTime && (
-            <Btn onClick={() => setBookTimeOpen(true)} disabled={actionLoading} variant={canSendLink || canOfferTimes ? 'neutral' : 'primary'}>Book a time</Btn>
+            <Btn onClick={() => setBookTimeOpen(true)} disabled={actionLoading} variant={canSendLink || canOfferTimes || (canSendQuote && !waitingOnAvailability) ? 'neutral' : 'primary'}>Book a time</Btn>
           )}
           {canOfferTimes && (
             <Btn onClick={() => setOfferOpen(true)} disabled={actionLoading} variant="primary">{currentOffer ? 'Edit times' : 'Offer times'}</Btn>

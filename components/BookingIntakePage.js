@@ -140,6 +140,7 @@ function IntakeInner({ mode }) {
   const [done, setDone]             = useState(false);
   const bookingPhone = phoneNum.trim().startsWith('+') ? phoneNum.trim() : `${COUNTRIES.find(c => c.id === phoneCode)?.dial ?? ''} ${phoneNum}`.trim();
 
+  const availabilityForArtist = !walkIn && studio?.booking_management === 'artist' && Boolean(artistId);
   // field(key) returns {enabled, required} from the loaded config, defaulting to enabled/not-required
   function field(key) {
     if (walkIn) {
@@ -147,6 +148,9 @@ function IntakeInner({ mode }) {
       if (key === 'artist_id') return { enabled: true, required: true };
       return formConfig?.[key] ?? { enabled: false, required: false };
     }
+    // At an "Artists confirm" studio, choosing an artist sends the request straight to
+    // them, so the client gives their availability now for the artist to send times.
+    if (key === 'availability_windows' && availabilityForArtist) return { enabled: true, required: true };
     // Weekly availability is newer than the other fields, so it stays off unless the studio turned it on.
     return formConfig?.[key] ?? { enabled: key !== 'availability_windows', required: false };
   }
@@ -653,7 +657,7 @@ function IntakeInner({ mode }) {
                 />
               </Field>
               <p style={s.sectionHint}>
-                {field('availability_windows').required ? 'Required' : 'Optional'} — which hours usually suit you each week?
+                {availabilityForArtist ? 'Required, so your artist can send you times' : field('availability_windows').required ? 'Required' : 'Optional'} — which hours usually suit you each week?
                 Press and drag down a day to mark the times that work, and tap a block to remove it.
               </p>
               <WeeklyAvailabilityGrid value={availability} onChange={setAvailability} hours={studioHours} />

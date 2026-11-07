@@ -7,42 +7,56 @@ import { useState } from 'react';
 import { saveBookingManagement, useBookingManagement } from '@/lib/bookingManagement';
 import styles from './BookingManagementSettings.module.css';
 
-// Who acts on a booking request, in order (mirrors the backend). Artist mode:
-// the studio sends times, the client picks, the artist confirms. Studio mode:
-// the booking is confirmed as soon as the client picks.
+// How a booking request becomes a booking, for each mode. It depends on whether the
+// booking form requires weekly availability: if it does, clients include it with
+// their request; if not, they send it after the studio or artist replies.
+const SENDS_TIMES = 'Sends times, a quote and the session length';
+const PAYS = 'Picks a time and pays the deposit';
+function flowFor(mode, availabilityRequired) {
+  const request = { who: 'Client', does: availabilityRequired ? 'Sends a request with their weekly availability' : 'Sends a request' };
+  const availability = { who: 'Client', does: 'Sends their availability' };
+  if (mode === 'artist') {
+    return [
+      request,
+      { who: 'Studio', does: 'Assigns an artist' },
+      ...(availabilityRequired ? [] : [availability]),
+      { who: 'Artist', does: SENDS_TIMES, key: true },
+      { who: 'Client', does: PAYS },
+      { who: 'Booked', does: 'Confirmed once the deposit is paid', done: true },
+    ];
+  }
+  return [
+    request,
+    ...(availabilityRequired
+      ? [{ who: 'Studio', does: SENDS_TIMES, key: true }]
+      : [{ who: 'Studio', does: 'Sends a quote and the session length' }, availability, { who: 'Studio', does: 'Sends times', key: true }]),
+    { who: 'Client', does: PAYS },
+    { who: 'Booked', does: 'The artist is told once it’s booked', done: true },
+  ];
+}
+
 const OPTIONS = [
   {
     value: 'artist',
     title: 'Artists confirm',
-    summary: 'The artist confirms each time the client picks. Good when artists manage their own diaries.',
-    steps: [
-      { who: 'Client', does: 'Requests' },
-      { who: 'Studio', does: 'Sends times' },
-      { who: 'Client', does: 'Picks a time' },
-      { who: 'Artist', does: 'Confirms', key: true },
-      { who: 'Client', does: 'Booked', done: true },
-    ],
+    summary: 'The studio assigns an artist, who sends the client times, a quote and the session length. Good when artists manage their own diaries.',
+    note: 'If the client chooses an artist in their request, it goes straight to that artist with no assigning, and your booking form asks for their weekly availability.',
   },
   {
     value: 'studio',
     title: 'The studio confirms',
-    summary: 'Booked as soon as the client picks a time. Artists don’t need to accept. Good when the studio runs the diary.',
-    steps: [
-      { who: 'Client', does: 'Requests' },
-      { who: 'Studio', does: 'Sends times', key: true },
-      { who: 'Client', does: 'Picks a time' },
-      { who: 'Client', does: 'Booked', done: true },
-    ],
+    summary: 'The studio sends the times, quote and session length. Artists don’t need to accept. Good when the studio runs the diary.',
     note: 'Already agreed a time with the client? Use “Book a time” to book it straight in.',
   },
 ];
 
 function Flow({ steps, label }) {
   return (
-    <ol className={styles.flow} aria-label={label} style={{ '--steps': steps.length }}>
+    <ol className={styles.flow} aria-label={label}>
       {steps.map((step, index) => (
         <li key={index} className={styles.step} data-key={step.key || undefined} data-done={step.done || undefined}>
-          <span className={styles.who}>{step.done ? '✓ ' : ''}{step.who}</span>
+          <span aria-hidden="true" className={styles.marker}>{step.done ? '✓' : index + 1}</span>
+          <span className={styles.who}>{step.who}</span>
           <span className={styles.does}>{step.does}</span>
         </li>
       ))}
@@ -50,7 +64,7 @@ function Flow({ steps, label }) {
   );
 }
 
-export default function BookingManagementSettings({ styles: s }) {
+export default function BookingManagementSettings({ styles: s, availabilityRequired = false }) {
   const mode = useBookingManagement();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -68,7 +82,13 @@ export default function BookingManagementSettings({ styles: s }) {
     <section style={s.card} aria-labelledby="booking-management-title">
       <h2 id="booking-management-title" style={s.sectionTitle}>Who confirms booking times</h2>
       <p style={s.sectionDesc}>
-        When a client sends a booking request, the studio sends them times and the client picks one. Choose whether the artist then confirms that time, or it’s booked straight away.
+        Choose who replies to a booking request with times, a quote and the session length. Either way, it’s booked once the client picks a time and pays the deposit.
+      </p>
+      <p className={styles.formNote}>
+        {availabilityRequired
+          ? 'Your booking form asks for weekly availability, so clients include it with their request.'
+          : 'Your booking form doesn’t require weekly availability, so clients send it after you reply.'}
+        {' '}You can change this in Booking form.
       </p>
       {mode === null ? <div style={s.loadingDot} /> : (
         <div role="radiogroup" aria-labelledby="booking-management-title" className={styles.options}>
@@ -84,7 +104,7 @@ export default function BookingManagementSettings({ styles: s }) {
                   </span>
                 </button>
                 <div id={`booking-flow-${o.value}`} className={styles.flowWrap}>
-                                    <Flow steps={o.steps} label={`How a booking works when ${o.title.toLowerCase()}`} />
+                  <Flow steps={flowFor(o.value, availabilityRequired)} label={`How a booking works when ${o.title.toLowerCase()}`} />
                   {o.note && <p className={styles.note}>{o.note}</p>}
                 </div>
               </div>
