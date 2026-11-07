@@ -387,3 +387,12 @@
   .studio-revenue-summary { grid-template-columns: 1fr !important; gap: 1.1rem !important; padding: 1.1rem !important; }
   .studio-revenue-summary-divider { height: 1px; }
 }
+
+/* Artist commission table: one card per artist on phones. */
+@media (max-width: 720px) {
+  .studio-commission-row { grid-template-columns: 1fr 1fr !important; gap: 0.75rem !important; }
+  .studio-commission-row > :first-child, .studio-commission-row > :last-child { grid-column: 1 / -1; }
+  .studio-commission-row > :last-child { justify-content: flex-start !important; }
+  .studio-commission-headrow { display: none !important; }
+  .studio-commission-mobile-label { display: block !important; }
+}
