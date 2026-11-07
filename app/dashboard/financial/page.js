@@ -280,14 +280,24 @@ function FinancialContent({ s, weeklyChart, startDate, endDate, isLight }) {
   const tooltipColor = isLight ? '#111008' : '#fff';
   return (
     <>
-      <Section title={`Revenue summary · ${startDate} – ${endDate}`}>
-        <div className="studio-kpi-grid" style={st.kpiGrid}>
-          <KpiCard label={t('revenue_gross_sales')}           value={fmt(s?.gross_sales)}        tone="success" />
-          <KpiCard label={t('revenue_net_sales')}             value={fmt(s?.net_sales)}          tone="success" />
-          <KpiCard label={t('revenue_deposits')}              value={fmt(s?.deposits_collected)} tone="info" />
-          <KpiCard label={t('revenue_remaining_balances')}    value={fmt(s?.remaining_balances)} tone="warning" />
-          <KpiCard label={t('revenue_completed_sessions')}    value={s?.completed_sessions ?? 0} tone="neutral" />
-        </div>
+      <Section title={`Revenue summary · ${rangeLabel(startDate, endDate)}`}>
+        {(() => {
+          const sessions = s?.completed_sessions ?? 0;
+          const showNet = s?.net_sales != null && s.net_sales !== s.gross_sales;
+          return (
+            <div className="studio-kpi-grid" style={st.kpiGrid}>
+              <KpiCard label={t('revenue_gross_sales')} value={fmt(s?.gross_sales)} tone="success"
+                hint={sessions ? `Final prices of ${sessions} completed ${sessions === 1 ? 'session' : 'sessions'}` : 'No completed sessions yet'} />
+              {showNet && <KpiCard label={t('revenue_net_sales')} value={fmt(s?.net_sales)} tone="success" hint="After refunds and discounts" />}
+              <KpiCard label={t('revenue_remaining_balances')} value={fmt(s?.remaining_balances)} tone="warning"
+                hint="Sales minus the deposits clients paid upfront" />
+              <KpiCard label={t('revenue_deposits')} value={fmt(s?.deposits_collected)} tone="info"
+                hint="Paid in this period, including for upcoming bookings" />
+              <KpiCard label={t('revenue_completed_sessions')} value={sessions} tone="neutral"
+                hint="Marked complete in this period" />
+            </div>
+          );
+        })()}
         <p style={st.comingSoon}>Refunds, discounts, taxes, gift cards and tips will appear here once they’re available.</p>
       </Section>
 
@@ -300,25 +310,25 @@ function FinancialContent({ s, weeklyChart, startDate, endDate, isLight }) {
                 <XAxis dataKey="week" tick={{ fill: tickColor, fontSize: 11 }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
                 <YAxis tickFormatter={v => '$' + (v >= 1000 ? (v / 1000).toFixed(0) + 'k' : v)} tick={{ fill: tickColor, fontSize: 11 }} axisLine={false} tickLine={false} width={48} />
                 <Tooltip
-                  formatter={(value, name) => [fmt(value), name === 'gross' ? 'Gross sales' : 'Deposits']}
+                  formatter={(value, name) => [fmt(value), name === 'gross' ? 'Sales' : 'Deposits received']}
                   contentStyle={{ background: tooltipBg, border: `1px solid ${tooltipBorder}`, borderRadius: 8, fontSize: 12, color: tooltipColor }}
                   labelStyle={{ color: tickColor }}
                 />
-                <Bar dataKey="gross"    fill="var(--color-success)" radius={[4,4,0,0]} name="Gross sales" />
-                <Bar dataKey="deposits" fill="var(--color-info)"    radius={[4,4,0,0]} name="Deposits" />
+                <Bar dataKey="gross"    fill="var(--color-success)" radius={[4,4,0,0]} name="Sales" />
+                <Bar dataKey="deposits" fill="var(--color-info)"    radius={[4,4,0,0]} name="Deposits received" />
               </BarChart>
             </ResponsiveContainer>
             <details style={{ marginTop: 16 }}>
               <summary style={{ cursor: 'pointer', minHeight: 44, lineHeight: '44px' }}>View chart data</summary>
               <table style={{ width: '100%', textAlign: 'left', fontSize: 14 }}>
                 <caption style={{ textAlign: 'left', padding: '8px 0' }}>Weekly sales and deposits</caption>
-                <thead><tr><th scope="col">Week</th><th scope="col">Gross sales</th><th scope="col">Deposits</th></tr></thead>
+                <thead><tr><th scope="col">Week</th><th scope="col">Sales</th><th scope="col">Deposits received</th></tr></thead>
                 <tbody>{weeklyChart.map(row => <tr key={row.week}><th scope="row">{row.week}</th><td>{fmt(row.gross)}</td><td>{fmt(row.deposits)}</td></tr>)}</tbody>
               </table>
             </details>
             <div style={st.legend}>
-              <LegendDot color="var(--color-success)" label="Gross sales" />
-              <LegendDot color="var(--color-info)" label="Deposits" />
+              <LegendDot color="var(--color-success)" label="Sales" />
+              <LegendDot color="var(--color-info)" label="Deposits received" />
             </div>
           </div>
         ) : (
@@ -411,7 +421,17 @@ function Section({ title, children }) {
   );
 }
 
-function KpiCard({ label, value, tone = 'neutral' }) {
+// "2026-10-31", "2026-11-07" → "31 Oct – 7 Nov 2026"
+function rangeLabel(start, end) {
+  const d = v => new Date(`${v}T00:00:00`);
+  if (!start || !end) return '';
+  const a = d(start), b = d(end);
+  const sameYear = a.getFullYear() === b.getFullYear();
+  const startText = a.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', ...(sameYear ? {} : { year: 'numeric' }) });
+  return `${startText} – ${b.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+}
+
+function KpiCard({ label, value, tone = 'neutral', hint }) {
   const toned = tone !== 'neutral';
   return (
     <div style={{
@@ -421,6 +441,7 @@ function KpiCard({ label, value, tone = 'neutral' }) {
     }}>
       <span style={st.kpiLabel}>{label}</span>
       <span style={{ ...st.kpiVal, color: toned ? `var(--color-${tone})` : 'var(--text)' }}>{value}</span>
+      {hint && <span style={st.kpiHint}>{hint}</span>}
     </div>
   );
 }
@@ -981,6 +1002,7 @@ const st = {
   section: { display: 'flex', flexDirection: 'column', gap: '1rem' },
   sectionTitle: { fontSize: '1.05rem', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.01em' },
   kpiGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: '0.75rem' },
+  kpiHint: { fontSize: '0.8rem', lineHeight: 1.35, color: 'var(--text-dim)' },
   comingSoon: { margin: '0.25rem 0 0', fontSize: '0.85rem', color: 'var(--text-muted)' },
   kpiCard: {
     background: 'var(--bg-card)', border: '1px solid var(--border)',
