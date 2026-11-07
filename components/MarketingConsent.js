@@ -6,18 +6,19 @@ import { showError } from '@/lib/feedback';
 import { Fact, Pill, Switch } from '@/components/ui/DetailParts';
 
 /**
- * Marketing by email and by SMS, each with its own switch. Used by the client and booking
- * panels. `clientKey` is the directory client id; `marketing` is
- * { optIn, smsOptIn, unsubscribed, smsOptedOut } or null when unknown. `onChange` gets
- * { optIn, smsOptIn }.
- * Once a client has opted out themselves (an email unsubscribe, or an SMS STOP), the
- * studio can't turn that channel back on: only the client can.
+ * Email marketing switch, used by the client and booking panels. `clientKey` is the
+ * directory client id; `marketing` is { optIn, smsOptIn, unsubscribed } or null when
+ * unknown. `onChange` gets { optIn, smsOptIn }.
+ * SMS marketing isn't offered yet, so there's no switch for it; its saved value is
+ * passed through unchanged.
+ * Once a client has unsubscribed themselves, the studio can't turn email back on: only
+ * the client can.
  */
-export default function MarketingConsent({ email, phone, clientKey, marketing, onChange }) {
+export default function MarketingConsent({ email, clientKey, marketing, onChange }) {
   const [saving, setSaving] = useState(false);
   const [state, setState] = useState({ optIn: !!marketing?.optIn, smsOptIn: !!marketing?.smsOptIn });
   useEffect(() => { setState({ optIn: !!marketing?.optIn, smsOptIn: !!marketing?.smsOptIn }); }, [marketing?.optIn, marketing?.smsOptIn, clientKey]);
-  if (!marketing || (!email && !phone) || !clientKey) return null;
+  if (!marketing || !email || !clientKey) return null;
 
   async function set(change) {
     const previous = state;
@@ -34,20 +35,11 @@ export default function MarketingConsent({ email, phone, clientKey, marketing, o
   }
 
   const optedOut = <span title="The client opted out. Only they can opt back in."><Pill>Opted out</Pill></span>;
-  return <>
-    {email && (
-      <Fact label="Email marketing" control>
-        {marketing.unsubscribed ? optedOut : (
-          <Switch aria-label="Client has agreed to marketing emails" checked={state.optIn} disabled={saving} onChange={value => set({ optIn: value })} />
-        )}
-      </Fact>
-    )}
-    {phone && (
-      <Fact label="SMS marketing" control>
-        {marketing.smsOptedOut ? optedOut : (
-          <Switch aria-label="Client has agreed to marketing texts" checked={state.smsOptIn} disabled={saving} onChange={value => set({ smsOptIn: value })} />
-        )}
-      </Fact>
-    )}
-  </>;
+  return (
+    <Fact label="Email marketing" control>
+      {marketing.unsubscribed ? optedOut : (
+        <Switch aria-label="Client has agreed to marketing emails" checked={state.optIn} disabled={saving} onChange={value => set({ optIn: value })} />
+      )}
+    </Fact>
+  );
 }

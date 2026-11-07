@@ -1,5 +1,20 @@
 /* Query the drawer's available width, including when it fills a small screen. */
 .panel { container-type: inline-size; box-shadow: -12px 0 32px rgb(0 0 0 / 16%); }
+
+/* Opening: the panel slides in a short way from the right, then its cards fade up one
+   after another. */
+.panel { animation: panelIn 260ms var(--ease-drawer) backwards; }
+@keyframes panelIn { from { opacity: 0; transform: translateX(24px); } }
+.panel .body > :not(.split):not(.cards),
+.panel .cards > *,
+.panel .column > * { animation: cardIn 280ms var(--ease-out) backwards; }
+@keyframes cardIn { from { opacity: 0; transform: translateY(6px); } }
+.panel .body > :nth-child(2) { animation-delay: 40ms; }
+.panel .body > :nth-child(n + 3) { animation-delay: 80ms; }
+.panel .cards > :nth-child(2), .panel .column > :nth-child(1) { animation-delay: 60ms; }
+.panel .cards > :nth-child(3), .panel .column > :nth-child(2) { animation-delay: 100ms; }
+.panel .cards > :nth-child(4), .panel .column > :nth-child(3) { animation-delay: 140ms; }
+.panel .cards > :nth-child(n + 5), .panel .column > :nth-child(n + 4) { animation-delay: 180ms; }
 .panel .body { min-height: 0; }
 .panel .cards { display: flex; flex-direction: column; gap: 12px; min-width: 0; flex-shrink: 0; }
 .panel .cards > * { min-width: 0; margin: 0; flex-shrink: 0; }

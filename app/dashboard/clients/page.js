@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback, Suspense } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { getStudioClients, getStudioClient, getClientConsents, getNotes, addNote, deleteNote, ensureStudioClient, patchStudioClient, updateStudioClientContact, generateConsentLink, listConsentTemplates, getClientConsentSubmissions, getBatchClientConsentSubmissions } from '@/lib/api';
 
@@ -72,6 +72,12 @@ function ClientsInner() {
   const [selected, setSelected] = useState(null);
   const [selectedClient, setSelectedClient] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  // When the detail panel opened, so whichever panel element is showing continues the
+  // same opening slide (see the panel CSS) instead of starting it again.
+  const panelOpenedAt = useRef(0);
+  if (!selected) panelOpenedAt.current = 0;
+  else if (!panelOpenedAt.current) panelOpenedAt.current = Date.now();
+  const panelDelay = selected ? `-${Date.now() - panelOpenedAt.current}ms` : undefined;
   const [consents, setConsents] = useState({});
   const [consentVersion, setConsentVersion] = useState('1');
   const [consentTemplates, setConsentTemplates] = useState([]);
@@ -337,10 +343,12 @@ function ClientsInner() {
           )}
         </div>
 
+        {/* The loading panel and the loaded one are different elements; a negative delay lets the
+            loaded one carry on the opening slide from where it is, rather than slide in twice. */}
         {(detailLoading || selectedClient) && <PanelBackdrop onClose={() => setSelected(null)} />}
 
         {detailLoading && (
-          <aside id="client-detail" className={`studio-client-detail ${panelLayout.panel}`} aria-label="Loading client details" aria-busy="true" style={s.panel}>
+          <aside id="client-detail" className={`studio-client-detail ${panelLayout.panel}`} aria-label="Loading client details" aria-busy="true" style={{ ...s.panel, animationDelay: panelDelay }}>
             <div style={s.panelHeader}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', minWidth: 0 }}>
                 <span style={s.panelTitle}>{clients.find(c => c.id === selected)?.name ?? <SkeletonBar w={180} h={22} />}</span>
@@ -357,6 +365,7 @@ function ClientsInner() {
             marketing={marketingFor(clients.find(c => c.id === selected))}
             onMarketingChange={next => setMarketingOverrides(current => ({ ...current, [selected]: next }))}
             clientKey={selected}
+            panelDelay={panelDelay}
             onClose={() => setSelected(null)}
             consentTemplates={consentTemplates}
             legacyConsent={selectedClient.email ? consents[selectedClient.email] : null}
@@ -478,7 +487,7 @@ function ContactEditor({ client, onSave, onCancel }) {
   );
 }
 
-function ClientDetail({ client, marketing, onMarketingChange, clientKey, onClose, consentTemplates = [], legacyConsent = null, consentVersion, onSendConsentLink, onContactSaved }) {
+function ClientDetail({ client, marketing, onMarketingChange, clientKey, panelDelay, onClose, consentTemplates = [], legacyConsent = null, consentVersion, onSendConsentLink, onContactSaved }) {
   const { t } = useLanguage();
   const [linkGeneratingId, setLinkGeneratingId] = useState(null);
   const [linkSentId,       setLinkSentId]       = useState(null);
@@ -604,7 +613,7 @@ function ClientDetail({ client, marketing, onMarketingChange, clientKey, onClose
   const age = ageFromDob(client.dob);
 
   return (
-    <aside id="client-detail" className={`studio-client-detail ${panelLayout.panel}`} aria-label={`${client.name} details`} style={s.panel}>
+    <aside id="client-detail" className={`studio-client-detail ${panelLayout.panel}`} aria-label={`${client.name} details`} style={{ ...s.panel, animationDelay: panelDelay }}>
       <div style={s.panelHeader}>
         <div style={s.headerIdentity}>
           <div aria-hidden="true" style={s.headerAvatar}>{client.name.charAt(0).toUpperCase()}</div>
@@ -677,32 +686,42 @@ function ClientDetail({ client, marketing, onMarketingChange, clientKey, onClose
           const sorted = [...submissions].sort((x, y) => new Date(y.submitted_at || 0) - new Date(x.submitted_at || 0));
           const shown = showOlderForms ? sorted : sorted.slice(0, 1);
           const template = consentTemplates[0];
+          const needsForm = Boolean(template && client.email && (consentState === 'none' || consentState === 'outdated'));
+          const who = (client.name ?? '').trim().split(/\s+/)[0] || 'This client';
           return (
             <Section title="Consent" aside={consentState && <Pill tone={consentTone}>{consentLabelText}</Pill>}>
-              {shown.map(sub => <ConsentSubmissionCard key={sub.id} sub={sub} templates={consentTemplates} compact />)}
+              {needsForm && (
+                <p style={{ ...detailStyles.hint, margin: 0, lineHeight: 1.45 }}>
+                  {consentState === 'outdated' ? `${who} signed an older version of your form. Send the current one before their next session.` : `${who} hasn’t signed a consent form yet.`}
+                </p>
+              )}
+              {shown.length > 0 && <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>{shown.map(sub => <ConsentSubmissionCard key={sub.id} sub={sub} templates={consentTemplates} compact />)}</div>}
               {!sorted.length && legacyConsent?.agreed_at && (
                 <span style={detailStyles.hint}>Signed {new Date(legacyConsent.agreed_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
               )}
-              <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-                {template && client.email && consentState !== 'current' && (
-                  <button type="button" onClick={() => handleSendLink(template.id)} disabled={linkGeneratingId === template.id} style={{ ...detailStyles.textLink, fontSize: '0.85rem' }}>
-                    {linkSentId === template.id ? 'Link sent ✓' : linkGeneratingId === template.id ? 'Sending…' : 'Send consent link'}
-                  </button>
-                )}
-                {sorted.length > 1 && (
-                  <button type="button" onClick={() => setShowOlderForms(v => !v)} style={{ ...detailStyles.textLink, fontSize: '0.85rem' }}>
-                    {showOlderForms ? 'Hide earlier forms' : `${sorted.length - 1} earlier form${sorted.length === 2 ? '' : 's'}`}
-                  </button>
-                )}
-              </div>
+              {(needsForm || sorted.length > 1) && (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
+                  {sorted.length > 1 ? (
+                    <button type="button" onClick={() => setShowOlderForms(v => !v)} style={detailStyles.textLink} aria-expanded={showOlderForms}>
+                      {showOlderForms ? 'Hide earlier forms' : `Show ${sorted.length - 1} earlier form${sorted.length === 2 ? '' : 's'}`}
+                    </button>
+                  ) : <span />}
+                  {needsForm && (
+                    <Button variant="secondary" size="sm" onClick={() => handleSendLink(template.id)}
+                      loading={linkGeneratingId === template.id} loadingLabel="Sending…" disabled={linkSentId === template.id}>
+                      {linkSentId === template.id ? 'Link sent ✓' : 'Send consent link'}
+                    </Button>
+                  )}
+                </div>
+              )}
             </Section>
           );
         })()}
 
-        {/* ── Marketing: email and SMS separately ── */}
-        {marketing && (client.email || client.phone) && (
+        {/* ── Marketing (email only; SMS marketing isn't offered yet) ── */}
+        {marketing && client.email && (
           <Section title="Marketing">
-            <MarketingConsent email={client.email} phone={client.phone} clientKey={clientKey} marketing={marketing} onChange={onMarketingChange} />
+            <MarketingConsent email={client.email} clientKey={clientKey} marketing={marketing} onChange={onMarketingChange} />
           </Section>
         )}
 

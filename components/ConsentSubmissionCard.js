@@ -8,13 +8,15 @@ import { downloadConsentPdf } from '@/lib/api';
 import { showError } from '@/lib/feedback';
 
 const headStyle = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', width: '100%', minHeight: 44, padding: 0, background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit', color: 'inherit' };
+const rowStyle = { display: 'flex', alignItems: 'center', gap: '0.7rem', width: '100%', padding: '0.6rem 0.75rem', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 10, textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit', color: 'inherit' };
+const docIconStyle = { width: 32, height: 32, borderRadius: 8, display: 'grid', placeItems: 'center', flexShrink: 0, background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-dim)' };
 const signatureStyle = { maxWidth: '100%', height: 64, objectFit: 'contain', borderRadius: 6, background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', display: 'block' };
 
 // One signed consent form as the client completed it: answers (with the form's own
 // question labels where the template still has them), photo ID, signatures and a PDF.
 // Shows its name and signing date; opening it shows the whole form in a window of its own,
 // so the side panel behind stays put.
-// compact: one line (date, signer, View) for tight spaces like the booking panel.
+// compact: one row per form, for the booking and client panels.
 export default function ConsentSubmissionCard({ sub, templates = [], compact = false }) {
   const fields = templates.find(t => t.id === sub.template_id)?.fields ?? [];
   const labelFor = id => fields.find(f => f.id === id)?.label || id;
@@ -23,11 +25,23 @@ export default function ConsentSubmissionCard({ sub, templates = [], compact = f
   const signed = `Signed ${new Date(sub.submitted_at).toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' })}${sub.signer_name ? ` by ${sub.signer_name}` : ''}`;
   const pdfName = `consent-${(sub.signer_name || 'form').replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.pdf`;
 
+  // compact: a row with the form's name, when and by whom it was signed, opening the form.
+  const signedOn = new Date(sub.submitted_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
   const trigger = compact ? (
-    <button type="button" onClick={() => setOpen(true)} aria-haspopup="dialog" aria-label={`View ${sub.template_name || 'consent form'}, ${signed}`}
-      style={{ ...headStyle, minHeight: 32, gap: '0.5rem' }}>
-      <span style={{ ...d.hint, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{signed}</span>
-      <span style={{ color: 'var(--color-info)', fontSize: '0.85rem', fontWeight: 600, flexShrink: 0 }}>View form</span>
+    <button type="button" className="studio-consent-row" onClick={() => setOpen(true)} aria-haspopup="dialog" aria-label={`View ${sub.template_name || 'consent form'}, ${signed}`} style={rowStyle}>
+      <span aria-hidden="true" style={docIconStyle}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="M14 3v5h5" /><path d="M9 13h6M9 17h4" /></svg>
+      </span>
+      <span style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem', minWidth: 0, flex: 1 }}>
+        <span style={{ ...d.itemTitle, display: 'flex', alignItems: 'center', gap: '0.4rem', minWidth: 0 }}>
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sub.template_name || 'Consent form'}</span>
+          {sub.is_minor && <Pill tone="warning">Minor</Pill>}
+        </span>
+        <span style={{ ...d.hint, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          Signed {signedOn}{sub.signer_name ? ` · ${sub.signer_name}` : ''}
+        </span>
+      </span>
+      <span aria-hidden="true" className="studio-row-chevron" style={{ color: 'var(--text-muted)', fontSize: '1.1rem', lineHeight: 1, flexShrink: 0 }}>›</span>
     </button>
   ) : null;
 

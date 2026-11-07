@@ -7,14 +7,14 @@ import OfferTimesModal from '@/components/OfferTimesModal';
 import { useBookingManagement } from '@/lib/bookingManagement';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { getStations, getClientConsents, getNotes, addNote, deleteNote, getBookingConsentSubmissions, getClientConsentSubmissions, getStudioClients, getStudioClient, generateConsentLink, getStudioBookingPayment, getDepositReceipt, getDepositStatus, getOfferedTimes, listConsentTemplates } from '@/lib/api';
+import { getStations, getStudioArtists, getClientConsents, getNotes, addNote, deleteNote, getBookingConsentSubmissions, getClientConsentSubmissions, getStudioClients, getStudioClient, generateConsentLink, getStudioBookingPayment, getDepositReceipt, getDepositStatus, getOfferedTimes, listConsentTemplates } from '@/lib/api';
 import { useStationAvailability } from '@/lib/useStationAvailability';
 import { statusColors, statusLabel, capitalise as cap } from '@/lib/status';
 import { formatDob as fmtDob, hasArtist, ageFromDob } from '@/lib/format';
 import { getCached, setCached } from '@/lib/cache';
 import { useLanguage } from '@/lib/i18n';
 import { showError, showFeedback } from '@/lib/feedback';
-import { getBookingSourceLabel } from '@/lib/bookingType';
+import { normalizeBookingSource, TYPE_STYLE } from '@/lib/bookingType';
 import Button, { IconButton } from '@/components/ui/Button';
 import BookingSMS from '@/components/BookingSMS';
 import MarketingConsent from '@/components/MarketingConsent';
@@ -52,9 +52,26 @@ function relativeDay(date) {
   return null;
 }
 
+// The studio's artists (any status, so past artists still show), fetched once per visit
+// for their profile photos.
+let studioArtistsRequest = null;
+function loadStudioArtists() {
+  if (!studioArtistsRequest) {
+    studioArtistsRequest = getStudioArtists().then(d => d.artists ?? []).catch(() => { studioArtistsRequest = null; return []; });
+  }
+  return studioArtistsRequest;
+}
+
 function fmtDate(iso) {
   if (!iso) return null;
   return new Date(iso).toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' });
+}
+
+// "28 Oct, 2:23 pm", with the year only when it isn't this year.
+function shortWhen(date) {
+  const thisYear = date.getFullYear() === new Date().getFullYear();
+  const day = date.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', ...(thisYear ? {} : { year: 'numeric' }) });
+  return `${day}, ${date.toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' })}`;
 }
 
 function parseStyles(raw) {
@@ -116,6 +133,8 @@ export default function BookingDetailPanel({
   const [clientProfile, setClientProfile] = useState(null);
   const [marketingOverride, setMarketingOverride] = useState(null);
   const [stationName,   setStationName]   = useState(null);
+  const [studioArtists, setStudioArtists] = useState(null);
+  const [artistPhotoFailed, setArtistPhotoFailed] = useState(false);
 
   // ── Consent submissions (new template system) ──────────────────────────────
   const [consentSubmissions,  setConsentSubmissions]  = useState([]);
@@ -136,6 +155,17 @@ export default function BookingDetailPanel({
   const dob         = booking?.dob               ?? null;
   const artistId    = booking?.artist_id          ?? entry?.artistId   ?? null;
   const artistName  = booking?.artist_name        ?? entry?.artistName ?? null;
+  // Artist photo: from the artists the page already has, otherwise the studio's list.
+  const artistPhoto = artistId
+    ? [...(bookTimeArtists ?? []), ...(studioArtists ?? [])].find(a => a.artistId === artistId || a.id === artistId)?.profileImage ?? null
+    : null;
+  useEffect(() => {
+    if (!artistId || studioArtists || (bookTimeArtists ?? []).some(a => (a.artistId === artistId || a.id === artistId) && a.profileImage)) return;
+    let live = true;
+    loadStudioArtists().then(list => { if (live) setStudioArtists(list); });
+    return () => { live = false; };
+  }, [artistId, studioArtists, bookTimeArtists]);
+  useEffect(() => { setArtistPhotoFailed(false); }, [artistPhoto]);
   const sessionType = booking?.session_type      ?? entry?.sessionType    ?? null;
   const placement   = booking?.body_location     ?? entry?.placement      ?? null;
   const sizeRaw     = booking?.size              ?? entry?.size           ?? null;
@@ -292,7 +322,9 @@ export default function BookingDetailPanel({
 
   // ── Load consent templates (once) ─────────────────────────────────────────
   useEffect(() => {
-    listConsentTemplates().then(d => setConsentTemplates(d.templates ?? [])).catch(() => {});
+    const cached = getCached('consent:templates');
+    if (cached) { setConsentTemplates(cached); return; }
+    listConsentTemplates().then(d => { const list = d.templates ?? []; setCached('consent:templates', list); setConsentTemplates(list); }).catch(() => {});
   }, []);
 
   // ── Consent ────────────────────────────────────────────────────────────────
@@ -376,22 +408,45 @@ export default function BookingDetailPanel({
 
   // ── Load consent submissions ───────────────────────────────────────────────
   // Forms signed for this booking; if none, the forms this client signed with the studio.
+  // Only the newest is loaded at first; the rest when "Show earlier forms" is pressed.
+  // (A backend without `limit` sends every form and no total: then nothing more to load.)
+  const [consentMore, setConsentMore] = useState(null); // { total, source, complete, loading }
   useEffect(() => {
     let live = true;
     setConsentSubmissions([]);
+    setConsentMore(null);
     setShowOlderForms(false);
     if (!bookingId) return;
     setSubmissionsLoading(true);
-    getBookingConsentSubmissions(bookingId)
+    const page = d => ({ subs: d.submissions ?? [], total: d.total ?? (d.submissions ?? []).length, complete: d.total == null });
+    // Both at once rather than one after the other.
+    const clientForms = email ? getClientConsentSubmissions(email, 1).then(page).catch(() => null) : Promise.resolve(null);
+    getBookingConsentSubmissions(bookingId, 1)
       .then(async d => {
-        let subs = d.submissions ?? [];
-        if (!subs.length && email) subs = (await getClientConsentSubmissions(email).catch(() => ({}))).submissions ?? [];
-        if (live) setConsentSubmissions(subs);
+        let found = { ...page(d), source: 'booking' };
+        if (!found.subs.length) found = { ...((await clientForms) ?? { subs: [], total: 0, complete: true }), source: 'client' };
+        if (!live) return;
+        setConsentSubmissions(found.subs);
+        setConsentMore({ total: found.total, source: found.source, complete: found.complete || found.subs.length >= found.total, loading: false });
       })
       .catch(() => {})
       .finally(() => { if (live) setSubmissionsLoading(false); });
     return () => { live = false; };
   }, [bookingId, email]);
+
+  async function toggleOlderForms() {
+    if (showOlderForms || consentMore?.complete) { setShowOlderForms(v => !v); return; }
+    setConsentMore(m => ({ ...m, loading: true }));
+    try {
+      const d = consentMore.source === 'booking' ? await getBookingConsentSubmissions(bookingId) : await getClientConsentSubmissions(email);
+      setConsentSubmissions(d.submissions ?? []);
+      setConsentMore(m => ({ ...m, complete: true, loading: false }));
+      setShowOlderForms(true);
+    } catch (error) {
+      setConsentMore(m => ({ ...m, loading: false }));
+      showError(error);
+    }
+  }
 
   // ── Station picker ─────────────────────────────────────────────────────────
   function handleAcceptClick() {
@@ -409,21 +464,48 @@ export default function BookingDetailPanel({
   // ── Client history ─────────────────────────────────────────────────────────
   // The client's own booking list from the contact book, wherever the panel is opened;
   // else whatever bookings the page has loaded.
-  const [historyLoaded, setHistoryLoaded] = useState(null); // { key, bookings }
+  // Only the most recent few are loaded at first (one extra, as this booking is usually
+  // among them); "Show all" loads the rest.
+  const HISTORY_SHOWN = 5;
+  const [historyLoaded, setHistoryLoaded] = useState(null); // { key, bookings, total, complete }
   const [showAllHistory, setShowAllHistory] = useState(false);
+  const [historyLoadingAll, setHistoryLoadingAll] = useState(false);
   useEffect(() => { setShowAllHistory(false); }, [bookingId]);
   useEffect(() => {
     const key = clientProfile?.id;
     if (!key) return;
     let live = true;
-    getStudioClient(key)
-      .then(d => { if (live) setHistoryLoaded({ key, bookings: d.bookings ?? [] }); })
+    getStudioClient(key, { bookingsLimit: HISTORY_SHOWN + 1 })
+      .then(d => {
+        if (!live) return;
+        const list = d.bookings ?? [];
+        const total = d.bookings_total ?? list.length;
+        setHistoryLoaded({ key, bookings: list, total, complete: list.length >= total });
+      })
       .catch(() => {});
     return () => { live = false; };
   }, [clientProfile?.id]);
-  const clientHistory = (historyLoaded && historyLoaded.key === clientProfile?.id ? historyLoaded.bookings : (allBookings ?? []).filter(bk => bk.requester_email === email))
+  const historyFromProfile = historyLoaded && historyLoaded.key === clientProfile?.id ? historyLoaded : null;
+  const clientHistory = (historyFromProfile ? historyFromProfile.bookings : (allBookings ?? []).filter(bk => bk.requester_email === email))
     .filter(bk => bk.id !== bookingId)
     .sort((a, b) => new Date(b.chosen_time || b.proposed_time_primary || b.created_at || 0) - new Date(a.chosen_time || a.proposed_time_primary || a.created_at || 0));
+  // How many other bookings there are in all, counting ones not loaded yet. This booking
+  // is the client's own, so it's in the total unless the full list shows otherwise.
+  const historyTotal = historyFromProfile && !historyFromProfile.complete
+    ? Math.max(clientHistory.length, historyFromProfile.total - 1)
+    : clientHistory.length;
+
+  async function toggleAllHistory() {
+    if (showAllHistory || !historyFromProfile || historyFromProfile.complete) { setShowAllHistory(v => !v); return; }
+    setHistoryLoadingAll(true);
+    try {
+      const d = await getStudioClient(historyFromProfile.key);
+      const list = d.bookings ?? [];
+      setHistoryLoaded({ key: historyFromProfile.key, bookings: list, total: list.length, complete: true });
+      setShowAllHistory(true);
+    } catch (error) { showError(error); }
+    finally { setHistoryLoadingAll(false); }
+  }
 
 
   // While the full booking is fetching, show only the header + a loading state —
@@ -436,11 +518,12 @@ export default function BookingDetailPanel({
         <div style={p.header}>
           <div style={p.headerText}>
             <span style={p.title}>{clientName}</span>
-            <div style={p.headerPills}><SkeletonBar w={86} h={24} /><SkeletonBar w={64} h={24} /></div>
+            <div style={p.contact}><SkeletonBar w={210} h={13} /></div>
+            <div style={p.headerPills}><SkeletonBar w={92} h={26} round /><SkeletonBar w={120} h={26} round /></div>
           </div>
           <IconButton onClick={onClose} aria-label="Close booking details">✕</IconButton>
         </div>
-        <div style={p.body}><DetailSkeleton label={t('loading')} hero cards={3} /></div>
+        <BookingSkeleton label={t('loading')} />
       </aside>
       </>
     );
@@ -459,7 +542,7 @@ export default function BookingDetailPanel({
   // A booking is confirmed when its deposit is confirmed, or without a deposit when the
   // client picks a time. That pick isn't recorded, so then "Confirmed" has no date.
   // MarketingConsent shows only when the client's marketing choices have loaded.
-  const hasMarketing = Boolean(clientProfile && clientProfile.email_marketing_opt_in !== undefined && (email || phone) && clientProfile.id);
+  const hasMarketing = Boolean(clientProfile && clientProfile.email_marketing_opt_in !== undefined && email && clientProfile.id);
   const firstName = clientName !== '—' ? clientName.split(' ')[0] : 'Client';
   const ended = ['cancelled', 'rejected', 'declined', 'timed_out'].includes(rawStatus);
   const timeline = [
@@ -468,7 +551,7 @@ export default function BookingDetailPanel({
     status === 'awaiting_payment' && updatedAt && { at: updatedAt, label: t('bdp_link_sent') },
     clientSaysPaid?.recorded_at && { at: clientSaysPaid.recorded_at, label: `${firstName} says they paid the deposit` },
     depositPaidAt && { at: depositPaidAt, label: `Deposit paid${depositPaidVia ? ` by ${depositPaidVia}` : ''}` },
-    depositConfirmedAt && { at: depositConfirmedAt, label: depositConfirmedAt === depositPaidAt ? 'Confirmed' : 'Deposit confirmed · booking confirmed' },
+    depositConfirmedAt && { at: depositConfirmedAt, label: 'Booking confirmed' },
     chosenTime && !ended && { at: chosenTime, label: 'Appointment' },
     booking?.artist_outcome_recorded_at && { at: booking.artist_outcome_recorded_at, label: 'Artist recorded the session' },
     outcomeAt && { at: outcomeAt, label: isNoShow ? 'Marked as no show' : 'Marked complete' },
@@ -479,7 +562,7 @@ export default function BookingDetailPanel({
   if (wasConfirmed && !depositConfirmedAt) {
     // Undated: goes just before the appointment, or at the end.
     const at = timeline.findIndex(item => item.label === 'Appointment');
-    timeline.splice(at < 0 ? timeline.length : at, 0, { at: null, label: 'Confirmed' });
+    timeline.splice(at < 0 ? timeline.length : at, 0, { at: null, label: 'Booking confirmed' });
   }
   const now = Date.now();
   const hasTimeline = timeline.length > 0 || (status === 'awaiting_payment' && selectionTokenExpiresAt) || (holdExpiresAt && canConfirm);
@@ -514,7 +597,18 @@ export default function BookingDetailPanel({
           )}
           <div style={p.headerPills}>
             {status && <Pill colors={sc}>{statusLabel(displayStatus)}</Pill>}
-            {source && <span style={p.sourceText}>Booked via {getBookingSourceLabel(source)}</span>}
+            {source && (() => {
+              // The booking's type, in the calendar's colour for it, so a studio booking
+              // isn't mistaken for a walk-in or personal booking the studio entered.
+              const type = normalizeBookingSource(source);
+              const label = { studio: 'Studio booking', walkin: 'Walk-in', personal: 'Personal booking', app: 'Booked in the app', import: 'Imported booking' }[type];
+              return (
+                <span style={p.typeTag} title="Booking type">
+                  <span aria-hidden="true" style={{ ...p.typeDot, background: TYPE_STYLE[type].dot }} />
+                  {label}
+                </span>
+              );
+            })()}
             {clientAge != null && clientAge < 18 && <Pill tone="warning">{t('bdp_minor')}</Pill>}
           </div>
         </div>
@@ -568,7 +662,9 @@ export default function BookingDetailPanel({
             <div style={p.heroPeople}>
               {hasArtist(artistId) ? (
                 <span style={p.heroArtist}>
-                  <span aria-hidden="true" style={p.heroArtistAvatar}>{(artistName || '?').trim().charAt(0).toUpperCase()}</span>
+                  {artistPhoto && !artistPhotoFailed
+                    ? <img src={artistPhoto} alt="" style={{ ...p.heroArtistAvatar, objectFit: 'cover', padding: 0 }} onError={() => setArtistPhotoFailed(true)} />
+                    : <span aria-hidden="true" style={p.heroArtistAvatar}>{(artistName || '?').trim().charAt(0).toUpperCase()}</span>}
                   {artistName}
                 </span>
               ) : (
@@ -652,27 +748,39 @@ export default function BookingDetailPanel({
                     {consentLoading || submissionsLoading ? <Pill>{t('loading')}</Pill> : <Pill tone={consentTone}>{consentLabel}</Pill>}
                   </div>
                   {(() => {
-                    // One line per signed form (newest first), each opening the full form.
+                    // Status in words when something's missing, then one row per signed
+                    // form (newest first; each opens the full form), then what to do next.
                     const sorted = [...consentSubmissions].sort((x, y) => new Date(y.submitted_at || 0) - new Date(x.submitted_at || 0));
                     const shown = showOlderForms ? sorted : sorted.slice(0, 1);
+                    const earlier = Math.max(0, (consentMore?.total ?? sorted.length) - 1);
+                    const loading = consentLoading || submissionsLoading;
+                    const needsForm = email && !loading && (consentStatus === 'none' || consentStatus === 'outdated');
                     return <>
+                      {needsForm && (
+                        <p style={{ ...p.hint, margin: 0, lineHeight: 1.45 }}>
+                          {consentStatus === 'outdated' ? `${firstName} signed an older version of your form. Send the current one before the session.` : `${firstName} hasn’t signed a consent form yet.`}
+                        </p>
+                      )}
                       {!submissionsLoading && sorted.length > 0
-                        ? shown.map(sub => <ConsentSubmissionCard key={sub.id} sub={sub} templates={consentTemplates} compact />)
+                        ? <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>{shown.map(sub => <ConsentSubmissionCard key={sub.id} sub={sub} templates={consentTemplates} compact />)}</div>
                         : consent && !consentLoading && (
                           <span style={p.hint}>Signed {new Date(consent.agreed_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
                         )}
-                      <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-                        {email && !consentLoading && (consentStatus === 'none' || consentStatus === 'outdated') && (
-                          <button onClick={() => handleSendConsentLink('__inline__')} disabled={linkGeneratingId === '__inline__'} style={p.textLink}>
-                            {linkSentId === '__inline__' ? 'Link sent ✓' : linkGeneratingId === '__inline__' ? 'Sending…' : 'Send consent link'}
-                          </button>
-                        )}
-                        {sorted.length > 1 && (
-                          <button type="button" onClick={() => setShowOlderForms(v => !v)} style={p.textLink}>
-                            {showOlderForms ? 'Hide earlier forms' : `${sorted.length - 1} earlier form${sorted.length === 2 ? '' : 's'}`}
-                          </button>
-                        )}
-                      </div>
+                      {(needsForm || earlier > 0) && (
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
+                          {earlier > 0 ? (
+                            <button type="button" onClick={toggleOlderForms} disabled={consentMore?.loading} style={p.textLink} aria-expanded={showOlderForms}>
+                              {consentMore?.loading ? 'Loading…' : showOlderForms ? 'Hide earlier forms' : `Show ${earlier} earlier form${earlier === 1 ? '' : 's'}`}
+                            </button>
+                          ) : <span />}
+                          {needsForm && (
+                            <Button variant="secondary" size="sm" onClick={() => handleSendConsentLink('__inline__')}
+                              loading={linkGeneratingId === '__inline__'} loadingLabel="Sending…" disabled={linkSentId === '__inline__'}>
+                              {linkSentId === '__inline__' ? 'Link sent ✓' : 'Send consent link'}
+                            </Button>
+                          )}
+                        </div>
+                      )}
                     </>;
                   })()}
                 </section>
@@ -815,10 +923,9 @@ export default function BookingDetailPanel({
           <Section title="Marketing">
             <MarketingConsent
               email={email}
-              phone={phone}
               clientKey={clientProfile?.id}
               marketing={clientProfile && clientProfile.email_marketing_opt_in !== undefined
-                ? { optIn: marketingOverride?.optIn ?? clientProfile.email_marketing_opt_in === true, smsOptIn: marketingOverride?.smsOptIn ?? clientProfile.sms_marketing_opt_in === true, unsubscribed: clientProfile.email_unsubscribed === true, smsOptedOut: clientProfile.sms_opted_out === true }
+                ? { optIn: marketingOverride?.optIn ?? clientProfile.email_marketing_opt_in === true, smsOptIn: marketingOverride?.smsOptIn ?? clientProfile.sms_marketing_opt_in === true, unsubscribed: clientProfile.email_unsubscribed === true }
                 : null}
               onChange={setMarketingOverride}
             />
@@ -872,19 +979,32 @@ export default function BookingDetailPanel({
         {/* ── Timeline ── */}
         {hasTimeline && (
           <Section title="Timeline">
-            <ol style={p.timeline}>
-              {timeline.map((item, i) => {
-                const future = item.at != null && new Date(item.at).getTime() > now;
-                return (
-                  <li key={`${item.label}-${i}`} style={p.timelineItem}>
-                    <span aria-hidden="true" style={{ ...p.timelineDot, ...(future ? p.timelineDotFuture : {}) }} />
-                    {i < timeline.length - 1 && <span aria-hidden="true" style={p.timelineLine} />}
-                    <span style={{ ...p.timelineLabel, color: future ? 'var(--text-muted)' : 'var(--text)' }}>{item.label}{future ? ' (upcoming)' : ''}</span>
-                    {item.at && <span style={p.timelineDate}>{fmtDate(item.at)}</span>}
-                  </li>
-                );
-              })}
-            </ol>
+            {/* The latest thing that happened is marked; what's still to come is hollow. On
+                opening, the steps draw in from the top (studio-tl-* in globals.css). */}
+            {(() => {
+              const isFuture = item => item.at != null && new Date(item.at).getTime() > now;
+              const latest = timeline.reduce((last, item, i) => (isFuture(item) ? last : i), -1);
+              return (
+                <ol style={p.timeline}>
+                  {timeline.map((item, i) => {
+                    const future = isFuture(item);
+                    const when = item.at ? new Date(item.at) : null;
+                    const soon = future && when ? relativeDay(when) : null;
+                    return (
+                      <li key={`${item.label}-${i}`} className="studio-tl-item" style={{ ...p.timelineItem, paddingBottom: i < timeline.length - 1 ? '0.95rem' : 0, '--tl-delay': `${180 + Math.min(i, 6) * 70}ms` }}>
+                        <span aria-hidden="true" className="studio-tl-dot" style={{ ...p.timelineDot, ...(future ? p.timelineDotFuture : i === latest ? p.timelineDotLatest : {}) }} />
+                        {i < timeline.length - 1 && <span aria-hidden="true" className="studio-tl-line" style={{ ...p.timelineLine, ...(isFuture(timeline[i + 1]) ? p.timelineLineFuture : {}) }} />}
+                        <span style={{ ...p.timelineLabel, color: future ? 'var(--text-dim)' : 'var(--text)', fontWeight: i === latest ? 700 : 600 }}>
+                          {item.label}
+                          {soon && <span style={p.heroRelative}>{soon}</span>}
+                        </span>
+                        {when && <span style={p.timelineDate}>{shortWhen(when)}</span>}
+                      </li>
+                    );
+                  })}
+                </ol>
+              );
+            })()}
             {status === 'awaiting_payment' && selectionTokenExpiresAt && <Fact label={t('bdp_link_expires')}>{fmtDate(selectionTokenExpiresAt)}</Fact>}
             {holdExpiresAt && canConfirm && (
               <div style={p.holdBox}>
@@ -897,8 +1017,8 @@ export default function BookingDetailPanel({
 
         {/* ── Other bookings ── */}
         {clientHistory.length > 0 && (
-          <Section title={`${t('bdp_other_bookings')} (${clientHistory.length})`}>
-            {(showAllHistory ? clientHistory : clientHistory.slice(0, 5)).map(bk => {
+          <Section title={`${t('bdp_other_bookings')} (${historyTotal})`}>
+            {(showAllHistory ? clientHistory : clientHistory.slice(0, HISTORY_SHOWN)).map(bk => {
               const bsc = statusColors(bk.status);
               const ds = bk.chosen_time || bk.proposed_time_primary;
               const date = ds ? new Date(ds).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
@@ -916,9 +1036,9 @@ export default function BookingDetailPanel({
                 </div>
               );
             })}
-            {clientHistory.length > 5 && (
-              <button type="button" onClick={() => setShowAllHistory(v => !v)} style={{ ...p.textLink, alignSelf: 'flex-start' }}>
-                {showAllHistory ? 'Show fewer' : `Show all ${clientHistory.length}`}
+            {historyTotal > HISTORY_SHOWN && (
+              <button type="button" onClick={toggleAllHistory} disabled={historyLoadingAll} style={{ ...p.textLink, alignSelf: 'flex-start' }} aria-expanded={showAllHistory}>
+                {historyLoadingAll ? 'Loading…' : showAllHistory ? 'Show fewer' : `Show all ${historyTotal}`}
               </button>
             )}
           </Section>
@@ -959,7 +1079,7 @@ export default function BookingDetailPanel({
             <Btn onClick={onReject} disabled={actionLoading} variant="danger">{t('reject')}</Btn>
           )}
           {canConfirm && onConfirm && (
-            <Btn onClick={onConfirm} disabled={actionLoading} variant="success">{t('bdp_confirm')}</Btn>
+            <Btn onClick={onConfirm} disabled={actionLoading} variant="success" icon={CHECK_ICON}>{t('bdp_confirm')}</Btn>
           )}
           {canConfirm && onReassign && (
             <Btn onClick={onReassign} disabled={actionLoading} variant="neutral">{t('reassign')}</Btn>
@@ -971,10 +1091,10 @@ export default function BookingDetailPanel({
             <Btn onClick={onReschedule} disabled={actionLoading} variant="neutral">{t('reschedule')}</Btn>
           )}
           {canComplete && onComplete && (
-            <Btn onClick={onComplete} disabled={actionLoading} variant="success">{t('bdp_mark_complete')}</Btn>
+            <Btn onClick={onComplete} disabled={actionLoading} variant="success" icon={CHECK_ICON}>{t('bdp_mark_complete')}</Btn>
           )}
           {canComplete && onNoShow && (
-            <Btn onClick={onNoShow} disabled={actionLoading} variant="danger">{t('bdp_no_show')}</Btn>
+            <Btn onClick={onNoShow} disabled={actionLoading} variant="neutral">{t('bdp_no_show')}</Btn>
           )}
           {canComplete && onCancel && (
             <Btn onClick={onCancel} disabled={actionLoading} variant="danger">{t('cancel')}</Btn>
@@ -986,16 +1106,65 @@ export default function BookingDetailPanel({
   );
 }
 
-// The main step (complete, confirm, offer times) is filled; others are outlined, and
-// destructive ones (cancel, no show, reject) are quiet red outlines.
-function Btn({ onClick, disabled, variant, children }) {
-  const main = variant === 'success' || variant === 'primary';
-  const style = main ? { flex: 1.4 }
-    : variant === 'neutral' ? { flex: 1 }
-    : { flex: 1, background: 'transparent', border: '1px solid var(--border-strong)', color: 'var(--color-danger)' };
+// Loading placeholder in the shape of the loaded panel (appointment, payment and consent,
+// then the booking and its timeline side by side), so nothing jumps when it arrives.
+function BookingSkeleton({ label }) {
+  const B = SkeletonBar;
+  const card = (title, rows) => (
+    <div style={{ ...p.summaryCard, gap: '0.85rem' }}>
+      <B w={title} h={16} />
+      {rows.map((w, i) => <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem' }}><B w="30%" h={12} /><B w={w} h={12} /></div>)}
+    </div>
+  );
   return (
-    <Button onClick={onClick} disabled={disabled} size="sm" variant={main ? 'primary' : 'secondary'} style={style}>
-      {children}
+    <div className={`studio-bdp-body ${panelLayout.body}`} style={p.body} role="status" aria-busy="true" aria-label={label}>
+      <div style={p.hero}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}><B w={170} h={16} /><B w={64} h={18} round /></div>
+        <B w={130} h={30} />
+        <div style={p.heroPeople}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}><B w={28} h={28} round /><B w={120} h={14} /></div>
+          <B w={70} h={12} />
+        </div>
+      </div>
+      <div className={panelLayout.glance} style={{ ...p.glance, '--tiles': 2 }}>
+        {card(80, ['22%', '34%'])}
+        {card(80, ['60%'])}
+      </div>
+      <div className={panelLayout.split}>
+        <div className={panelLayout.column}>
+          {card(110, ['40%', '28%', '48%'])}
+          {card(70, ['55%', '35%'])}
+        </div>
+        <div className={panelLayout.column}>
+          <div style={{ ...p.summaryCard, gap: '0.95rem' }}>
+            <B w={90} h={16} />
+            {[0, 1, 2, 3].map(i => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.7rem' }}>
+                <B w={10} h={10} round /><B w={`${[38, 30, 44, 34][i]}%`} h={13} /><span style={{ flex: 1 }} /><B w={80} h={11} />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+      <span className="sr-only">{label}</span>
+    </div>
+  );
+}
+
+const CHECK_ICON = (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
+);
+
+// Action bar order by importance: the main step (complete, confirm, offer times) is
+// filled and sits on the right; other steps are outlined beside it; destructive ones
+// (cancel, reject) are quiet red text on the far left, away from the main step.
+function Btn({ onClick, disabled, variant, icon, children }) {
+  const main = variant === 'success' || variant === 'primary';
+  const danger = variant === 'danger';
+  return (
+    <Button onClick={onClick} disabled={disabled} variant={main ? 'primary' : danger ? 'ghost' : 'secondary'}
+      className={`studio-bdp-action${main ? ' studio-bdp-action--main' : danger ? ' studio-bdp-action--danger' : ''}`}>
+      {icon}{children}
     </Button>
   );
 }
@@ -1032,7 +1201,8 @@ const p = {
   heroArtistAvatar: { width: 28, height: 28, borderRadius: '50%', flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem', fontWeight: 700, background: 'var(--color-info-surface)', border: '1px solid var(--color-info-border)', color: 'var(--color-info)' },
   heroStation: { fontSize: '0.8rem', color: 'var(--text-muted)' },
   heroRelative: { fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-info)', background: 'var(--color-info-surface)', padding: '0.05rem 0.45rem', borderRadius: 99 },
-  sourceText: { fontSize: '0.8rem', color: 'var(--text-muted)' },
+  typeTag: { display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-dim)', padding: '0.2rem 0.6rem', borderRadius: 20, border: '1px solid var(--border)', background: 'var(--bg-card)', whiteSpace: 'nowrap' },
+  typeDot: { width: 8, height: 8, borderRadius: '50%', flexShrink: 0 },
   heroCaption: { fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' },
   heroTime: { fontSize: '1.5rem', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em', lineHeight: 1.2 },
   heroMeta: { fontSize: '0.9rem', color: 'var(--text-dim)' },
@@ -1055,18 +1225,20 @@ const p = {
   phoneBtn: { background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--color-info)', fontSize: '0.95rem', fontWeight: 600, fontFamily: 'inherit' },
   allergy: { background: 'var(--color-danger-surface)', border: '1px solid var(--color-danger-border)', borderRadius: 10, padding: '0.7rem 0.85rem' },
   allergyLabel: { fontSize: '0.875rem', fontWeight: 700, color: 'var(--color-danger)' },
-  timeline: { listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '0.85rem' },
-  timelineItem: { position: 'relative', paddingLeft: '1.4rem', display: 'flex', flexDirection: 'column', gap: '0.1rem' },
-  timelineDot: { position: 'absolute', left: 0, top: '0.35rem', width: 9, height: 9, borderRadius: '50%', background: 'var(--text-dim)' },
-  timelineDotFuture: { background: 'transparent', border: '1.5px solid var(--text-ghost)', boxSizing: 'border-box' },
-  timelineLine: { position: 'absolute', left: 4, top: '1.05rem', bottom: '-0.85rem', width: 1, background: 'var(--border-strong)' },
-  timelineLabel: { fontSize: '0.9rem', fontWeight: 600, lineHeight: 1.35 },
-  timelineDate: { fontSize: '0.8rem', color: 'var(--text-muted)' },
+  timeline: { listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column' },
+  timelineItem: { position: 'relative', paddingLeft: '1.5rem', display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', flexWrap: 'wrap', columnGap: '1rem', rowGap: '0.1rem' },
+  timelineDot: { position: 'absolute', left: 0, top: '0.32rem', width: 10, height: 10, borderRadius: '50%', background: 'var(--text-muted)', boxSizing: 'border-box' },
+  timelineDotLatest: { background: 'var(--text)', boxShadow: '0 0 0 3px var(--bg-card), 0 0 0 4.5px var(--border-strong)' },
+  timelineDotFuture: { background: 'var(--bg-card)', border: '1.5px solid var(--text-muted)' },
+  timelineLine: { position: 'absolute', left: 4.5, top: 'calc(0.32rem + 14px)', bottom: 'calc(-0.32rem + 4px)', width: 1, background: 'var(--border-strong)' },
+  timelineLineFuture: { background: 'none', borderLeft: '1px dashed var(--border-strong)' },
+  timelineLabel: { fontSize: '0.9rem', lineHeight: 1.35, display: 'inline-flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', minWidth: 0 },
+  timelineDate: { fontSize: '0.8rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' },
   holdBox: { background: 'var(--color-info-surface)', border: '1px solid var(--color-info-border)', borderRadius: 10, padding: '0.7rem 0.85rem', display: 'flex', flexDirection: 'column', gap: '0.2rem' },
   holdLabel: { fontSize: '0.875rem', fontWeight: 700, color: 'var(--color-info)' },
   actions: {
-    display: 'flex', gap: '0.6rem', flexWrap: 'wrap',
-    padding: '1rem 1.25rem', borderTop: '1px solid var(--border)', flexShrink: 0, background: 'var(--bg-panel)',
+    display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.6rem', flexWrap: 'wrap',
+    padding: '0.85rem 1.25rem', borderTop: '1px solid var(--border)', flexShrink: 0, background: 'var(--bg-panel)',
   },
   stationPicker: {
     background: 'var(--color-info-surface)', border: '1px solid var(--color-info-border)',

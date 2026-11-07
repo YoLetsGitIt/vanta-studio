@@ -9,7 +9,8 @@ import BookingDetailPanel from '@/components/BookingDetailPanel';
 import CompleteBookingModal from '@/components/CompleteBookingModal';
 import RejectBookingModal from '@/components/RejectBookingModal';
 import SendSelectionLinkModal from '@/components/SendSelectionLinkModal';
-import { getStudioBooking, getStudioArtists, getStripeStatus } from '@/lib/api';
+import { getStudioArtists, getStripeStatus } from '@/lib/api';
+import { fetchBooking, forgetBookings, loadBooking, startBookingPrefetch } from '@/lib/bookingCache';
 import { bookingActions } from '@/lib/bookingActions';
 import { canCollectDeposits } from '@/lib/deposits';
 import { showError, showFeedback } from '@/lib/feedback';
@@ -32,20 +33,25 @@ export default function GlobalBookingPanel() {
   const [modal, setModal] = useState(null); // 'complete' | 'noShow' | 'reject' | 'cancel' | 'sendLink'
 
   useEffect(() => {
-    async function open(event) {
+    startBookingPrefetch();
+    let cancel = () => {};
+    function open(event) {
       const { id, summary } = event.detail ?? {};
       if (!id) return;
+      cancel();
       setModal(null);
       setBooking(summary ? { ...summary, id } : { id });
       setLoading(true);
-      try { setBooking(await getStudioBooking(id)); }
-      catch (error) { showError(error); }
-      finally { setLoading(false); }
+      cancel = loadBooking(id, {
+        onBooking: (full, { cached }) => { setBooking(full); if (cached) setLoading(false); },
+        onError: showError,
+        onDone: () => setLoading(false),
+      });
     }
     window.addEventListener(OPEN_BOOKING_EVENT, open);
     getStudioArtists('approved').then(d => setArtists(d.artists ?? [])).catch(() => {});
     getStripeStatus().then(s => setDepositsReady(canCollectDeposits(s))).catch(() => {});
-    return () => window.removeEventListener(OPEN_BOOKING_EVENT, open);
+    return () => { cancel(); window.removeEventListener(OPEN_BOOKING_EVENT, open); };
   }, []);
 
   // Deposit buttons inside the panel report changes with these events.
@@ -65,9 +71,10 @@ export default function GlobalBookingPanel() {
   }
 
   async function refresh(close) {
+    forgetBookings();
     notifyChanged();
     if (close) { setBooking(null); return; }
-    if (booking?.id) getStudioBooking(booking.id).then(setBooking).catch(() => {});
+    if (booking?.id) fetchBooking(booking.id).then(setBooking).catch(() => {});
   }
 
   async function act(action, message, close = true) {

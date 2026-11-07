@@ -91,8 +91,8 @@ export function Switch({ checked, disabled, onChange, ...props }) {
   return <input {...props} type="checkbox" role="switch" className={styles.switch} checked={checked} disabled={disabled} onChange={e => onChange?.(e.target.checked)} />;
 }
 
-export function SkeletonBar({ w = '100%', h = 14 }) {
-  return <span className={`skeleton ${styles.bar}`} style={{ width: w, height: h }} aria-hidden="true" />;
+export function SkeletonBar({ w = '100%', h = 14, round = false }) {
+  return <span className={`skeleton ${styles.bar}`} style={{ width: w, height: h, flexShrink: 0, ...(round ? { borderRadius: 999 } : {}) }} aria-hidden="true" />;
 }
 
 /** Placeholder that mirrors the real panel layout while its data loads. */

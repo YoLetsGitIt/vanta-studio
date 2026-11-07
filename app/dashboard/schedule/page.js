@@ -2,8 +2,9 @@
 
 import { SCHEDULE_GO_TO_DATE, SCHEDULE_SHOWN_DATE } from '@/components/SidebarCalendar';
 
-import { useState, useEffect } from 'react';
-import { getStudioArtists, getStudioSchedule, getStudioScheduleRange, getStudioBooking, createManualBooking, getStations, getStripeStatus } from '@/lib/api';
+import { useState, useEffect, useRef } from 'react';
+import { getStudioArtists, getStudioSchedule, getStudioScheduleRange, createManualBooking, getStations, getStripeStatus } from '@/lib/api';
+import { loadBooking } from '@/lib/bookingCache';
 import { BOOKING_SOURCES, getBookingStyle, TYPE_STYLE } from '@/lib/bookingType';
 import BookingDetailPanel from '@/components/BookingDetailPanel';
 import ScheduleWeekView, { useScheduleFilterSlot } from '@/components/ScheduleWeekView';
@@ -133,14 +134,17 @@ function useBookingActions(afterChange) {
     getStripeStatus().then(s => setStripeConnected(canCollectDeposits(s))).catch(() => {});
   }, []);
 
+  // A booking opened before (or just hovered) shows at once, then refreshes.
+  const cancelDetailLoad = useRef(() => {});
   function openDetail(entry) {
+    cancelDetailLoad.current();
     setSelectedEntry(entry);
     setDetailBooking(null);
     setDetailLoading(true);
-    getStudioBooking(entry.bookingId)
-      .then(setDetailBooking)
-      .catch(() => {}) // fall back to schedule entry data
-      .finally(() => setDetailLoading(false));
+    cancelDetailLoad.current = loadBooking(entry.bookingId, {
+      onBooking: (booking, { cached }) => { setDetailBooking(booking); if (cached) setDetailLoading(false); },
+      onDone: () => setDetailLoading(false), // on failure, fall back to schedule entry data
+    });
   }
 
   function closeDetail() {
@@ -656,7 +660,7 @@ function MonthView({ monthStart, onDayClick }) {
                     const ss = srcStyle(b.source);
                     const unconfirmed = b.status === 'requires_confirmation' || b.status === 'awaiting_payment';
                     return (
-                      <div key={b.bookingId} style={{ ...s.chip, cursor: 'pointer', background: unconfirmed ? 'rgba(255,255,255,0.04)' : ss.bg, border: unconfirmed ? '1px dashed rgba(255,255,255,0.18)' : undefined }} onClick={e => { e.stopPropagation(); actions.openDetail(b); }}>
+                      <div key={b.bookingId} data-booking-id={b.bookingId} style={{ ...s.chip, cursor: 'pointer', background: unconfirmed ? 'rgba(255,255,255,0.04)' : ss.bg, border: unconfirmed ? '1px dashed rgba(255,255,255,0.18)' : undefined }} onClick={e => { e.stopPropagation(); actions.openDetail(b); }}>
                         <div style={{ width: 6, height: 6, borderRadius: 2, background: unconfirmed ? 'rgba(255,255,255,0.2)' : ss.dot, flexShrink: 0 }} />
                         <span style={{ ...s.chipTime, color: unconfirmed ? 'rgba(255,255,255,0.3)' : undefined }}>{fmtTime(b.chosenTime)}</span>
                         <span style={{ ...s.chipClient, color: unconfirmed ? 'rgba(255,255,255,0.3)' : undefined }}>{b.clientName.split(' ')[0]}</span>
@@ -855,6 +859,7 @@ function DayView({ date, showAll, setShowAll }) {
                 return (
                   <div
                     key={b.bookingId}
+                    data-booking-id={b.bookingId}
                     onClick={() => actions.openDetail(b)}
                     style={{
                       ...s.block, top, height, left: 4, right: 32, width: undefined, zIndex: 1,
@@ -1215,6 +1220,7 @@ function StationView({ date }) {
                 return (
                   <div
                     key={b.bookingId}
+                    data-booking-id={b.bookingId}
                     onClick={() => actions.openDetail(b)}
                     style={{
                       ...s.block, top, height, left: 4, right: 4, width: undefined,

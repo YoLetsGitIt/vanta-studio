@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { listStudioBookings, getStudioArtists, getStripeStatus, getStudioBooking } from '@/lib/api';
+import { listStudioBookings, getStudioArtists, getStripeStatus } from '@/lib/api';
+import { loadBooking } from '@/lib/bookingCache';
 import { getCached, setCached, invalidatePrefix } from '@/lib/cache';
 import { statusColors, statusLabel, capitalise } from '@/lib/status';
 import { getBookingStyle } from '@/lib/bookingType';
@@ -151,23 +152,23 @@ function AppointmentsInner() {
 
   useEffect(() => {
     if (!selected) { setSelectedBooking(null); return; }
-    let active = true;
     setSelectedBooking(null);
     setDetailLoading(true);
-    getStudioBooking(selected)
-      .then(booking => {
-        if (!active) return;
+    // A booking opened before (or just hovered) shows at once, then refreshes.
+    return loadBooking(selected, {
+      onBooking: (booking, { cached }) => {
         setSelectedBooking(booking);
+        if (cached) setDetailLoading(false);
         // Opened via a link (e.g. a client's booking history): show the tab this booking lives in.
         if (selected === requestedBookingId && deepLinkTabSet.current !== requestedBookingId) {
           deepLinkTabSet.current = requestedBookingId;
           const tab = filterForStatus(booking.status);
           if (tab) { setActiveFilter(tab); setCompletedSubFilter('all'); setConfirmedSubFilter('all'); }
         }
-      })
-      .catch(showError)
-      .finally(() => { if (active) setDetailLoading(false); });
-    return () => { active = false; };
+      },
+      onError: showError,
+      onDone: () => setDetailLoading(false),
+    });
   }, [selected]);
 
   useEffect(() => { load(); }, [load]);
@@ -655,6 +656,7 @@ function BookingRow({ booking: b, selected, onSelect, labelOverride }) {
   return (
     <div
       className="studio-booking-row"
+      data-booking-id={b.id}
       role="button"
       tabIndex={0}
       aria-expanded={selected}

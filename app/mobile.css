@@ -372,3 +372,12 @@
 
 /* Needs action inside the phone "More" menu. */
 .studio-mobile-needs-action { margin: 0 -0.75rem 1rem; }
+
+/* Booking action bar on a phone: one row, the main and other steps share the width,
+   cancel stays a small red text button on the left. */
+@media (max-width: 760px) {
+  .studio-bdp-actions { flex-wrap: nowrap !important; gap: 8px !important; }
+  .studio-bdp-action { flex: 1 1 auto; min-width: 0; }
+  .studio-bdp-action--main { flex-grow: 1.4; min-width: 0; }
+  .studio-bdp-action--danger { flex: 0 0 auto; margin-right: 0; }
+}

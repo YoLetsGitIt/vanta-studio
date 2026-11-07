@@ -97,7 +97,7 @@ export default function SidebarNeedsAction({ paymentRecording, onNavigate }) {
                 {g.items.map(item => (
                   <li key={item.id}>
                     {item.booking ? (
-                      <button type="button" className={styles.item} onClick={() => { onNavigate?.(); openBookingPanel(item.id, item.booking); }}>
+                      <button type="button" className={styles.item} data-booking-id={item.id} onClick={() => { onNavigate?.(); openBookingPanel(item.id, item.booking); }}>
                         <span className={styles.itemTitle}>{item.title}</span>
                         {item.lines.map(line => <span key={line} className={styles.itemSub}>{line}</span>)}
                       </button>

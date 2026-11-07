@@ -27,6 +27,8 @@
   --line-height-body: 1.5;
   --duration-fast: 150ms;
   --duration-normal: 200ms;
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
   --focus-ring-width: 2px;
   --focus-ring: #b9d5ff;
   --control-border: #78746e;
@@ -350,11 +352,17 @@ textarea {
 }
 
 /* ── Skeleton loading ───────────────────────────────────────────────────────── */
-@keyframes skeleton-pulse {
-  0%, 100% { opacity: 0.45; }
-  50%       { opacity: 0.9; }
+/* A soft highlight sweeps across placeholders while they load. */
+.skeleton { position: relative; overflow: hidden; }
+.skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--text) 7%, transparent), transparent);
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
 }
-.skeleton { animation: skeleton-pulse 1.6s ease-in-out infinite; }
+@keyframes skeleton-shimmer { to { transform: translateX(100%); } }
 
 /* ── Scrollbar ─────────────────────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 4px; }
@@ -390,6 +398,9 @@ textarea {
 .studio-button--icon.studio-button--lg { min-width: var(--control-height-lg); }
 .studio-button-icon { display: inline-flex; align-items: center; justify-content: center; }
 .studio-button:disabled { opacity: 0.55; filter: none; }
+/* Buttons give a little under the finger. */
+.studio-button { transition: filter var(--duration-fast) ease, background-color var(--duration-fast) ease, border-color var(--duration-fast) ease, transform 120ms var(--ease-out); }
+.studio-button:active:not(:disabled) { transform: scale(0.97); }
 .studio-button[aria-busy="true"] { cursor: progress; }
 @media (hover: hover) {
   .studio-button--ghost:hover:not(:disabled) { background: var(--bg-row-active); color: var(--text); }
@@ -485,7 +496,8 @@ textarea {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
-  .skeleton, .studio-spinner { animation: none !important; }
+  .skeleton, .skeleton::after, .studio-spinner { animation: none !important; }
+  .skeleton::after { display: none; }
 }
 
 @media (max-width: 760px) {
@@ -515,9 +527,33 @@ textarea {
 .studio-schedule-filter-select { margin-right: 0.5rem; max-width: 200px; min-height: 32px; padding: 0.3rem 1.8rem 0.3rem 0.7rem; border: 1px solid var(--border-strong); border-radius: 8px; background-color: var(--bg-base); color: var(--text); font: inherit; font-size: 0.82rem; font-weight: 600; cursor: pointer; text-overflow: ellipsis; }
 .studio-schedule-filter-select:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
 
-/* Client list rows lift slightly on hover. */
-.studio-client-row { transition: background 0.12s, border-color 0.12s, box-shadow 0.15s; }
-@media (hover: hover) {
-  .studio-client-row:hover { background: var(--bg-row-hover); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05), 0 4px 12px rgba(0, 0, 0, 0.04); }
+/* Booking panel action bar: see Btn in BookingDetailPanel. */
+.studio-bdp-action { min-width: 112px; }
+.studio-bdp-action--main { order: 2; min-width: 148px; box-shadow: 0 1px 2px rgb(0 0 0 / 12%), 0 2px 8px rgb(0 0 0 / 8%); }
+.studio-bdp-action--danger { order: -1; margin-right: auto; min-width: 0; padding-inline: var(--space-3); color: var(--color-danger) !important; }
+@media (hover: hover) and (pointer: fine) {
+  .studio-bdp-action--danger:hover:not(:disabled) { background: var(--color-danger-surface) !important; color: var(--color-danger) !important; }
 }
+
+/* Booking timeline draws itself once when the booking opens: each dot pops in, then the
+   line grows down to the next step. --tl-delay is set per step. */
+.studio-tl-item > :not(.studio-tl-dot):not(.studio-tl-line) { animation: tlTextIn 240ms var(--ease-out) var(--tl-delay) backwards; }
+.studio-tl-dot { animation: tlDotIn 220ms var(--ease-out) var(--tl-delay) backwards; }
+.studio-tl-line { transform-origin: top; animation: tlLineIn 200ms var(--ease-out) calc(var(--tl-delay) + 90ms) backwards; }
+@keyframes tlTextIn { from { opacity: 0; transform: translateX(-4px); } }
+@keyframes tlDotIn { from { opacity: 0; transform: scale(0.5); } }
+@keyframes tlLineIn { from { transform: scaleY(0); } }
+
+/* Client list rows and signed-form rows: lift on hover, give a little when pressed, and
+   their chevron leans toward where the row goes. */
+.studio-client-row { transition: background 0.12s, border-color 0.12s, box-shadow 0.15s, transform 120ms var(--ease-out); }
+.studio-consent-row { transition: background 0.12s, border-color 0.12s, transform 120ms var(--ease-out); }
+.studio-client-row:active, .studio-consent-row:active { transform: scale(0.99); }
+.studio-client-chevron, .studio-row-chevron { display: inline-block; transition: transform 160ms var(--ease-out), color 0.12s; }
+@media (hover: hover) and (pointer: fine) {
+  .studio-client-row:hover { background: var(--bg-row-hover); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05), 0 4px 12px rgba(0, 0, 0, 0.04); }
+  .studio-consent-row:hover { background: var(--bg-row-hover) !important; border-color: var(--border-strong) !important; }
+  .studio-client-row:hover .studio-client-chevron, .studio-consent-row:hover .studio-row-chevron { transform: translateX(3px); color: var(--text) !important; }
+}
+.studio-consent-row:focus-visible { outline: 2px solid var(--focus-ring, var(--color-info)); outline-offset: 2px; }
 .studio-client-row:focus-visible { outline: 2px solid var(--focus-ring, var(--color-info)); outline-offset: 2px; }
