@@ -648,3 +648,8 @@ textarea {
 }
 .studio-consent-row:focus-visible { outline: 2px solid var(--focus-ring, var(--color-info)); outline-offset: 2px; }
 .studio-client-row:focus-visible { outline: 2px solid var(--focus-ring, var(--color-info)); outline-offset: 2px; }
+
+/* Booking link name: the prefix and input read as one field. */
+.studio-slug-field:focus-within { outline: var(--focus-ring-width) solid var(--focus-ring); outline-offset: 3px; }
+/* The ring goes round the whole field (prefix + input), not the input alone. */
+.studio-slug-field input:focus-visible { outline: none !important; }

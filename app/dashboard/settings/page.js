@@ -1,6 +1,7 @@
 'use client';
 
 import Dialog from '@/components/ui/Dialog';
+import Button from '@/components/ui/Button';
 import { WidgetPreview, ConsentFormPreview } from '@/components/forms/FormPreviews';
 import StudioLogoUpload from '@/components/StudioLogoUpload';
 // import SmartSchedulingSettings from '@/components/SmartSchedulingSettings'; // smart scheduling temporarily hidden
@@ -15,7 +16,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import {
   getMyStudioAccount, updateStudioProfile,
   getStudioHours, updateStudioHours,
-  getStations, addStation, removeStation, setStationLastDay,
+  getStations, addStation, removeStation, renameStation, setStationLastDay,
   setStationUnavailability, clearStationUnavailability,
   listConsentTemplates, createConsentTemplate, updateConsentTemplate,
   getStripeStatus, startStripeOnboarding, disconnectStripe,
@@ -29,7 +30,7 @@ import accountStyles from './AccountSettings.module.css';
 import { useLanguage, LANGUAGES } from '@/lib/i18n';
 import { requestConfirmation, showError, showFeedback } from '@/lib/feedback';
 
-import DownloadableQR from '@/components/DownloadableQR';
+import DownloadableQR, { downloadQR } from '@/components/DownloadableQR';
 import WalkInFormSettings from '@/components/WalkInFormSettings';
 import BookingManagementSettings from '@/components/BookingManagementSettings';
 import EmailSenderSettings from '@/components/EmailSenderSettings';
@@ -274,6 +275,7 @@ export default function SettingsPage() {
   // Result of the "Check" button for the link name: null, or
   // { slug, state: 'short' | 'yours' | 'checking' | 'available' | 'taken' | 'error', message }.
   const [slugCheck, setSlugCheck] = useState(null);
+  const [editingSlug, setEditingSlug] = useState(false);
   const latestSlugDraft = useRef(slugDraft);
   latestSlugDraft.current = slugDraft;
   // Editing the name clears the last result.
@@ -502,6 +504,25 @@ export default function SettingsPage() {
       setStations(s => [...s, station]);
     } catch (e) {
       showError(e);
+    } finally {
+      setStationLoading(false);
+    }
+  }
+
+  // Renaming a station in place: { id, name } while editing.
+  const [renaming, setRenaming] = useState(null);
+  async function saveStationName() {
+    const name = renaming?.name.trim();
+    const current = stations.find(st => st.id === renaming?.id);
+    if (!renaming || !name || name === current?.name) { setRenaming(null); return; }
+    setStationLoading(true);
+    try {
+      await renameStation(renaming.id, name);
+      setStations(list => list.map(st => (st.id === renaming.id ? { ...st, name } : st)));
+      setRenaming(null);
+      showFeedback('Station renamed', 'success');
+    } catch (e) {
+      showError(e.message);
     } finally {
       setStationLoading(false);
     }
@@ -762,6 +783,16 @@ export default function SettingsPage() {
     }
   }
 
+  // Check the new link name a moment after typing stops.
+  useEffect(() => {
+    if (!editingSlug) return undefined;
+    if (slugDraft === bookingSlug) { setSlugCheck(null); return undefined; }
+    if (slugDraft.length < 3) { setSlugCheck({ slug: slugDraft, state: 'short' }); return undefined; }
+    const timer = setTimeout(checkBookingSlug, 400);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slugDraft, editingSlug, bookingSlug]);
+
   async function saveBookingSlug(event) {
     event.preventDefault();
     setSlugError('');
@@ -770,6 +801,8 @@ export default function SettingsPage() {
     try {
       const { slug } = await updateBookingLink(slugDraft);
       setBookingSlug(slug); setSlugDraft(slug); setWalkInUrl(`${SHORT_LINK_BASE}/b/${slug}`);
+      setEditingSlug(false);
+      showFeedback('Booking link changed', 'success');
     } catch (err) {
       setSlugError(err.message === 'that link is already taken' ? `Another studio already uses vanta.tattoo/b/${slugDraft}. Try a different name.` : err.message);
     } finally {
@@ -1151,14 +1184,34 @@ export default function SettingsPage() {
               <div key={st.id} style={s.stationRow}>
                 <div className="studio-wrap-row" style={s.stationTop}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                    <span style={s.stationName}>{st.name}</span>
+                    {renaming?.id === st.id ? (
+                      <form style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }} onSubmit={e => { e.preventDefault(); saveStationName(); }}>
+                        <input
+                          aria-label="Station name"
+                          value={renaming.name}
+                          maxLength={40}
+                          autoFocus
+                          onFocus={e => e.target.select()}
+                          onChange={e => setRenaming(r => ({ ...r, name: e.target.value }))}
+                          onKeyDown={e => { if (e.key === 'Escape') setRenaming(null); }}
+                          style={{ ...s.stationNameInput }}
+                        />
+                        <button type="submit" style={s.stationToggleBtn} disabled={stationLoading || !renaming.name.trim()}>Save</button>
+                        <button type="button" style={{ ...s.stationToggleBtn, background: 'transparent', border: 'none' }} onClick={() => setRenaming(null)}>Cancel</button>
+                      </form>
+                    ) : (
+                      <span style={s.stationName}>{st.name}</span>
+                    )}
                     {st.endDate && (
                       <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#f59e3a', background: 'rgba(245,158,58,0.1)', border: '1px solid rgba(245,158,58,0.25)', borderRadius: 20, padding: '0.12rem 0.5rem', whiteSpace: 'nowrap' }}>
                         Last day {new Date(st.endDate + 'T00:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}
                       </span>
                     )}
                   </div>
-                  <div style={s.stationActions}>
+                  {renaming?.id !== st.id && <div style={s.stationActions}>
+                    <button style={s.stationToggleBtn} onClick={() => setRenaming({ id: st.id, name: st.name })} disabled={stationLoading}>
+                      Rename
+                    </button>
                     <button
                       style={{ ...s.stationToggleBtn, opacity: stations.length <= 1 ? 0.4 : 1 }}
                       onClick={() => setStationLastDayTarget({ id: st.id, endDate: st.endDate ?? null })}
@@ -1175,7 +1228,7 @@ export default function SettingsPage() {
                     >
                       Remove
                     </button>
-                  </div>
+                  </div>}
                 </div>
                 {/* Unavailability panel — re-enable with button above
                 {expandedStation === st.id && (
@@ -1365,48 +1418,60 @@ export default function SettingsPage() {
               <button onClick={saveProfile} style={s.saveBtn} disabled={saving}>
                 {saving ? t('saving') : saved ? t('saved') : t('save')}
               </button>
+
+              <div style={{ ...s.embedCard, borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>
+                <h3 style={{ ...s.label, margin: 0 }}>Add it to your website</h3>
+                <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: 0 }}>Paste this code where you want the booking form to appear on your site.</p>
+                <pre style={s.codeBlock}>{embedSnippet}</pre>
+                <button onClick={copyEmbed} style={s.copyBtn}>{embedCopied ? t('copied') : t('copy_snippet')}</button>
+              </div>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <WidgetPreview bg={widgetBgColor} accent={widgetAccentColor} logoUrl={logoUrl} studioName={name || 'Your Studio'} fields={formFields} consentTemplate={widgetConsentTemplateId ? consentTemplates.find(t => t.id === widgetConsentTemplateId) : null} />
             </div>
           </div>
-          <div style={{ ...s.embedCard, borderTop: '1px solid var(--border)', paddingTop: '1.25rem', marginTop: '1.5rem' }}>
-            <h3 style={{ ...s.label, margin: 0 }}>Add it to your website</h3>
-            <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: 0 }}>Paste this code where you want the booking form to appear on your site.</p>
-            <pre style={s.codeBlock}>{embedSnippet}</pre>
-            <button onClick={copyEmbed} style={s.copyBtn}>{embedCopied ? t('copied') : t('copy_snippet')}</button>
-          </div>
         </section>
 
-        <section className="settings-span-6" style={s.card}>
-          <h2 style={s.sectionTitle}>{t('booking_link')}</h2>
-          <p style={s.sectionDesc}>Share this link or QR code so clients can submit booking requests.</p>
-          <div className="studio-wrap-row" style={s.walkInCard}>
-            <div style={s.walkInLeft}>
-              <span style={s.walkInUrl}>{walkInUrl}</span>
-              <button onClick={copyLink} style={s.copyBtn}>{copied ? t('copied') : t('copy_link')}</button>
-            </div>
-            <DownloadableQR value={walkInUrl} filename="booking-qr" />
-          </div>
-          {bookingSlug && (
-            <form onSubmit={saveBookingSlug} style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '1rem' }}>
-              <label htmlFor="booking-slug" style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text)' }}>Link name</label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>vanta.tattoo/b/</span>
-                <input id="booking-slug" className="vanta-input" value={slugDraft} onChange={e => setSlugDraft(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))} maxLength={40} autoCapitalize="none" autoCorrect="off" spellCheck={false} style={{ flex: '1 1 140px', minWidth: 0, background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 8, padding: '0.5rem 0.7rem', fontSize: '16px', color: 'var(--text)' }} />
-                <button type="button" style={s.copyBtn} onClick={checkBookingSlug} disabled={slugSaving || slugCheck?.state === 'checking'}>{slugCheck?.state === 'checking' ? 'Checking…' : 'Check'}</button>
-                <button type="submit" style={s.copyBtn} disabled={slugSaving || slugDraft === bookingSlug || slugDraft.length < 3 || slugCheck?.state === 'taken'}>{slugSaving ? 'Saving…' : 'Save'}</button>
+        <section className="settings-span-6" style={s.card} aria-labelledby="booking-link-title">
+          <h2 id="booking-link-title" style={s.sectionTitle}>{t('booking_link')}</h2>
+          <p style={s.sectionDesc}>Share this link or QR code so clients can send you booking requests.</p>
+          <div style={s.linkBlock}>
+            <DownloadableQR value={walkInUrl} id="booking-qr" filename="booking-qr" displaySize={84} hideButton />
+            <div style={s.linkMain}>
+              <span style={s.linkUrl}>{walkInUrl.replace(/^https?:\/\//, '')}</span>
+              <div style={s.linkActions}>
+                <Button size="sm" onClick={copyLink}>{copied ? t('copied') : t('copy_link')}</Button>
+                <Button size="sm" variant="secondary" onClick={() => downloadQR('booking-qr', 'booking-qr')}>Download QR</Button>
+                {bookingSlug && !editingSlug && (
+                  <Button size="sm" variant="ghost" onClick={() => { setSlugDraft(bookingSlug); setSlugCheck(null); setSlugError(''); setEditingSlug(true); }}>Change link</Button>
+                )}
               </div>
-              <div aria-live="polite">
-                {slugError ? <p role="alert" style={{ margin: 0, fontSize: '0.85rem', color: 'var(--color-danger)' }}>{slugError}</p>
-                  : slugCheck?.state === 'short' ? <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-muted)' }}>Use at least 3 letters or numbers.</p>
-                  : slugCheck?.state === 'yours' ? <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-muted)' }}>This is your current link.</p>
-                  : slugCheck?.state === 'error' ? <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--color-danger)' }}>Couldn’t check right now. Try again.</p>
-                  : slugCheck?.state === 'available' ? <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--color-success)' }}>✓ vanta.tattoo/b/{slugCheck.slug} is available</p>
-                  : slugCheck?.state === 'taken' ? <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--color-danger)' }}>{slugCheck.message === 'that link is already taken' ? `Another studio already uses vanta.tattoo/b/${slugCheck.slug}. Try a different name.` : `${slugCheck.message.charAt(0).toUpperCase()}${slugCheck.message.slice(1)}.`}</p>
+            </div>
+          </div>
+          {bookingSlug && editingSlug && (
+            <form onSubmit={saveBookingSlug} style={s.slugForm}>
+              <label htmlFor="booking-slug" style={s.label}>New link</label>
+              <div className="studio-slug-field" style={s.slugField}>
+                <span aria-hidden="true" style={s.slugPrefix}>vanta.tattoo/b/</span>
+                <input id="booking-slug" value={slugDraft} autoFocus
+                  onChange={e => setSlugDraft(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+                  onKeyDown={e => { if (e.key === 'Escape') setEditingSlug(false); }}
+                  maxLength={40} autoCapitalize="none" autoCorrect="off" spellCheck={false} style={s.slugInput} />
+              </div>
+              <div aria-live="polite" style={{ minHeight: '1.15rem' }}>
+                {slugError ? <p role="alert" style={{ ...s.slugNote, color: 'var(--color-danger)' }}>{slugError}</p>
+                  : slugCheck?.state === 'short' ? <p style={s.slugNote}>Use at least 3 letters or numbers.</p>
+                  : slugCheck?.state === 'checking' ? <p style={s.slugNote}>Checking…</p>
+                  : slugCheck?.state === 'error' ? <p style={{ ...s.slugNote, color: 'var(--color-danger)' }}>Couldn’t check right now. Try again.</p>
+                  : slugCheck?.state === 'available' ? <p style={{ ...s.slugNote, color: 'var(--color-success)' }}>✓ Available</p>
+                  : slugCheck?.state === 'taken' ? <p style={{ ...s.slugNote, color: 'var(--color-danger)' }}>{slugCheck.message === 'that link is already taken' ? 'Another studio already uses this link. Try a different name.' : `${slugCheck.message.charAt(0).toUpperCase()}${slugCheck.message.slice(1)}.`}</p>
                   : null}
               </div>
-              {slugCheck?.state !== 'taken' && <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-ghost)' }}>Changing it stops the old link and QR codes working.</p>}
+              <div style={s.linkActions}>
+                <Button size="sm" type="submit" loading={slugSaving} loadingLabel="Saving…" disabled={slugDraft === bookingSlug || slugCheck?.state !== 'available'}>Save link</Button>
+                <Button size="sm" variant="ghost" onClick={() => setEditingSlug(false)}>Cancel</Button>
+              </div>
+              <p style={{ ...s.slugNote, color: 'var(--text-ghost)' }}>Your old link and printed QR codes will stop working.</p>
             </form>
           )}
         </section>
@@ -1875,6 +1940,7 @@ const s = {
   stationTop: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', minHeight: 52, padding: '0 0.1rem' },
   stationName: { fontSize: '0.95rem', fontWeight: 500, color: 'var(--text)' },
   stationActions: { display: 'flex', gap: '0.5rem' },
+  stationNameInput: { width: 180, padding: '0.4rem 0.6rem', fontSize: '0.9rem', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-input, var(--bg))', color: 'var(--text)' },
   stationToggleBtn: { background: 'var(--bg-chip)', border: '1px solid var(--border)', borderRadius: 8, padding: '0.4rem 0.75rem', fontSize: '0.85rem', color: 'var(--text-dim)', cursor: 'pointer' },
   stationRemoveBtn: { background: 'transparent', border: '1px solid rgba(255,80,80,0.2)', borderRadius: 8, padding: '0.4rem 0.75rem', fontSize: '0.85rem', color: 'var(--color-danger)', cursor: 'pointer' },
   unavailPanel: { borderTop: '1px solid var(--border-faint)', padding: '0.75rem 0.85rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' },
@@ -1885,6 +1951,15 @@ const s = {
   unavailDate: { fontSize: '0.85rem', color: 'rgba(255,200,60,0.8)' },
   clearBtn: { background: 'none', border: 'none', color: 'rgba(255,200,60,0.5)', cursor: 'pointer', fontSize: '0.78rem', padding: 0 },
   // Walk-in
+  linkBlock: { display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.85rem', borderRadius: 12, background: 'var(--bg-base)', border: '1px solid var(--border-faint)' },
+  linkMain: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.6rem' },
+  linkUrl: { fontSize: '1rem', fontWeight: 600, color: 'var(--text)', wordBreak: 'break-all' },
+  linkActions: { display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' },
+  slugForm: { display: 'flex', flexDirection: 'column', gap: '0.45rem', marginTop: '1rem' },
+  slugField: { display: 'flex', alignItems: 'center', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 8, paddingLeft: '0.7rem', overflow: 'hidden' },
+  slugPrefix: { fontSize: '0.95rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' },
+  slugInput: { flex: 1, minWidth: 0, border: 'none', outline: 'none', background: 'transparent', padding: '0.55rem 0.7rem 0.55rem 0', fontSize: '16px', color: 'var(--text)' },
+  slugNote: { margin: 0, fontSize: '0.82rem', color: 'var(--text-muted)' },
   walkInCard: { display: 'flex', alignItems: 'center', gap: '1.5rem' },
   walkInLeft: { flex: 1, display: 'flex', flexDirection: 'column', gap: '0.75rem', minWidth: 0 },
   walkInUrl: { fontSize: '0.85rem', color: 'var(--text-muted)', wordBreak: 'break-all' },

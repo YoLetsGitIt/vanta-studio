@@ -4,7 +4,8 @@
 // Name, date of birth, email, phone and the artist are always asked; consent forms
 // are always included. Changes save straight away.
 import { useEffect, useState } from 'react';
-import DownloadableQR from '@/components/DownloadableQR';
+import DownloadableQR, { downloadQR } from '@/components/DownloadableQR';
+import Button from '@/components/ui/Button';
 import { getMyWalkInFormConfig, updateMyWalkInFormConfig } from '@/lib/api';
 import { WalkInPreview } from '@/components/forms/FormPreviews';
 
@@ -47,20 +48,23 @@ export default function WalkInFormSettings({ styles: s, url, studioName, logoUrl
     <section style={s.card} aria-labelledby="walkin-form-title">
       <h2 id="walkin-form-title" style={s.sectionTitle}>Walk-in form</h2>
       <p style={s.sectionDesc}>
-        For clients who walk in. They scan the QR code or open the link, choose their artist, fill in their details and sign your consent forms, and they’re booked in straight away.
+        Clients who walk in scan the QR code or open the link, pick their artist, fill in their details and sign your consent forms. They’re booked in straight away.
       </p>
       {url && (
-        <div className="studio-wrap-row" style={s.walkInCard}>
-          <div style={s.walkInLeft}>
-            <span style={s.walkInUrl}>{url}</span>
-            <button onClick={copy} style={s.copyBtn}>{copied ? 'Copied' : 'Copy link'}</button>
+        <div style={s.linkBlock}>
+          <DownloadableQR value={url} id="walkin-qr" filename="walk-in-qr" displaySize={84} hideButton />
+          <div style={s.linkMain}>
+            <span style={s.linkUrl}>{url.replace(/^https?:\/\//, '')}</span>
+            <div style={s.linkActions}>
+              <Button size="sm" onClick={copy}>{copied ? 'Copied' : 'Copy link'}</Button>
+              <Button size="sm" variant="secondary" onClick={() => downloadQR('walkin-qr', 'walk-in-qr')}>Download QR</Button>
+            </div>
           </div>
-          <DownloadableQR value={url} filename="walk-in-qr" />
         </div>
       )}
-      <div className="studio-feature-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', alignItems: 'start', marginTop: '1rem' }}>
+      <div className="studio-feature-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', alignItems: 'start', marginTop: '1.5rem' }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-        <span style={s.label}>Extra fields</span>
+        <span style={s.label}>Form fields</span>
         <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '0 0 0.35rem' }}>
           Name, date of birth, email, phone and artist are always asked, and your consent forms are always included.
         </p>
@@ -68,7 +72,7 @@ export default function WalkInFormSettings({ styles: s, url, studioName, logoUrl
           const entry = fields[key] ?? { enabled: false, required: false };
           return (
             <div key={key} style={s.formFieldRow}>
-              <span style={{ flex: 1, fontSize: '0.83rem', fontWeight: 500, color: entry.enabled ? 'var(--text)' : 'var(--text-ghost)' }}>{label}</span>
+              <span style={{ flex: 1, fontSize: '0.95rem', fontWeight: 500, color: entry.enabled ? 'var(--text)' : 'var(--text-secondary)' }}>{label}</span>
               {entry.enabled && (
                 <label style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', cursor: 'pointer' }}>
                   <input type="checkbox" aria-label={`Walk-in ${label} required`} checked={!!entry.required} disabled={saving}
@@ -76,20 +80,17 @@ export default function WalkInFormSettings({ styles: s, url, studioName, logoUrl
                   <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Required</span>
                 </label>
               )}
-              <button role="switch" aria-label={`Walk-in ${label} field`} aria-checked={entry.enabled} disabled={saving}
-                onClick={() => toggle(key, 'enabled', !entry.enabled)}
-                style={{
-                  ...s.fieldToggleBtn,
-                  background: entry.enabled ? 'var(--accent-tint)' : 'var(--bg-chip)',
-                  borderColor: entry.enabled ? 'var(--accent-tint-border)' : 'var(--border)',
-                  color: entry.enabled ? 'var(--accent)' : 'var(--text-ghost)',
-                }}>
-                {entry.enabled ? 'On' : 'Off'}
+              <button type="button" role="switch" aria-label={`Walk-in ${label} field`} aria-checked={entry.enabled} disabled={saving}
+                onClick={() => toggle(key, 'enabled', !entry.enabled)} style={s.switchBtn}>
+                <span aria-hidden="true" style={{ ...s.switchTrack, background: entry.enabled ? 'var(--switch-on)' : 'var(--switch-off)' }}>
+                  <span style={{ ...s.switchThumb, transform: entry.enabled ? 'translateX(16px)' : 'none' }} />
+                </span>
               </button>
             </div>
           );
         })}
         {error && <p role="alert" style={{ margin: 0, fontSize: '0.85rem', color: 'var(--color-danger)' }}>{error}</p>}
+        {fields !== null && !error && <p style={{ margin: '0.35rem 0 0', fontSize: '0.8rem', color: 'var(--text-ghost)' }}>Changes save straight away.</p>}
       </div>
       {/* The walk-in page uses Studio's own colours, not the website widget's. */}
       <WalkInPreview bg="#111111" accent="#d5d0c7" studioName={studioName || 'Your Studio'} logoUrl={logoUrl} fields={fields} consentTemplates={consentTemplates} />
