@@ -1489,7 +1489,7 @@ export default function SettingsPage() {
         </>}
 
         {tab === 'walkins' && <>
-        <div className="settings-span-12 settings-cell"><WalkInFormSettings styles={s} bg={validHex(widgetBgColor) ? widgetBgColor : undefined} accent={validHex(widgetAccentColor) ? widgetAccentColor : undefined} studioName={name} logoUrl={logoUrl} consentTemplates={consentTemplates} url={bookingSlug ? `${SHORT_LINK_BASE}/w/${bookingSlug}` : studioId ? `${typeof window === 'undefined' ? '' : window.location.origin}/walkin?s=${studioId}` : ''} /></div>
+        <WalkInFormSettings styles={s} bg={validHex(widgetBgColor) ? widgetBgColor : undefined} accent={validHex(widgetAccentColor) ? widgetAccentColor : undefined} studioName={name} logoUrl={logoUrl} consentTemplates={consentTemplates} url={bookingSlug ? `${SHORT_LINK_BASE}/w/${bookingSlug}` : studioId ? `${typeof window === 'undefined' ? '' : window.location.origin}/walkin?s=${studioId}` : ''} />
 
         </>}
 
@@ -1602,7 +1602,7 @@ export default function SettingsPage() {
             <span role="status" style={{ marginRight: 'auto', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
               {consentDirty ? 'Unsaved changes' : consentForm ? 'All changes saved' : 'Not saved yet'}
             </span>
-            {consentDirty && consentForm && <button type="button" style={s.cancelBtn} disabled={templateSaving} onClick={resetConsentForm}>Discard</button>}
+            {consentDirty && consentForm && <button type="button" style={{ ...s.cancelBtn, flex: "none" }} disabled={templateSaving} onClick={resetConsentForm}>Discard</button>}
             <button type="button" style={s.saveBtn} onClick={saveTemplate} disabled={templateSaving || (!consentDirty && !!consentForm)}>
               {templateSaving ? 'Saving…' : consentForm ? 'Save form' : 'Create form'}
             </button>
