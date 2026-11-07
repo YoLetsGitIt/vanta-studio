@@ -1481,6 +1481,23 @@ export default function SettingsPage() {
         </>}
 
         {tab === 'consent' && <>
+        {walkInUrl && (
+          <section className="settings-span-12" style={s.card} aria-labelledby="consent-qr-title">
+            <h2 id="consent-qr-title" style={s.sectionTitle}>Consent link</h2>
+            <p style={s.sectionDesc}>Print the QR code or share the link. Clients open your consent form, sign in or create an account, then fill it in and sign.</p>
+            <div style={s.linkBlock}>
+              <DownloadableQR value={consentUrl} id="consent-qr" filename="consent-qr" displaySize={84} hideButton />
+              <div style={s.linkMain}>
+                <span style={s.linkUrl}>{consentUrl.replace(/^https?:\/\//, '')}</span>
+                <div style={s.linkActions}>
+                  <Button size="sm" onClick={() => navigator.clipboard.writeText(consentUrl).then(() => showFeedback('Consent link copied', 'success')).catch(() => {})}>Copy link</Button>
+                  <Button size="sm" variant="secondary" onClick={() => downloadQR('consent-qr', 'consent-qr')}>Download QR</Button>
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
+
         <section className="settings-span-12 studio-consent-editor" style={s.card} aria-label="Consent form editor">
           <p style={{ ...s.sectionDesc, margin: 0 }}>Clients fill in and sign this before their appointment. The preview shows what they see.</p>
               <div className="studio-feature-grid studio-consent-editor-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', alignItems: 'start' }}>
@@ -1552,7 +1569,7 @@ export default function SettingsPage() {
                 </div>
 
                 {/* Right — preview */}
-                <div className="studio-consent-preview" style={{ position: 'sticky', top: 0 }}>
+                <div className="studio-consent-preview" style={{ position: 'sticky', top: '1.5rem' }}>
                   <ConsentFormPreview
                     name={templateName}
                     fields={templateFields}
@@ -1574,18 +1591,6 @@ export default function SettingsPage() {
           </div>
         </section>
 
-        {walkInUrl && (
-          <section className="settings-span-12" style={s.card} aria-labelledby="consent-qr-title">
-            <div className="studio-wrap-row" style={s.walkInCard}>
-              <div style={s.walkInLeft}>
-                <h2 id="consent-qr-title" style={s.sectionTitle}>Consent QR code</h2>
-                <span style={s.sectionDesc}>Print or display this in your studio. Scanning it opens your consent form; clients create an account or sign in, then fill in and sign it.</span>
-                <span style={s.walkInUrl}>{consentUrl}</span>
-              </div>
-              <DownloadableQR value={consentUrl} filename="consent-qr" displaySize={112} />
-            </div>
-          </section>
-        )}
 
         </>}
 
