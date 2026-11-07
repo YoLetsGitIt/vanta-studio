@@ -13,21 +13,61 @@ export default function FeedbackHost() {
   const timerRef = useRef(null);
   const cancelButtonRef = useRef(null);
 
+  // Auto-dismiss after 5s; hovering or focusing the notice pauses the countdown.
+  const DISMISS_MS = 5000;
+  const remainingRef = useRef(DISMISS_MS);
+  const startedRef = useRef(0);
+  const [paused, setPaused] = useState(false);
+  const [leaving, setLeaving] = useState(false);
+  const leaveTimerRef = useRef(null);
+  const seqRef = useRef(0);
+
+  function startTimer(ms) {
+    clearTimeout(timerRef.current);
+    remainingRef.current = ms;
+    startedRef.current = Date.now();
+    timerRef.current = setTimeout(() => dismiss(), ms);
+  }
+  function pause() {
+    if (!notice || notice.sticky || paused) return;
+    clearTimeout(timerRef.current);
+    remainingRef.current = Math.max(remainingRef.current - (Date.now() - startedRef.current), 600);
+    setPaused(true);
+  }
+  function resume() {
+    if (!notice || notice.sticky || !paused) return;
+    setPaused(false);
+    startTimer(remainingRef.current);
+  }
+  // Plays the exit, then removes the notice.
+  function dismiss() {
+    clearTimeout(timerRef.current);
+    setLeaving(true);
+    clearTimeout(leaveTimerRef.current);
+    leaveTimerRef.current = setTimeout(() => { setNotice(null); setLeaving(false); }, 160);
+  }
+
   useEffect(() => {
     function onFeedback(event) {
-      clearTimeout(timerRef.current);
-      setNotice(event.detail);
+      clearTimeout(leaveTimerRef.current);
+      setLeaving(false);
+      setPaused(false);
       const hasActions = event.detail?.actions?.length || event.detail?.action;
-      if (!hasActions) timerRef.current = setTimeout(() => setNotice(null), 5000);
+      seqRef.current += 1;
+      setNotice({ ...event.detail, sticky: Boolean(hasActions), seq: seqRef.current });
+      if (hasActions) clearTimeout(timerRef.current);
+      else startTimer(DISMISS_MS);
     }
     function onConfirm(event) { setConfirmation(event.detail); }
     window.addEventListener(FEEDBACK_EVENT, onFeedback);
     window.addEventListener(CONFIRM_EVENT, onConfirm);
     return () => {
       clearTimeout(timerRef.current);
+      clearTimeout(leaveTimerRef.current);
       window.removeEventListener(FEEDBACK_EVENT, onFeedback);
       window.removeEventListener(CONFIRM_EVENT, onConfirm);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -51,18 +91,27 @@ export default function FeedbackHost() {
   return (
     <>
       {notice && noticeHost && createPortal(
-        <div role="status" aria-live="polite" style={{ ...styles.notice, ...(noticeHost.tagName === 'DIALOG' ? styles.dialogNotice : {}), ...(notice.type === 'success' ? styles.success : styles.error) }}>
-          <span aria-hidden="true">{notice.type === 'success' ? '✓' : '!'}</span>
-          <span style={styles.noticeMessage}>{notice.message}</span>
-          <button aria-label="Dismiss message" onClick={() => setNotice(null)} style={styles.dismiss}>×</button>
+        <div role="status" aria-live="polite"
+          className="studio-toast"
+          data-leaving={leaving || undefined}
+          data-paused={paused || undefined}
+          onMouseEnter={pause} onMouseLeave={resume} onFocus={pause} onBlur={resume}
+          style={{ ...styles.notice, ...(noticeHost.tagName === 'DIALOG' ? styles.dialogNotice : {}), ...(notice.type === 'success' ? styles.success : styles.error) }}>
+          <span key={`icon-${notice.seq}`} aria-hidden="true" className={`studio-toast-icon studio-toast-icon--${notice.type === 'success' ? 'success' : 'error'}`}>
+            {notice.type === 'success' ? (
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path className="studio-toast-check" d="M2.5 6.2 5 8.6l4.5-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            ) : '!'}
+          </span>
+          <span key={`msg-${notice.seq}`} className="studio-toast-message" style={styles.noticeMessage}>{notice.message}</span>
+          <button aria-label="Dismiss message" className="studio-toast-dismiss" onClick={dismiss} style={styles.dismiss}>×</button>
           {(notice.actions?.length || notice.action) && (
             <div style={styles.noticeActions}>
               {(notice.actions ?? [notice.action]).map((action, index) => (
                 <button
                   key={`${action.label}-${index}`}
+                  className="studio-toast-action"
                   onClick={() => {
-                    clearTimeout(timerRef.current);
-                    setNotice(null);
+                    dismiss();
                     action.onClick?.();
                   }}
                   style={styles.noticeAction}
@@ -72,6 +121,7 @@ export default function FeedbackHost() {
               ))}
             </div>
           )}
+          {!notice.sticky && <span key={`bar-${notice.seq}`} aria-hidden="true" className="studio-toast-timer" style={{ animationDuration: `${DISMISS_MS}ms` }} />}
         </div>
       , noticeHost)}
       {confirmation && (
@@ -97,7 +147,7 @@ export default function FeedbackHost() {
 }
 
 const styles = {
-  notice: { position: 'fixed', zIndex: 10000, right: 24, top: 24, width: 'min(430px, calc(100vw - 32px))', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 10, padding: '0.8rem 0.9rem', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--bg-modal)', color: 'var(--text)', boxShadow: '0 16px 45px rgba(0,0,0,0.32)', fontSize: '0.84rem' },
+  notice: { position: 'fixed', zIndex: 10000, right: 24, top: 24, width: 'min(430px, calc(100vw - 32px))', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 10, padding: '0.8rem 0.9rem', borderRadius: 10, overflow: 'hidden', border: '1px solid var(--border)', background: 'var(--bg-modal)', color: 'var(--text)', boxShadow: '0 16px 45px rgba(0,0,0,0.32)', fontSize: '0.84rem' },
   dialogNotice: { position: 'relative', top: 'auto', right: 'auto', width: 'calc(100% - 32px)', margin: '16px auto', flexShrink: 0, order: -1 },
   error: { borderColor: 'var(--color-danger-border)' },
   success: { borderColor: 'var(--color-success-border)' },

@@ -1,50 +1,64 @@
 'use client';
 
-// Settings → Payments: PayID and bank transfer details for deposits. Any one of
-// Stripe, PayID or bank transfer is enough to send deposit links; clients see
-// every option that's set up.
+// Settings → Payments: how clients can pay deposits. Three methods, each with its
+// own switch: card (through the studio's Stripe account), PayID and bank transfer.
+// A switched-off method keeps its details. Any one method that's on is enough to
+// send deposit links; clients see every method that's on.
 import { useEffect, useState } from 'react';
+import Button from '@/components/ui/Button';
 import { getDepositMethods, updateDepositMethods } from '@/lib/api';
+import { showFeedback } from '@/lib/feedback';
 
-const EMPTY = { payid: '', payid_name: '', bank_account_name: '', bank_bsb: '', bank_account_number: '' };
+const DETAILS = ['payid', 'payid_name', 'bank_account_name', 'bank_bsb', 'bank_account_number'];
+const SWITCHES = ['payid_enabled', 'bank_enabled', 'card_enabled'];
+const EMPTY = { payid: '', payid_name: '', bank_account_name: '', bank_bsb: '', bank_account_number: '', payid_enabled: true, bank_enabled: true, card_enabled: true };
 
-export default function DepositPaymentOptions({ styles: s, stripeReady = false }) {
+export default function DepositPaymentOptions({ styles: s, stripe }) {
   const [form, setForm] = useState(null);
   const [saved, setSaved] = useState(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [justSaved, setJustSaved] = useState(false);
 
   useEffect(() => {
     getDepositMethods()
-      .then(data => { const next = { ...EMPTY, ...data }; setForm(next); setSaved(next); })
+      .then(data => { const next = fromServer(data); setForm(next); setSaved(next); })
       .catch(e => { setForm({ ...EMPTY }); setSaved({ ...EMPTY }); setError(e.message); });
   }, []);
 
   if (!form) {
     return (
-      <section style={{ ...s.card, gridColumn: '1 / -1' }}>
+      <section style={s.card}>
         <h2 style={s.sectionTitle}>Deposit payment options</h2>
         <div style={s.loadingDot} />
       </section>
     );
   }
 
-  const set = key => e => { setForm(f => ({ ...f, [key]: e.target.value })); setJustSaved(false); };
-  const dirty = Object.keys(EMPTY).some(k => (form[k] ?? '') !== (saved[k] ?? ''));
-  const hasPayID = !!saved.payid;
-  const hasBank = !!(saved.bank_account_name && saved.bank_bsb && saved.bank_account_number);
-  const methods = [stripeReady && 'card (Stripe)', hasPayID && 'PayID', hasBank && 'bank transfer'].filter(Boolean);
+  const set = key => e => setForm(f => ({ ...f, [key]: e.target.value }));
+  const flip = key => () => setForm(f => ({ ...f, [key]: !f[key] }));
+  const dirty = [...DETAILS, ...SWITCHES].some(k => (form[k] ?? '') !== (saved[k] ?? ''));
+
+  const stripeActive = !!(stripe.status?.connected && stripe.status?.charges_enabled);
+  const on = {
+    card: stripeActive && saved.card_enabled,
+    payid: saved.payid_enabled && !!saved.payid,
+    bank: saved.bank_enabled && !!(saved.bank_account_name && saved.bank_bsb && saved.bank_account_number),
+  };
+  const methods = [on.card && 'card', on.payid && 'PayID', on.bank && 'bank transfer'].filter(Boolean);
 
   async function save(e) {
-    e.preventDefault();
+    e?.preventDefault();
+    if (form.payid_enabled && !form.payid.trim()) { setError('Enter your PayID, or switch PayID off.'); return; }
+    if (form.bank_enabled && !(form.bank_account_name.trim() && form.bank_bsb.trim() && form.bank_account_number.trim())) {
+      setError('Enter the account name, BSB and account number, or switch bank transfer off.'); return;
+    }
     setSaving(true);
     setError('');
     try {
-      const next = { ...EMPTY, ...(await updateDepositMethods(form)) };
+      const next = fromServer(await updateDepositMethods(form));
       setForm(next);
       setSaved(next);
-      setJustSaved(true);
+      showFeedback('Payment options saved', 'success');
     } catch (err) {
       setError(err.message);
     } finally {
@@ -53,65 +67,145 @@ export default function DepositPaymentOptions({ styles: s, stripeReady = false }
   }
 
   return (
-    <section style={{ ...s.card, gridColumn: '1 / -1' }} aria-labelledby="deposit-options-title">
+    <section style={s.card} aria-labelledby="deposit-options-title">
       <h2 id="deposit-options-title" style={s.sectionTitle}>Deposit payment options</h2>
       <p style={s.sectionDesc}>
-        Let clients pay deposits by PayID or bank transfer. You only need one way to be paid — Stripe, PayID or bank transfer —
-        to send deposit links. The deposit email shows every option you set up, with a booking reference.
+        Choose how clients can pay deposits. The deposit email shows every option that’s on, with a booking reference.
       </p>
-      <p style={{ ...s.sectionDesc, color: methods.length ? 'var(--text)' : 'var(--color-warning, #e0a84f)' }}>
+      <p role="status" style={{ ...o.summary, ...(methods.length ? {} : o.summaryWarn) }}>
         {methods.length
           ? `Clients can pay by ${methods.length > 1 ? `${methods.slice(0, -1).join(', ')} or ${methods.at(-1)}` : methods[0]}.`
-          : 'No deposit payment options yet — add one to send deposit links.'}
+          : 'No way to pay is switched on yet, so you can’t ask for deposits.'}
       </p>
 
-      <form onSubmit={save} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-        <fieldset style={o.group} disabled={saving}>
-          <legend style={o.legend}>PayID</legend>
-          <div style={o.row}>
-            <label style={o.field}>
-              <span style={s.label}>PayID</span>
-              <input style={s.input} value={form.payid} onChange={set('payid')} placeholder="Email, mobile or ABN" autoComplete="off" maxLength={140} />
-            </label>
-            <label style={o.field}>
-              <span style={s.label}>Name shown to clients <span style={o.optional}>(optional)</span></span>
-              <input style={s.input} value={form.payid_name} onChange={set('payid_name')} placeholder="e.g. Ink Studio Pty Ltd" autoComplete="off" maxLength={140} />
-            </label>
+      <form onSubmit={save} style={o.list}>
+        {/* Card, through the studio's Stripe account */}
+        <div style={o.method}>
+          <div style={o.methodHead}>
+            <div style={o.methodText}>
+              <span style={o.methodName}>Card</span>
+              <span style={o.methodHint}>Paid through your Stripe account, minus the platform fee. Confirmed automatically.</span>
+            </div>
+            {stripeActive && (
+              <Switch label="Card payments" checked={form.card_enabled} onChange={flip('card_enabled')} disabled={saving} s={s} />
+            )}
           </div>
-        </fieldset>
+          {stripe.status === null ? (
+            <div style={s.loadingDot} />
+          ) : !stripe.status?.connected ? (
+            <div style={o.stripeRow}>
+              <Button size="sm" onClick={stripe.connect} loading={stripe.connecting} loadingLabel="Opening Stripe…">Connect Stripe</Button>
+              <span style={o.methodHint}>You’ll set it up on Stripe, then come back here.</span>
+            </div>
+          ) : (
+            <div style={o.stripeRow}>
+              <span style={o.stripeStatus}>
+                <span aria-hidden="true" style={{ ...o.dot, background: stripeActive ? 'var(--color-success)' : 'var(--color-warning)' }} />
+                {stripeActive ? 'Stripe connected' : 'Stripe setup isn’t finished'}
+              </span>
+              {!stripeActive && <Button size="sm" onClick={stripe.connect} loading={stripe.connecting} loadingLabel="Opening Stripe…">Finish setup</Button>}
+              <Button size="sm" variant="ghost" className="studio-danger-ghost" onClick={stripe.disconnect}>Disconnect</Button>
+            </div>
+          )}
+          {stripe.error && <p role="alert" style={s.errorText}>{stripe.error}</p>}
+        </div>
 
-        <fieldset style={o.group} disabled={saving}>
-          <legend style={o.legend}>Bank transfer</legend>
-          <div style={o.row}>
-            <label style={{ ...o.field, flexBasis: '100%' }}>
-              <span style={s.label}>Account name</span>
-              <input style={s.input} value={form.bank_account_name} onChange={set('bank_account_name')} placeholder="e.g. Ink Studio Pty Ltd" autoComplete="off" maxLength={140} />
-            </label>
-            <label style={o.field}>
-              <span style={s.label}>BSB</span>
-              <input style={s.input} value={form.bank_bsb} onChange={set('bank_bsb')} placeholder="000-000" inputMode="numeric" autoComplete="off" maxLength={7} />
-            </label>
-            <label style={o.field}>
-              <span style={s.label}>Account number</span>
-              <input style={s.input} value={form.bank_account_number} onChange={set('bank_account_number')} placeholder="12345678" inputMode="numeric" autoComplete="off" maxLength={14} />
-            </label>
+        {/* PayID */}
+        <div style={o.method}>
+          <div style={o.methodHead}>
+            <div style={o.methodText}>
+              <span style={o.methodName}>PayID</span>
+              <span style={o.methodHint}>You mark it received once the money arrives.</span>
+            </div>
+            <Switch label="PayID" checked={form.payid_enabled} onChange={flip('payid_enabled')} disabled={saving} s={s} />
           </div>
-        </fieldset>
+          {form.payid_enabled ? (
+            <div style={o.fields}>
+              <label style={o.field}>
+                <span style={s.label}>PayID</span>
+                <input style={s.input} value={form.payid} onChange={set('payid')} placeholder="Email, mobile or ABN" autoComplete="off" maxLength={140} disabled={saving} />
+              </label>
+              <label style={o.field}>
+                <span style={s.label}>Name shown to clients <span style={o.optional}>(optional)</span></span>
+                <input style={s.input} value={form.payid_name} onChange={set('payid_name')} placeholder="e.g. Ink Studio Pty Ltd" autoComplete="off" maxLength={140} disabled={saving} />
+              </label>
+            </div>
+          ) : form.payid && <p style={o.offNote}>Off. {form.payid} is kept for when you switch it back on.</p>}
+        </div>
 
-        <p style={{ ...s.sectionDesc, fontSize: '0.8rem' }}>Leave a section empty to stop offering it. Mark PayID and bank deposits as received on the booking once the money arrives.</p>
+        {/* Bank transfer */}
+        <div style={o.method}>
+          <div style={o.methodHead}>
+            <div style={o.methodText}>
+              <span style={o.methodName}>Bank transfer</span>
+              <span style={o.methodHint}>You mark it received once the money arrives.</span>
+            </div>
+            <Switch label="Bank transfer" checked={form.bank_enabled} onChange={flip('bank_enabled')} disabled={saving} s={s} />
+          </div>
+          {form.bank_enabled ? (
+            <div style={o.fields}>
+              <label style={{ ...o.field, flexBasis: '100%' }}>
+                <span style={s.label}>Account name</span>
+                <input style={s.input} value={form.bank_account_name} onChange={set('bank_account_name')} placeholder="e.g. Ink Studio Pty Ltd" autoComplete="off" maxLength={140} disabled={saving} />
+              </label>
+              <label style={o.field}>
+                <span style={s.label}>BSB</span>
+                <input style={s.input} value={form.bank_bsb} onChange={set('bank_bsb')} placeholder="000-000" inputMode="numeric" autoComplete="off" maxLength={7} disabled={saving} />
+              </label>
+              <label style={o.field}>
+                <span style={s.label}>Account number</span>
+                <input style={s.input} value={form.bank_account_number} onChange={set('bank_account_number')} placeholder="12345678" inputMode="numeric" autoComplete="off" maxLength={14} disabled={saving} />
+              </label>
+            </div>
+          ) : form.bank_account_number && <p style={o.offNote}>Off. Your bank details are kept for when you switch it back on.</p>}
+        </div>
+
         {error && <p role="alert" style={s.errorText}>{error}</p>}
-        <button type="submit" style={{ ...s.saveBtn, opacity: dirty || saving ? 1 : 0.6 }} disabled={saving || !dirty}>
-          {saving ? 'Saving…' : justSaved && !dirty ? 'Saved' : 'Save payment options'}
-        </button>
+        <div style={o.footer}>
+          <Button type="submit" loading={saving} loadingLabel="Saving…" disabled={!dirty}>Save payment options</Button>
+          {dirty && !saving && <span style={o.methodHint}>Unsaved changes</span>}
+        </div>
       </form>
     </section>
   );
 }
 
+// A method with no details shows as off, whatever its saved switch says.
+function fromServer(data) {
+  const d = { ...EMPTY, ...data };
+  return {
+    ...d,
+    payid_enabled: d.payid_enabled !== false && !!d.payid,
+    bank_enabled: d.bank_enabled !== false && !!(d.bank_account_name && d.bank_bsb && d.bank_account_number),
+    card_enabled: d.card_enabled !== false,
+  };
+}
+
+function Switch({ label, checked, onChange, disabled, s }) {
+  return (
+    <button type="button" role="switch" aria-label={label} aria-checked={checked} onClick={onChange} disabled={disabled} style={s.switchBtn}>
+      <span aria-hidden="true" style={{ ...s.switchTrack, background: checked ? 'var(--switch-on)' : 'var(--switch-off)' }}>
+        <span style={{ ...s.switchThumb, transform: checked ? 'translateX(16px)' : 'none' }} />
+      </span>
+    </button>
+  );
+}
+
 const o = {
-  group: { border: 0, margin: 0, padding: 0, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.6rem' },
-  legend: { fontSize: '0.8rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-secondary)', padding: 0, marginBottom: '0.6rem' },
-  row: { display: 'flex', flexWrap: 'wrap', gap: '0.75rem' },
+  summary: { margin: 0, fontSize: '0.9rem', color: 'var(--text)' },
+  summaryWarn: { color: 'var(--color-warning)' },
+  list: { display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '0.25rem' },
+  method: { display: 'flex', flexDirection: 'column', gap: '0.75rem', padding: '0.9rem 1rem', borderRadius: 12, border: '1px solid var(--border-faint)', background: 'var(--bg-base)' },
+  methodHead: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' },
+  methodText: { display: 'flex', flexDirection: 'column', gap: '0.15rem', minWidth: 0 },
+  methodName: { fontSize: '0.95rem', fontWeight: 600, color: 'var(--text)' },
+  methodHint: { fontSize: '0.82rem', color: 'var(--text-muted)', lineHeight: 1.4 },
+  fields: { display: 'flex', flexWrap: 'wrap', gap: '0.75rem' },
   field: { flex: '1 1 220px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.35rem' },
   optional: { fontWeight: 400, color: 'var(--text-secondary)' },
+  offNote: { margin: 0, fontSize: '0.82rem', color: 'var(--text-ghost)' },
+  stripeRow: { display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' },
+  stripeStatus: { display: 'inline-flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.88rem', fontWeight: 500, color: 'var(--text)', marginRight: 'auto' },
+  dot: { width: 8, height: 8, borderRadius: '50%', flexShrink: 0 },
+  footer: { display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '0.25rem' },
 };

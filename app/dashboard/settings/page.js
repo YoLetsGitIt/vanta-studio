@@ -738,7 +738,8 @@ export default function SettingsPage() {
     setStripeConnecting(true);
     setStripeError('');
     try {
-      const returnTo = window.location.href.split('?')[0];
+      // Come back to Settings → Payments after Stripe.
+      const returnTo = `${window.location.href.split('?')[0]}?tab=payments`;
       const result = await startStripeOnboarding(returnTo);
       window.location.href = result.onboarding_url;
     } catch (e) {
@@ -748,7 +749,7 @@ export default function SettingsPage() {
   }
 
   async function handleStripeDisconnect() {
-    if (!await requestConfirmation({ title: 'Disconnect Stripe?', message: 'Deposits will no longer be collected for new bookings.', confirmLabel: 'Disconnect', danger: true })) return;
+    if (!await requestConfirmation({ title: 'Disconnect Stripe?', message: 'Clients won’t be able to pay deposits by card. PayID and bank transfer stay as they are.', confirmLabel: 'Disconnect', danger: true })) return;
     setStripeError('');
     try {
       await disconnectStripe();
@@ -1116,54 +1117,8 @@ export default function SettingsPage() {
           </form>
         </section>
 
-        <div className="settings-span-7 settings-cell"><ArtistCommissionOverrides styles={s} defaults={{ studio: walkinCut, personal: personalCut }} /></div>
-        <section className="settings-span-5" style={s.card}>
-          <h2 style={s.sectionTitle}>{t('stripe_connect')}</h2>
-          <p style={s.sectionDesc}>
-            Connect your Stripe account so clients can pay deposits by card.
-            Payments go directly to your Stripe account minus the platform fee. You can also offer PayID or bank transfer below.
-          </p>
-
-          {stripeStatus === null ? (
-            <div style={s.loadingDot} />
-          ) : stripeStatus.connected ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              <div style={s.stripeStatusRow}>
-                <div style={s.stripeStatusDot(stripeStatus.charges_enabled)} />
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  <span style={{ fontSize: '0.87rem', fontWeight: 600, color: 'var(--text)' }}>
-                    {stripeStatus.charges_enabled ? 'Active' : 'Onboarding incomplete'}
-                  </span>
-                  <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
-                    {stripeStatus.charges_enabled
-                      ? 'Deposits can be collected from clients.'
-                      : 'Finish Stripe onboarding to start accepting payments.'}
-                  </span>
-                </div>
-                <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.5rem' }}>
-                  {!stripeStatus.charges_enabled && (
-                    <button style={s.saveBtn} onClick={handleStripeConnect} disabled={stripeConnecting}>
-                      {stripeConnecting ? 'Redirecting…' : 'Continue setup'}
-                    </button>
-                  )}
-                  <button style={s.stripeDisconnectBtn} onClick={handleStripeDisconnect}>
-                    Disconnect
-                  </button>
-                </div>
-              </div>
-              {stripeError && <p style={s.errorText}>{stripeError}</p>}
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              <button style={s.stripeConnectBtn} onClick={handleStripeConnect} disabled={stripeConnecting}>
-                {stripeConnecting ? 'Redirecting to Stripe…' : 'Connect Stripe account'}
-              </button>
-              {stripeError && <p style={s.errorText}>{stripeError}</p>}
-            </div>
-          )}
-        </section>
-
-        <div className="settings-span-12 settings-cell"><DepositPaymentOptions styles={s} stripeReady={!!(stripeStatus?.connected && stripeStatus?.charges_enabled)} /></div>
+        <div className="settings-span-12 settings-cell"><DepositPaymentOptions styles={s} stripe={{ status: stripeStatus, connecting: stripeConnecting, error: stripeError, connect: handleStripeConnect, disconnect: handleStripeDisconnect }} /></div>
+        <div className="settings-span-12 settings-cell"><ArtistCommissionOverrides styles={s} defaults={{ studio: walkinCut, personal: personalCut }} /></div>
 
         </>}
 

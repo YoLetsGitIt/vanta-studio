@@ -658,3 +658,49 @@ textarea {
 @media (hover: hover) and (pointer: fine) {
   .studio-button--ghost.studio-danger-ghost:hover:not(:disabled) { background: var(--color-danger-surface, var(--bg-row-active)); color: var(--color-danger); }
 }
+
+/* ── Popup notices (FeedbackHost) ─────────────────────────────────────────── */
+/* Drops in from above and leaves the same way; the icon pops (a success tick draws
+   itself); a thin bar counts down to auto-dismiss and pauses on hover. */
+.studio-toast { animation: toastIn 220ms var(--ease-out) both; transform-origin: top center; }
+.studio-toast[data-leaving] { animation: toastOut 160ms var(--ease-out) both; pointer-events: none; }
+@keyframes toastIn { from { opacity: 0; transform: translateY(-8px) scale(0.97); } }
+@keyframes toastOut { to { opacity: 0; transform: translateY(-6px) scale(0.98); } }
+
+.studio-toast-icon {
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  width: 20px; height: 20px; border-radius: 50%; font-size: 0.75rem; font-weight: 800;
+  animation: toastIconIn 260ms var(--ease-out) 60ms both;
+}
+.studio-toast-icon--success { background: var(--color-success-surface); color: var(--color-success); }
+.studio-toast-icon--error { background: var(--color-danger-surface); color: var(--color-danger); }
+@keyframes toastIconIn { from { opacity: 0; transform: scale(0.6); } }
+.studio-toast-check { stroke-dasharray: 12; stroke-dashoffset: 12; animation: toastCheck 280ms var(--ease-out) 160ms forwards; }
+@keyframes toastCheck { to { stroke-dashoffset: 0; } }
+
+/* A new message replacing one already showing crossfades its text. */
+.studio-toast-message { animation: toastText 180ms var(--ease-out) both; }
+@keyframes toastText { from { opacity: 0; transform: translateY(2px); } }
+
+.studio-toast-timer {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: currentColor; opacity: 0.18;
+  transform-origin: left center; animation-name: toastTimer; animation-timing-function: linear; animation-fill-mode: forwards;
+}
+.studio-toast[data-paused] .studio-toast-timer { animation-play-state: paused; }
+@keyframes toastTimer { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+
+.studio-toast-dismiss { border-radius: 8px; transition: background-color 150ms ease, color 150ms ease, transform 120ms var(--ease-out); }
+.studio-toast-dismiss:active, .studio-toast-action:active { transform: scale(0.94); }
+.studio-toast-action { transition: transform 120ms var(--ease-out), filter 150ms ease; }
+@media (hover: hover) and (pointer: fine) {
+  .studio-toast-dismiss:hover { background: var(--bg-row-active); color: var(--text); }
+  .studio-toast-action:hover { filter: brightness(1.08); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .studio-toast { animation: toastFade 160ms ease both; }
+  .studio-toast[data-leaving] { animation: toastFade 120ms ease reverse both; }
+  .studio-toast-icon, .studio-toast-message { animation: none; }
+  .studio-toast-check { animation: none; stroke-dashoffset: 0; }
+  .studio-toast-timer { display: none; }
+}
+@keyframes toastFade { from { opacity: 0; } }
