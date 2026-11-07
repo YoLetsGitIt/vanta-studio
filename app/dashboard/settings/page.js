@@ -5,6 +5,7 @@ import Button from '@/components/ui/Button';
 import { WidgetPreview, ConsentFormPreview, CONSENT_DEFAULT_BG, CONSENT_DEFAULT_ACCENT } from '@/components/forms/FormPreviews';
 import { isLightHex as isLightColorHex } from '@/lib/formTheme';
 import StudioLogoUpload from '@/components/StudioLogoUpload';
+import StickyPreview from '@/components/StickyPreview';
 // import SmartSchedulingSettings from '@/components/SmartSchedulingSettings'; // smart scheduling temporarily hidden
 import SMSSettings from '@/components/SMSSettings';
 import AppointmentTypesSettings from '@/components/AppointmentTypesSettings';
@@ -1583,7 +1584,7 @@ export default function SettingsPage() {
                 </div>
 
                 {/* Right — preview */}
-                <div className="studio-consent-preview" style={{ position: 'sticky', top: '1.5rem' }}>
+                <StickyPreview>
                   <ConsentFormPreview
                     name={templateName}
                     fields={templateFields}
@@ -1593,7 +1594,7 @@ export default function SettingsPage() {
                     accent={validHex(widgetAccentColor) ? widgetAccentColor : CONSENT_DEFAULT_ACCENT}
                     studioName={name}
                   />
-                </div>
+                </StickyPreview>
               </div>
 
           {templateError && <p role="alert" style={{ fontSize: '0.8rem', color: 'var(--color-danger)', margin: 0 }}>{templateError}</p>}

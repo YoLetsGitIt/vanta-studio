@@ -401,9 +401,3 @@
 .settings-column { display: flex; flex-direction: column; gap: 16px; align-self: start; min-width: 0; }
 .settings-column > * { margin: 0 !important; }
 @media (max-width: 720px) { .settings-column { gap: 12px; } }
-
-/* Form previews (consent, walk-in) stay in view while the settings beside them scroll:
-   never taller than the window, scrolling inside themselves if the form is long. */
-@media (min-width: 901px) {
-  .studio-consent-preview { max-height: calc(100vh - 3rem); overflow-y: auto; overscroll-behavior: contain; border-radius: 12px; scrollbar-width: thin; }
-}

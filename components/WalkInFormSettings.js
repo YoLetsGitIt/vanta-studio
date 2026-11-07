@@ -6,6 +6,7 @@
 import { useEffect, useState } from 'react';
 import DownloadableQR, { downloadQR } from '@/components/DownloadableQR';
 import Button from '@/components/ui/Button';
+import StickyPreview from '@/components/StickyPreview';
 import { getMyWalkInFormConfig, updateMyWalkInFormConfig } from '@/lib/api';
 import { WalkInPreview } from '@/components/forms/FormPreviews';
 
@@ -98,9 +99,9 @@ export default function WalkInFormSettings({ styles: s, url, studioName, logoUrl
           </div>
         </div>
         {/* The studio's form colours (Studio → Logo and colours). */}
-        <div className="studio-consent-preview" style={{ position: 'sticky', top: '1.5rem' }}>
+        <StickyPreview>
           <WalkInPreview bg={bg} accent={accent} studioName={studioName || 'Your Studio'} logoUrl={logoUrl} fields={fields} consentTemplates={consentTemplates} />
-        </div>
+        </StickyPreview>
       </div>
     </section>
   );
