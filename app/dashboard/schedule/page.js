@@ -5,7 +5,7 @@ import { SCHEDULE_GO_TO_DATE, SCHEDULE_SHOWN_DATE } from '@/components/SidebarCa
 import { useState, useEffect, useRef } from 'react';
 import { getStudioArtists, getStudioSchedule, getStudioScheduleRange, createManualBooking, getStations, getStripeStatus } from '@/lib/api';
 import { loadBooking } from '@/lib/bookingCache';
-import { BOOKING_SOURCES, getBookingStyle, TYPE_STYLE } from '@/lib/bookingType';
+import { entryStyle, useAppointmentTypes, UNTYPED_COLOR } from '@/lib/appointmentTypes';
 import BookingDetailPanel from '@/components/BookingDetailPanel';
 import ScheduleWeekView, { useScheduleFilterSlot } from '@/components/ScheduleWeekView';
 import { createPortal } from 'react-dom';
@@ -55,8 +55,6 @@ function useHourPx() {
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 // All block colours are type-based — no per-artist palette.
-const SOURCE_STYLE = TYPE_STYLE;
-function srcStyle(source) { return getBookingStyle(source); }
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -559,6 +557,7 @@ const saveBtnStyle = {
 // ── Week view ─────────────────────────────────────────────────────────────────
 
 function MonthView({ monthStart, onDayClick }) {
+  const { byId: typesById } = useAppointmentTypes();
   const { t } = useLanguage();
   const monthEnd  = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0);
   const gridStart = getMonday(monthStart);
@@ -657,7 +656,7 @@ function MonthView({ monthStart, onDayClick }) {
                 {/* Booking chips */}
                 <div style={s.monthChipList}>
                   {visible.map(b => {
-                    const ss = srcStyle(b.source);
+                    const ss = entryStyle(b, typesById);
                     const unconfirmed = b.status === 'requires_confirmation' || b.status === 'awaiting_payment';
                     return (
                       <div key={b.bookingId} data-booking-id={b.bookingId} style={{ ...s.chip, cursor: 'pointer', background: unconfirmed ? 'rgba(255,255,255,0.04)' : ss.bg, border: unconfirmed ? '1px dashed rgba(255,255,255,0.18)' : undefined }} onClick={e => { e.stopPropagation(); actions.openDetail(b); }}>
@@ -679,14 +678,7 @@ function MonthView({ monthStart, onDayClick }) {
         </div>
       </div>
 
-      <div style={s.legend}>
-        {Object.values(BOOKING_SOURCES).map(source => (
-          <div key={source.key} style={s.legendItem}>
-            <div style={{ width: 8, height: 8, borderRadius: 2, background: SOURCE_STYLE[source.key].dot, flexShrink: 0 }} />
-            <span style={{ ...s.legendName, color: SOURCE_STYLE[source.key].tagColor }}>{source.label}</span>
-          </div>
-        ))}
-      </div>
+      <MonthTypeLegend />
     </div>
 
     <BookingOverlays actions={actions} />
@@ -716,6 +708,7 @@ function WeekView({ date, lens, onDayClick }) {
 // ── Day view ──────────────────────────────────────────────────────────────────
 
 function DayView({ date, showAll, setShowAll }) {
+  const { byId: typesById } = useAppointmentTypes();
   const { t } = useLanguage();
   const hourPx = useHourPx();
   const gridH  = (DAY_END - DAY_START) * hourPx;
@@ -851,7 +844,7 @@ function DayView({ date, showAll, setShowAll }) {
                 const height   = Math.max(durMin * (hourPx / 60), 24);
                 if (top < 0 || top > gridH) return null;
                 const isSelected = actions.selectedEntry?.bookingId === b.bookingId;
-                const ss = srcStyle(b.source);
+                const ss = entryStyle(b, typesById);
                 const unconfirmed = b.status === 'requires_confirmation' || b.status === 'awaiting_payment';
                 const blockBorder = unconfirmed ? 'rgba(255,255,255,0.18)' : ss.border;
                 const blockBg     = unconfirmed ? 'var(--bg-base)' : ss.bg;
@@ -1127,6 +1120,7 @@ function StationMonthView({ monthStart, onDayClick }) {
 // ── Station day view ──────────────────────────────────────────────────────────
 
 function StationView({ date }) {
+  const { byId: typesById } = useAppointmentTypes();
   const { t } = useLanguage();
   const hourPx = useHourPx();
   const gridH  = (DAY_END - DAY_START) * hourPx;
@@ -1212,7 +1206,7 @@ function StationView({ date }) {
                 const height   = Math.max(durMin * (hourPx / 60), 24);
                 if (top < 0 || top > gridH) return null;
                 const isSelected = actions.selectedEntry?.bookingId === b.bookingId;
-                const ss = srcStyle(b.source);
+                const ss = entryStyle(b, typesById);
                 const unconfirmed = b.status === 'requires_confirmation' || b.status === 'awaiting_payment';
                 const blockBorder = unconfirmed ? 'rgba(255,255,255,0.18)' : ss.border;
                 const blockBg     = unconfirmed ? 'rgba(255,255,255,0.04)' : ss.bg;
@@ -1730,3 +1724,19 @@ const s = {
     boxShadow: '0 8px 40px rgba(0,0,0,0.6)',
   },
 };
+
+// Month view key: the studio's appointment types and their colours.
+function MonthTypeLegend() {
+  const { active } = useAppointmentTypes();
+  if (!active.length) return null;
+  return (
+    <div style={s.legend}>
+      {[...active, { id: 'none', name: 'No type', color: UNTYPED_COLOR }].map(type => (
+        <div key={type.id} style={s.legendItem}>
+          <div style={{ width: 8, height: 8, borderRadius: 2, background: type.color, flexShrink: 0 }} />
+          <span style={s.legendName}>{type.name}</span>
+        </div>
+      ))}
+    </div>
+  );
+}

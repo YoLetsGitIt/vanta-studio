@@ -12,6 +12,7 @@ import { formatDob, ageFromDob } from '@/lib/format';
 import { useLanguage } from '@/lib/i18n';
 import { requestConfirmation, showError, showFeedback } from '@/lib/feedback';
 import { bookingActions } from '@/lib/bookingActions';
+import { formatTypeLength, useAppointmentTypes } from '@/lib/appointmentTypes';
 import Button from '@/components/ui/Button';
 import styles from './NewAppointmentPanel.module.css';
 
@@ -213,6 +214,9 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
   const [size, setSize] = useState('');
   const [sizeUnit, setSizeUnit] = useState(getDefaultSizeUnit);
   const [appointmentType, setAppointmentType] = useState(null); // 'tattoo' | 'piercing', chosen by the studio
+  // One of the studio's own appointment types (Settings): fills in length, price and deposit.
+  const { active: presets } = useAppointmentTypes();
+  const [presetId, setPresetId] = useState(null);
   const isPiercing = appointmentType === 'piercing';
   const [retouch, setRetouch] = useState(false);
 
@@ -443,18 +447,30 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
   const trackTyping = (step, leaving) => setTypingStep(current => (step ? step : current === leaving ? null : current));
   const artistName = artists.find(artist => (artist.artistId ?? artist.artist_id ?? artist.id) === artistId)?.name;
   const stationName = (availableStations ?? allStations).find(station => station.id === stationId)?.name;
-  const durationName = DURATION_OPTIONS.find(option => option.value === durationMins)?.label;
+  const durationName = DURATION_OPTIONS.find(option => option.value === durationMins)?.label ?? (durationMins ? formatTypeLength(durationMins) : null);
+  const preset = presets.find(type => type.id === presetId) ?? null;
+  // The preset's length is offered even when it isn't one of the usual lengths.
+  const durationOptions = durationMins && !DURATION_OPTIONS.some(o => o.value === durationMins)
+    ? [...DURATION_OPTIONS, { value: durationMins, label: formatTypeLength(durationMins) }].sort((a, b) => a.value - b.value)
+    : DURATION_OPTIONS;
+  function pickPreset(type) {
+    if (presetId === type.id) { setPresetId(null); return; } // the filled-in values stay
+    setPresetId(type.id);
+    setDurationMins(type.duration_minutes);
+    if (type.price != null) setFinalPrice(String(type.price));
+    if (type.deposit > 0) { setDepositAmount(String(type.deposit)); if (!depositMode || depositMode === 'none') setDepositMode('later'); }
+  }
   const stepSummary = {
     type: { studio: 'Studio', walkin: 'Walk-in', personal: 'Personal' }[bookingType],
     client: clientName ? [clientName, ageOf(clientMode === 'search' ? selectedClient?.dob : clientDob), clientMode === 'search' ? (selectedClient?.email || selectedClient?.phone) : (clientEmail.trim() || clientPhone.trim())].filter(Boolean).join(' · ') : null,
-    appointment: [appointmentType && (isPiercing ? 'Piercing' : 'Tattoo'), artistName].filter(Boolean).join(' · ') || null,
+    appointment: [preset?.name, appointmentType && (isPiercing ? 'Piercing' : 'Tattoo'), artistName].filter(Boolean).join(' · ') || null,
     schedule: sectionDone.schedule ? [chosenDateTime?.toLocaleString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }), durationName, stationName].filter(Boolean).join(' · ') : null,
     payment: depositMode ? [{ none: 'No deposit', later: stripeConnected ? 'Deposit to collect' : 'Deposit due later', paid: `Deposit paid${depositMethod ? ` by ${DEPOSIT_METHODS.find(m => m.value === depositMethod)?.phrase}` : ''}` }[depositMode] + (depositEnabled && deposit > 0 ? ` $${deposit.toFixed(2)}` : ''), quote > 0 ? `$${quote.toFixed(2)} quoted` : null].filter(Boolean).join(' · ') : null,
   };
   const essentialsComplete = Boolean(clientName && artistId && bookingDate && startTime && durationMins && stationId && !timeError && !dateInPast && !artistConflict);
   // The station is picked automatically and the artist can come from the clicked slot, so
   // neither counts as an edit on its own.
-  const dirty = Boolean(selectedClient || firstName || lastName || clientEmail || clientPhone || clientDob || (artistId && artistId !== (initialSlot?.artistId || '')) || appointmentType || size || retouch || finalPrice || depositAmount || depositMode || notes || bookingType);
+  const dirty = Boolean(selectedClient || firstName || lastName || clientEmail || clientPhone || clientDob || (artistId && artistId !== (initialSlot?.artistId || '')) || appointmentType || size || retouch || finalPrice || depositAmount || depositMode || notes || bookingType || presetId);
   dirtyRef.current = dirty;
   const bodyRef = useRef(null);
   const lastStep = useRef(activeStep);
@@ -483,7 +499,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
     setStationId(''); setScheduleTouched(false); setPaymentFolded(false); setFoldTried([]);
     setSize(''); setSizeUnit('cm'); setRetouch(false); setAppointmentType(null);
     setFinalPrice(''); setDepositAmount(''); setDepositMode(null); setDepositMethod(null);
-    setBookingType(null);
+    setBookingType(null); setPresetId(null);
     setNotes(''); setError('');
   }
 
@@ -551,6 +567,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
       if (depositEnabled && da > 0) body.deposit_amount = da;
       if (depositMode === 'paid') { body.deposit_paid = true; body.deposit_method = depositMethod; }
       if (notes.trim()) body.notes = notes.trim();
+      if (presetId) body.appointment_type_id = presetId;
       body.source = bookingType;
       const createdBooking = await createManualBooking(body);
       const bookingId = createdBooking?.id;
@@ -803,9 +820,22 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
               </FormSection>
 
               <FormSection id="appointment-section-title" step="appointment" title={t('nap_appointment')} state={stepState('appointment')} done={sectionDone.appointment} summary={stepSummary.appointment} missing={foldTriedFor('appointment')} expanded={isOpen('appointment')} onToggle={() => toggleStep('appointment')} onTyping={trackTyping} onPicked={setPickedStep}>
+                {presets.length > 0 && (
+                  <div style={bd.field}>
+                    <span id="new-appointment-preset" style={bd.label}>Appointment type <span className={styles.optionalBadge}>fills in length, price and deposit</span></span>
+                    <div className={styles.presets} role="radiogroup" aria-labelledby="new-appointment-preset">
+                      {presets.map(type => (
+                        <button key={type.id} type="button" role="radio" aria-checked={presetId === type.id} onClick={() => pickPreset(type)} style={{ '--type-color': type.color }}>
+                          <span className={styles.presetName}>{type.name}</span>
+                          <span className={styles.presetMeta}>{[formatTypeLength(type.duration_minutes), type.price != null ? `$${Number(type.price).toLocaleString('en-AU')}` : null].filter(Boolean).join(' · ')}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 <div className={styles.fieldRow}>
                   <div style={bd.field}>
-                    <span id="new-appointment-type" style={bd.label}>Appointment type</span>
+                    <span id="new-appointment-type" style={bd.label}>Service</span>
                     <div className={styles.choices} role="radiogroup" aria-labelledby="new-appointment-type">
                       {[['tattoo', 'Tattoo'], ['piercing', 'Piercing']].map(([value, label]) => (
                         <button key={value} type="button" role="radio" aria-checked={appointmentType === value} onClick={() => setAppointmentType(value)}><span aria-hidden="true" className={styles.radio} />{label}</button>
@@ -842,7 +872,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
                     <label htmlFor="new-appointment-duration" style={bd.label}>{t('bdp_duration')}</label>
                     <select style={bd.select} id="new-appointment-duration" value={durationMins || ''} required onChange={e => { setDurationMins(Number(e.target.value) || 0); setScheduleTouched(true); }}>
                       <option value="" disabled>Select duration…</option>
-                      {DURATION_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                      {durationOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                     </select>
                   </div>
                   {bookingDate && startTime && allStations.length > 0 && (

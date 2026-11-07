@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { getStudioArtists, getStudioScheduleRange, getStations } from '@/lib/api';
 import { getCached, setCached, invalidatePrefix } from '@/lib/cache';
-import { getBookingStyle } from '@/lib/bookingType';
+import { entryStyle, useAppointmentTypes } from '@/lib/appointmentTypes';
 import { hasArtist } from '@/lib/format';
 import { useLanguage } from '@/lib/i18n';
 import { calendarDayAfter, layoutDayLanes, localDateKey, weekHourRange, weekStartFor, weekSchedule } from '@/lib/scheduleWeek.mjs';
@@ -29,6 +29,7 @@ const LOCALES = { en: 'en-AU', 'zh-Hans': 'zh-CN', ko: 'ko-KR' };
 const resourceId = (entry, lens) => (lens === 'artist' ? (hasArtist(entry.artistId) ? entry.artistId : null) : entry.stationId) || '__unassigned__';
 
 export default function ScheduleWeekView({ date, lens, refreshKey, selectedBookingId, onOpenDetail, onDayClick }) {
+  const { byId: typesById } = useAppointmentTypes();
   const { t, lang } = useLanguage();
   const locale = LOCALES[lang] ?? 'en-AU';
   const start = weekStartFor(date), startKey = localDateKey(start);
@@ -169,13 +170,13 @@ export default function ScheduleWeekView({ date, lens, refreshKey, selectedBooki
                 {day.key === today && now >= day.date && <div className={styles.nowLine} style={{ top: `${offset(day, now)}%` }} aria-hidden="true" />}
                 {layoutDayLanes(day.bookings).map(booking => {
                   const { entry } = booking;
-                  const source = getBookingStyle(entry.source);
+                  const source = entryStyle(entry, typesById);
                   const statusKey = { awaiting_payment: 'status_awaiting_payment', requires_confirmation: 'status_needs_confirmation', completed: 'status_completed' }[entry.status];
                   const pending = entry.status === 'awaiting_payment' || entry.status === 'requires_confirmation';
                   const artist = entry.artistName || t('sched_unassigned'), station = entry.stationName || t('sched_unassigned');
                   const minutes = (booking.displayEnd - booking.displayStart) / 60000;
                   const top = offset(day, booking.displayStart), height = minutes / span * 100;
-                  const label = [`${time(booking.displayStart)} – ${time(booking.displayEnd)}`, entry.clientName, lens === 'artist' ? artist : station, statusKey && t(statusKey), booking.continuesFrom && t('sched_continued'), booking.continuesInto && t('sched_continues_tomorrow')].filter(Boolean).join(', ');
+                  const label = [`${time(booking.displayStart)} – ${time(booking.displayEnd)}`, entry.clientName, source.typed && source.tag, lens === 'artist' ? artist : station, statusKey && t(statusKey), booking.continuesFrom && t('sched_continued'), booking.continuesInto && t('sched_continues_tomorrow')].filter(Boolean).join(', ');
                   return (
                     <button
                       key={entry.bookingId} type="button" data-booking-id={entry.bookingId} aria-label={label} title={label}
@@ -185,6 +186,7 @@ export default function ScheduleWeekView({ date, lens, refreshKey, selectedBooki
                     >
                       <span className={styles.client}>{entry.clientName}</span>
                       <span className={styles.time}>{time(booking.displayStart)} – {time(booking.displayEnd)}</span>
+                      {source.typed && <span className={styles.typeName}>{source.tag}</span>}
                       <span className={styles.resource}>{lens === 'artist' ? artist : station}</span>
                       {statusKey && <span className={pending ? styles.pendingTag : styles.status}>{t(statusKey)}</span>}
                     </button>

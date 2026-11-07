@@ -5,6 +5,7 @@ import { WidgetPreview, ConsentFormPreview } from '@/components/forms/FormPrevie
 import StudioLogoUpload from '@/components/StudioLogoUpload';
 // import SmartSchedulingSettings from '@/components/SmartSchedulingSettings'; // smart scheduling temporarily hidden
 import SMSSettings from '@/components/SMSSettings';
+import AppointmentTypesSettings from '@/components/AppointmentTypesSettings';
 import DepositPaymentOptions from '@/components/DepositPaymentOptions';
 import { StudioSetupLinks } from '@/components/StudioSetupChecklist';
 
@@ -212,6 +213,7 @@ const SHORT_LINK_BASE = (process.env.NEXT_PUBLIC_MARKETING_URL || 'https://vanta
 // Settings sections. On phones they're a list you tap into; on larger screens, tabs.
 const SETTINGS_TABS = [
   { id: 'studio',   label: 'Studio',           hint: 'Profile, logo, opening hours and stations' },
+  { id: 'types',    label: 'Appointment types', hint: 'Presets with length, colour, price and deposit' },
   { id: 'requests', label: 'Booking requests', hint: 'Who confirms times, booking form, link and widget' },
   { id: 'walkins',  label: 'Walk-ins',         hint: 'Walk-in link, QR code and form fields' },
   { id: 'consent',  label: 'Consent form',     hint: 'Build the form clients sign' },
@@ -1215,6 +1217,8 @@ export default function SettingsPage() {
         </section>
 
         </>}
+
+        {tab === 'types' && <AppointmentTypesSettings styles={s} />}
 
         {tab === 'requests' && <>
 

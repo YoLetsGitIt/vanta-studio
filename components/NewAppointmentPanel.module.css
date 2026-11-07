@@ -280,3 +280,22 @@ button.sectionHead:hover .collapseIcon { background: var(--border-strong); color
   100% { transform: translateX(0); }
 }
 @media (prefers-reduced-motion: reduce) { .missingIcon, .sectionMissing { animation: none; } }
+
+/* The studio's appointment types: a colour bar, the name and its length/price. */
+.presets { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.presets button {
+  position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-width: 0;
+  padding: 9px 12px 9px 16px; border: 1px solid var(--border-strong); border-radius: 9px;
+  background: var(--appointment-input, var(--bg-input)); color: var(--text); font: inherit; text-align: left; cursor: pointer; overflow: hidden;
+  transition: border-color 120ms, background 120ms, transform 100ms ease-out;
+}
+.presets button::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 5px; background: var(--type-color); }
+.presets button:active { transform: scale(0.97); }
+.presets button:hover { border-color: var(--text-muted); }
+.presets button[aria-checked='true'] {
+  border-color: var(--type-color); box-shadow: inset 0 0 0 1px var(--type-color);
+  background: color-mix(in srgb, var(--type-color) 12%, var(--appointment-input, var(--bg-input)));
+}
+.presets button:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.presetName { font-size: 0.875rem; font-weight: 600; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.presetMeta { font-size: 0.78rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }

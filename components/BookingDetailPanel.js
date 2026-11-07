@@ -7,14 +7,16 @@ import OfferTimesModal from '@/components/OfferTimesModal';
 import { useBookingManagement } from '@/lib/bookingManagement';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { getStations, getStudioArtists, getClientConsents, getNotes, addNote, deleteNote, getBookingConsentSubmissions, getClientConsentSubmissions, getStudioClients, getStudioClient, generateConsentLink, getStudioBookingPayment, getDepositReceipt, getDepositStatus, getOfferedTimes, listConsentTemplates } from '@/lib/api';
+import { setBookingAppointmentType, getStations, getStudioArtists, getClientConsents, getNotes, addNote, deleteNote, getBookingConsentSubmissions, getClientConsentSubmissions, getStudioClients, getStudioClient, generateConsentLink, getStudioBookingPayment, getDepositReceipt, getDepositStatus, getOfferedTimes, listConsentTemplates } from '@/lib/api';
 import { useStationAvailability } from '@/lib/useStationAvailability';
 import { statusColors, statusLabel, capitalise as cap } from '@/lib/status';
 import { formatDob as fmtDob, hasArtist, ageFromDob } from '@/lib/format';
 import { getCached, setCached } from '@/lib/cache';
 import { useLanguage } from '@/lib/i18n';
 import { showError, showFeedback } from '@/lib/feedback';
-import { normalizeBookingSource, TYPE_STYLE } from '@/lib/bookingType';
+import { normalizeBookingSource } from '@/lib/bookingType';
+import { useAppointmentTypes, formatTypeLength } from '@/lib/appointmentTypes';
+import { forgetBookings } from '@/lib/bookingCache';
 import Button, { IconButton } from '@/components/ui/Button';
 import BookingSMS from '@/components/BookingSMS';
 import MarketingConsent from '@/components/MarketingConsent';
@@ -134,6 +136,10 @@ export default function BookingDetailPanel({
   const [marketingOverride, setMarketingOverride] = useState(null);
   const [stationName,   setStationName]   = useState(null);
   const [studioArtists, setStudioArtists] = useState(null);
+  // The studio's appointment type for this booking (its colour on the schedule).
+  const { active: activeTypes, byId: typesById } = useAppointmentTypes();
+  const [typeOverride, setTypeOverride] = useState(null); // { booking, id }
+  const [typeSaving, setTypeSaving] = useState(false);
   const [artistPhotoFailed, setArtistPhotoFailed] = useState(false);
 
   // ── Consent submissions (new template system) ──────────────────────────────
@@ -155,6 +161,9 @@ export default function BookingDetailPanel({
   const dob         = booking?.dob               ?? null;
   const artistId    = booking?.artist_id          ?? entry?.artistId   ?? null;
   const artistName  = booking?.artist_name        ?? entry?.artistName ?? null;
+  const appointmentTypeId = typeOverride && typeOverride.booking === bookingId
+    ? typeOverride.id
+    : booking?.appointment_type_id ?? entry?.appointmentTypeId ?? null;
   // Artist photo: from the artists the page already has, otherwise the studio's list.
   const artistPhoto = artistId
     ? [...(bookTimeArtists ?? []), ...(studioArtists ?? [])].find(a => a.artistId === artistId || a.id === artistId)?.profileImage ?? null
@@ -390,6 +399,21 @@ export default function BookingDetailPanel({
   const allergies         = clientProfile?.allergies || null;
   const painTolerance     = clientProfile?.pain_tolerance || null;
 
+  async function changeAppointmentType(typeId) {
+    if (!bookingId) return;
+    const previous = appointmentTypeId;
+    setTypeOverride({ booking: bookingId, id: typeId });
+    setTypeSaving(true);
+    try {
+      await setBookingAppointmentType(bookingId, typeId);
+      forgetBookings();
+      window.dispatchEvent(new Event('booking-created')); // the schedule recolours
+    } catch (error) {
+      setTypeOverride({ booking: bookingId, id: previous });
+      showError(error);
+    } finally { setTypeSaving(false); }
+  }
+
   async function handleSendConsentLink(templateId) {
     if (!email) return;
     setLinkGeneratingId(templateId);
@@ -597,18 +621,28 @@ export default function BookingDetailPanel({
           )}
           <div style={p.headerPills}>
             {status && <Pill colors={sc}>{statusLabel(displayStatus)}</Pill>}
-            {source && (() => {
-              // The booking's type, in the calendar's colour for it, so a studio booking
-              // isn't mistaken for a walk-in or personal booking the studio entered.
-              const type = normalizeBookingSource(source);
-              const label = { studio: 'Studio booking', walkin: 'Walk-in', personal: 'Personal booking', app: 'Booked in the app', import: 'Imported booking' }[type];
+            {bookingId && booking && (activeTypes.length > 0 || appointmentTypeId) && (() => {
+              // The studio's appointment type, in its schedule colour; change it here.
+              const current = appointmentTypeId ? typesById[appointmentTypeId] : null;
+              const options = current?.archived ? [current, ...activeTypes] : activeTypes;
               return (
-                <span style={p.typeTag} title="Booking type">
-                  <span aria-hidden="true" style={{ ...p.typeDot, background: TYPE_STYLE[type].dot }} />
-                  {label}
-                </span>
+                <label className="studio-type-chip" style={{ ...p.typeTag, ...p.typeChip, ...(current ? { borderColor: current.color, background: `color-mix(in srgb, ${current.color} 12%, var(--bg-card))`, color: 'var(--text)' } : {}) }}>
+                  <span aria-hidden="true" style={{ ...p.typeDot, background: current?.color ?? 'transparent', border: current ? 'none' : '1.5px dashed var(--text-muted)' }} />
+                  <span>{typeSaving ? 'Saving…' : current?.name ?? 'Add type'}</span>
+                  <span aria-hidden="true" style={{ fontSize: '0.7rem', opacity: 0.7 }}>▾</span>
+                  <select aria-label="Appointment type" value={appointmentTypeId ?? ''} disabled={typeSaving} onChange={e => changeAppointmentType(e.target.value || null)} style={p.typeSelect}>
+                    <option value="">No type</option>
+                    {options.map(type => <option key={type.id} value={type.id}>{type.name} ({formatTypeLength(type.duration_minutes)}){type.archived ? ' (removed)' : ''}</option>)}
+                  </select>
+                </label>
               );
             })()}
+            {source && (
+              // Studio, walk-in or personal: decides how the money is counted.
+              <span style={{ ...p.typeTag, color: 'var(--text-muted)' }} title="Booking source">
+                {{ studio: 'Studio booking', walkin: 'Walk-in', personal: 'Personal booking', app: 'Booked in the app', import: 'Imported booking' }[normalizeBookingSource(source)]}
+              </span>
+            )}
             {clientAge != null && clientAge < 18 && <Pill tone="warning">{t('bdp_minor')}</Pill>}
           </div>
         </div>
@@ -1202,7 +1236,10 @@ const p = {
   heroStation: { fontSize: '0.8rem', color: 'var(--text-muted)' },
   heroRelative: { fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-info)', background: 'var(--color-info-surface)', padding: '0.05rem 0.45rem', borderRadius: 99 },
   typeTag: { display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-dim)', padding: '0.2rem 0.6rem', borderRadius: 20, border: '1px solid var(--border)', background: 'var(--bg-card)', whiteSpace: 'nowrap' },
-  typeDot: { width: 8, height: 8, borderRadius: '50%', flexShrink: 0 },
+  typeDot: { width: 8, height: 8, borderRadius: '50%', flexShrink: 0, boxSizing: 'border-box' },
+  typeChip: { position: 'relative', cursor: 'pointer', color: 'var(--text-dim)' },
+  // The real select covers the chip, so it opens the native picker.
+  typeSelect: { position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer', width: '100%', height: '100%', fontSize: 16 },
   heroCaption: { fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' },
   heroTime: { fontSize: '1.5rem', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em', lineHeight: 1.2 },
   heroMeta: { fontSize: '0.9rem', color: 'var(--text-dim)' },

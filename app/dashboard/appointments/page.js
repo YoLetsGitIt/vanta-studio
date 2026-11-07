@@ -701,7 +701,7 @@ function BookingRow({ booking: b, selected, onSelect, labelOverride }) {
           <span style={s.rowMeta}>{sessionParts.join(' · ')}</span>
         )}
         <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', marginTop: '0.1rem' }}>
-          <span style={{ ...s.sourceTag, background: bookingStyle.bg, color: bookingStyle.tagColor, borderColor: bookingStyle.border }}>
+          <span style={{ ...s.sourceTag, background: 'var(--bg-chip)', color: 'var(--text-muted)', borderColor: 'var(--border)' }}>
             {bookingStyle.tag}
           </span>
         </div>

@@ -61,7 +61,7 @@ if (behind > 0) {
 
 // ── 3. Is the live site from code we have? ──────────────────────────────────
 const lastDeploy = out('git log -1 --format=%s origin/gh-pages');
-const deployedSha = lastDeploy.match(/Deploy ([0-9a-f]{7,40})/)?.[1];
+const deployedSha = lastDeploy.match(/[Dd]eploy ([0-9a-f]{7,40})/)?.[1]; // also "Redeploy <sha>" nudges
 const known = deployedSha && (() => { try { run(`git merge-base --is-ancestor ${deployedSha} HEAD`, { stdio: 'ignore' }); return true; } catch { return false; } })();
 if (!known) {
   console.log(`\n⚠ The live site's last deploy was: "${lastDeploy}"`);
