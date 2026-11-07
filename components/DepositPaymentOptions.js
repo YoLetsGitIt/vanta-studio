@@ -84,11 +84,19 @@ export default function DepositPaymentOptions({ styles: s, stripe }) {
           <div style={o.methodHead}>
             <div style={o.methodText}>
               <span style={o.methodName}>Card</span>
-              <span style={o.methodHint}>Paid through your Stripe account, minus the platform fee. Confirmed automatically.</span>
+              <span style={o.methodHint}>Clients pay a small card fee on top, so you get the whole deposit. Confirmed automatically.</span>
             </div>
             {stripeActive && (
               <Switch label="Card payments" checked={form.card_enabled} onChange={flip('card_enabled')} disabled={saving} s={s} />
             )}
+          </div>
+          {/* How the card fee works: the client pays it, the studio keeps the full deposit. */}
+          <div style={o.feeBox} aria-label="How card fees work">
+            <div style={o.feeRow}><span>Deposit you ask for</span><span style={o.feeNum}>$100.00</span></div>
+            <div style={o.feeRow}><span>Card fee, paid by the client (3% + 50c)</span><span style={o.feeNum}>+ $3.50</span></div>
+            <div style={{ ...o.feeRow, ...o.feeTotal }}><span>Client pays</span><span style={o.feeNum}>$103.50</span></div>
+            <div style={{ ...o.feeRow, ...o.feeYou }}><span>You receive in Stripe</span><span style={{ ...o.feeNum, color: "var(--color-success)" }}>$100.00</span></div>
+            <p style={o.feeNote}>The card fee covers Stripe’s processing costs, so nothing comes out of your deposit.</p>
           </div>
           {stripe.status === null ? (
             <div style={s.loadingDot} />
@@ -207,5 +215,11 @@ const o = {
   stripeRow: { display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' },
   stripeStatus: { display: 'inline-flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.88rem', fontWeight: 500, color: 'var(--text)', marginRight: 'auto' },
   dot: { width: 8, height: 8, borderRadius: '50%', flexShrink: 0 },
+  feeBox: { display: 'flex', flexDirection: 'column', gap: '0.35rem', padding: '0.75rem 0.85rem', borderRadius: 10, background: 'var(--bg-card)', border: '1px solid var(--border-faint)', maxWidth: 440 },
+  feeRow: { display: 'flex', justifyContent: 'space-between', gap: '1rem', fontSize: '0.85rem', color: 'var(--text-muted)' },
+  feeNum: { fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', color: 'var(--text)' },
+  feeTotal: { paddingTop: '0.35rem', borderTop: '1px solid var(--border-faint)', fontWeight: 600, color: 'var(--text)' },
+  feeYou: { fontWeight: 700, color: 'var(--color-success)' },
+  feeNote: { margin: '0.2rem 0 0', fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: 1.4 },
   footer: { display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '0.25rem' },
 };

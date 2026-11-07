@@ -308,10 +308,8 @@ function FinancialContent({ s, weeklyChart, daily, startDate, endDate, isLight }
         {(() => {
           const sessions = s?.completed_sessions ?? 0;
           const showNet = s?.net_sales != null && s.net_sales !== s.gross_sales;
-          // Sales split into the part clients paid upfront as a deposit and the
-          // part paid on the day, so the two lines add up to Sales.
+          // The part of Sales paid at the appointments (the rest was paid as deposits).
           const atAppointments = s?.remaining_balances ?? 0;
-          const fromDeposits = Math.max((s?.gross_sales ?? 0) - atAppointments, 0);
           return (
             <div className="studio-revenue-summary" style={st.summaryPanel}>
               <div style={st.summaryCol}>
@@ -320,7 +318,6 @@ function FinancialContent({ s, weeklyChart, daily, startDate, endDate, isLight }
                 <span style={st.summaryHint}>{sessions ? `From ${sessions} completed ${sessions === 1 ? 'session' : 'sessions'}` : 'No completed sessions in this period'}</span>
                 {sessions > 0 && (
                   <dl style={st.summaryRows}>
-                    <div style={st.summaryRow}><dt style={{ ...st.summaryRowLabel, paddingLeft: 'calc(8px + 0.5rem)' }}>Paid upfront as deposits</dt><dd style={st.summaryRowValue}>{fmt(fromDeposits)}</dd></div>
                     <div style={st.summaryRow}><dt style={st.summaryRowLabel}><span aria-hidden="true" style={{ ...st.summaryDot, background: 'var(--color-success)' }} />Paid on the day</dt><dd style={st.summaryRowValue}>{fmt(atAppointments)}</dd></div>
                   </dl>
                 )}

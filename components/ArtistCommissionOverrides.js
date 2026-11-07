@@ -62,7 +62,7 @@ export default function ArtistCommissionOverrides({ styles: s, defaults }) {
         </label>
       )}
       <div style={o.inputs}>
-        {[['studio', 'Studio & walk-in', defaults.studio], ['personal', 'Personal, app & imported', defaults.personal]].map(([key, label, fallback]) => (
+        {[['studio', 'Studio & walk-in', defaults.studio], ['personal', 'Personal & app', defaults.personal]].map(([key, label, fallback]) => (
           <label key={key} style={o.field}>
             <span style={s.label}>{label}</span>
             <span style={o.percentWrap}>

@@ -259,6 +259,8 @@ export default function SettingsPage() {
   const [personalCut, setPersonalCut] = useState('0');
   const [paymentRecordingReq, setPaymentRecordingReq] = useState('studio_only');
   const [payForfeitedDeposits, setPayForfeitedDeposits] = useState(false);
+  // Artist's share of a forfeited deposit, as typed; '' = their usual commission share.
+  const [forfeitPct, setForfeitPct] = useState('');
   const [sendReminder7d, setSendReminder7d] = useState(true);
   const [sendReminder3d, setSendReminder3d] = useState(false);
   const [sendReminder24h, setSendReminder24h] = useState(true);
@@ -382,6 +384,7 @@ export default function SettingsPage() {
         setPersonalCut(String(account.studio?.personal_cut_percent ?? account.studio?.studio_cut_percent ?? 0));
         setPaymentRecordingReq(account.studio?.payment_recording_requirement ?? 'studio_only');
         setPayForfeitedDeposits(account.studio?.pay_artist_on_forfeited_deposits ?? false);
+        setForfeitPct(account.studio?.forfeited_deposit_artist_percent != null ? String(Number(account.studio.forfeited_deposit_artist_percent)) : '');
         setSendReminder7d(account.studio?.send_reminder_7d ?? true);
         setSendReminder3d(account.studio?.send_reminder_3d ?? false);
         setSendReminder24h(account.studio?.send_reminder_24h ?? true);
@@ -459,7 +462,9 @@ export default function SettingsPage() {
     try {
       const wc = parseFloat(walkinCut);
       const pc = parseFloat(personalCut);
-      await updateStudioProfile(name.trim(), address.trim(), widgetBgColor, widgetAccentColor, isNaN(wc) ? 0 : wc, isNaN(pc) ? 0 : pc, aftercareInstructions, timezone, addressLat, addressLng, paymentRecordingReq, undefined, widgetConsentTemplateId || null, sendReminder7d, sendReminder24h, payForfeitedDeposits, schedulingMode, piercingAftercareInstructions, sendReminder3d);
+      const fp = forfeitPct.trim() === '' ? null : parseFloat(forfeitPct);
+      if (fp != null && !(fp >= 0 && fp <= 100)) { setProfileError('The artist’s share of forfeited deposits must be between 0 and 100%.'); setSaving(false); return; }
+      await updateStudioProfile(name.trim(), address.trim(), widgetBgColor, widgetAccentColor, isNaN(wc) ? 0 : wc, isNaN(pc) ? 0 : pc, aftercareInstructions, timezone, addressLat, addressLng, paymentRecordingReq, undefined, widgetConsentTemplateId || null, sendReminder7d, sendReminder24h, payForfeitedDeposits, schedulingMode, piercingAftercareInstructions, sendReminder3d, fp);
       invalidate('studio-account');
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
@@ -1024,14 +1029,14 @@ export default function SettingsPage() {
         <section className="settings-span-12" style={s.card}>
           <div style={s.settingsSectionHeader}>
             <h2 style={s.sectionTitle}>Commission</h2>
-            <p style={s.sectionDesc}>Set the studio share for each booking source. The remainder is paid to the artist.</p>
+            <p style={s.sectionDesc}>Set the studio share for each booking source. The remainder is paid to the artist. Imported bookings aren’t included in payouts, since they were settled before you moved to Vanta.</p>
           </div>
           <form onSubmit={handleSaveProfile} style={s.paymentsForm}>
             <div style={s.field}>
               <div className="studio-commission-grid" style={s.commissionGrid}>
                 {[
                   { label: 'Studio & walk-in', description: 'Bookings sourced or recorded by the studio.', sources: ['Studio', 'Walk-in'], value: walkinCut, set: setWalkinCut },
-                  { label: 'Personal, app & imported', description: 'Bookings brought in by an artist or added from another source.', sources: ['Personal', 'App', 'Imported'], value: personalCut, set: setPersonalCut },
+                  { label: 'Personal & app', description: 'Bookings brought in by an artist, or made in the Vanta app.', sources: ['Personal', 'App'], value: personalCut, set: setPersonalCut },
                 ].map(({ label, description, sources, value, set }) => {
                   const parsedValue = parseFloat(value);
                   const studioShare = Number.isFinite(parsedValue) ? Math.min(100, Math.max(0, parsedValue)) : 0;
@@ -1084,6 +1089,7 @@ export default function SettingsPage() {
                 onChange={e => setPaymentRecordingReq(e.target.value)}
               >
                 <option value="studio_only">Studio only</option>
+                <option value="artist_only">Artist only</option>
                 <option value="both">Studio and artist</option>
               </select>
             </div>
@@ -1091,7 +1097,7 @@ export default function SettingsPage() {
               <div style={s.paymentSettingCopy}>
                 <div style={s.paymentSettingTitle}>Pay artist on forfeited deposits</div>
                 <p style={s.paymentSettingDescription}>
-                  If a paid deposit is retained after cancellation, credit the assigned artist their commission. This applies to future cancellations only.
+                  If a client cancels and you keep their deposit, give the assigned artist a share of it. This applies to future cancellations only.
                 </p>
               </div>
               <button
@@ -1110,6 +1116,35 @@ export default function SettingsPage() {
                 </span>
               </button>
             </div>
+            {payForfeitedDeposits && (() => {
+              const usual = 100 - (Number.isFinite(parseFloat(walkinCut)) ? Math.min(100, Math.max(0, parseFloat(walkinCut))) : 0);
+              const typed = parseFloat(forfeitPct);
+              const example = Number.isFinite(typed) ? Math.min(100, Math.max(0, typed)) : usual;
+              return (
+                <div className="studio-payment-setting" style={{ ...s.paymentSetting, paddingTop: 0, borderTop: 'none' }}>
+                  <div style={s.paymentSettingCopy}>
+                    <label htmlFor="forfeit-percent" style={s.paymentSettingTitle}>Artist’s share of the deposit</label>
+                    <p style={s.paymentSettingDescription}>
+                      Leave blank to give them their usual commission share. With {Number.isInteger(example) ? example : example.toFixed(1)}%, a $100 forfeited deposit pays the artist ${(example).toFixed(2).replace(/\.00$/, '')}.
+                    </p>
+                  </div>
+                  <label style={s.commissionInputWrap}>
+                    <input
+                      id="forfeit-percent"
+                      className="studio-commission-input"
+                      style={s.commissionInput}
+                      type="number" min="0" max="100" step="1"
+                      inputMode="decimal"
+                      value={forfeitPct}
+                      onChange={e => setForfeitPct(e.target.value)}
+                      onKeyDown={e => ['e','E','+','-'].includes(e.key) && e.preventDefault()}
+                      placeholder={String(usual)}
+                    />
+                    <span style={s.commissionPercent}>%</span>
+                  </label>
+                </div>
+              );
+            })()}
             {profileError && <p style={s.errorText}>{profileError}</p>}
             <button type="submit" style={s.saveBtn} disabled={saving}>
               {saving ? t('saving') : saved ? t('saved') : t('save_changes')}
