@@ -713,63 +713,96 @@ export default function BookingDetailPanel({
         {/* ── Payment and consent ── */}
         {(() => {
           const money = n => `$${Number(n).toLocaleString('en-AU', { minimumFractionDigits: Number(n) % 1 ? 2 : 0, maximumFractionDigits: 2 })}`;
-          const priceLabel = showCompleted && finalPrice != null ? t('bdp_final_price') : t('bdp_quoted');
-          const priceValue = showCompleted && finalPrice != null ? money(finalPrice) : quote != null ? money(quote) : null;
+          // What's been paid and what's left, with one status for the deposit:
+          //   no deposit · due · overdue (appointment passed) · link sent · link expired ·
+          //   client says paid · paid, not confirmed · paid.
           const hasDeposit = depositRequired || depositPaid;
-          const depositPill = depositConfirmedAt ? { tone: 'success', text: t('bdp_deposit_confirmed') }
-            : depositPaid ? { tone: 'warning', text: t('bdp_deposit_unconfirmed') }
-            : clientSaysPaid ? { tone: 'warning', text: 'Check payment' }
-            : { tone: 'danger', text: t('bdp_deposit_unpaid') };
+          const paid = Boolean(depositPaidAt || depositConfirmedAt);
+          const firstNm = clientName !== '—' ? clientName.split(' ')[0] : 'The client';
+          const apptPassed = chosenTime && new Date(chosenTime).getTime() < Date.now();
+          const depositState = !hasDeposit ? null
+            : depositConfirmedAt ? 'paid'
+            : depositPaid ? 'unconfirmed'
+            : ended || isCompleted ? 'neverPaid'
+            : clientSaysPaid ? 'claimed'
+            : status === 'deposit_expired' ? 'expired'
+            : status === 'awaiting_payment' ? 'link'
+            : apptPassed ? 'overdue' : 'due';
+          const pill = {
+            paid:        { tone: 'success', text: 'Deposit paid' },
+            unconfirmed: { tone: 'warning', text: 'Check payment' },
+            claimed:     { tone: 'warning', text: 'Check payment' },
+            expired:     { tone: 'danger',  text: 'Link expired' },
+            link:        { tone: 'info',    text: 'Waiting for client' },
+            overdue:     { tone: 'danger',  text: 'Deposit overdue' },
+            due:         { tone: 'warning', text: 'Deposit due' },
+            neverPaid:   { text: 'Deposit not paid' },
+          }[depositState];
+          const price = showCompleted && finalPrice != null ? finalPrice : quote;
+          const priceLabel = showCompleted && finalPrice != null ? t('bdp_final_price') : t('bdp_quoted');
+          // Left to pay at the appointment, once a deposit is in.
+          const balance = !isCompleted && !ended && paid && quote != null && depositAmount != null && quote > depositAmount ? quote - depositAmount : null;
+          const fee = paid && paidByStripe && depositAmount != null ? (Math.round(depositAmount * 0.03 * 100) + 50) / 100 : 0;
+          const paidOn = paid ? new Date(depositPaidAt || depositConfirmedAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }) : null;
+          const paidHow = depositPaidVia ? `by ${depositPaidVia}` : paidByStripe ? 'by card' : null;
+          const note = {
+            paid: [`Paid ${[paidHow, paidOn && `on ${paidOn}`].filter(Boolean).join(' ')}.`, fee ? `${firstNm} was charged ${money(depositAmount + fee)}, including a ${money(fee)} card fee.` : null, isNoShow ? `${firstNm} didn’t show.` : null, ended ? 'The booking was cancelled after the deposit was paid.' : null].filter(Boolean).join(' '),
+            unconfirmed: `Paid ${[paidHow, paidOn && `on ${paidOn}`].filter(Boolean).join(' ')}. Check it’s arrived.`,
+            link: `${firstNm} has been sent a link to pay${selectionTokenExpiresAt ? `. It expires ${new Date(selectionTokenExpiresAt).toLocaleString('en-AU', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}` : ''}.`,
+            expired: `${firstNm} didn’t pay before the payment link expired.`,
+            overdue: 'The appointment has passed and the deposit wasn’t recorded.',
+            claimed: clientSaysPaid ? `${firstNm} says they paid by ${clientSaysPaid.method === 'payid' ? 'PayID' : 'bank transfer'} on ${new Date(clientSaysPaid.recorded_at).toLocaleString('en-AU', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}.` : null,
+            neverPaid: isNoShow ? `${firstNm} didn’t show and hadn’t paid the deposit.` : ended ? 'The booking ended before the deposit was paid.' : 'The deposit wasn’t recorded before the session was completed.',
+          }[depositState];
+          const canRecord = depositRequired && !paid && ['confirmed', 'awaiting_payment', 'requires_confirmation', 'deposit_expired'].includes(status);
           const showConsent = Boolean(email) || consentSubmissions.length > 0;
           const consentTone = consentStatus === 'current' ? 'success' : consentStatus === 'outdated' ? 'warning' : 'danger';
           return (
             <div className={panelLayout.glance} style={{ ...p.glance, '--tiles': showConsent ? 2 : 1 }}>
               <section style={p.summaryCard} aria-labelledby="bdp-payment-title">
-                <h3 id="bdp-payment-title" style={p.sectionTitle}>Payment</h3>
                 <div style={p.summaryRow}>
-                  <span style={p.factLabel}>{priceLabel}</span>
-                  <span style={priceValue ? { ...p.factValue, ...p.factStrong } : p.summaryMuted}>{priceValue ?? 'Not set'}</span>
+                  <h3 id="bdp-payment-title" style={p.sectionTitle}>Payment</h3>
+                  {pill && <Pill tone={pill.tone}>{pill.text}</Pill>}
                 </div>
-                {/* Deposit on one line like the price: amount and status on the right. */}
-                <div style={p.summaryRow}>
-                  <span style={p.factLabel}>{t('bdp_deposit')}</span>
-                  {hasDeposit ? (
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.6rem' }}>
-                      {depositAmount != null && <span style={{ ...p.factValue, fontWeight: 700 }}>{money(depositAmount)}</span>}
-                      <Pill tone={depositPill.tone}>{depositPill.text}</Pill>
+                <div style={p.payRows}>
+                  <div style={p.summaryRow}>
+                    <span style={p.factLabel}>{priceLabel}</span>
+                    <span style={price != null ? { ...p.factValue, ...p.factStrong } : p.summaryMuted}>{price != null ? money(price) : 'Not set'}</span>
+                  </div>
+                  {showCompleted && finalPrice != null && quote != null && quote !== finalPrice && (
+                    <div style={p.summaryRow}>
+                      <span style={p.factLabel}>{t('bdp_quoted')}</span>
+                      <span style={p.summaryMuted}>{money(quote)}</span>
+                    </div>
+                  )}
+                  <div style={p.summaryRow}>
+                    <span style={p.factLabel}>{t('bdp_deposit')}</span>
+                    {hasDeposit
+                      ? <span style={{ ...p.factValue, fontWeight: 600, ...(paid ? {} : { color: 'var(--text-dim)' }) }}>{depositAmount != null ? money(depositAmount) : '—'}</span>
+                      : <span style={p.summaryMuted}>None</span>}
+                  </div>
+                  {balance != null && (
+                    <div style={{ ...p.summaryRow, ...p.payBalance }}>
+                      <span style={p.factLabel}>Left to pay at the appointment</span>
+                      <span style={{ ...p.factValue, fontWeight: 700 }}>{money(balance)}</span>
+                    </div>
+                  )}
+                </div>
+                {depositState === 'claimed' ? (
+                  <p role="status" style={p.payClaim}>
+                    <strong style={p.payClaimTitle}>{firstNm} says they’ve paid</strong>
+                    <span style={p.payClaimMeta}>
+                      By <strong>{clientSaysPaid.method === 'payid' ? 'PayID' : 'bank transfer'}</strong> on <strong>{new Date(clientSaysPaid.recorded_at).toLocaleString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}</strong>.
                     </span>
-                  ) : <span style={p.summaryMuted}>Not required</span>}
-                </div>
-                {hasDeposit && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    {(depositPaidAt || depositConfirmedAt) && (() => {
-                      // Only card payments through Stripe carry a fee.
-                      const fee = paidByStripe && depositAmount != null ? (Math.round(depositAmount * 0.03 * 100) + 50) / 100 : 0;
-                      const when = depositPaidAt || depositConfirmedAt;
-                      return (
-                        <span style={{ ...p.hint, textAlign: 'right' }}>
-                          {[
-                            `Paid${depositPaidVia ? ` by ${depositPaidVia}` : paidByStripe ? ' by card' : ''}`,
-                            new Date(when).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }),
-                            fee ? `client charged ${money(depositAmount + fee)} incl. ${money(fee)} card fee` : null,
-                          ].filter(Boolean).join(' · ')}
-                        </span>
-                      );
-                    })()}
-                    {clientSaysPaid && (
-                      <p role="status" style={{ margin: 0, padding: '0.6rem 0.75rem', borderRadius: 10, background: 'var(--color-warning-surface, rgba(224,168,79,0.12))', border: '1px solid var(--color-warning-border, rgba(224,168,79,0.4))', color: 'var(--text)', fontSize: '0.9rem', lineHeight: 1.45 }}>
-                        {clientName !== '—' ? clientName.split(' ')[0] : 'The client'} says they paid by {clientSaysPaid.method === 'payid' ? 'PayID' : 'bank transfer'} on{' '}
-                        {new Date(clientSaysPaid.recorded_at).toLocaleString('en-AU', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}. Check it’s arrived, then mark it received.
-                      </p>
-                    )}
-                    {depositRequired && !depositPaid && !depositConfirmedAt && ['confirmed', 'awaiting_payment', 'requires_confirmation', 'deposit_expired'].includes(status) && (
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                        <MarkDepositReceivedButton bookingId={bookingId} clientName={clientName !== '—' ? clientName : undefined} disabled={actionLoading}
-                          onReceived={result => setReceivedDeposit({ id: bookingId, at: new Date().toISOString(), status: result?.status, method: result?.method })} />
-                        {chosenTime && status !== 'deposit_expired' && (
-                          <CancelDepositButton bookingId={bookingId} onCancelled={() => setCancelledDepositId(bookingId)} disabled={actionLoading} />
-                        )}
-                      </div>
+                  </p>
+                ) : note && <p style={{ ...p.hint, margin: 0, lineHeight: 1.45 }}>{note}</p>}
+                {canRecord && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', flexWrap: 'wrap' }}>
+                    <MarkDepositReceivedButton bookingId={bookingId} clientName={clientName !== '—' ? clientName : undefined} disabled={actionLoading}
+                      label={clientSaysPaid ? 'Mark received' : 'Mark deposit received'}
+                      onReceived={result => setReceivedDeposit({ id: bookingId, at: new Date().toISOString(), status: result?.status, method: result?.method })} />
+                    {chosenTime && status !== 'deposit_expired' && (
+                      <CancelDepositButton bookingId={bookingId} variant="ghost" className="studio-quiet-link" onCancelled={() => setCancelledDepositId(bookingId)} disabled={actionLoading} />
                     )}
                   </div>
                 )}
@@ -1235,6 +1268,11 @@ const p = {
   heroArtistAvatar: { width: 28, height: 28, borderRadius: '50%', flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem', fontWeight: 700, background: 'var(--color-info-surface)', border: '1px solid var(--color-info-border)', color: 'var(--color-info)' },
   heroStation: { fontSize: '0.8rem', color: 'var(--text-muted)' },
   heroRelative: { fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-info)', background: 'var(--color-info-surface)', padding: '0.05rem 0.45rem', borderRadius: 99 },
+  payRows: { display: 'flex', flexDirection: 'column', gap: '0.55rem' },
+  payClaim: { margin: 0, padding: '0.1rem 0 0.1rem 0.75rem', borderLeft: '3px solid var(--color-warning)', display: 'flex', flexDirection: 'column', gap: '0.2rem', lineHeight: 1.45 },
+  payClaimTitle: { color: 'var(--text)', fontSize: '0.95rem', fontWeight: 650 },
+  payClaimMeta: { color: 'var(--text)', fontSize: '0.9rem', fontWeight: 400 },
+  payBalance: { paddingTop: '0.55rem', borderTop: '1px dashed var(--border)' },
   typeTag: { display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-dim)', padding: '0.2rem 0.6rem', borderRadius: 20, border: '1px solid var(--border)', background: 'var(--bg-card)', whiteSpace: 'nowrap' },
   typeDot: { width: 8, height: 8, borderRadius: '50%', flexShrink: 0, boxSizing: 'border-box' },
   typeChip: { position: 'relative', cursor: 'pointer', color: 'var(--text-dim)' },

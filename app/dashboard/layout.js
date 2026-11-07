@@ -290,16 +290,6 @@ function DashboardShell({ children }) {
               <span style={s.logoMark}>vanta</span>
               <span style={s.logoSub}>studio</span>
             </Link>
-            <button
-              type="button"
-              onClick={() => { setAppointmentType('walkin'); setAppointmentSlot(null); setAppointmentPanelOpen(true); }}
-              style={s.newApptBtn}
-              aria-label={t('new_appointment')}
-              title={t('new_appointment')}
-            >
-              <PlusIcon size={12} />
-              New
-            </button>
           </div>
 
           <div className="studio-dashboard-sidebar-middle" style={s.sidebarMiddle}>
@@ -689,21 +679,6 @@ const s = {
     color: 'var(--accent)',
     opacity: 0.65,
     letterSpacing: '0.02em',
-  },
-  newApptBtn: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '0.3rem',
-    flexShrink: 0,
-    padding: '0.4rem 0.7rem',
-    background: 'var(--accent)',
-    border: 'none',
-    borderRadius: 8,
-    fontSize: '0.82rem',
-    fontWeight: 700,
-    color: 'var(--bg-sidebar)',
-    cursor: 'pointer',
-    letterSpacing: '-0.01em',
   },
   nav: {
     display: 'flex',

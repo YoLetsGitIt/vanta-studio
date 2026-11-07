@@ -5,7 +5,7 @@ import Button from '@/components/ui/Button';
 import { bookingActions } from '@/lib/bookingActions';
 import { requestConfirmation, showError, showFeedback } from '@/lib/feedback';
 
-export default function CancelDepositButton({ bookingId, onCancelled, disabled = false }) {
+export default function CancelDepositButton({ bookingId, onCancelled, disabled = false, variant = 'secondary', className = '' }) {
   const [saving, setSaving] = useState(false);
   async function cancel() {
     if (saving) return;
@@ -24,5 +24,5 @@ export default function CancelDepositButton({ bookingId, onCancelled, disabled =
     } catch (error) { showError(error); }
     finally { setSaving(false); }
   }
-  return <Button variant="secondary" size="sm" loading={saving} loadingLabel="Cancelling…" disabled={disabled} onClick={cancel}>Cancel deposit</Button>;
+  return <Button variant={variant} size="sm" className={className} loading={saving} loadingLabel="Cancelling…" disabled={disabled} onClick={cancel}>Cancel deposit</Button>;
 }
