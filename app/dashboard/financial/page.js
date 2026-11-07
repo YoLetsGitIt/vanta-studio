@@ -131,14 +131,30 @@ export default function FinancialPage() {
     sessionStorage.removeItem('financial_unlocked');
   }
 
+  // One bar per week (weeks start on Monday, like the server's), including weeks
+  // with no sales, so the axis shows the whole date range.
   const weeklyChart = useMemo(() => {
-    if (!stats?.weekly?.length) return [];
-    return stats.weekly.map(w => ({
-      week: new Date(w.week_start + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-      gross: w.gross_sales,
-      deposits: w.deposits_collected,
-    }));
-  }, [stats]);
+    if (!stats || !startDate || !endDate) return [];
+    const byWeek = new Map((stats.weekly ?? []).map(w => [w.week_start, w]));
+    const toUTC = v => { const [y, m, d] = v.split('-').map(Number); return new Date(Date.UTC(y, m - 1, d)); };
+    const monday = date => new Date(date.getTime() - ((date.getUTCDay() + 6) % 7) * 86400000);
+    const rows = [];
+    for (let week = monday(toUTC(startDate)), last = toUTC(endDate); week <= last && rows.length < 60; week = new Date(week.getTime() + 7 * 86400000)) {
+      const key = week.toISOString().slice(0, 10);
+      const w = byWeek.get(key);
+      // Each week's sales, split into the part paid upfront as deposits and the
+      // part paid on the day (the two stack to the week's sales).
+      const gross = w?.gross_sales ?? 0;
+      const fromDeposits = Math.min(w?.sales_from_deposits ?? 0, gross);
+      rows.push({
+        week: week.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', timeZone: 'UTC' }),
+        gross,
+        fromDeposits,
+        onTheDay: gross - fromDeposits,
+      });
+    }
+    return rows;
+  }, [stats, startDate, endDate]);
 
   const s = stats?.summary;
 
@@ -284,17 +300,18 @@ function FinancialContent({ s, weeklyChart, startDate, endDate, isLight }) {
         {(() => {
           const sessions = s?.completed_sessions ?? 0;
           const showNet = s?.net_sales != null && s.net_sales !== s.gross_sales;
+          // Sales split into the part clients paid upfront as a deposit and the
+          // part paid on the day, so the two lines add up to Sales.
+          const atAppointments = s?.remaining_balances ?? 0;
+          const fromDeposits = Math.max((s?.gross_sales ?? 0) - atAppointments, 0);
           return (
             <div className="studio-kpi-grid" style={st.kpiGrid}>
               <KpiCard label={t('revenue_gross_sales')} value={fmt(s?.gross_sales)} tone="success"
-                hint={sessions ? `Final prices of ${sessions} completed ${sessions === 1 ? 'session' : 'sessions'}` : 'No completed sessions yet'} />
+                hint={sessions ? `From ${sessions} completed ${sessions === 1 ? 'session' : 'sessions'}` : 'No completed sessions yet'}
+                breakdown={sessions ? [['Deposits', fmt(fromDeposits), 'var(--color-info)'], ['Paid on the day', fmt(atAppointments), 'var(--color-success)']] : null} />
               {showNet && <KpiCard label={t('revenue_net_sales')} value={fmt(s?.net_sales)} tone="success" hint="After refunds and discounts" />}
-              <KpiCard label={t('revenue_remaining_balances')} value={fmt(s?.remaining_balances)} tone="warning"
-                hint="Sales minus the deposits clients paid upfront" />
               <KpiCard label={t('revenue_deposits')} value={fmt(s?.deposits_collected)} tone="info"
-                hint="Paid in this period, including for upcoming bookings" />
-              <KpiCard label={t('revenue_completed_sessions')} value={sessions} tone="neutral"
-                hint="Marked complete in this period" />
+                hint="Taken this period for any booking, mostly ones still to come. Not in Sales until the session is done." />
             </div>
           );
         })()}
@@ -310,26 +327,36 @@ function FinancialContent({ s, weeklyChart, startDate, endDate, isLight }) {
                 <XAxis dataKey="week" tick={{ fill: tickColor, fontSize: 11 }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
                 <YAxis tickFormatter={v => '$' + (v >= 1000 ? (v / 1000).toFixed(0) + 'k' : v)} tick={{ fill: tickColor, fontSize: 11 }} axisLine={false} tickLine={false} width={48} />
                 <Tooltip
-                  formatter={(value, name) => [fmt(value), name === 'gross' ? 'Sales' : 'Deposits received']}
-                  contentStyle={{ background: tooltipBg, border: `1px solid ${tooltipBorder}`, borderRadius: 8, fontSize: 12, color: tooltipColor }}
-                  labelStyle={{ color: tickColor }}
+                  cursor={{ fill: gridColor }}
+                  content={({ active, payload, label }) => {
+                    if (!active || !payload?.length) return null;
+                    const row = payload[0].payload;
+                    return (
+                      <div style={{ background: tooltipBg, border: `1px solid ${tooltipBorder}`, borderRadius: 8, fontSize: 12, color: tooltipColor, padding: '0.5rem 0.65rem', minWidth: 170 }}>
+                        <div style={{ color: tickColor, marginBottom: 4 }}>Week of {label}</div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontWeight: 700 }}><span>Sales</span><span>{fmt(row.gross)}</span></div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span>Deposits</span><span>{fmt(row.fromDeposits)}</span></div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span>Paid on the day</span><span>{fmt(row.onTheDay)}</span></div>
+                      </div>
+                    );
+                  }}
                 />
-                <Bar dataKey="gross"    fill="var(--color-success)" radius={[4,4,0,0]} name="Sales" />
-                <Bar dataKey="deposits" fill="var(--color-info)"    radius={[4,4,0,0]} name="Deposits received" />
+                <Bar dataKey="fromDeposits" stackId="sales" fill="var(--color-info)" name="Deposits" />
+                <Bar dataKey="onTheDay" stackId="sales" fill="var(--color-success)" radius={[4,4,0,0]} name="Paid on the day" />
               </BarChart>
             </ResponsiveContainer>
+            <div style={st.legend}>
+              <LegendDot color="var(--color-info)" label="Deposits" />
+              <LegendDot color="var(--color-success)" label="Paid on the day" />
+            </div>
             <details style={{ marginTop: 16 }}>
               <summary style={{ cursor: 'pointer', minHeight: 44, lineHeight: '44px' }}>View chart data</summary>
               <table style={{ width: '100%', textAlign: 'left', fontSize: 14 }}>
-                <caption style={{ textAlign: 'left', padding: '8px 0' }}>Weekly sales and deposits</caption>
-                <thead><tr><th scope="col">Week</th><th scope="col">Sales</th><th scope="col">Deposits received</th></tr></thead>
-                <tbody>{weeklyChart.map(row => <tr key={row.week}><th scope="row">{row.week}</th><td>{fmt(row.gross)}</td><td>{fmt(row.deposits)}</td></tr>)}</tbody>
+                <caption style={{ textAlign: 'left', padding: '8px 0' }}>Weekly sales</caption>
+                <thead><tr><th scope="col">Week</th><th scope="col">Sales</th><th scope="col">Deposits</th><th scope="col">Paid on the day</th></tr></thead>
+                <tbody>{weeklyChart.map(row => <tr key={row.week}><th scope="row">{row.week}</th><td>{fmt(row.gross)}</td><td>{fmt(row.fromDeposits)}</td><td>{fmt(row.onTheDay)}</td></tr>)}</tbody>
               </table>
             </details>
-            <div style={st.legend}>
-              <LegendDot color="var(--color-success)" label="Sales" />
-              <LegendDot color="var(--color-info)" label="Deposits received" />
-            </div>
           </div>
         ) : (
           <p style={st.empty}>{t('revenue_no_sessions')}</p>
@@ -431,7 +458,7 @@ function rangeLabel(start, end) {
   return `${startText} – ${b.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}`;
 }
 
-function KpiCard({ label, value, tone = 'neutral', hint }) {
+function KpiCard({ label, value, tone = 'neutral', hint, breakdown }) {
   const toned = tone !== 'neutral';
   return (
     <div style={{
@@ -442,6 +469,13 @@ function KpiCard({ label, value, tone = 'neutral', hint }) {
       <span style={st.kpiLabel}>{label}</span>
       <span style={{ ...st.kpiVal, color: toned ? `var(--color-${tone})` : 'var(--text)' }}>{value}</span>
       {hint && <span style={st.kpiHint}>{hint}</span>}
+      {breakdown && (
+        <dl style={st.kpiBreakdown}>
+          {breakdown.map(([k, v, dot]) => (
+            <div key={k} style={st.kpiBreakdownRow}><dt style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', whiteSpace: 'nowrap' }}>{dot && <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: 2, background: dot }} />}{k}</dt><dd style={{ margin: 0, fontWeight: 600, color: 'var(--text)' }}>{v}</dd></div>
+          ))}
+        </dl>
+      )}
     </div>
   );
 }
@@ -1002,6 +1036,8 @@ const st = {
   section: { display: 'flex', flexDirection: 'column', gap: '1rem' },
   sectionTitle: { fontSize: '1.05rem', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.01em' },
   kpiGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: '0.75rem' },
+  kpiBreakdown: { margin: '0.35rem 0 0', paddingTop: '0.55rem', borderTop: '1px dashed var(--border)', display: 'flex', flexDirection: 'column', gap: '0.3rem' },
+  kpiBreakdownRow: { display: 'flex', justifyContent: 'space-between', gap: '0.75rem', fontSize: '0.85rem', color: 'var(--text-dim)' },
   kpiHint: { fontSize: '0.8rem', lineHeight: 1.35, color: 'var(--text-dim)' },
   comingSoon: { margin: '0.25rem 0 0', fontSize: '0.85rem', color: 'var(--text-muted)' },
   kpiCard: {
