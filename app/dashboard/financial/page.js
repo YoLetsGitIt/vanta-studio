@@ -131,30 +131,37 @@ export default function FinancialPage() {
     sessionStorage.removeItem('financial_unlocked');
   }
 
-  // One bar per week (weeks start on Monday, like the server's), including weeks
-  // with no sales, so the axis shows the whole date range.
-  const weeklyChart = useMemo(() => {
-    if (!stats || !startDate || !endDate) return [];
-    const byWeek = new Map((stats.weekly ?? []).map(w => [w.week_start, w]));
+  // One bar per day for ranges up to 31 days, otherwise one per week (weeks start on
+  // Monday, like the server's). Days or weeks with no sales still get a bar so the
+  // axis covers the whole range.
+  const salesChart = useMemo(() => {
+    if (!stats || !startDate || !endDate) return { rows: [], daily: false };
     const toUTC = v => { const [y, m, d] = v.split('-').map(Number); return new Date(Date.UTC(y, m - 1, d)); };
-    const monday = date => new Date(date.getTime() - ((date.getUTCDay() + 6) % 7) * 86400000);
+    const first = toUTC(startDate), last = toUTC(endDate);
+    const DAY = 86400000;
+    const daily = Array.isArray(stats.daily) && (last - first) / DAY < 31;
+    const source = new Map((daily ? stats.daily : stats.weekly ?? []).map(p => [daily ? p.date : p.week_start, p]));
+    const step = daily ? DAY : 7 * DAY;
+    const startAt = daily ? first : new Date(first.getTime() - ((first.getUTCDay() + 6) % 7) * DAY);
     const rows = [];
-    for (let week = monday(toUTC(startDate)), last = toUTC(endDate); week <= last && rows.length < 60; week = new Date(week.getTime() + 7 * 86400000)) {
-      const key = week.toISOString().slice(0, 10);
-      const w = byWeek.get(key);
-      // Each week's sales, split into the part paid upfront as deposits and the
-      // part paid on the day (the two stack to the week's sales).
-      const gross = w?.gross_sales ?? 0;
-      const fromDeposits = Math.min(w?.sales_from_deposits ?? 0, gross);
+    for (let at = startAt; at <= last && rows.length < 400; at = new Date(at.getTime() + step)) {
+      const p = source.get(at.toISOString().slice(0, 10));
+      // Each bar is the period's sales: the part paid upfront as deposits plus the
+      // part paid on the day.
+      const gross = p?.gross_sales ?? 0;
+      const fromDeposits = Math.min(p?.sales_from_deposits ?? 0, gross);
+      // A week's label is its first day inside the chosen range.
+      const labelDate = at < first ? first : at;
       rows.push({
-        week: week.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', timeZone: 'UTC' }),
+        week: labelDate.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', timeZone: 'UTC' }),
         gross,
         fromDeposits,
         onTheDay: gross - fromDeposits,
       });
     }
-    return rows;
+    return { rows, daily };
   }, [stats, startDate, endDate]);
+  const weeklyChart = salesChart.rows;
 
   const s = stats?.summary;
 
@@ -237,7 +244,7 @@ export default function FinancialPage() {
           <>
             {/* ── Financial tab ─────────────────────────────────────────── */}
             {tab === 'financial' && (
-              <FinancialContent s={s} weeklyChart={weeklyChart} startDate={startDate} endDate={endDate} isLight={isLight} />
+              <FinancialContent s={s} weeklyChart={weeklyChart} daily={salesChart.daily} startDate={startDate} endDate={endDate} isLight={isLight} />
             )}
 
             {/* ── Artists & Payouts tab ──────────────────────────────────── */}
@@ -287,7 +294,7 @@ export default function FinancialPage() {
 
 // ── Financial content ───────────────────────────────────────────────────────
 
-function FinancialContent({ s, weeklyChart, startDate, endDate, isLight }) {
+function FinancialContent({ s, weeklyChart, daily, startDate, endDate, isLight }) {
   const { t } = useLanguage();
   const tickColor = isLight ? 'rgba(17,16,8,0.4)' : 'rgba(255,255,255,0.3)';
   const gridColor = isLight ? 'rgba(0,0,0,0.07)' : 'rgba(255,255,255,0.05)';
@@ -318,7 +325,7 @@ function FinancialContent({ s, weeklyChart, startDate, endDate, isLight }) {
         <p style={st.comingSoon}>Refunds, discounts, taxes, gift cards and tips will appear here once they’re available.</p>
       </Section>
 
-      <Section title={t('revenue_weekly_gross')}>
+      <Section title={daily ? 'Daily sales' : t('revenue_weekly_gross')}>
         {weeklyChart.length > 0 ? (
           <div style={st.chartWrap}>
             <ResponsiveContainer width="100%" height={200}>
@@ -333,7 +340,7 @@ function FinancialContent({ s, weeklyChart, startDate, endDate, isLight }) {
                     const row = payload[0].payload;
                     return (
                       <div style={{ background: tooltipBg, border: `1px solid ${tooltipBorder}`, borderRadius: 8, fontSize: 12, color: tooltipColor, padding: '0.5rem 0.65rem', minWidth: 170 }}>
-                        <div style={{ color: tickColor, marginBottom: 4 }}>Week of {label}</div>
+                        <div style={{ color: tickColor, marginBottom: 4 }}>{daily ? label : `Week of ${label}`}</div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontWeight: 700 }}><span>Sales</span><span>{fmt(row.gross)}</span></div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span>Deposits</span><span>{fmt(row.fromDeposits)}</span></div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span>Paid on the day</span><span>{fmt(row.onTheDay)}</span></div>
@@ -352,8 +359,8 @@ function FinancialContent({ s, weeklyChart, startDate, endDate, isLight }) {
             <details style={{ marginTop: 16 }}>
               <summary style={{ cursor: 'pointer', minHeight: 44, lineHeight: '44px' }}>View chart data</summary>
               <table style={{ width: '100%', textAlign: 'left', fontSize: 14 }}>
-                <caption style={{ textAlign: 'left', padding: '8px 0' }}>Weekly sales</caption>
-                <thead><tr><th scope="col">Week</th><th scope="col">Sales</th><th scope="col">Deposits</th><th scope="col">Paid on the day</th></tr></thead>
+                <caption style={{ textAlign: 'left', padding: '8px 0' }}>{daily ? 'Daily sales' : 'Weekly sales'}</caption>
+                <thead><tr><th scope="col">{daily ? 'Day' : 'Week'}</th><th scope="col">Sales</th><th scope="col">Deposits</th><th scope="col">Paid on the day</th></tr></thead>
                 <tbody>{weeklyChart.map(row => <tr key={row.week}><th scope="row">{row.week}</th><td>{fmt(row.gross)}</td><td>{fmt(row.fromDeposits)}</td><td>{fmt(row.onTheDay)}</td></tr>)}</tbody>
               </table>
             </details>

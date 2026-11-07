@@ -1182,54 +1182,49 @@ export default function SettingsPage() {
           <div style={s.stationList}>
             {stations.map(st => (
               <div key={st.id} style={s.stationRow}>
-                <div className="studio-wrap-row" style={s.stationTop}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                    {renaming?.id === st.id ? (
-                      <form style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }} onSubmit={e => { e.preventDefault(); saveStationName(); }}>
-                        <input
-                          aria-label="Station name"
-                          value={renaming.name}
-                          maxLength={40}
-                          autoFocus
-                          onFocus={e => e.target.select()}
-                          onChange={e => setRenaming(r => ({ ...r, name: e.target.value }))}
-                          onKeyDown={e => { if (e.key === 'Escape') setRenaming(null); }}
-                          style={{ ...s.stationNameInput }}
-                        />
-                        <button type="submit" style={s.stationToggleBtn} disabled={stationLoading || !renaming.name.trim()}>Save</button>
-                        <button type="button" style={{ ...s.stationToggleBtn, background: 'transparent', border: 'none' }} onClick={() => setRenaming(null)}>Cancel</button>
-                      </form>
-                    ) : (
+                {renaming?.id === st.id ? (
+                  <form style={s.stationTop} onSubmit={e => { e.preventDefault(); saveStationName(); }}>
+                    <input
+                      aria-label="Station name"
+                      className="studio-control"
+                      value={renaming.name}
+                      maxLength={40}
+                      autoFocus
+                      onFocus={e => e.target.select()}
+                      onChange={e => setRenaming(r => ({ ...r, name: e.target.value }))}
+                      onKeyDown={e => { if (e.key === 'Escape') setRenaming(null); }}
+                      style={s.stationNameInput}
+                    />
+                    <div style={s.stationActions}>
+                      <Button size="sm" type="submit" loading={stationLoading} disabled={!renaming.name.trim()}>Save</Button>
+                      <Button size="sm" variant="ghost" onClick={() => setRenaming(null)}>Cancel</Button>
+                    </div>
+                  </form>
+                ) : (
+                  <div className="studio-wrap-row" style={s.stationTop}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', minWidth: 0 }}>
                       <span style={s.stationName}>{st.name}</span>
-                    )}
-                    {st.endDate && (
-                      <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#f59e3a', background: 'rgba(245,158,58,0.1)', border: '1px solid rgba(245,158,58,0.25)', borderRadius: 20, padding: '0.12rem 0.5rem', whiteSpace: 'nowrap' }}>
-                        Last day {new Date(st.endDate + 'T00:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}
-                      </span>
-                    )}
+                      {st.endDate && (
+                        <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#f59e3a', background: 'rgba(245,158,58,0.1)', border: '1px solid rgba(245,158,58,0.25)', borderRadius: 20, padding: '0.12rem 0.5rem', whiteSpace: 'nowrap' }}>
+                          Last day {new Date(st.endDate + 'T00:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}
+                        </span>
+                      )}
+                    </div>
+                    <div style={s.stationActions}>
+                      <Button size="sm" variant="ghost" onClick={() => setRenaming({ id: st.id, name: st.name })} disabled={stationLoading}>Rename</Button>
+                      <Button size="sm" variant="ghost" onClick={() => setStationLastDayTarget({ id: st.id, endDate: st.endDate ?? null })}
+                        disabled={stationLoading || stations.length <= 1}
+                        title={stations.length <= 1 ? 'Add another station before setting this station’s last day.' : undefined}>
+                        {st.endDate ? 'Change last day' : 'Set last day'}
+                      </Button>
+                      <Button size="sm" variant="ghost" className="studio-danger-ghost" onClick={() => handleRemoveStation(st.id)}
+                        disabled={stationLoading || stations.length <= 1}
+                        title={stations.length <= 1 ? 'A studio must have at least one station.' : undefined}>
+                        Remove
+                      </Button>
+                    </div>
                   </div>
-                  {renaming?.id !== st.id && <div style={s.stationActions}>
-                    <button style={s.stationToggleBtn} onClick={() => setRenaming({ id: st.id, name: st.name })} disabled={stationLoading}>
-                      Rename
-                    </button>
-                    <button
-                      style={{ ...s.stationToggleBtn, opacity: stations.length <= 1 ? 0.4 : 1 }}
-                      onClick={() => setStationLastDayTarget({ id: st.id, endDate: st.endDate ?? null })}
-                      disabled={stationLoading || stations.length <= 1}
-                      title={stations.length <= 1 ? 'Add another station before setting this station’s last day.' : undefined}
-                    >
-                      {st.endDate ? 'Change last day' : 'Set last day'}
-                    </button>
-                    <button
-                      style={{ ...s.stationRemoveBtn, opacity: stations.length <= 1 ? 0.4 : 1 }}
-                      onClick={() => handleRemoveStation(st.id)}
-                      disabled={stationLoading || stations.length <= 1}
-                      title={stations.length <= 1 ? 'A studio must have at least one station.' : undefined}
-                    >
-                      Remove
-                    </button>
-                  </div>}
-                </div>
+                )}
                 {/* Unavailability panel — re-enable with button above
                 {expandedStation === st.id && (
                   <div style={s.unavailPanel}>
@@ -1937,10 +1932,10 @@ const s = {
   // Stations
   stationList: { display: 'flex', flexDirection: 'column' },
   stationRow: { borderBottom: '1px solid var(--border-faint)' },
-  stationTop: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', minHeight: 52, padding: '0 0.1rem' },
+  stationTop: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', minHeight: 56, padding: '0.5rem 0' },
   stationName: { fontSize: '0.95rem', fontWeight: 500, color: 'var(--text)' },
-  stationActions: { display: 'flex', gap: '0.5rem' },
-  stationNameInput: { width: 180, padding: '0.4rem 0.6rem', fontSize: '0.9rem', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-input, var(--bg))', color: 'var(--text)' },
+  stationActions: { display: 'flex', alignItems: 'center', gap: '0.25rem', flexShrink: 0 },
+  stationNameInput: { flex: 1, minWidth: 0, minHeight: 'var(--control-height-sm)', padding: '0.3rem 0.65rem', fontSize: '0.95rem', fontWeight: 500 },
   stationToggleBtn: { background: 'var(--bg-chip)', border: '1px solid var(--border)', borderRadius: 8, padding: '0.4rem 0.75rem', fontSize: '0.85rem', color: 'var(--text-dim)', cursor: 'pointer' },
   stationRemoveBtn: { background: 'transparent', border: '1px solid rgba(255,80,80,0.2)', borderRadius: 8, padding: '0.4rem 0.75rem', fontSize: '0.85rem', color: 'var(--color-danger)', cursor: 'pointer' },
   unavailPanel: { borderTop: '1px solid var(--border-faint)', padding: '0.75rem 0.85rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' },

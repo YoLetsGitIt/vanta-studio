@@ -653,3 +653,8 @@ textarea {
 .studio-slug-field:focus-within { outline: var(--focus-ring-width) solid var(--focus-ring); outline-offset: 3px; }
 /* The ring goes round the whole field (prefix + input), not the input alone. */
 .studio-slug-field input:focus-visible { outline: none !important; }
+/* A quiet destructive action: muted until hovered. */
+.studio-button--ghost.studio-danger-ghost { color: var(--color-danger); }
+@media (hover: hover) and (pointer: fine) {
+  .studio-button--ghost.studio-danger-ghost:hover:not(:disabled) { background: var(--color-danger-surface, var(--bg-row-active)); color: var(--color-danger); }
+}
