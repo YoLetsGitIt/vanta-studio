@@ -437,6 +437,7 @@ function ContactEditor({ client, onSave, onCancel }) {
   const [phoneCountry, setPhoneCountry] = useState(initialPhone.country);
   const [phoneNumber, setPhoneNumber] = useState(initialPhone.number);
   const [dob, setDob] = useState(client.dob ? String(client.dob).slice(0, 10) : '');
+  const [address, setAddress] = useState(client.address ?? '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const phone = joinPhone(phoneCountry, phoneNumber);
@@ -452,7 +453,7 @@ function ContactEditor({ client, onSave, onCancel }) {
     if (problem || saving) { setError(problem); return; }
     setSaving(true); setError('');
     const name = [firstName.trim(), lastName.trim()].filter(Boolean).join(' ');
-    try { await onSave({ name, email: email.trim(), phone, dob }); }
+    try { await onSave({ name, email: email.trim(), phone, dob, address: address.trim() }); }
     catch (e) { setError(e.message); }
     finally { setSaving(false); }
   }
@@ -478,6 +479,8 @@ function ContactEditor({ client, onSave, onCancel }) {
       </div>
       <div style={field}><span style={label}>Date of birth</span>
         <DateOfBirthInput style={input} required={false} value={dob} onChange={setDob} /></div>
+      <label style={field}><span style={label}>Address</span>
+        <input style={input} value={address} onChange={e => setAddress(e.target.value)} maxLength={300} autoComplete="off" placeholder="Street, suburb, state, postcode" /></label>
       {error && <p role="alert" style={{ margin: 0, fontSize: '0.85rem', color: 'var(--color-danger)' }}>{error}</p>}
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
         <Button type="button" variant="secondary" size="sm" onClick={onCancel} disabled={saving}>Cancel</Button>
@@ -650,7 +653,7 @@ function ClientDetail({ client, marketing, onMarketingChange, clientKey, panelDe
           <ContactEditor
             client={client}
             onCancel={() => setEditingContact(false)}
-            onSave={async fields => {
+            onSave={async ({ address, ...fields }) => {
               let id = contactId ?? client.id;
               try {
                 await updateStudioClientContact(id, fields);
@@ -662,7 +665,8 @@ function ClientDetail({ client, marketing, onMarketingChange, clientKey, panelDe
                 setContactId(id);
                 await updateStudioClientContact(id, fields);
               }
-              onContactSaved?.({ name: fields.name, email: fields.email || null, phone: fields.phone || null, dob: fields.dob || null });
+              if ((address ?? '') !== (client.address ?? '')) await patchStudioClient(id, { address });
+              onContactSaved?.({ name: fields.name, email: fields.email || null, phone: fields.phone || null, dob: fields.dob || null, address: address || null });
               setEditingContact(false);
             }}
           />
@@ -678,6 +682,7 @@ function ClientDetail({ client, marketing, onMarketingChange, clientKey, panelDe
             ) : <span style={{ color: 'var(--text-muted)' }}>{t('clients_no_phone')}</span>}
           </Fact>
           {client.dob && <Fact label={t('clients_dob')}>{formatDob(String(client.dob).slice(0, 10))}{age != null ? ` (${age} yrs)` : ''}</Fact>}
+          {client.address && <Fact label="Address">{client.address}</Fact>}
         </Section>
         )}
 

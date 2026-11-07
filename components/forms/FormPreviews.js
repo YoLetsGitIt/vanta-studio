@@ -237,7 +237,7 @@ export function WalkInPreview({ bg, accent, studioName, logoUrl, fields, consent
       <span style={{ flex: 1, borderTop: `1px dashed ${hexToRgbaStr(accent, 0.35)}` }} />
     </div>
   );
-  const extras = ['body_location', 'design_details', 'skin_tone', 'size', 'notes', 'allergies'].filter(on);
+  const extras = ['body_location', 'design_details', 'skin_tone', 'size', 'notes', 'allergies', 'address'].filter(on);
   return (
     <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-faint)', borderRadius: 12, padding: '1.25rem' }}>
       <p style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)', letterSpacing: '0.06em', textTransform: 'uppercase', margin: '0 0 0.85rem' }}>Example walk-in form</p>
@@ -293,6 +293,7 @@ export function WalkInPreview({ bg, accent, studioName, logoUrl, fields, consent
         {on('skin_tone') && <div style={fld}><span style={lbl}>Skin tone{req('skin_tone')}</span><div style={inp} /></div>}
         {on('size') && <div style={fld}><span style={lbl}>Size{req('size')}</span><div style={inp} /></div>}
         {on('notes') && <div style={fld}><span style={lbl}>Additional notes{req('notes')}</span><div style={{ ...inp, height: 52 }} /></div>}
+        {on('address') && <div style={fld}><span style={lbl}>Address{req('address')}</span><div style={inp} /></div>}
         {on('allergies') && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0.2rem 0' }}>
             <div style={{ width: 14, height: 14, borderRadius: 3, border: '1px solid rgba(255,255,255,0.25)', background: 'rgba(255,255,255,0.05)', flexShrink: 0 }} />

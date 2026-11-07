@@ -119,6 +119,8 @@ function IntakeInner({ mode, onStyle }) {
   const [hasAllergies, setHasAllergies] = useState(false);
   const [allergyDetails, setAllergyDetails] = useState('');
   const [notes, setNotes]           = useState('');
+  // Walk-ins only, when the studio asks for it (kept on the client's record).
+  const [address, setAddress]       = useState('');
   // Weekly availability: [{ day_of_week, start_time, end_time }]
   const [availability, setAvailability] = useState([]);
   const [earliestDate, setEarliestDate] = useState('');
@@ -358,6 +360,7 @@ function IntakeInner({ mode, onStyle }) {
         color:                isPiercing ? '' : colorStyle,
         notes,
         allergies:            hasAllergies ? (allergyDetails.trim() || 'Yes') : '',
+        ...(walkIn && field('address').enabled ? { address: address.trim() } : {}),
         availability_windows: field('availability_windows').enabled
           ? [...availability].sort((a, b) => a.day_of_week - b.day_of_week || a.start_time.localeCompare(b.start_time))
           : [],
@@ -472,6 +475,11 @@ function IntakeInner({ mode, onStyle }) {
                 />
               </div>
             </Field>
+            {walkIn && field('address').enabled && (
+              <Field label={<>Address{field('address').required ? null : <Optional />}</>}>
+                <input style={s.input} value={address} required={field('address').required} onChange={e => setAddress(e.target.value)} maxLength={300} autoComplete="street-address" placeholder="Street, suburb, state, postcode" />
+              </Field>
+            )}
           </Section>
 
           {/* ── Your tattoo ── */}

@@ -20,6 +20,7 @@ const FIELDS = [
   { key: 'skin_tone', label: 'Skin tone' },
   { key: 'allergies', label: 'Allergies' },
   { key: 'notes', label: 'Additional notes' },
+  { key: 'address', label: 'Address' },
 ];
 
 const entryOf = (fields, key) => fields?.[key] ?? { enabled: false, required: false };
