@@ -49,7 +49,7 @@ async function submitStudioConsent(studioId, accessToken, signerName, dob, phone
   return data;
 }
 
-function ConsentForm() {
+function ConsentForm({ onStyle }) {
   const searchParams = useSearchParams();
   const studioId = searchParams.get('s');
 
@@ -116,7 +116,10 @@ function ConsentForm() {
   useEffect(() => {
     if (!studioId) { setLoadErr('This consent link is missing its studio.'); return; }
     Promise.all([getStudioPublic(studioId), getStudioConsentTemplates(studioId, true)])
-      .then(([studio, tpl]) => setInfo({ studio_id: studioId, studio_name: studio.name, logo_url: studio.logo_url ?? '', templates: tpl.templates ?? [] }))
+      .then(([studio, tpl]) => {
+        onStyle?.(studio.consent_style ?? null);
+        setInfo({ studio_id: studioId, studio_name: studio.name, logo_url: studio.logo_url ?? '', templates: tpl.templates ?? [] });
+      })
       .catch(() => setLoadErr('This consent link is invalid.'));
   }, [studioId]);
 
@@ -312,7 +315,7 @@ function ConsentForm() {
                   type="checkbox"
                   checked={!!ts.answers?.__agreed__}
                   onChange={e => setAnswer(t.id, '__agreed__', e.target.checked ? 'true' : '')}
-                  style={{ accentColor: '#f5ecd9', flexShrink: 0, width: 16, height: 16, minWidth: 'auto' }}
+                  style={{ accentColor: 'var(--cf-accent)', flexShrink: 0, width: 16, height: 16, minWidth: 'auto' }}
                 />
                 <span style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.7)', lineHeight: 1.5 }}>
                   I have read and agreed to the above <span style={{ color: '#e86f6f' }}>*</span>
@@ -403,7 +406,7 @@ const typeBadgeColor = {
 function ConsentFormField({ field, value, onChange }) {
   switch (field.type) {
     case 'photo_id':
-      return <PhotoIdField label={field.label} required={field.required} value={value} onChange={onChange} labelStyle={s.label} accent="#f5ecd9" />;
+      return <PhotoIdField label={field.label} required={field.required} value={value} onChange={onChange} labelStyle={s.label} accent="var(--cf-accent)" />;
     case 'heading':
       return <p style={{ fontSize: '0.9rem', fontWeight: 700, color: '#f5f5f5', margin: 0 }}>{field.label}</p>;
     case 'paragraph':
@@ -423,7 +426,7 @@ function ConsentFormField({ field, value, onChange }) {
               flexShrink: 0, marginTop: 3,
               width: 18, height: 18, minWidth: 'auto',
               padding: 0, border: 'none', background: 'none', borderRadius: 0,
-              accentColor: '#f5ecd9', cursor: 'pointer',
+              accentColor: 'var(--cf-accent)', cursor: 'pointer',
             }}
           />
           <span style={{ fontSize: '0.83rem', color: 'rgba(255,255,255,0.8)', lineHeight: 1.6 }}>
@@ -442,9 +445,9 @@ function ConsentFormField({ field, value, onChange }) {
               <button key={opt} type="button" onClick={() => onChange(opt)}
                 style={{
                   padding: '0.4rem 1.1rem', borderRadius: 8, cursor: 'pointer',
-                  border: `1px solid ${value === opt ? '#f5ecd9' : 'rgba(255,255,255,0.12)'}`,
-                  background: value === opt ? 'rgba(245,236,217,0.1)' : 'rgba(255,255,255,0.04)',
-                  color: value === opt ? '#f5ecd9' : 'rgba(255,255,255,0.45)',
+                  border: `1px solid ${value === opt ? 'var(--cf-accent)' : 'rgba(255,255,255,0.12)'}`,
+                  background: value === opt ? 'var(--cf-accent-soft)' : 'rgba(255,255,255,0.04)',
+                  color: value === opt ? 'var(--cf-accent)' : 'rgba(255,255,255,0.45)',
                   fontSize: '0.82rem', fontWeight: 600, fontFamily: 'inherit',
                 }}>{opt}</button>
             ))}
@@ -566,26 +569,53 @@ export default function ConsentPage() {
     };
   }, []);
 
+  const [style, setStyle] = useState(null);
   return (
-    <div style={s.page}>
+    <div style={{ ...s.page, ...consentTheme(style) }}>
       <style>{'@keyframes spin{to{transform:rotate(360deg)}}'}</style>
       <Suspense fallback={<div style={s.card}><div style={s.spinner} /></div>}>
-        <ConsentForm />
+        <ConsentForm onStyle={setStyle} />
       </Suspense>
     </div>
   );
+}
+
+// The studio's consent form colours (Settings → Consent form) as CSS variables: the
+// card background, a slightly darker page behind it, and the highlight for buttons,
+// ticks and chosen answers (with readable text on it).
+const DEFAULT_CARD = '#1a2026';
+const DEFAULT_ACCENT = '#f5ecd9';
+function rgb(hex) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex || '');
+  if (!m) return null;
+  const n = parseInt(m[1], 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+function consentTheme(style) {
+  const card = rgb(style?.bg_color) ? style.bg_color : DEFAULT_CARD;
+  const accent = rgb(style?.accent_color) ? style.accent_color : DEFAULT_ACCENT;
+  const [r, g, b] = rgb(card);
+  const [ar, ag, ab] = rgb(accent);
+  const light = (0.299 * ar + 0.587 * ag + 0.114 * ab) / 255 > 0.6;
+  return {
+    '--cf-card': card,
+    '--cf-page': `rgb(${Math.round(r * 0.72)}, ${Math.round(g * 0.72)}, ${Math.round(b * 0.72)})`,
+    '--cf-accent': accent,
+    '--cf-accent-soft': `rgba(${ar}, ${ag}, ${ab}, 0.12)`,
+    '--cf-accent-text': light ? '#11151b' : '#ffffff',
+  };
 }
 
 const s = {
   page: {
     minHeight: '100dvh',
     display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
-    background: '#11151b',
+    background: 'var(--cf-page)',
     padding: '2.5rem 1rem 4rem',
     fontFamily: 'var(--font-body), system-ui, -apple-system, sans-serif',
   },
   card: {
-    background: '#1a2026',
+    background: 'var(--cf-card)',
     border: '1px solid rgba(255,255,255,0.08)',
     borderRadius: 16,
     padding: '2rem 1.75rem',
@@ -598,14 +628,14 @@ const s = {
   spinner: {
     width: 28, height: 28, borderRadius: '50%',
     border: '3px solid rgba(255,255,255,0.1)',
-    borderTopColor: '#f5ecd9',
+    borderTopColor: 'var(--cf-accent)',
     animation: 'spin 0.8s linear infinite',
     margin: '2rem auto',
   },
   studioTag: {
     margin: 0,
     fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.1em',
-    textTransform: 'uppercase', color: '#f5ecd9',
+    textTransform: 'uppercase', color: 'var(--cf-accent)',
   },
   heading: {
     margin: 0,
@@ -695,9 +725,9 @@ const s = {
     color: '#f59e3a',
   },
   btn: {
-    background: '#f5ecd9', border: 'none', borderRadius: 10,
+    background: 'var(--cf-accent)', border: 'none', borderRadius: 10,
     padding: '0.8rem', fontSize: '0.92rem', fontWeight: 700,
-    color: '#11151b', cursor: 'pointer', transition: 'opacity 0.15s',
+    color: 'var(--cf-accent-text)', cursor: 'pointer', transition: 'opacity 0.15s',
   },
   error: {
     margin: 0, fontSize: '0.8rem', color: '#e86f6f',

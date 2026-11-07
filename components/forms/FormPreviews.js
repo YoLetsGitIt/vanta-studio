@@ -311,13 +311,19 @@ export function WalkInPreview({ bg, accent, studioName, logoUrl, fields, consent
   );
 }
 
-export function ConsentFormPreview({ name, fields, requiresSig, requiresGuardian }) {
+// bg / accent: the consent form's own colours (Settings → Consent form); the defaults
+// match the client page's standard look.
+export const CONSENT_DEFAULT_BG = '#1a2026';
+export const CONSENT_DEFAULT_ACCENT = '#f5ecd9';
+export function ConsentFormPreview({ name, fields, requiresSig, requiresGuardian, bg = CONSENT_DEFAULT_BG, accent = CONSENT_DEFAULT_ACCENT, studioName }) {
+  const accentText = isLightColor(accent) ? '#11151b' : '#ffffff';
   const inp = { height: 36, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8 };
   const lbl = { fontSize: '0.7rem', fontWeight: 600, color: 'rgba(255,255,255,0.4)', marginBottom: 3, display: 'block' };
   return (
     <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-faint)', borderRadius: 12, padding: '1.25rem' }}>
       <p style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)', letterSpacing: '0.06em', textTransform: 'uppercase', margin: '0 0 0.85rem' }}>Preview</p>
-      <div style={{ background: '#111', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: '1.35rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+      <div style={{ background: bg, border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: '1.35rem', display: 'flex', flexDirection: 'column', gap: '0.85rem', transition: 'background-color 0.2s ease' }}>
+        {studioName && <span style={{ fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: accent }}>{studioName}</span>}
         {name ? (
           <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#fff', margin: 0 }}>{name}</h3>
         ) : (
@@ -360,7 +366,7 @@ export function ConsentFormPreview({ name, fields, requiresSig, requiresGuardian
               <span style={lbl}>{f.label || <em>Question</em>}{f.required && ' *'}</span>
               <div style={{ display: 'flex', gap: 6 }}>
                 {['Yes', 'No'].map(opt => (
-                  <div key={opt} style={{ padding: '0.3rem 0.9rem', borderRadius: 6, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)' }}>{opt}</div>
+                  <div key={opt} style={{ padding: '0.3rem 0.9rem', borderRadius: 6, background: opt === 'Yes' ? hexAlpha(accent, 0.14) : 'rgba(255,255,255,0.04)', border: `1px solid ${opt === 'Yes' ? hexAlpha(accent, 0.45) : 'rgba(255,255,255,0.1)'}`, fontSize: '0.75rem', color: opt === 'Yes' ? accent : 'rgba(255,255,255,0.4)' }}>{opt}</div>
                 ))}
               </div>
             </div>
@@ -404,7 +410,7 @@ export function ConsentFormPreview({ name, fields, requiresSig, requiresGuardian
           </div>
         )}
 
-        <div style={{ padding: '0.6rem', background: 'var(--accent-tint)', border: '1px solid var(--accent-tint-border)', borderRadius: 8, fontSize: '0.8rem', fontWeight: 700, color: 'var(--accent)', textAlign: 'center', marginTop: 4 }}>
+        <div style={{ padding: '0.6rem', background: accent, borderRadius: 8, fontSize: '0.8rem', fontWeight: 700, color: accentText, textAlign: 'center', marginTop: 4, transition: 'background-color 0.2s ease, color 0.2s ease' }}>
           Submit
         </div>
       </div>
@@ -412,3 +418,11 @@ export function ConsentFormPreview({ name, fields, requiresSig, requiresGuardian
   );
 }
 
+
+// #rrggbb at the given opacity.
+function hexAlpha(hex, alpha) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex || '');
+  if (!m) return `rgba(245,236,217,${alpha})`;
+  const n = parseInt(m[1], 16);
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${alpha})`;
+}

@@ -39,7 +39,7 @@
 }
 
 .socialTerms a {
-  color: #f5ecd9;
+  color: var(--cf-accent, #f5ecd9);
   text-decoration: underline;
   text-underline-offset: 2px;
 }

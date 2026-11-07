@@ -2,7 +2,7 @@
 
 import Dialog from '@/components/ui/Dialog';
 import Button from '@/components/ui/Button';
-import { WidgetPreview, ConsentFormPreview } from '@/components/forms/FormPreviews';
+import { WidgetPreview, ConsentFormPreview, CONSENT_DEFAULT_BG, CONSENT_DEFAULT_ACCENT } from '@/components/forms/FormPreviews';
 import StudioLogoUpload from '@/components/StudioLogoUpload';
 // import SmartSchedulingSettings from '@/components/SmartSchedulingSettings'; // smart scheduling temporarily hidden
 import SMSSettings from '@/components/SMSSettings';
@@ -16,7 +16,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import {
   getMyStudioAccount, updateStudioProfile,
   getStudioHours, updateStudioHours,
-  getStations, addStation, removeStation, renameStation, setStationLastDay,
+  getStations, addStation, removeStation, renameStation, setStationLastDay, getConsentStyle, updateConsentStyle,
   setStationUnavailability, clearStationUnavailability,
   listConsentTemplates, createConsentTemplate, updateConsentTemplate,
   getStripeStatus, startStripeOnboarding, disconnectStripe,
@@ -261,6 +261,31 @@ export default function SettingsPage() {
   const [payForfeitedDeposits, setPayForfeitedDeposits] = useState(false);
   // Artist's share of a forfeited deposit, as typed; '' = their usual commission share.
   const [forfeitPct, setForfeitPct] = useState('');
+  // The consent form's own colours; saved a moment after the last change.
+  const [consentBg, setConsentBg] = useState(CONSENT_DEFAULT_BG);
+  const [consentAccent, setConsentAccent] = useState(CONSENT_DEFAULT_ACCENT);
+  const [consentStyleState, setConsentStyleState] = useState('idle'); // idle | saving | saved | error
+  const consentStyleTouched = useRef(false);
+  useEffect(() => {
+    getConsentStyle().then(st => {
+      if (st?.bg_color) setConsentBg(st.bg_color);
+      if (st?.accent_color) setConsentAccent(st.accent_color);
+    }).catch(() => {});
+  }, []);
+  useEffect(() => {
+    if (!consentStyleTouched.current) return undefined;
+    const valid = v => /^#[0-9a-f]{6}$/i.test(v);
+    if (!valid(consentBg) || !valid(consentAccent)) return undefined;
+    setConsentStyleState('saving');
+    const timer = setTimeout(() => {
+      updateConsentStyle({
+        bg_color: consentBg.toLowerCase() === CONSENT_DEFAULT_BG ? null : consentBg,
+        accent_color: consentAccent.toLowerCase() === CONSENT_DEFAULT_ACCENT ? null : consentAccent,
+      }).then(() => setConsentStyleState('saved')).catch(() => setConsentStyleState('error'));
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [consentBg, consentAccent]);
+  const changeConsentColour = setter => value => { consentStyleTouched.current = true; setter(value); };
   const [sendReminder7d, setSendReminder7d] = useState(true);
   const [sendReminder3d, setSendReminder3d] = useState(false);
   const [sendReminder24h, setSendReminder24h] = useState(true);
@@ -1566,6 +1591,35 @@ export default function SettingsPage() {
                       </div>
                     ))}
                   </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '1rem' }}>
+                      <div>
+                        <h3 style={{ ...s.label, margin: 0 }}>Form colours</h3>
+                        <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '0.25rem 0 0' }}>Match the consent form to your studio. Saves as you go.</p>
+                      </div>
+                      <span role="status" style={{ fontSize: '0.8rem', color: consentStyleState === 'error' ? 'var(--color-danger)' : 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                        {consentStyleState === 'saving' ? 'Saving…' : consentStyleState === 'saved' ? 'Saved' : consentStyleState === 'error' ? 'Couldn’t save' : ''}
+                      </span>
+                    </div>
+                    <div className="studio-form-row" style={s.colorRow}>
+                      {[['Background', consentBg, setConsentBg], ['Highlight', consentAccent, setConsentAccent]].map(([label, value, setter]) => (
+                        <div key={label} style={s.colorField}>
+                          <label style={s.label}>{label}</label>
+                          <div style={s.colorInputWrap}>
+                            <input aria-label={`Consent form ${label.toLowerCase()} colour`} type="color" value={/^#[0-9a-f]{6}$/i.test(value) ? value : '#000000'} onChange={e => changeConsentColour(setter)(e.target.value)} style={s.colorSwatch} />
+                            <input aria-label={`Consent form ${label.toLowerCase()} hex colour`} style={{ ...s.input, fontFamily: 'ui-monospace,monospace', fontSize: '0.82rem' }} value={value} maxLength={7} onChange={e => changeConsentColour(setter)(e.target.value)} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    {(consentBg.toLowerCase() !== CONSENT_DEFAULT_BG || consentAccent.toLowerCase() !== CONSENT_DEFAULT_ACCENT) && (
+                      <button type="button" className="studio-link-button" style={{ alignSelf: 'flex-start', fontSize: '0.82rem' }}
+                        onClick={() => { consentStyleTouched.current = true; setConsentBg(CONSENT_DEFAULT_BG); setConsentAccent(CONSENT_DEFAULT_ACCENT); }}>
+                        Use the default colours
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {/* Right — preview */}
@@ -1575,6 +1629,9 @@ export default function SettingsPage() {
                     fields={templateFields}
                     requiresSig={templateRequiresSig}
                     requiresGuardian={templateRequiresGuardian}
+                    bg={/^#[0-9a-f]{6}$/i.test(consentBg) ? consentBg : CONSENT_DEFAULT_BG}
+                    accent={/^#[0-9a-f]{6}$/i.test(consentAccent) ? consentAccent : CONSENT_DEFAULT_ACCENT}
+                    studioName={name}
                   />
                 </div>
               </div>
@@ -1847,7 +1904,7 @@ export default function SettingsPage() {
 
 const s = {
   // Let Settings grow inside the dashboard scroller so the final card keeps its bottom padding.
-  page: { flex: '1 0 auto', padding: '2rem 2.5rem calc(4rem + env(safe-area-inset-bottom, 0px))', display: 'flex', flexDirection: 'column', gap: '1.25rem', minHeight: '100%', boxSizing: 'border-box', width: '100%', maxWidth: 1320 },
+  page: { flex: '1 0 auto', padding: '2rem 2.5rem calc(2rem + env(safe-area-inset-bottom, 0px))', display: 'flex', flexDirection: 'column', gap: '1.25rem', minHeight: '100%', boxSizing: 'border-box', width: '100%', maxWidth: 1320 },
   tabIntroWrap: { display: 'flex', flexDirection: 'column', gap: '0.3rem', marginTop: '0.5rem' },
   tabIntroTitle: { margin: 0, fontSize: '1.2rem', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.01em' },
   tabIntro: { margin: 0, fontSize: '0.95rem', lineHeight: 1.5, color: 'var(--text-secondary)' },
