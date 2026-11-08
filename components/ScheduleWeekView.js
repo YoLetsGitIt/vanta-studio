@@ -258,7 +258,8 @@ function MoreChip({ chip, open, onToggle, onClose, style, alignEnd, short, label
     document.addEventListener('keydown', key);
     return () => { document.removeEventListener('pointerdown', away); document.removeEventListener('keydown', key); };
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
-  const faces = chip.bookings.slice(0, 3);
+  // Each artist once, so two bookings with the same artist don't repeat their photo.
+  const faces = [...new Map(chip.bookings.map(b => [String(b.entry.artistId ?? b.entry.artistName ?? b.entry.bookingId), b])).values()].slice(0, 3);
   return (
     <>
       <button ref={chipRef} type="button" className={`${styles.more} ${short ? styles.moreShort : ''}`} style={style}

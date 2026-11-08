@@ -38,7 +38,7 @@
 /* Client name with the artist's photo in front. */
 .head { display: flex; align-items: center; gap: 5px; min-width: 0; }
 .head .client { min-width: 0; }
-.avatar { flex-shrink: 0; width: 18px; height: 18px; border-radius: 50%; object-fit: cover; display: inline-flex; align-items: center; justify-content: center; background: color-mix(in srgb, var(--booking-color) 35%, var(--bg-chip)); color: var(--text); font-size: 10px; font-weight: 700; line-height: 1; box-shadow: 0 0 0 1px color-mix(in srgb, var(--text) 12%, transparent); }
+.avatar { flex-shrink: 0; width: 18px; height: 18px; border-radius: 50%; object-fit: cover; display: inline-flex; align-items: center; justify-content: center; background: color-mix(in srgb, var(--booking-color, var(--text-muted)) 35%, var(--bg-chip)); color: var(--text); font-size: 10px; font-weight: 700; line-height: 1; box-shadow: 0 0 0 1px color-mix(in srgb, var(--text) 12%, transparent); }
 .short { flex-direction: row; align-items: center; padding-block: 2px; }
 .compact .typeName, .short .time, .short .typeName, .short .resource, .short .status, .short .pendingTag { display: none; }
 /* Three or more side by side: name only; the full details are in the tooltip/label. */
@@ -106,10 +106,17 @@
 .moreShort { flex-direction: row; align-items: center; padding-block: 2px; }
 .moreShort .faces { display: none; }
 .moreCount { font-size: 12px; font-weight: 700; line-height: 1.2; font-variant-numeric: tabular-nums; }
-.faces { display: flex; }
-.faces .avatar { width: 16px; height: 16px; font-size: 9px; }
-.faces > * + * { margin-left: -6px; }
-.faces > * { box-shadow: 0 0 0 1.5px var(--bg-panel); }
+.faces { display: flex; flex-wrap: nowrap; }
+/* Only as many faces as fit across the chip; never half a face. */
+.more { container-type: inline-size; }
+@container (max-width: 37.9px) { .faces > :nth-child(3) { display: none; } }
+@container (max-width: 26.9px) { .faces > :nth-child(2) { display: none; } }
+.faces .avatar { position: relative; width: 16px; height: 16px; font-size: 9px; box-shadow: 0 0 0 2px var(--bg-panel); }
+.faces > * + * { margin-left: -5px; }
+/* The first face sits on top, so every one shows its left edge in full. */
+.faces > :nth-child(1) { z-index: 3; }
+.faces > :nth-child(2) { z-index: 2; }
+.faces > :nth-child(3) { z-index: 1; }
 
 /* The list it opens. */
 .moreList { position: absolute; z-index: 7; left: calc(100% - var(--add-strip) - 4px); width: 250px; margin-top: 2px; padding: 10px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg-panel); box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28); transform-origin: top left; animation: moreIn 160ms cubic-bezier(0.23, 1, 0.32, 1); }
