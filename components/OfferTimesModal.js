@@ -13,6 +13,7 @@ import Dialog from '@/components/ui/Dialog';
 import Button from '@/components/ui/Button';
 import Field, { Input, Select } from '@/components/ui/Field';
 import OfferWeekView, { mondayOf } from '@/components/OfferWeekView';
+import { TypeChips, lengthLabel, useTypePricing, withLength } from '@/components/TypePricing';
 
 const pad = n => String(n).padStart(2, '0');
 const DURATIONS = [30, 60, 90, 120, 180, 240, 300, 360, 480];
@@ -136,6 +137,7 @@ export default function OfferTimesModal({ booking, offer = null, artists: givenA
     });
   }
 
+  const pricing = useTypePricing({ booking, artistId, duration, setDuration, setQuote, setDeposit, setDepositAmount, depositsReady });
   const quoteNum = quote ? Number(quote) : null;
   const depositNum = deposit && depositAmount ? Number(depositAmount) : null;
   const depositInvalid = deposit && (!depositNum || depositNum <= 0 || (quoteNum > 0 && depositNum > quoteNum));
@@ -187,6 +189,7 @@ export default function OfferTimesModal({ booking, offer = null, artists: givenA
         artistId, times: slots.map(d => d.toISOString()), durationMinutes: duration,
         estimatedQuote: quoteNum, depositRequired: deposit, depositAmount: depositNum,
       });
+      await pricing.saveType(booking.id);
       await onOffered?.(booking.id, result);
       onClose();
     } catch (error) {
@@ -225,6 +228,7 @@ export default function OfferTimesModal({ booking, offer = null, artists: givenA
             })}
           </Select>
         </Field>
+        <TypeChips pricing={pricing} />
         {artistId ? (
           <OfferWeekView
             weekStart={weekStart}
@@ -260,7 +264,7 @@ export default function OfferTimesModal({ booking, offer = null, artists: givenA
         </div>
         <Field label="Duration">
           <Select value={duration} onChange={e => setDuration(Number(e.target.value))} aria-label="Duration">
-            {DURATIONS.map(m => <option key={m} value={m}>{m === 480 ? 'Full day (8 hrs)' : m < 60 ? '30 minutes' : `${m / 60} hour${m === 60 ? '' : 's'}`}</option>)}
+            {withLength(DURATIONS, duration).map(m => <option key={m} value={m}>{lengthLabel(m)}</option>)}
           </Select>
         </Field>
 
@@ -295,8 +299,8 @@ export default function OfferTimesModal({ booking, offer = null, artists: givenA
           )}
         </div>
 
-        <Field label="Quote" hint="Shown to the client as an estimate.">
-          <Input type="number" inputMode="decimal" min="0" step="0.01" value={quote} onChange={e => setQuote(e.target.value)} placeholder="e.g. 350" aria-label="Quote" />
+        <Field label="Quote" hint={pricing.hint || 'Shown to the client as an estimate.'}>
+          <Input type="number" inputMode="decimal" min="0" step="0.01" value={quote} onChange={e => { setQuote(e.target.value); pricing.quoteTyped(); }} placeholder="e.g. 350" aria-label="Quote" />
         </Field>
         {depositsReady ? (
           <>

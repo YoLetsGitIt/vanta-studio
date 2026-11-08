@@ -7,6 +7,7 @@ import { showError } from '@/lib/feedback';
 import Dialog from '@/components/ui/Dialog';
 import Button from '@/components/ui/Button';
 import Field, { Input, Select } from '@/components/ui/Field';
+import { TypeChips, lengthLabel, useTypePricing, withLength } from '@/components/TypePricing';
 
 export default function SendSelectionLinkModal({ booking, artists = [], stripeConnected = false, onClose, onSent }) {
   const [hours, setHours] = useState(168);
@@ -29,6 +30,8 @@ export default function SendSelectionLinkModal({ booking, artists = [], stripeCo
     setArtistId(assignedArtistIsAvailable ? bookingArtistId : '');
   }, [booking, bookingArtistId, assignedArtistIsAvailable]);
 
+  const pricing = useTypePricing({ booking, artistId, duration, setDuration, setQuote, setDeposit, setDepositAmount, depositsReady: stripeConnected });
+
   async function submit() {
     if (saving || !booking?.id || (needsArtist && !artistId)) return;
     setErrorMessage('');
@@ -42,6 +45,7 @@ export default function SendSelectionLinkModal({ booking, artists = [], stripeCo
         estimatedQuote: quote ? Number(quote) : null,
         artistId: artistId || null,
       });
+      await pricing.saveType(booking.id);
       await onSent?.(booking.id);
       onClose();
     } catch (error) {
@@ -80,17 +84,16 @@ export default function SendSelectionLinkModal({ booking, artists = [], stripeCo
             })}
           </Select>
         </Field>
+        <TypeChips pricing={pricing} />
         <Field label="Duration">
           <Select value={duration} onChange={e => setDuration(Number(e.target.value))}>
-            {[60, 90, 120, 180, 240, 300, 360, 480].map(minutes => (
-              <option key={minutes} value={minutes}>
-                {minutes === 480 ? 'Full day (8 hrs)' : `${minutes / 60} hour${minutes === 60 ? '' : 's'}`}
-              </option>
+            {withLength([60, 90, 120, 180, 240, 300, 360, 480], duration).map(minutes => (
+              <option key={minutes} value={minutes}>{lengthLabel(minutes)}</option>
             ))}
           </Select>
         </Field>
-        <Field label="Quote">
-          <Input type="number" inputMode="decimal" min="0" step="0.01" value={quote} onChange={e => setQuote(e.target.value)} placeholder="e.g. 350" />
+        <Field label="Quote" hint={pricing.hint || undefined}>
+          <Input type="number" inputMode="decimal" min="0" step="0.01" value={quote} onChange={e => { setQuote(e.target.value); pricing.quoteTyped(); }} placeholder="e.g. 350" />
         </Field>
         <Field label="Link expires">
           <Select value={hours} onChange={e => setHours(Number(e.target.value))}>

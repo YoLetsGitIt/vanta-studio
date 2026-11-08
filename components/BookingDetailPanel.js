@@ -17,7 +17,7 @@ import { getCached, setCached } from '@/lib/cache';
 import { useLanguage } from '@/lib/i18n';
 import { showError, showFeedback } from '@/lib/feedback';
 import { normalizeBookingSource } from '@/lib/bookingType';
-import { useAppointmentTypes, formatTypeLength } from '@/lib/appointmentTypes';
+import { useAppointmentTypes, formatTypeLength, priceBasis } from '@/lib/appointmentTypes';
 import { forgetBookings } from '@/lib/bookingCache';
 import Button, { IconButton } from '@/components/ui/Button';
 import BookingSMS from '@/components/BookingSMS';
@@ -144,6 +144,7 @@ export default function BookingDetailPanel({
   // The studio's appointment type for this booking (its colour on the schedule).
   const { active: activeTypes, byId: typesById } = useAppointmentTypes();
   const [typeOverride, setTypeOverride] = useState(null); // { booking, id }
+  const [quoteOverride, setQuoteOverride] = useState(null); // { booking, value }: repriced by a type
   const [typeSaving, setTypeSaving] = useState(false);
   const [artistPhotoFailed, setArtistPhotoFailed] = useState(false);
 
@@ -194,7 +195,7 @@ export default function BookingDetailPanel({
     ? new Date(`${String(booking.earliest_date).slice(0, 10)}T12:00:00`).toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })
     : null;
   const refImages   = booking?.reference_images  ?? [];
-  const quote       = booking?.estimated_quote   ?? entry?.estimatedQuote ?? null;
+  const quote       = (quoteOverride?.booking === bookingId ? quoteOverride.value : null) ?? booking?.estimated_quote ?? entry?.estimatedQuote ?? null;
   const duration    = booking?.proposed_duration_minutes ?? entry?.durationMins ?? null;
   const chosenTime  = booking?.chosen_time       ?? entry?.chosenTime     ?? null;
   const proposedTime = booking?.proposed_time_primary    ?? null;
@@ -423,7 +424,12 @@ export default function BookingDetailPanel({
     setTypeOverride({ booking: bookingId, id: typeId });
     setTypeSaving(true);
     try {
-      await setBookingAppointmentType(bookingId, typeId);
+      const next = typeId ? typesById[typeId] : null;
+      const result = await setBookingAppointmentType(bookingId, typeId, { reprice: Boolean(next?.price_basis) });
+      if (result?.estimated_quote != null && result.estimated_quote !== quote) {
+        setQuoteOverride({ booking: bookingId, value: result.estimated_quote });
+        showFeedback(`Price updated to $${Number(result.estimated_quote).toLocaleString('en-AU')} from ${artistName ? `${artistName.split(' ')[0]}’s` : 'the artist’s'} ${priceBasis(next.price_basis).label.toLowerCase()}`, 'success');
+      }
       forgetBookings();
       window.dispatchEvent(new Event('booking-created')); // the schedule recolours
     } catch (error) {
