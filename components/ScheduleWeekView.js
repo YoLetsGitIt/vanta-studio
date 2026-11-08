@@ -35,6 +35,7 @@ export default function ScheduleWeekView({ date, lens, refreshKey, selectedBooki
   const start = weekStartFor(date), startKey = localDateKey(start);
   const [entries, setEntries] = useState([]);
   const [resources, setResources] = useState([]);
+  const [artists, setArtists] = useState([]); // for each booking's artist photo
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [filter, setFilter] = useState('all');
@@ -55,16 +56,19 @@ export default function ScheduleWeekView({ date, lens, refreshKey, selectedBooki
     Promise.all([
       cached ? { entries: cached } : getStudioScheduleRange(localDateKey(calendarDayAfter(start, -1)), localDateKey(calendarDayAfter(start, 7))),
       cachedResources ? cachedResources : (lens === 'artist' ? getStudioArtists('approved').then(data => data.artists ?? []) : getStations().then(data => (data.stations ?? []).filter(station => station.is_active !== false))),
-    ]).then(([data, list]) => {
+      lens === 'artist' ? null : (getCached('artists:approved') ?? getStudioArtists('approved').then(data => data.artists ?? []).catch(() => [])),
+    ]).then(([data, list, artistList]) => {
       if (cancelled) return;
       const bookings = data.entries ?? [];
       setCached(scheduleKey, bookings); setCached(resourceKey, list);
-      setEntries(bookings); setResources(list); setLoading(false);
+      if (artistList?.length) setCached('artists:approved', artistList);
+      setEntries(bookings); setResources(list); setArtists(lens === 'artist' ? list : artistList ?? []); setLoading(false);
     }).catch(err => { if (!cancelled) { setError(err.message); setLoading(false); } });
     return () => { cancelled = true; };
   }, [startKey, lens, refreshKey, retry]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const allDays = useMemo(() => weekSchedule(entries, date), [entries, startKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  const artistById = new Map(artists.map(artist => [String(artist.artistId ?? artist.artist_id ?? artist.id), artist]));
   const options = new Map(resources.map(resource => [lens === 'artist' ? resource.artistId ?? resource.id : resource.id, resource.name]));
   for (const day of allDays) for (const { entry } of day.bookings) {
     const id = resourceId(entry, lens);
@@ -75,20 +79,21 @@ export default function ScheduleWeekView({ date, lens, refreshKey, selectedBooki
   const time = value => new Intl.DateTimeFormat(locale, { hour: 'numeric', minute: '2-digit' }).format(value);
   const hourLabel = hour => new Intl.DateTimeFormat(locale, { hour: 'numeric' }).format(new Date(2000, 0, 1, hour));
   const today = localDateKey(new Date());
-  const { startHour, endHour } = weekHourRange(days);
+  const { startHour, endHour } = weekHourRange();
   const hours = Array.from({ length: endHour - startHour }, (_, index) => startHour + index);
   const span = (endHour - startHour) * 60;
   // Percent of the column from the top of the visible range.
   const offset = (day, at) => ((at.getTime() - day.date.getTime()) / 60000 - startHour * 60) / span * 100;
   const now = new Date();
-  // Open on the working day (or the week's earliest start, if earlier), not midnight.
+  // Open scrolled to the working day (or the week's earliest start, if earlier), not midnight.
   const firstStart = Math.min(8, ...days.flatMap(day => day.bookings.filter(b => !b.continuesFrom).map(b => b.displayStart.getHours())));
   const scrollHour = Math.max(startHour, firstStart - 1);
 
   useEffect(() => {
     const scroller = scrollRef.current, column = scroller?.querySelector('section > div');
     if (!scroller || !column) return;
-    scroller.scrollTop = (scrollHour - startHour) * (column.offsetHeight / (endHour - startHour));
+    // A little short of the hour line, so its label isn't cut off under the headings.
+    scroller.scrollTop = Math.max(0, (scrollHour - startHour) * (column.offsetHeight / (endHour - startHour)) - 12);
   }, [loading, startKey, lens, scrollHour, startHour, endHour]);
 
   function addBooking(day, minutes) {
@@ -184,7 +189,10 @@ export default function ScheduleWeekView({ date, lens, refreshKey, selectedBooki
                       style={{ '--booking-color': source.border, top: `${top}%`, height: `${height}%`, left: `calc((100% - var(--add-strip)) * ${booking.lane / booking.lanes} + 2px)`, width: `calc((100% - var(--add-strip)) / ${booking.lanes} - 4px)` }}
                       onClick={() => onOpenDetail(entry)}
                     >
-                      <span className={styles.client}>{entry.clientName}</span>
+                      <span className={styles.head}>
+                        <ArtistAvatar artist={artistById.get(String(entry.artistId))} name={entry.artistName} />
+                        <span className={styles.client}>{entry.clientName}</span>
+                      </span>
                       <span className={styles.time}>{time(booking.displayStart)} – {time(booking.displayEnd)}</span>
                       {source.typed && <span className={styles.typeName}>{source.tag}</span>}
                       <span className={styles.resource}>{lens === 'artist' ? artist : station}</span>
@@ -199,4 +207,14 @@ export default function ScheduleWeekView({ date, lens, refreshKey, selectedBooki
       </div>
     </div>
   );
+}
+
+// The booking's artist: their photo, or their first initial. Always shown, so a booking
+// too narrow for its text still says whose it is.
+function ArtistAvatar({ artist, name }) {
+  const image = artist?.profileImage ?? artist?.profile_image;
+  const initial = (artist?.name || name || '?').trim().charAt(0).toUpperCase();
+  return image
+    ? <img src={image} alt="" className={styles.avatar} loading="lazy" />
+    : <span aria-hidden="true" className={styles.avatar}>{initial}</span>;
 }

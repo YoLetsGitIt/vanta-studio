@@ -35,11 +35,16 @@
 .status, .pendingTag { align-self: flex-start; font-size: 10px; line-height: 1.3; border-radius: 4px; padding: 1px 5px; background: var(--bg-chip); color: var(--text-dim); white-space: nowrap; }
 .pendingTag { color: var(--color-warning); background: var(--color-warning-surface); }
 /* Short bookings: one line with the client name. */
+/* Client name with the artist's photo in front. */
+.head { display: flex; align-items: center; gap: 5px; min-width: 0; }
+.head .client { min-width: 0; }
+.avatar { flex-shrink: 0; width: 18px; height: 18px; border-radius: 50%; object-fit: cover; display: inline-flex; align-items: center; justify-content: center; background: color-mix(in srgb, var(--booking-color) 35%, var(--bg-chip)); color: var(--text); font-size: 10px; font-weight: 700; line-height: 1; box-shadow: 0 0 0 1px color-mix(in srgb, var(--text) 12%, transparent); }
 .short { flex-direction: row; align-items: center; padding-block: 2px; }
 .compact .typeName, .short .time, .short .typeName, .short .resource, .short .status, .short .pendingTag { display: none; }
 /* Three or more side by side: name only; the full details are in the tooltip/label. */
 .narrow { padding-inline: 5px; }
-.narrow .client { white-space: normal; overflow-wrap: normal; text-overflow: clip; font-size: 11px; }
+/* Three or more side by side: just the artist's photo; hover or open it for the rest. */
+.narrow .client { display: none; }
 .narrow .time, .narrow .typeName, .narrow .resource, .narrow .status, .narrow .pendingTag { display: none; }
 .message { padding: 24px; color: var(--text-muted); font-size: 14px; }
 .retry { background: var(--bg-input); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 8px 14px; cursor: pointer; }
