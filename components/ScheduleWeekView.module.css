@@ -13,7 +13,12 @@
 .day:last-child { border-right: 0; }
 .dayHeading { position: sticky; top: 0; z-index: 5; width: 100%; height: var(--heading-h); display: grid; grid-template-columns: 1fr auto; align-content: center; gap: 4px; padding: 0 12px; text-align: left; background: var(--bg-sidebar); color: var(--text); border: 0; border-bottom: 1px solid var(--border); cursor: pointer; }
 .dayHeading:hover { background: var(--bg-row-hover); }
-.dayName { grid-column: 1 / -1; font-size: 12px; font-weight: 600; color: var(--text-muted); }
+.dayName { grid-column: 1 / -1; display: flex; align-items: baseline; justify-content: space-between; gap: 6px; font-size: 12px; font-weight: 600; color: var(--text-muted); }
+/* "Day view →": shows on hover and focus, and always on days too busy to read here. */
+.openDay { font-size: 11px; font-weight: 650; color: var(--accent); white-space: nowrap; opacity: 0; transform: translateX(-3px); transition: opacity 150ms ease, transform 150ms ease; }
+.dayHeading:focus-visible .openDay, .dayHeading[data-busy] .openDay { opacity: 1; transform: none; }
+@media (hover: hover) and (pointer: fine) { .dayHeading:hover .openDay { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .openDay { transform: none; } }
 .date { font-size: 22px; font-weight: 700; letter-spacing: -0.04em; }
 .date > span { font-size: 12px; letter-spacing: normal; font-weight: 500; color: var(--text-muted); }
 .dayCount { align-self: center; font-size: 11px; background: var(--bg-chip); color: var(--text-muted); padding: 3px 7px; border-radius: 6px; }
@@ -67,6 +72,7 @@
   .days { --hour-px: 40px; --heading-h: 40px; }
   .dayHeading { padding: 0 10px; grid-template-columns: auto 1fr auto; align-items: center; }
   .dayName { grid-column: auto; }
+  .openDay { display: none; }
   .date { font-size: 16px; }
   /* One line per day heading: "Mon 2 Nov  1". */
   /* The whole week fits the screen width: no sideways scrolling to reach Sunday. */
@@ -99,9 +105,9 @@
 .column { --add-strip: 28px; }
 .addSlotBeside { left: calc(100% - var(--add-strip)); width: var(--add-strip); padding: 0; text-align: center; }
 
-/* "+N": bookings that don't fit side by side. It fills its column for the busy stretch
-   like a booking, drawn as a small stack of cards so it reads as "more bookings here". */
-.more { position: absolute; z-index: 1; min-height: 22px; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 5px 6px; border: 1px solid var(--border-strong); border-radius: 7px; background: var(--bg-card); color: var(--text); font: inherit; cursor: pointer; box-shadow: 3px 3px 0 -1px var(--bg-card), 3px 3px 0 0 var(--border-strong), 6px 6px 0 -1px var(--bg-card), 6px 6px 0 0 var(--border); transition: background-color 150ms ease, border-color 150ms ease, transform 120ms ease-out; }
+/* "+N": bookings that don't fit side by side. A plain card filling its column for the
+   busy stretch, like a booking. */
+.more { position: absolute; z-index: 1; min-height: 22px; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 5px 6px; border: 1px solid var(--border-strong); border-radius: 7px; background: var(--bg-card); color: var(--text); font: inherit; cursor: pointer; transition: background-color 150ms ease, border-color 150ms ease, transform 120ms ease-out; }
 .more:active { transform: scale(0.97); }
 .more[aria-expanded='true'] { z-index: 3; border-color: var(--accent); }
 @media (hover: hover) and (pointer: fine) { .more:hover { background: var(--bg-row-hover); border-color: var(--text-muted); } }

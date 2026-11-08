@@ -148,10 +148,18 @@ export default function ScheduleWeekView({ date, lens, refreshKey, selectedBooki
               {hours.map(hour => <span key={hour} className={styles.hourLabel} style={{ top: `${(hour - startHour) / hours.length * 100}%` }}>{hour === startHour ? '' : hourLabel(hour)}</span>)}
             </div>
           </div>
-          {days.map((day, dayIndex) => (
+          {days.map((day, dayIndex) => {
+            const laid = capDayLanes(layoutDayLanes(day.bookings));
+            // Too many at once to show here: the heading points to Day view (a column per artist).
+            const busy = laid.overflow.length > 0;
+            return (
             <section key={day.key} className={`${styles.day} ${day.key === today ? styles.today : ''}`} aria-label={day.date.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' })}>
-              <button type="button" className={styles.dayHeading} onClick={() => onDayClick(day.date)} aria-current={day.key === today ? 'date' : undefined} title="Open in Day view, one column per artist">
-                <span className={styles.dayName}>{day.date.toLocaleDateString(locale, { weekday: 'short' })}</span>
+              <button type="button" className={styles.dayHeading} data-busy={busy || undefined} onClick={() => onDayClick(day.date)} aria-current={day.key === today ? 'date' : undefined}
+                aria-label={`${day.date.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' })}, ${day.bookings.length} bookings. Open in Day view`} title="Open in Day view, one column per artist">
+                <span className={styles.dayName}>
+                  {day.date.toLocaleDateString(locale, { weekday: 'short' })}
+                  <span className={styles.openDay} aria-hidden="true">Day view →</span>
+                </span>
                 <span className={styles.date}>{day.date.getDate()} <span>{day.date.toLocaleDateString(locale, { month: 'short' })}</span></span>
                 <span className={styles.dayCount} data-empty={day.bookings.length === 0 || undefined}>{day.bookings.length}</span>
               </button>
@@ -176,7 +184,7 @@ export default function ScheduleWeekView({ date, lens, refreshKey, selectedBooki
                 {hours.map(hour => <div key={hour} className={styles.hourLine} style={{ top: `${(hour - startHour) / hours.length * 100}%` }} />)}
                 {day.key === today && now >= day.date && <div className={styles.nowLine} style={{ top: `${offset(day, now)}%` }} aria-hidden="true" />}
                 {(() => {
-                  const { shown, overflow } = capDayLanes(layoutDayLanes(day.bookings));
+                  const { shown, overflow } = laid;
                   // A busy day shows every booking the same way (photo and name), so the
                   // ones with room don't look like a different kind of booking.
                   const dense = overflow.length > 0 || shown.some(b => b.lanes >= 3);
@@ -231,7 +239,8 @@ export default function ScheduleWeekView({ date, lens, refreshKey, selectedBooki
                 })()}
               </div>
             </section>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>
