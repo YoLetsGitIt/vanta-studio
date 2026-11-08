@@ -254,9 +254,14 @@ function MoreChip({ chip, open, onToggle, onClose, style, alignEnd, short, label
     listRef.current?.focus(); // Tab goes through its bookings; Escape closes it
     const away = event => { if (!chipRef.current?.contains(event.target) && !listRef.current?.contains(event.target)) onClose(); };
     const key = event => { if (event.key === 'Escape') { onClose(); chipRef.current?.focus(); } };
+    // Scrolling over the list never scrolls the calendar behind it: only the bookings
+    // list scrolls (and stops at its ends, see overscroll-behavior in the CSS).
+    const list = listRef.current;
+    const wheel = event => { if (!list?.querySelector('ul')?.contains(event.target)) event.preventDefault(); };
+    list?.addEventListener('wheel', wheel, { passive: false });
     document.addEventListener('pointerdown', away);
     document.addEventListener('keydown', key);
-    return () => { document.removeEventListener('pointerdown', away); document.removeEventListener('keydown', key); };
+    return () => { list?.removeEventListener('wheel', wheel); document.removeEventListener('pointerdown', away); document.removeEventListener('keydown', key); };
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
   // The list shows everything at that time, the bookings showing beside the chip too.
   const list = chip.all ?? chip.bookings;

@@ -713,12 +713,14 @@ function DayView({ date, showAll, setShowAll }) {
               {Array.from({ length: (DAY_END - DAY_START) * 2 }, (_, i) => {
                 const minutes = DAY_START * 60 + i * 30;
                 const label = `${t('new_appointment')} · ${artist.name} · ${slotTime(minutes)}`;
+                // An artist can't be double-booked, so a booked half hour has nothing to add.
                 const covered = bookings.some(b => { const start = minutesFromMidnight(b.chosenTime); return start < minutes + 30 && start + (b.durationMins ?? 60) > minutes; });
+                if (covered) return null;
                 return (
-                  <button key={minutes} type="button" className={`${weekStyles.addSlot} ${covered ? weekStyles.addSlotBeside : ''}`} aria-label={label}
-                    style={{ top: i * 30 * (hourPx / 60), height: 30 * (hourPx / 60), '--add-strip': '32px' }}
+                  <button key={minutes} type="button" className={weekStyles.addSlot} aria-label={label}
+                    style={{ top: i * 30 * (hourPx / 60), height: 30 * (hourPx / 60) }}
                     onClick={() => addBooking(artist.artistId, minutes)}>
-                    <span aria-hidden="true">{covered ? '＋' : `＋ ${slotTime(minutes)}`}</span>
+                    <span aria-hidden="true">{`＋ ${slotTime(minutes)}`}</span>
                   </button>
                 );
               })}
@@ -741,7 +743,7 @@ function DayView({ date, showAll, setShowAll }) {
                     data-booking-id={b.bookingId}
                     onClick={() => actions.openDetail(b)}
                     style={{
-                      ...s.block, top, height, left: 4, right: 32, width: undefined, zIndex: 1,
+                      ...s.block, top, height, left: 4, right: 4, width: undefined, zIndex: 1,
                       background: blockBg,
                       border: `1px ${unconfirmed ? 'dashed' : 'solid'} ${blockBorder}55`,
                       borderLeft: `3px ${unconfirmed ? 'dashed' : 'solid'} ${blockBorder}`,

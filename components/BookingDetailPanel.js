@@ -7,10 +7,11 @@ import OfferTimesModal from '@/components/OfferTimesModal';
 import AssignArtistModal from '@/components/AssignArtistModal';
 import SendQuoteModal from '@/components/SendQuoteModal';
 import EditBookingModal from '@/components/EditBookingModal';
+import CompleteBookingModal from '@/components/CompleteBookingModal';
 import { useBookingManagement } from '@/lib/bookingManagement';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { setBookingAppointmentType, getStations, getStudioArtists, getClientConsents, getNotes, addNote, deleteNote, getBookingConsentSubmissions, getClientConsentSubmissions, getStudioClients, getStudioClient, generateConsentLink, getStudioBookingPayment, getDepositReceipt, getDepositStatus, getOfferedTimes, listConsentTemplates, requestAvailability } from '@/lib/api';
+import { setBookingAppointmentType, getStations, getStudioArtists, getClientConsents, getNotes, addNote, deleteNote, getBookingConsentSubmissions, getClientConsentSubmissions, getStudioClients, getStudioClient, generateConsentLink, getStudioBookingPayment, recordStudioBookingPayment, getDepositReceipt, getDepositStatus, getOfferedTimes, listConsentTemplates, requestAvailability } from '@/lib/api';
 import { useStationAvailability } from '@/lib/useStationAvailability';
 import { statusColors, statusLabel, capitalise as cap } from '@/lib/status';
 import { formatDob as fmtDob, hasArtist, ageFromDob } from '@/lib/format';
@@ -123,6 +124,10 @@ export default function BookingDetailPanel({
 
   // ── Payment recording status ───────────────────────────────────────────────
   const [paymentSplits, setPaymentSplits] = useState(null); // null = not loaded
+  const [recordOpen, setRecordOpen] = useState(false);
+  const [recordSaving, setRecordSaving] = useState(false);
+  // What the studio just recorded, shown before the next refresh.
+  const [paidOverride, setPaidOverride] = useState(null); // { booking, total, methods }
 
   // ── Studio notes state (notes table, entity_type='booking') ────────────────
   const [studioNotes, setStudioNotes] = useState(null); // null = loading
@@ -207,8 +212,9 @@ export default function BookingDetailPanel({
   const depositPaidAt     = booking?.deposit_paid_at     ?? depositReceived?.at ?? null;
   const depositConfirmedAt = booking?.deposit_confirmed_at ?? depositReceived?.at ?? null;
   const depositPaid       = !!depositPaidAt || !!(entry?.depositPaid);
-  const finalPrice        = booking?.final_price         ?? null;
-  const paymentMethod     = booking?.payment_method      ?? null;
+  const paid              = paidOverride?.booking === bookingId ? paidOverride : null;
+  const finalPrice        = paid?.total ?? booking?.final_price ?? null;
+  const paymentMethod     = paid?.methods ?? booking?.payment_method ?? null;
   const outcomeAt         = booking?.outcome_recorded_at ?? null;
   const aftercareInstructions = booking?.aftercare_instructions ?? null;
   const cancelReason      = booking?.cancellation_reason ?? null;
@@ -281,7 +287,7 @@ export default function BookingDetailPanel({
   useEffect(() => {
     if (!bookingId || !isCompleted) { setPaymentSplits(null); return; }
     getStudioBookingPayment(bookingId)
-      .then(d => setPaymentSplits(d.splits ?? []))
+      .then(d => setPaymentSplits(d.all_splits ?? d.splits ?? []))
       .catch(() => setPaymentSplits([]));
   }, [bookingId, isCompleted]);
 
@@ -916,7 +922,7 @@ export default function BookingDetailPanel({
                 </span>
               )}
             </div>
-            {showCompleted && paymentMethod && <Fact label={t('bdp_payment')}>{PAYMENT_LABELS[paymentMethod] ?? paymentMethod}</Fact>}
+            {showCompleted && paymentMethod && <Fact label={t('bdp_payment')}>{paymentMethod.split(',').map(m => PAYMENT_LABELS[m] ?? m).join(', ')}</Fact>}
             {showCompleted && paymentSplits !== null && (() => {
               const artistSplits = paymentSplits.filter(s => s.recorded_by === 'artist');
               const studioSplits = paymentSplits.filter(s => s.recorded_by === 'studio');
@@ -927,7 +933,7 @@ export default function BookingDetailPanel({
                   <span style={p.subLabel}>{t('bdp_payment_recordings')}</span>
                   {[
                     { label: t('bdp_artist'), splits: artistSplits, total: artistTotal },
-                    { label: t('nav_studios'), splits: studioSplits, total: studioTotal },
+                    { label: 'Studio', splits: studioSplits, total: studioTotal },
                   ].map(({ label, splits, total }) => (
                     <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
                       <span style={p.factLabel}>{label}</span>
@@ -943,6 +949,11 @@ export default function BookingDetailPanel({
                       )}
                     </div>
                   ))}
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.25rem' }}>
+                    <Button size="sm" variant={studioSplits.length ? 'secondary' : 'primary'} onClick={() => setRecordOpen(true)}>
+                      {studioSplits.length ? 'Edit payment' : 'Record payment'}
+                    </Button>
+                  </div>
                 </div>
               );
             })()}
@@ -1172,6 +1183,28 @@ export default function BookingDetailPanel({
         <SendQuoteModal booking={booking} onClose={() => setQuoteOpen(false)}
           onSent={async () => { showFeedback(`Quote sent. ${clientFirst} has been asked for their availability`, 'success'); forgetBookings(); await onBooked?.(bookingId); }} />
       )}
+      {recordOpen && bookingId && (() => {
+        const studioSplits = (paymentSplits ?? []).filter(x => x.recorded_by === 'studio');
+        const artistSplits = (paymentSplits ?? []).filter(x => x.recorded_by === 'artist');
+        return (
+          <CompleteBookingModal mode="record" saving={recordSaving}
+            initialPrice={finalPrice ?? quote}
+            initialSplits={studioSplits.length ? studioSplits : artistSplits}
+            onCancel={() => setRecordOpen(false)}
+            onConfirm={async (_price, splits) => {
+              setRecordSaving(true);
+              try {
+                const data = await recordStudioBookingPayment(bookingId, splits);
+                setPaymentSplits(data.all_splits ?? data.splits ?? []);
+                setPaidOverride({ booking: bookingId, total: splits.reduce((n, x) => n + x.amount, 0), methods: [...new Set(splits.map(x => x.method))].join(',') });
+                forgetBookings();
+                setRecordOpen(false);
+                showFeedback('Payment recorded', 'success');
+              } catch (err) { showError(err); }
+              finally { setRecordSaving(false); }
+            }} />
+        );
+      })()}
       {editOpen && booking && (
         <EditBookingModal booking={booking} artists={bookTimeArtists} onClose={() => setEditOpen(false)}
           onSaved={async ({ emailed, first }) => { showFeedback(emailed ? `Booking updated. ${first} has been emailed the new time` : 'Booking updated', 'success'); forgetBookings(); await onBooked?.(bookingId); }} />

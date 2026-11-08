@@ -11,16 +11,19 @@ const PAYMENT_METHODS = [
   { value: 'bank_transfer', label: 'Bank Transfer' },
 ];
 
-export default function CompleteBookingModal({ outcome = 'completed', initialPrice, depositAmount, onConfirm, onCancel, saving }) {
+// mode="record": record what was paid for a booking that's already completed (no
+// follow-up option); initialSplits prefill a correction.
+export default function CompleteBookingModal({ outcome = 'completed', mode = 'complete', initialPrice, initialSplits, depositAmount, onConfirm, onCancel, saving }) {
   const { t } = useLanguage();
   const id = useId();
   const [finalPrice, setFinalPrice] = useState(initialPrice != null ? String(initialPrice) : '');
-  const [splits, setSplits] = useState([{ method: '', amount: '' }]);
+  const [splits, setSplits] = useState(() => initialSplits?.length ? initialSplits.map(s => ({ method: s.method, amount: String(s.amount) })) : [{ method: '', amount: '' }]);
   const [followUp, setFollowUp] = useState(false);
   const [error, setError] = useState('');
   // While there's a single payment method and its amount hasn't been hand-edited,
   // keep it mirroring Final Price so the user never has to type the number twice.
-  const [amountAutoLinked, setAmountAutoLinked] = useState(true);
+  const [amountAutoLinked, setAmountAutoLinked] = useState(!initialSplits?.length);
+  const recording = mode === 'record';
 
   const isNoShow = outcome === 'no_show';
 
@@ -84,8 +87,8 @@ export default function CompleteBookingModal({ outcome = 'completed', initialPri
 
   return (
     <Dialog
-      title={isNoShow ? t('noshow_title') : t('complete_title')}
-      description={isNoShow ? t('noshow_desc') : t('complete_desc')}
+      title={isNoShow ? t('noshow_title') : recording ? 'Record payment' : t('complete_title')}
+      description={isNoShow ? t('noshow_desc') : recording ? 'What the client paid for this appointment. It’s used for payouts and Financials.' : t('complete_desc')}
       onClose={onCancel}
       dismissDisabled={saving}
       maxWidth={440}
@@ -99,7 +102,7 @@ export default function CompleteBookingModal({ outcome = 'completed', initialPri
       ) : (
         <>
           <Button variant="secondary" onClick={onCancel} disabled={saving}>{t('cancel')}</Button>
-          <Button onClick={handleSubmit} loading={saving} loadingLabel={t('saving')}>{t('confirm')}</Button>
+          <Button onClick={handleSubmit} loading={saving} loadingLabel={t('saving')}>{recording ? 'Save payment' : t('confirm')}</Button>
         </>
       )}
     >
@@ -179,7 +182,7 @@ export default function CompleteBookingModal({ outcome = 'completed', initialPri
             </Button>
           </fieldset>
 
-          <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', minHeight: 44, cursor: 'pointer', fontSize: '0.875rem', color: 'var(--text-muted)' }}>
+          {!recording && <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', minHeight: 44, cursor: 'pointer', fontSize: '0.875rem', color: 'var(--text-muted)' }}>
             <input
               type="checkbox"
               checked={followUp}
@@ -187,7 +190,7 @@ export default function CompleteBookingModal({ outcome = 'completed', initialPri
               style={{ accentColor: 'var(--accent)', width: 18, height: 18, flexShrink: 0 }}
             />
             <span>{t('complete_followup')}</span>
-          </label>
+          </label>}
         </fieldset>
       )}
       {error && <p id={`${id}-error`} role="alert" style={{ margin: 'var(--space-3) 0 0', fontSize: '0.875rem', color: 'var(--color-danger)' }}>{error}</p>}
