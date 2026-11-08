@@ -99,3 +99,21 @@ test('three or more at once become one full-width group card; one or two show as
   const three = groupDayLanes(layoutDayLanes(day([at('a', '10:00', 60), at('b', '10:00', 60), at('c', '10:00', 60)])));
   assert.deepEqual([three.shown.length, three.groups.map(g => g.bookings.length)], [0, [3]]);
 });
+
+test('a group card lists each booking as a row at its start time, stacked when they collide', async () => {
+  const { stackGroupRows } = await import('../lib/scheduleWeek.mjs');
+  // Card 200px tall, rows 20px. Offsets are where each booking starts (0 = top, 1 = bottom).
+  const one = stackGroupRows([0, 0, 0.5], 200, 20);
+  assert.deepEqual(one.rows.map(r => r.top), [0, 20, 100], 'two at the top stack; the later one sits at its time');
+  assert.equal(one.hidden, 0);
+
+  // A row never lands past the bottom: the rest become "+N more" in the last row's place.
+  const crowded = stackGroupRows([0, 0, 0, 0, 0, 0, 0, 0, 0, 0], 100, 20);
+  assert.deepEqual(crowded.rows.map(r => r.index), [0, 1, 2, 3]);
+  assert.equal(crowded.hidden, 6);
+  assert.equal(crowded.moreTop, 80);
+
+  // Late starters move up just enough to fit above the bottom edge.
+  const late = stackGroupRows([0, 0.95], 200, 20);
+  assert.deepEqual(late.rows.map(r => r.top), [0, 180]);
+});

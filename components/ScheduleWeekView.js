@@ -7,7 +7,7 @@ import { getCached, setCached, invalidatePrefix } from '@/lib/cache';
 import { entryStyle, useAppointmentTypes } from '@/lib/appointmentTypes';
 import { hasArtist } from '@/lib/format';
 import { useLanguage } from '@/lib/i18n';
-import { calendarDayAfter, groupDayLanes, layoutDayLanes, localDateKey, weekHourRange, weekStartFor, weekSchedule } from '@/lib/scheduleWeek.mjs';
+import { calendarDayAfter, groupDayLanes, layoutDayLanes, stackGroupRows, localDateKey, weekHourRange, weekStartFor, weekSchedule } from '@/lib/scheduleWeek.mjs';
 import styles from './ScheduleWeekView.module.css';
 
 // Where the schedule's filter goes: the header next to "Today", or on a rotated phone the
@@ -188,8 +188,8 @@ export default function ScheduleWeekView({ date, lens, refreshKey, selectedBooki
                       onToggle={() => setOpenMore(current => (current === key ? null : key))}
                       onClose={() => setOpenMore(null)}
                       style={{ top: `${offset(day, group.displayStart)}%`, height: `${minutes / span * 100}%` }}
-                      alignEnd={dayIndex >= 5} short={minutes < 60}
-                      label={`${group.bookings.length} bookings, ${time(group.displayStart)} – ${time(group.displayEnd)}: ${names}. Show them`}
+                      alignEnd={dayIndex >= 5}
+                      label={`${group.bookings.length} bookings, ${time(group.displayStart)} – ${time(group.displayEnd)}: ${names}`}
                       artistById={artistById} time={time} colorOf={entry => entryStyle(entry, typesById).border}
                       onOpen={entry => { setOpenMore(null); onOpenDetail(entry); }}
                       onOpenDay={() => { setOpenMore(null); onDayClick(day.date); }}
@@ -245,16 +245,28 @@ function ArtistAvatar({ artist, name }) {
     : <span aria-hidden="true" className={styles.avatar}>{initial}</span>;
 }
 
-// Where three or more bookings overlap: one full-width card with the artists' photos,
-// how many bookings and when, and a thin bar per booking showing when it runs. Opens a
-// list of them, with a link to the day (Day view has a column per artist).
-function GroupCard({ group, open, onToggle, onClose, style, alignEnd, short, label, artistById, time, colorOf, onOpen, onOpenDay, dayName }) {
+// Where three or more bookings overlap: one full-width card listing them, each as a
+// one-line row (type colour, artist, start time, client) placed at its start time and
+// stacked when they collide. A row opens its booking; "+N more" or the count opens the
+// whole list, with a link to the day (Day view has a column per artist).
+const GROUP_ROW_PX = 20;
+function GroupCard({ group, open, onToggle, onClose, style, alignEnd, label, artistById, time, colorOf, onOpen, onOpenDay, dayName }) {
   const chipRef = useRef(null), listRef = useRef(null);
+  const [height, setHeight] = useState(0);
+  useEffect(() => {
+    const card = chipRef.current;
+    if (!card) return undefined;
+    const measure = () => setHeight(card.clientHeight);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(card);
+    return () => observer.disconnect();
+  }, []);
   useEffect(() => {
     if (!open) return undefined;
     listRef.current?.focus(); // Tab goes through its bookings; Escape closes it
     const away = event => { if (!chipRef.current?.contains(event.target) && !listRef.current?.contains(event.target)) onClose(); };
-    const key = event => { if (event.key === 'Escape') { onClose(); chipRef.current?.focus(); } };
+    const key = event => { if (event.key === 'Escape') { onClose(); chipRef.current?.querySelector('[aria-haspopup]')?.focus(); } };
     // Scrolling over the list never scrolls the calendar behind it: only the bookings
     // list scrolls (and stops at its ends, see overscroll-behavior in the CSS).
     const list = listRef.current;
@@ -266,31 +278,38 @@ function GroupCard({ group, open, onToggle, onClose, style, alignEnd, short, lab
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
   const list = group.bookings;
   const span = group.displayEnd - group.displayStart;
-  // Each artist once, so two bookings with the same artist don't repeat their photo.
-  const artists = [...new Map(list.map(b => [String(b.entry.artistId ?? b.entry.artistName ?? b.entry.bookingId), b])).values()];
-  const faces = artists.slice(0, 3);
+  const inner = Math.max(0, height - 6); // 3px padding top and bottom
+  const { rows, hidden, moreTop } = stackGroupRows(list.map(b => (b.displayStart - group.displayStart) / span), inner, GROUP_ROW_PX);
+  // "10am", "10:30am": short enough to leave room for the client's name.
+  const short = t => time(t).replace(/:00(?=\D)/, '').replace(/\s?([ap])\.?m\.?$/i, '$1m');
   return (
     <>
-      <button ref={chipRef} type="button" className={`${styles.group} ${short ? styles.groupShort : ''}`} style={style}
-        aria-label={label} title={label} aria-expanded={open} aria-haspopup="dialog" onClick={onToggle}>
-        <span className={styles.groupText}>
-          <span className={styles.faces} aria-hidden="true">
-            {faces.map(b => <ArtistAvatar key={b.entry.bookingId} artist={artistById.get(String(b.entry.artistId))} name={b.entry.artistName} />)}
-            {artists.length > faces.length && <span className={styles.facesMore}>+{artists.length - faces.length}</span>}
-          </span>
-          <span className={styles.groupCount}>{list.length} bookings</span>
-          <span className={styles.time}><span>{time(group.displayStart)} –</span> <span>{time(group.displayEnd)}</span></span>
-        </span>
-        {/* When each booking runs: one bar per booking, side by side like lanes. */}
-        <span className={styles.groupBars} aria-hidden="true" style={{ width: `${group.lanes * 6 - 2}px` }}>
-          {list.map(b => (
-            <span key={b.entry.bookingId} style={{
-              left: `${b.lane * 6}px`, top: `${(b.displayStart - group.displayStart) / span * 100}%`,
-              height: `${(b.displayEnd - b.displayStart) / span * 100}%`, background: colorOf(b.entry),
-            }} />
-          ))}
-        </span>
-      </button>
+      <div ref={chipRef} className={`${styles.group} ${open ? styles.groupOpen : ''}`} style={style} role="group" aria-label={label}>
+        {height > 0 && rows.map(({ index, top }) => {
+          const b = list[index];
+          return (
+            <button key={b.entry.bookingId} type="button" className={`${styles.groupRow} ${top < GROUP_ROW_PX && hidden === 0 ? styles.besideCount : ''}`} style={{ top: top + 3, '--booking-color': colorOf(b.entry) }}
+              title={`${time(b.displayStart)} – ${time(b.displayEnd)}, ${b.entry.clientName}${b.entry.artistName ? `, ${b.entry.artistName}` : ''}`}
+              onClick={() => onOpen(b.entry)}>
+              <ArtistAvatar artist={artistById.get(String(b.entry.artistId))} name={b.entry.artistName} />
+              <span className={styles.groupRowTime}>{short(b.displayStart)}</span>
+              <span className={styles.groupRowName}>{b.entry.clientName}</span>
+            </button>
+          );
+        })}
+        {height > 0 && hidden > 0 && (
+          <button type="button" className={`${styles.groupRow} ${styles.groupMore}`} style={{ top: moreTop + 3 }}
+            aria-haspopup="dialog" aria-expanded={open} onClick={onToggle}>
+            +{hidden} more
+          </button>
+        )}
+        {hidden === 0 && (
+          <button type="button" className={styles.groupCount} aria-haspopup="dialog" aria-expanded={open}
+            aria-label={`Show all ${list.length} bookings`} title={`All ${list.length} bookings`} onClick={onToggle}>
+            {list.length}
+          </button>
+        )}
+      </div>
       {open && (
         <div ref={listRef} tabIndex={-1} role="dialog" aria-label={`${list.length} bookings`} className={`${styles.moreList} ${alignEnd ? styles.moreListEnd : ''}`}
           style={{ top: style.top }}>
