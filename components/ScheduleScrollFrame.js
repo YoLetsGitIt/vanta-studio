@@ -24,7 +24,8 @@ export default function ScheduleScrollFrame({ children, resetKey, style }) {
     let intent = null;
     let touch = null;
     const container = root.current;
-    const scrollerFor = event => event.target instanceof Element ? event.target.closest('.studio-calendar-scroll') : null;
+    // Scrolling inside a pop-up (like the "+N" list) isn't scrolling the calendar.
+    const scrollerFor = event => event.target instanceof Element && !event.target.closest('[role="dialog"]') ? event.target.closest('.studio-calendar-scroll') : null;
     function arm(scroller, source = 'scroll') {
       if (!scroller) return;
       const now = performance.now();
