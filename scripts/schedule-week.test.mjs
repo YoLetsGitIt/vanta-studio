@@ -104,4 +104,12 @@ test('more than three side by side: two bookings show and the rest fold into a "
   assert.equal(apart.overflow.length, 2);
   assert.deepEqual(apart.overflow.map(o => o.bookings.length), [2, 2]);
   assert.deepEqual(apart.overflow.map(o => o.all.map(item => item.entry.bookingId)), [['a', 'b', 'c', 'd'], ['a', 'b', 'e', 'f']]);
+
+  // A single booking that doesn't fit is shown in the chip's place, not as "+1".
+  const lone = capDayLanes(layoutDayLanes(day([
+    at('a', '09:00', 600), at('b', '09:00', 600), at('c', '09:00', 60), at('d', '09:00', 60), at('e', '15:00', 60),
+  ])));
+  assert.deepEqual(lone.overflow.map(o => o.bookings.length), [2]);
+  const e = lone.shown.find(item => item.entry.bookingId === 'e');
+  assert.deepEqual(e && [e.lane, e.lanes], [2, 3]);
 });

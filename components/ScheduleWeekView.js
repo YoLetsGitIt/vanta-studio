@@ -177,6 +177,9 @@ export default function ScheduleWeekView({ date, lens, refreshKey, selectedBooki
                 {day.key === today && now >= day.date && <div className={styles.nowLine} style={{ top: `${offset(day, now)}%` }} aria-hidden="true" />}
                 {(() => {
                   const { shown, overflow } = capDayLanes(layoutDayLanes(day.bookings));
+                  // A busy day shows every booking the same way (photo and name), so the
+                  // ones with room don't look like a different kind of booking.
+                  const dense = overflow.length > 0 || shown.some(b => b.lanes >= 3);
                   return <>
                 {overflow.map(chip => {
                   const key = `${day.key}|${chip.displayStart.getTime()}`;
@@ -187,7 +190,7 @@ export default function ScheduleWeekView({ date, lens, refreshKey, selectedBooki
                       key={key} chip={chip} open={openMore === key}
                       onToggle={() => setOpenMore(current => (current === key ? null : key))}
                       onClose={() => setOpenMore(null)}
-                      style={{ top: `${offset(day, chip.displayStart)}%`, height: `${minutes / span * 100}%`, left: `calc((100% - var(--add-strip)) * ${chip.lane / chip.lanes} + 2px)`, width: `calc((100% - var(--add-strip)) / ${chip.lanes} - 4px)` }}
+                      style={{ top: `${offset(day, chip.displayStart)}%`, height: `min(${minutes / span * 100}%, 46px)`, left: `calc((100% - var(--add-strip)) * ${chip.lane / chip.lanes} + 2px)`, width: `calc((100% - var(--add-strip)) / ${chip.lanes} - 4px)` }}
                       alignEnd={dayIndex >= 5} short={minutes < 45}
                       label={`${chip.bookings.length} more bookings, ${time(chip.displayStart)} – ${time(chip.displayEnd)}: ${names}. Show all bookings at this time`}
                       artistById={artistById} time={time}
@@ -209,7 +212,7 @@ export default function ScheduleWeekView({ date, lens, refreshKey, selectedBooki
                   return (
                     <button
                       key={entry.bookingId} type="button" data-booking-id={entry.bookingId} aria-label={label} title={label}
-                      className={`${styles.booking} ${pending ? styles.pending : ''} ${selectedBookingId === entry.bookingId ? styles.selected : ''} ${minutes < 45 ? styles.short : minutes < 75 ? styles.compact : ''} ${booking.lanes >= 3 ? styles.narrow : ''}`}
+                      className={`${styles.booking} ${pending ? styles.pending : ''} ${selectedBookingId === entry.bookingId ? styles.selected : ''} ${minutes < 45 ? styles.short : minutes < 75 ? styles.compact : ''} ${booking.lanes >= 3 ? styles.narrow : ''} ${dense ? styles.dense : ''}`}
                       style={{ '--booking-color': source.border, top: `${top}%`, height: `${height}%`, left: `calc((100% - var(--add-strip)) * ${booking.lane / booking.lanes} + 2px)`, width: `calc((100% - var(--add-strip)) / ${booking.lanes} - 4px)` }}
                       onClick={() => onOpenDetail(entry)}
                     >

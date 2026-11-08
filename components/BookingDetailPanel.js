@@ -707,6 +707,13 @@ export default function BookingDetailPanel({
                   </span>
                   <span style={p.heroTime}>{clock(start)}{end ? ` – ${clock(end)}` : ''}</span>
                 </div>
+                {/* Edits what this card shows: the time, length, artist and station. */}
+                {canEdit && (
+                  <Button size="sm" variant="secondary" onClick={() => setEditOpen(true)} disabled={actionLoading}
+                    aria-label="Edit time, length, artist and station" style={{ marginLeft: 'auto', flexShrink: 0, alignSelf: 'flex-start' }}>
+                    Edit
+                  </Button>
+                )}
               </div>
             );
           })() : (
@@ -1213,7 +1220,7 @@ export default function BookingDetailPanel({
         <AssignArtistModal booking={booking} artists={bookTimeArtists} onClose={() => setAssignOpen(false)}
           onAssigned={async name => { showFeedback(`Sent to ${name} to send times`, 'success'); forgetBookings(); await onBooked?.(bookingId); }} />
       )}
-      {!stationStep && (canAcceptReject || canComplete || isFutureConfirmed || canSendLink || canConfirm || canEdit || canBookTime || canAssignArtist || canSendQuote) && (
+      {!stationStep && (canAcceptReject || canComplete || isFutureConfirmed || canSendLink || canConfirm || canBookTime || canAssignArtist || canSendQuote) && (
         <div className="studio-bdp-actions" style={p.actions}>
           {canAssignArtist && (
             <Btn onClick={() => setAssignOpen(true)} disabled={actionLoading} variant="primary">Assign artist</Btn>
@@ -1243,9 +1250,6 @@ export default function BookingDetailPanel({
           )}
           {isFutureConfirmed && onCancel && (
             <Btn onClick={onCancel} disabled={actionLoading} variant="danger">{t('cancel')}</Btn>
-          )}
-          {canEdit && (
-            <Btn onClick={() => setEditOpen(true)} disabled={actionLoading} variant="neutral">Edit booking</Btn>
           )}
           {canComplete && onComplete && (
             <Btn onClick={onComplete} disabled={actionLoading} variant="success" icon={CHECK_ICON}>{t('bdp_mark_complete')}</Btn>

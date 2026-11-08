@@ -40,7 +40,7 @@
 .head .client { min-width: 0; }
 .avatar { flex-shrink: 0; width: 18px; height: 18px; border-radius: 50%; object-fit: cover; display: inline-flex; align-items: center; justify-content: center; background: color-mix(in srgb, var(--booking-color, var(--text-muted)) 35%, var(--bg-chip)); color: var(--text); font-size: 10px; font-weight: 700; line-height: 1; box-shadow: 0 0 0 1px color-mix(in srgb, var(--text) 12%, transparent); }
 .short { flex-direction: row; align-items: center; padding-block: 2px; }
-.compact .typeName, .short .time, .short .typeName, .short .resource, .short .status, .short .pendingTag { display: none; }
+.compact .typeName, .compact .resource, .compact .status, .compact .pendingTag, .short .time, .short .typeName, .short .resource, .short .status, .short .pendingTag { display: none; }
 /* Three or more side by side: name only; the full details are in the tooltip/label. */
 .narrow { padding-inline: 5px; }
 /* Three or more side by side: the artist's photo on top, the client's name under it
@@ -51,6 +51,8 @@
 .narrow.short .head { flex-direction: row; align-items: center; gap: 4px; }
 .narrow.short .avatar { width: 14px; height: 14px; font-size: 8px; }
 .narrow .time, .narrow .typeName, .narrow .resource, .narrow .status, .narrow .pendingTag { display: none; }
+/* Busy day: every booking shows just its photo and client (details on hover and in the panel). */
+.dense .time, .dense .typeName, .dense .resource, .dense .status, .dense .pendingTag { display: none; }
 .message { padding: 24px; color: var(--text-muted); font-size: 14px; }
 .retry { background: var(--bg-input); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 8px 14px; cursor: pointer; }
 @media (max-width: 760px) {
@@ -97,7 +99,7 @@
 .column { --add-strip: 28px; }
 .addSlotBeside { left: calc(100% - var(--add-strip)); width: var(--add-strip); padding: 0; text-align: center; }
 
-/* "+N": bookings that don't fit side by side. */
+/* "+N": bookings that don't fit side by side. A short pill where the busy stretch starts, not a box over all of it. */
 .more { position: absolute; z-index: 1; min-height: 22px; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 5px 6px; border: 1px dashed var(--border-strong); border-radius: 7px; background: var(--bg-panel); color: var(--text); font: inherit; cursor: pointer; overflow: hidden; transition: background-color 150ms ease, border-color 150ms ease, transform 120ms ease-out; }
 .more:active { transform: scale(0.97); }
 .more[aria-expanded='true'] { z-index: 3; border-style: solid; border-color: var(--accent); }
