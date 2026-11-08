@@ -1379,6 +1379,7 @@ export default function SettingsPage() {
                       { key: 'allergies',      label: 'Allergies' },
                       { key: 'availability_windows', label: 'Weekly availability' },
                       { key: 'image_paths',    label: 'Reference photos' },
+                      { key: 'address',        label: 'Address' },
                     ].map(({ key, label }) => {
                       const entry = formFields[key] ?? { enabled: false, required: false };
                       return (

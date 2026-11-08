@@ -29,6 +29,35 @@
 .previewTitle { font-weight: 700; color: var(--text); font-size: 0.95rem; }
 .previewMeta { font-size: 0.8rem; color: var(--text-muted); }
 
+/* Priced by */
+.bases { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.basis { min-height: 36px; padding: 0 0.85rem; border-radius: 999px; border: 1px solid var(--border); background: var(--bg-input); color: var(--text-secondary); font: inherit; font-size: 0.88rem; font-weight: 600; cursor: pointer; transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 120ms var(--ease-out); }
+.basis[aria-checked="true"] { border-color: var(--accent); background: var(--accent-tint); color: var(--text); }
+.basis:active { transform: scale(0.97); }
+.basis:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.basisHint { margin: 0; font-size: 0.82rem; color: var(--text-muted); line-height: 1.45; }
+
+/* Artist rates */
+.rates { display: flex; flex-direction: column; }
+.rateHead, .rateRow { display: grid; grid-template-columns: minmax(140px, 1.4fr) repeat(3, minmax(90px, 1fr)) 84px; gap: 0.75rem; align-items: center; }
+.rateHead { padding: 0 0 0.5rem; font-size: 0.75rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; border-bottom: 1px solid var(--border); }
+.rateRow { padding: 0.6rem 0; border-bottom: 1px solid var(--border); }
+.rateRow:last-child { border-bottom: 0; }
+.rateArtist { display: flex; align-items: center; gap: 0.6rem; min-width: 0; font-weight: 600; color: var(--text); }
+.rateArtist span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rateAvatar { width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; background: var(--bg-chip); font-size: 0.75rem; font-weight: 700; color: var(--text-dim); }
+.rateInput { position: relative; }
+.rateInput > span { position: absolute; left: 0.65rem; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 0.9rem; pointer-events: none; }
+.rateInput input { width: 100%; min-height: 38px; padding: 0 0.6rem 0 1.4rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-input); color: var(--text); font: inherit; font-size: 0.92rem; font-variant-numeric: tabular-nums; }
+.rateInput input:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+.rateLabel { display: none; }
+.rateSave { justify-self: end; }
+
 @media (max-width: 760px) {
+  .rateHead { display: none; }
+  .rateRow { grid-template-columns: repeat(3, 1fr); row-gap: 0.5rem; }
+  .rateArtist { grid-column: 1 / -1; }
+  .rateLabel { display: block; font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.2rem; }
+  .rateSave { grid-column: 1 / -1; }
   .rowActions { flex-direction: column; }
 }

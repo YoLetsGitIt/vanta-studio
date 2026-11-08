@@ -12,7 +12,7 @@ import { formatDob, ageFromDob } from '@/lib/format';
 import { useLanguage } from '@/lib/i18n';
 import { requestConfirmation, showError, showFeedback } from '@/lib/feedback';
 import { bookingActions } from '@/lib/bookingActions';
-import { formatTypeLength, useAppointmentTypes } from '@/lib/appointmentTypes';
+import { formatTypeLength, priceBasis, priceFor, useAppointmentTypes, useArtistRates } from '@/lib/appointmentTypes';
 import Button from '@/components/ui/Button';
 import styles from './NewAppointmentPanel.module.css';
 
@@ -216,6 +216,9 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
   const [appointmentType, setAppointmentType] = useState(null); // 'tattoo' | 'piercing', chosen by the studio
   // One of the studio's own appointment types (Settings): fills in length, price and deposit.
   const { active: presets } = useAppointmentTypes();
+  const { byArtist: artistRates } = useArtistRates();
+  // While true, the price follows the type and the artist's rate; typing a price stops it.
+  const [priceFromRate, setPriceFromRate] = useState(false);
   const [presetId, setPresetId] = useState(null);
   const isPiercing = appointmentType === 'piercing';
   const [retouch, setRetouch] = useState(false);
@@ -457,9 +460,20 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
     if (presetId === type.id) { setPresetId(null); return; } // the filled-in values stay
     setPresetId(type.id);
     setDurationMins(type.duration_minutes);
-    if (type.price != null) setFinalPrice(String(type.price));
+    setPriceFromRate(Boolean(type.price_basis));
+    if (!type.price_basis && type.price != null) setFinalPrice(String(type.price));
     if (type.deposit > 0) { setDepositAmount(String(type.deposit)); if (!depositMode || depositMode === 'none') setDepositMode('later'); }
   }
+  const presetBasis = priceBasis(preset?.price_basis);
+  const ratePrice = preset && artistId ? priceFor(preset, artistRates[artistId], durationMins) : null;
+  useEffect(() => {
+    if (priceFromRate && ratePrice != null) setFinalPrice(String(ratePrice));
+  }, [priceFromRate, ratePrice]);
+  const rateHint = !presetBasis || !priceFromRate ? null
+    : !artistId ? `Priced from the artist’s ${presetBasis.label.toLowerCase()} once you choose an artist.`
+    : ratePrice == null ? `${artistName ?? 'This artist'} has no ${presetBasis.label.toLowerCase()} set. Add it in Settings → Appointment types, or enter a price.`
+    : presetBasis.value === 'hourly' ? `${artistName}’s hourly rate, $${Number(artistRates[artistId].hourly_rate).toLocaleString('en-AU')} × ${formatTypeLength(durationMins)}.`
+    : `${artistName}’s ${presetBasis.label.toLowerCase()}.`;
   const stepSummary = {
     type: { studio: 'Studio', walkin: 'Walk-in', personal: 'Personal' }[bookingType],
     client: clientName ? [clientName, ageOf(clientMode === 'search' ? selectedClient?.dob : clientDob), clientMode === 'search' ? (selectedClient?.email || selectedClient?.phone) : (clientEmail.trim() || clientPhone.trim())].filter(Boolean).join(' · ') : null,
@@ -499,7 +513,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
     setStationId(''); setScheduleTouched(false); setPaymentFolded(false); setFoldTried([]);
     setSize(''); setSizeUnit('cm'); setRetouch(false); setAppointmentType(null);
     setFinalPrice(''); setDepositAmount(''); setDepositMode(null); setDepositMethod(null);
-    setBookingType(null); setPresetId(null);
+    setBookingType(null); setPresetId(null); setPriceFromRate(false);
     setNotes(''); setError('');
   }
 
@@ -827,7 +841,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
                       {presets.map(type => (
                         <button key={type.id} type="button" role="radio" aria-checked={presetId === type.id} onClick={() => pickPreset(type)} style={{ '--type-color': type.color }}>
                           <span className={styles.presetName}>{type.name}</span>
-                          <span className={styles.presetMeta}>{[formatTypeLength(type.duration_minutes), type.price != null ? `$${Number(type.price).toLocaleString('en-AU')}` : null].filter(Boolean).join(' · ')}</span>
+                          <span className={styles.presetMeta}>{[formatTypeLength(type.duration_minutes), (() => { const p = artistId ? priceFor(type, artistRates[artistId], type.duration_minutes) : null; return p != null ? `$${p.toLocaleString('en-AU')}` : type.price_basis ? priceBasis(type.price_basis).short : type.price != null ? `$${Number(type.price).toLocaleString('en-AU')}` : null; })()].filter(Boolean).join(' · ')}</span>
                         </button>
                       ))}
                     </div>
@@ -910,8 +924,9 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
                       <label htmlFor="new-appointment-estimate" style={bd.label}>Estimated price</label>
                       <div style={bd.prefixWrap}>
                         <span style={bd.prefix}>$</span>
-                        <input style={{ ...bd.input, paddingLeft: '1.75rem' }} type="number" min="0" step="0.01" id="new-appointment-estimate" value={finalPrice} onChange={e => setFinalPrice(e.target.value)} placeholder="0.00" />
+                        <input style={{ ...bd.input, paddingLeft: '1.75rem' }} type="number" min="0" step="0.01" id="new-appointment-estimate" value={finalPrice} onChange={e => { setFinalPrice(e.target.value); setPriceFromRate(false); }} placeholder="0.00" />
                       </div>
+                      {rateHint && <span style={bd.hint}>{rateHint}</span>}
                     </div>
                   </div>
                   <div style={bd.field}>

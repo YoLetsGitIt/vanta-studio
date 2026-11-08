@@ -16,10 +16,11 @@ function flowFor(mode, availabilityRequired) {
   const request = { who: 'Client', does: availabilityRequired ? 'Sends a request with their weekly availability' : 'Sends a request' };
   const availability = { who: 'Client', does: 'Sends their availability' };
   if (mode === 'artist') {
+    // A client who picks an artist skips assigning, and gives their availability up front.
     return [
       request,
-      { who: 'Studio', does: 'Assigns an artist' },
-      ...(availabilityRequired ? [] : [availability]),
+      { who: 'Studio', does: 'Assigns an artist', skip: 'Skipped if the client picks an artist' },
+      ...(availabilityRequired ? [] : [{ ...availability, skip: 'Skipped if the client picks an artist (it comes with their request)' }]),
       { who: 'Artist', does: SENDS_TIMES, key: true },
       { who: 'Client', does: PAYS },
       { who: 'Booked', does: 'Confirmed once the deposit is paid', done: true },
@@ -40,7 +41,6 @@ const OPTIONS = [
     value: 'artist',
     title: 'Artists confirm',
     summary: 'The studio assigns an artist, who sends the client times, a quote and the session length. Good when artists manage their own diaries.',
-    note: 'If the client chooses an artist in their request, it goes straight to that artist with no assigning, and your booking form asks for their weekly availability.',
   },
   {
     value: 'studio',
@@ -54,10 +54,13 @@ function Flow({ steps, label }) {
   return (
     <ol className={styles.flow} aria-label={label}>
       {steps.map((step, index) => (
-        <li key={index} className={styles.step} data-key={step.key || undefined} data-done={step.done || undefined}>
+        <li key={index} className={styles.step} data-key={step.key || undefined} data-done={step.done || undefined} data-skip={step.skip ? true : undefined}>
           <span aria-hidden="true" className={styles.marker}>{step.done ? '✓' : index + 1}</span>
           <span className={styles.who}>{step.who}</span>
-          <span className={styles.does}>{step.does}</span>
+          <span className={styles.does}>
+            {step.does}
+            {step.skip && <span className={styles.skip}>{step.skip}</span>}
+          </span>
         </li>
       ))}
     </ol>

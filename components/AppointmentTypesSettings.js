@@ -1,14 +1,16 @@
 'use client';
 
 // Settings → Appointment types: the studio's own booking presets. Each has a name,
-// length and colour, and optionally a price and deposit that fill in a new booking.
+// length and colour, is priced by one of the artist's rates (hourly, half day or full
+// day), and can have a deposit. Below them, each artist's rates.
 // Bookings are coloured by their type on the schedule.
 import { useState } from 'react';
 import Button from '@/components/ui/Button';
 import Dialog from '@/components/ui/Dialog';
 import Field, { Input, Select } from '@/components/ui/Field';
 import { createAppointmentType, deleteAppointmentType, updateAppointmentType } from '@/lib/api';
-import { TYPE_COLORS, formatMoney, formatTypeLength, refreshAppointmentTypes, useAppointmentTypes } from '@/lib/appointmentTypes';
+import { PRICE_BASES, TYPE_COLORS, formatMoney, formatTypeLength, priceBasis, refreshAppointmentTypes, useAppointmentTypes } from '@/lib/appointmentTypes';
+import ArtistRatesSettings from '@/components/ArtistRatesSettings';
 import { showError, showFeedback } from '@/lib/feedback';
 import styles from './AppointmentTypesSettings.module.css';
 
@@ -37,11 +39,12 @@ export default function AppointmentTypesSettings({ styles: s }) {
   const nextColor = TYPE_COLORS.find(c => !usedColors.has(c.value))?.value ?? TYPE_COLORS[0].value;
 
   return (
+    <>
     <section className="settings-span-12" style={s.card} aria-labelledby="appointment-types-title">
       <div className={styles.head}>
         <div style={s.settingsSectionHeader}>
           <h2 id="appointment-types-title" style={s.visuallyHidden}>Appointment types</h2>
-          <p style={s.sectionDesc}>Presets for the bookings you make most, like a full day or a small tattoo. Picking one fills in the length, price and deposit, and colours the booking on your schedule.</p>
+          <p style={s.sectionDesc}>Presets for the bookings you make most, like a full day or a small tattoo. Picking one fills in the length and deposit, prices it from the artist’s rate, and colours the booking on your schedule.</p>
         </div>
         {active.length > 0 && <Button onClick={() => setEditing('new')}>Add type</Button>}
       </div>
@@ -68,7 +71,7 @@ export default function AppointmentTypesSettings({ styles: s }) {
               <span className={styles.rowText}>
                 <span className={styles.rowName}>{type.name}</span>
                 <span className={styles.rowMeta}>
-                  {[formatTypeLength(type.duration_minutes), type.price != null ? formatMoney(type.price) : null, type.deposit ? `${formatMoney(type.deposit)} deposit` : null].filter(Boolean).join(' · ')}
+                  {[formatTypeLength(type.duration_minutes), typePriceLabel(type), type.deposit ? `${formatMoney(type.deposit)} deposit` : null].filter(Boolean).join(' · ')}
                 </span>
               </span>
               <span className={styles.rowActions}>
@@ -95,30 +98,42 @@ export default function AppointmentTypesSettings({ styles: s }) {
         </Dialog>
       )}
     </section>
+    <ArtistRatesSettings styles={s} />
+    </>
   );
 }
+
+function typePriceLabel(type) {
+  const basis = priceBasis(type.price_basis);
+  if (basis) return basis.short;
+  return type.price != null ? formatMoney(type.price) : null;
+}
+
+// A new type's likely rate from its length.
+const basisForLength = minutes => (minutes >= 420 ? 'full_day' : minutes >= 210 ? 'half_day' : 'hourly');
 
 function TypeDialog({ type, defaultColor, onClose }) {
   const [name, setName] = useState(type?.name ?? '');
   const [hours, setHours] = useState(type ? Math.floor(type.duration_minutes / 60) : 1);
   const [minutes, setMinutes] = useState(type ? type.duration_minutes % 60 : 0);
   const [color, setColor] = useState(type?.color ?? defaultColor);
-  const [price, setPrice] = useState(type?.price != null ? String(type.price) : '');
+  const [basis, setBasis] = useState(type ? (type.price_basis ?? '') : null); // null: follow the length
   const [deposit, setDeposit] = useState(type?.deposit != null ? String(type.deposit) : '');
   const [saving, setSaving] = useState(false);
   const [problem, setProblem] = useState('');
 
   const length = Number(hours) * 60 + Number(minutes);
+  const chosenBasis = basis ?? basisForLength(length);
   const money = v => (v.trim() === '' ? null : Number(v));
 
   async function save(event) {
     event?.preventDefault();
     if (!name.trim()) { setProblem('Give it a name.'); return; }
     if (length < 15) { setProblem('Make it at least 15 minutes long.'); return; }
-    if ([price, deposit].some(v => v.trim() !== '' && !(Number(v) >= 0))) { setProblem('Price and deposit must be numbers.'); return; }
+    if (deposit.trim() !== '' && !(Number(deposit) >= 0)) { setProblem('The deposit must be a number.'); return; }
     setSaving(true); setProblem('');
     try {
-      const body = { name: name.trim(), duration_minutes: length, color, price: money(price), deposit: money(deposit) };
+      const body = { name: name.trim(), duration_minutes: length, color, price: chosenBasis ? null : (type?.price ?? null), price_basis: chosenBasis || null, deposit: money(deposit) };
       if (type) await updateAppointmentType(type.id, body);
       else await createAppointmentType(body);
       await refreshAppointmentTypes();
@@ -162,10 +177,21 @@ function TypeDialog({ type, defaultColor, onClose }) {
             ))}
           </div>
         </fieldset>
+        <fieldset className={styles.fieldset}>
+          <legend className="studio-field-label">Priced by</legend>
+          <div className={styles.bases} role="radiogroup" aria-label="Priced by">
+            {[...PRICE_BASES, { value: '', label: 'No price' }].map(b => (
+              <button key={b.value || 'none'} type="button" role="radio" aria-checked={chosenBasis === b.value}
+                className={styles.basis} onClick={() => setBasis(b.value)}>{b.label}</button>
+            ))}
+          </div>
+          <p className={styles.basisHint}>
+            {chosenBasis === 'hourly' ? 'The artist’s hourly rate × the booking’s length.'
+              : chosenBasis ? `The assigned artist’s ${priceBasis(chosenBasis).label.toLowerCase()}.`
+              : 'Enter the price on each booking.'} Set rates below.
+          </p>
+        </fieldset>
         <div className={styles.moneyRow}>
-          <Field label="Price" hint="Optional">
-            <Input inputMode="decimal" value={price} onChange={e => setPrice(e.target.value)} placeholder="$0" />
-          </Field>
           <Field label="Deposit" hint="Optional">
             <Input inputMode="decimal" value={deposit} onChange={e => setDeposit(e.target.value)} placeholder="$0" />
           </Field>

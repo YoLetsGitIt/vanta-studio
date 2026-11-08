@@ -26,6 +26,11 @@
 .step[data-key] .does { color: var(--text); font-weight: 600; }
 .step[data-done] .marker { background: var(--color-success-surface); border-color: var(--color-success-border); color: var(--color-success); }
 .step[data-done] .who { color: var(--color-success); }
+/* A step that's skipped when the client picks an artist: dashed marker and line. */
+.step[data-skip] .marker { border-style: dashed; background: transparent; }
+.step[data-skip]::before, .step:has(+ .step[data-skip])::before { background: none; border-left: 1px dashed var(--border-strong); }
+.skip { display: block; margin-top: 0.15rem; font-size: 0.76rem; font-weight: 500; color: var(--text-muted); }
+.skip::before { content: '↷ '; }
 .formNote { margin: 0; font-size: 0.82rem; line-height: 1.45; color: var(--text-muted); }
 
 .note { margin: auto 0 0; padding-top: 0.75rem; font-size: 0.8rem; line-height: 1.45; color: var(--text-muted); }

@@ -105,6 +105,11 @@ export function WidgetPreview({ bg, accent, studioName, logoUrl, fields, consent
           </div>
         </div>
 
+        {/* Address — only when the studio asks for it */}
+        {fields?.address?.enabled && (
+          <div style={fld}><span style={lbl}>Address{fields.address.required ? ' *' : ''}</span><div style={inp} /></div>
+        )}
+
         {f('artist_id').enabled && (
           <div style={fld}><span style={lbl}>Artist preference</span><div style={inp} /></div>
         )}
