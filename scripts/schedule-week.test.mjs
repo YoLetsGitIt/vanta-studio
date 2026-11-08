@@ -67,3 +67,35 @@ test('overlapping bookings get side-by-side lanes; back-to-back bookings stay fu
   assert.deepEqual(lanes.c, [0, 1], 'c starts as a and b end, so it overlaps nothing and is full width');
   assert.deepEqual(lanes.d, [0, 1], 'a separate booking later in the day is full width');
 });
+
+test('more than three side by side: two bookings show and the rest fold into a "+N" chip', async () => {
+  const { layoutDayLanes, capDayLanes } = await import('../lib/scheduleWeek.mjs');
+  const at = (id, time, durationMins) => ({ bookingId: id, chosenTime: `2026-10-26T${time}:00+11:00`, durationMins });
+  const day = bookings => weekSchedule(bookings, new Date('2026-10-26T12:00:00+11:00'))[0].bookings;
+
+  // Three at once: nothing folds.
+  const three = capDayLanes(layoutDayLanes(day([at('a', '10:00', 60), at('b', '10:00', 60), at('c', '10:00', 60)])));
+  assert.equal(three.shown.length, 3);
+  assert.deepEqual(three.overflow, []);
+
+  // Six at once, plus a later booking on its own.
+  const six = capDayLanes(layoutDayLanes(day([
+    at('a', '10:00', 240), at('b', '10:00', 120), at('c', '10:30', 60), at('d', '11:00', 60), at('e', '11:00', 120), at('f', '11:30', 30),
+    at('g', '16:00', 60),
+  ])));
+  const shown = Object.fromEntries(six.shown.map(item => [item.entry.bookingId, [item.lane, item.lanes]]));
+  assert.deepEqual(shown, { a: [0, 3], b: [1, 3], g: [0, 1] });
+  assert.equal(six.overflow.length, 1);
+  const chip = six.overflow[0];
+  assert.deepEqual(chip.bookings.map(item => item.entry.bookingId).sort(), ['c', 'd', 'e', 'f']);
+  assert.deepEqual([chip.lane, chip.lanes], [2, 3]);
+  assert.equal(chip.displayStart.getTime(), new Date('2026-10-26T10:30:00+11:00').getTime());
+  assert.equal(chip.displayEnd.getTime(), new Date('2026-10-26T13:00:00+11:00').getTime());
+
+  // Folded bookings at separate times get separate chips.
+  const apart = capDayLanes(layoutDayLanes(day([
+    at('a', '09:00', 600), at('b', '09:00', 600), at('c', '09:00', 60), at('d', '09:00', 60), at('e', '15:00', 60), at('f', '15:00', 60),
+  ])));
+  assert.equal(apart.overflow.length, 2);
+  assert.deepEqual(apart.overflow.map(o => o.bookings.length), [2, 2]);
+});

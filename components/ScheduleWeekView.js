@@ -7,7 +7,7 @@ import { getCached, setCached, invalidatePrefix } from '@/lib/cache';
 import { entryStyle, useAppointmentTypes } from '@/lib/appointmentTypes';
 import { hasArtist } from '@/lib/format';
 import { useLanguage } from '@/lib/i18n';
-import { calendarDayAfter, layoutDayLanes, localDateKey, weekHourRange, weekStartFor, weekSchedule } from '@/lib/scheduleWeek.mjs';
+import { calendarDayAfter, capDayLanes, layoutDayLanes, localDateKey, weekHourRange, weekStartFor, weekSchedule } from '@/lib/scheduleWeek.mjs';
 import styles from './ScheduleWeekView.module.css';
 
 // Where the schedule's filter goes: the header next to "Today", or on a rotated phone the
@@ -36,6 +36,7 @@ export default function ScheduleWeekView({ date, lens, refreshKey, selectedBooki
   const [entries, setEntries] = useState([]);
   const [resources, setResources] = useState([]);
   const [artists, setArtists] = useState([]); // for each booking's artist photo
+  const [openMore, setOpenMore] = useState(null); // the "+N" list that's open: `${dayKey}|${start}`
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [filter, setFilter] = useState('all');
@@ -45,6 +46,7 @@ export default function ScheduleWeekView({ date, lens, refreshKey, selectedBooki
   const toolbarSlot = useScheduleFilterSlot();
 
   useEffect(() => { setFilter('all'); }, [lens]);
+  useEffect(() => { setOpenMore(null); }, [startKey, lens, filter]);
 
   useEffect(() => {
     let cancelled = false;
@@ -148,7 +150,7 @@ export default function ScheduleWeekView({ date, lens, refreshKey, selectedBooki
           </div>
           {days.map((day, dayIndex) => (
             <section key={day.key} className={`${styles.day} ${day.key === today ? styles.today : ''}`} aria-label={day.date.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' })}>
-              <button type="button" className={styles.dayHeading} onClick={() => onDayClick(day.date)} aria-current={day.key === today ? 'date' : undefined}>
+              <button type="button" className={styles.dayHeading} onClick={() => onDayClick(day.date)} aria-current={day.key === today ? 'date' : undefined} title="Open in Day view, one column per artist">
                 <span className={styles.dayName}>{day.date.toLocaleDateString(locale, { weekday: 'short' })}</span>
                 <span className={styles.date}>{day.date.getDate()} <span>{day.date.toLocaleDateString(locale, { month: 'short' })}</span></span>
                 <span className={styles.dayCount} data-empty={day.bookings.length === 0 || undefined}>{day.bookings.length}</span>
@@ -173,7 +175,29 @@ export default function ScheduleWeekView({ date, lens, refreshKey, selectedBooki
                 })}
                 {hours.map(hour => <div key={hour} className={styles.hourLine} style={{ top: `${(hour - startHour) / hours.length * 100}%` }} />)}
                 {day.key === today && now >= day.date && <div className={styles.nowLine} style={{ top: `${offset(day, now)}%` }} aria-hidden="true" />}
-                {layoutDayLanes(day.bookings).map(booking => {
+                {(() => {
+                  const { shown, overflow } = capDayLanes(layoutDayLanes(day.bookings));
+                  return <>
+                {overflow.map(chip => {
+                  const key = `${day.key}|${chip.displayStart.getTime()}`;
+                  const minutes = (chip.displayEnd - chip.displayStart) / 60000;
+                  const names = chip.bookings.map(b => b.entry.clientName).join(', ');
+                  return (
+                    <MoreChip
+                      key={key} chip={chip} open={openMore === key}
+                      onToggle={() => setOpenMore(current => (current === key ? null : key))}
+                      onClose={() => setOpenMore(null)}
+                      style={{ top: `${offset(day, chip.displayStart)}%`, height: `${minutes / span * 100}%`, left: `calc((100% - var(--add-strip)) * ${chip.lane / chip.lanes} + 2px)`, width: `calc((100% - var(--add-strip)) / ${chip.lanes} - 4px)` }}
+                      alignEnd={dayIndex >= 5} short={minutes < 45}
+                      label={`${chip.bookings.length} more bookings, ${time(chip.displayStart)} – ${time(chip.displayEnd)}: ${names}`}
+                      artistById={artistById} time={time}
+                      onOpen={entry => { setOpenMore(null); onOpenDetail(entry); }}
+                      onOpenDay={() => { setOpenMore(null); onDayClick(day.date); }}
+                      dayName={day.date.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'short' })}
+                    />
+                  );
+                })}
+                {shown.map(booking => {
                   const { entry } = booking;
                   const source = entryStyle(entry, typesById);
                   const statusKey = { awaiting_payment: 'status_awaiting_payment', requires_confirmation: 'status_needs_confirmation', completed: 'status_completed' }[entry.status];
@@ -200,6 +224,8 @@ export default function ScheduleWeekView({ date, lens, refreshKey, selectedBooki
                     </button>
                   );
                 })}
+                  </>;
+                })()}
               </div>
             </section>
           ))}
@@ -217,4 +243,51 @@ function ArtistAvatar({ artist, name }) {
   return image
     ? <img src={image} alt="" className={styles.avatar} loading="lazy" />
     : <span aria-hidden="true" className={styles.avatar}>{initial}</span>;
+}
+
+// "+N": bookings that don't fit side by side. Shows the artists' photos; opens a list
+// of those bookings, with a link to the day (Day view has a column per artist).
+function MoreChip({ chip, open, onToggle, onClose, style, alignEnd, short, label, artistById, time, onOpen, onOpenDay, dayName }) {
+  const chipRef = useRef(null), listRef = useRef(null);
+  useEffect(() => {
+    if (!open) return undefined;
+    listRef.current?.focus(); // Tab goes through its bookings; Escape closes it
+    const away = event => { if (!chipRef.current?.contains(event.target) && !listRef.current?.contains(event.target)) onClose(); };
+    const key = event => { if (event.key === 'Escape') { onClose(); chipRef.current?.focus(); } };
+    document.addEventListener('pointerdown', away);
+    document.addEventListener('keydown', key);
+    return () => { document.removeEventListener('pointerdown', away); document.removeEventListener('keydown', key); };
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+  const faces = chip.bookings.slice(0, 3);
+  return (
+    <>
+      <button ref={chipRef} type="button" className={`${styles.more} ${short ? styles.moreShort : ''}`} style={style}
+        aria-label={label} title={label} aria-expanded={open} aria-haspopup="dialog" onClick={onToggle}>
+        <span className={styles.moreCount}>+{chip.bookings.length}</span>
+        <span className={styles.faces} aria-hidden="true">
+          {faces.map(b => <ArtistAvatar key={b.entry.bookingId} artist={artistById.get(String(b.entry.artistId))} name={b.entry.artistName} />)}
+        </span>
+      </button>
+      {open && (
+        <div ref={listRef} tabIndex={-1} role="dialog" aria-label={`${chip.bookings.length} more bookings`} className={`${styles.moreList} ${alignEnd ? styles.moreListEnd : ''}`}
+          style={{ top: style.top, ...(alignEnd ? { right: `calc(var(--add-strip) + (100% - var(--add-strip)) * ${(chip.lanes - chip.lane) / chip.lanes} + 4px)` } : {}) }}>
+          <p className={styles.moreTitle}>{time(chip.displayStart)} – {time(chip.displayEnd)}</p>
+          <ul>
+            {chip.bookings.map(b => (
+              <li key={b.entry.bookingId}>
+                <button type="button" onClick={() => onOpen(b.entry)}>
+                  <ArtistAvatar artist={artistById.get(String(b.entry.artistId))} name={b.entry.artistName} />
+                  <span className={styles.moreText}>
+                    <span className={styles.moreClient}>{b.entry.clientName}</span>
+                    <span className={styles.moreMeta}>{time(b.displayStart)} – {time(b.displayEnd)}{b.entry.artistName ? ` · ${b.entry.artistName}` : ''}</span>
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+          <button type="button" className={styles.moreDay} onClick={onOpenDay}>Open {dayName} →</button>
+        </div>
+      )}
+    </>
+  );
 }
