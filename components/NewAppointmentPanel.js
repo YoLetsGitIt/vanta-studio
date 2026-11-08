@@ -240,7 +240,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
   // ── Remote data
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const { artists, stations: allStations, hours: studioHours, clients: pastClients, stripeConnected, stripeCharges, loading, error: loadError, retry } = useNewAppointmentData(open);
+  const { artists, stations: allStations, hours: studioHours, clients: pastClients, stripeConnected, loading, error: loadError, retry } = useNewAppointmentData(open);
 
   useEffect(() => {
     if (!open) return;
@@ -477,8 +477,8 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
   const stepSummary = {
     type: { studio: 'Studio', walkin: 'Walk-in', personal: 'Personal' }[bookingType],
     client: clientName ? [clientName, ageOf(clientMode === 'search' ? selectedClient?.dob : clientDob), clientMode === 'search' ? (selectedClient?.email || selectedClient?.phone) : (clientEmail.trim() || clientPhone.trim())].filter(Boolean).join(' · ') : null,
-    appointment: [preset?.name, appointmentType && (isPiercing ? 'Piercing' : 'Tattoo'), artistName].filter(Boolean).join(' · ') || null,
-    schedule: sectionDone.schedule ? [chosenDateTime?.toLocaleString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }), durationName, stationName].filter(Boolean).join(' · ') : null,
+    appointment: [appointmentType && (isPiercing ? 'Piercing' : 'Tattoo'), artistName].filter(Boolean).join(' · ') || null,
+    schedule: sectionDone.schedule ? [preset?.name, chosenDateTime?.toLocaleString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }), durationName, stationName].filter(Boolean).join(' · ') : null,
     payment: depositMode ? [{ none: 'No deposit', later: stripeConnected ? 'Deposit to collect' : 'Deposit due later', paid: `Deposit paid${depositMethod ? ` by ${DEPOSIT_METHODS.find(m => m.value === depositMethod)?.phrase}` : ''}` }[depositMode] + (depositEnabled && deposit > 0 ? ` $${deposit.toFixed(2)}` : ''), quote > 0 ? `$${quote.toFixed(2)} quoted` : null].filter(Boolean).join(' · ') : null,
   };
   const essentialsComplete = Boolean(clientName && artistId && bookingDate && startTime && durationMins && stationId && !timeError && !dateInPast && !artistConflict);
@@ -834,19 +834,6 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
               </FormSection>
 
               <FormSection id="appointment-section-title" step="appointment" title={t('nap_appointment')} state={stepState('appointment')} done={sectionDone.appointment} summary={stepSummary.appointment} missing={foldTriedFor('appointment')} expanded={isOpen('appointment')} onToggle={() => toggleStep('appointment')} onTyping={trackTyping} onPicked={setPickedStep}>
-                {presets.length > 0 && (
-                  <div style={bd.field}>
-                    <span id="new-appointment-preset" style={bd.label}>Appointment type <span className={styles.optionalBadge}>fills in length, price and deposit</span></span>
-                    <div className={styles.presets} role="radiogroup" aria-labelledby="new-appointment-preset">
-                      {presets.map(type => (
-                        <button key={type.id} type="button" role="radio" aria-checked={presetId === type.id} onClick={() => pickPreset(type)} style={{ '--type-color': type.color }}>
-                          <span className={styles.presetName}>{type.name}</span>
-                          <span className={styles.presetMeta}>{[formatTypeLength(type.duration_minutes), (() => { const p = artistId ? priceFor(type, artistRates[artistId], type.duration_minutes) : null; return p != null ? `$${p.toLocaleString('en-AU')}` : type.price_basis ? priceBasis(type.price_basis).short : type.price != null ? `$${Number(type.price).toLocaleString('en-AU')}` : null; })()].filter(Boolean).join(' · ')}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
                 <div className={styles.fieldRow}>
                   <div style={bd.field}>
                     <span id="new-appointment-type" style={bd.label}>Service</span>
@@ -871,6 +858,22 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
               </FormSection>
 
               <FormSection id="schedule-section-title" step="schedule" title={t('nav_schedule')} state={stepState('schedule')} done={sectionDone.schedule} summary={stepSummary.schedule} missing={foldTriedFor('schedule')} expanded={isOpen('schedule')} onToggle={() => toggleStep('schedule')} onTyping={trackTyping} onPicked={setPickedStep}>
+                {presets.length > 0 && (
+                  <div className={styles.presetBox}>
+                    <div className={styles.presetHead}>
+                      <span id="new-appointment-preset" className={styles.presetTitle}>Quick fill</span>
+                      <span id="new-appointment-preset-hint" className={styles.presetHint}>Optional · fills in length, price and deposit</span>
+                    </div>
+                    <div className={styles.presets} role="radiogroup" aria-labelledby="new-appointment-preset" aria-describedby="new-appointment-preset-hint">
+                      {presets.map(type => (
+                        <button key={type.id} type="button" role="radio" aria-checked={presetId === type.id} onClick={() => pickPreset(type)} style={{ '--type-color': type.color }}>
+                          <span className={styles.presetName}>{type.name}</span>
+                          <span className={styles.presetMeta}>{[formatTypeLength(type.duration_minutes), (() => { const p = artistId ? priceFor(type, artistRates[artistId], type.duration_minutes) : null; return p != null ? `$${p.toLocaleString('en-AU')}` : type.price_basis ? priceBasis(type.price_basis).short : type.price != null ? `$${Number(type.price).toLocaleString('en-AU')}` : null; })()].filter(Boolean).join(' · ')}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 <div className={styles.fieldRow}>
                   <div style={bd.field}>
                     <label htmlFor="new-appointment-date" style={bd.label}>{t('sched_date')}</label>
@@ -964,17 +967,6 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
                         </div>
                       </div>
                     )}
-                    {(() => {
-                      const da = depositMode === 'later' && stripeCharges ? parseFloat(depositAmount) || 0 : 0;
-                      if (da <= 0) return null;
-                      const feeCents = Math.round(da * 0.03 * 100) + 50;
-                      const total = da + feeCents / 100;
-                      return (
-                        <span style={{ fontSize: '0.74rem', color: 'var(--text-ghost)', marginTop: '0.25rem', display: 'block' }}>
-                          {t('nap_fee_client_charged')} ${total.toFixed(2)} ({t('nap_fee_incl')} ${(feeCents / 100).toFixed(2)} {t('nap_fee_suffix')})
-                        </span>
-                      );
-                    })()}
                   </>}
                 </FormSection>
 

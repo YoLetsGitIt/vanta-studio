@@ -59,12 +59,15 @@ export function useTypePricing({ booking, artistId, duration, setDuration, setQu
   };
 }
 
-export function TypeChips({ pricing, label = 'Appointment type' }) {
+export function TypeChips({ pricing }) {
   if (!pricing.types.length) return null;
   return (
-    <div>
-      <span id="type-pricing-label" className="studio-field-label">{label} <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>(optional)</span></span>
-      <div className={styles.types} role="radiogroup" aria-labelledby="type-pricing-label" style={{ marginTop: 'var(--space-2)' }}>
+    <div className={styles.box}>
+      <div className={styles.head}>
+        <span id="type-pricing-label" className={styles.title}>Quick fill</span>
+        <span id="type-pricing-hint" className={styles.boxHint}>Optional · fills in length, quote and deposit</span>
+      </div>
+      <div className={styles.types} role="radiogroup" aria-labelledby="type-pricing-label" aria-describedby="type-pricing-hint">
         {pricing.types.map(type => {
           const p = pricing.priceOf(type);
           const meta = [formatTypeLength(type.duration_minutes), p != null ? money(p) : priceBasis(type.price_basis)?.short ?? (type.price != null ? money(type.price) : null)].filter(Boolean).join(' · ');

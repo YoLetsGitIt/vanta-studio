@@ -1,3 +1,7 @@
+.box { display: flex; flex-direction: column; gap: 8px; padding-bottom: var(--space-4); border-bottom: 1px solid var(--border); }
+.head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 8px; }
+.title { font-size: 0.875rem; font-weight: 600; color: var(--text); }
+.boxHint { font-size: 0.78rem; color: var(--text-muted); }
 .types { display: grid; grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 8px; }
 .types button {
   position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-width: 0; min-height: 44px;

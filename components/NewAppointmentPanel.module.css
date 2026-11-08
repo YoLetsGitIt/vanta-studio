@@ -290,6 +290,11 @@ button.sectionHead:hover .collapseIcon { background: var(--border-strong); color
 @media (prefers-reduced-motion: reduce) { .missingIcon, .sectionMissing { animation: none; } }
 
 /* The studio's appointment types: a colour bar, the name and its length/price. */
+/* Appointment types: an optional shortcut that fills in the fields below. */
+.presetBox { display: flex; flex-direction: column; gap: 8px; padding-bottom: 16px; margin-bottom: 4px; border-bottom: 1px solid var(--border); }
+.presetHead { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 8px; }
+.presetTitle { font-size: 0.875rem; font-weight: 600; color: var(--text); }
+.presetHint { font-size: 0.78rem; color: var(--text-muted); }
 .presets { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
 .presets button {
   position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-width: 0;
