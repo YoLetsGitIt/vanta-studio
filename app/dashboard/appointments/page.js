@@ -84,12 +84,6 @@ function AppointmentsInner() {
   const [reassignArtistId, setReassignArtistId] = useState('');
   const [reassignResend, setReassignResend] = useState(true);
   const [reassignSaving, setReassignSaving] = useState(false);
-  const [rescheduleTarget, setRescheduleTarget] = useState(null); // booking object
-  const [rescheduleDate,  setRescheduleDate]  = useState('');
-  const [rescheduleStart, setRescheduleStart] = useState('');
-  const [rescheduleEnd,   setRescheduleEnd]   = useState('');
-  const [rescheduleMsg,   setRescheduleMsg]   = useState('');
-  const [rescheduleSaving, setRescheduleSaving] = useState(false);
   const [studioArtists, setStudioArtists] = useState([]);
   const [stripeConnected, setStripeConnected] = useState(false);
   const requestedBookingId = searchParams.get('booking');
@@ -285,42 +279,6 @@ function AppointmentsInner() {
       showToast(reassignResend ? 'Artist reassigned · new link sent' : 'Artist reassigned');
     } catch (e) { showError(e); }
     finally { setReassignSaving(false); }
-  }
-
-  function openReschedule(booking) {
-    const currentTime = booking?.chosen_time ?? booking?.proposed_time_primary ?? null;
-    const chosenDate = currentTime ? currentTime.slice(0, 10) : null;
-    const today = new Date().toLocaleDateString('en-CA');
-    if (chosenDate && chosenDate <= today) return;
-    const dt = currentTime ? new Date(currentTime) : new Date();
-    const pad = n => String(n).padStart(2, '0');
-    const dateStr = `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`;
-    const startHHMM = `${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
-    const durationMins = booking?.duration_minutes ?? 60;
-    const endDt = new Date(dt.getTime() + durationMins * 60000);
-    const endHHMM = `${pad(endDt.getHours())}:${pad(endDt.getMinutes())}`;
-    setRescheduleDate(dateStr);
-    setRescheduleStart(startHHMM);
-    setRescheduleEnd(endHHMM);
-    setRescheduleMsg('');
-    setRescheduleTarget(booking);
-  }
-
-  async function confirmReschedule() {
-    if (!rescheduleStart || !rescheduleEnd || !rescheduleMsg.trim()) return;
-    const [sh, sm] = rescheduleStart.split(':').map(Number);
-    const [eh, em] = rescheduleEnd.split(':').map(Number);
-    const durationMins = (eh * 60 + em) - (sh * 60 + sm);
-    if (durationMins <= 0) { showError('End time must be after start time.'); return; }
-    const newTime = new Date(`${rescheduleDate}T${rescheduleStart}:00`).toISOString();
-    setRescheduleSaving(true);
-    try {
-      await bookingActions.reschedule(rescheduleTarget.id, { newTime, message: rescheduleMsg, durationMinutes: durationMins });
-      await load(true);
-      setRescheduleTarget(null);
-      showToast('Booking rescheduled · client emailed');
-    } catch (e) { showError(e); }
-    finally { setRescheduleSaving(false); }
   }
 
   const filteredBookings = useMemo(() => {
@@ -525,7 +483,6 @@ function AppointmentsInner() {
           onSendLink={selectedBooking ? () => handleSendLink(selectedBooking.id) : undefined}
           onConfirm={selectedBooking ? () => handleConfirm(selectedBooking.id) : undefined}
           onReassign={selectedBooking ? () => openReassign(selectedBooking.id) : undefined}
-          onReschedule={selectedBooking ? () => openReschedule(selectedBooking) : undefined}
           bookTimeArtists={studioArtists}
           depositsReady={stripeConnected}
           onBooked={async () => { setSelected(null); await load(true); }}
@@ -533,76 +490,6 @@ function AppointmentsInner() {
         />
       )}
 
-      {/* ── Reschedule modal ── */}
-      {rescheduleTarget && (
-        <div className="studio-legacy-overlay" style={s.modalOverlay} onClick={e => e.target === e.currentTarget && setRescheduleTarget(null)}>
-          <div className="studio-legacy-modal" style={s.modal}>
-            <h3 style={s.modalTitle}>{t('reschedule_booking')}</h3>
-            <p style={s.modalSub}>
-              {rescheduleTarget.requester_name} · {rescheduleTarget.session_type}
-            </p>
-
-            <div style={s.modalField}>
-              <label style={s.modalLabel}>{t('sched_date')}</label>
-              <input
-                type="date"
-                value={rescheduleDate}
-                disabled
-                style={{ ...s.modalInput, colorScheme: 'auto', opacity: 0.55, cursor: 'not-allowed' }}
-              />
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem', marginBottom: '0.85rem' }}>
-              <div>
-                <label style={s.modalLabel}>{t('nap_start_time')}</label>
-                <input
-                  type="time"
-                  value={rescheduleStart}
-                  onChange={e => setRescheduleStart(e.target.value)}
-                  style={{ ...s.modalInput, colorScheme: 'auto' }}
-                />
-              </div>
-              <div>
-                <label style={s.modalLabel}>{t('reschedule_end_time')}</label>
-                <input
-                  type="time"
-                  value={rescheduleEnd}
-                  onChange={e => setRescheduleEnd(e.target.value)}
-                  style={{ ...s.modalInput, colorScheme: 'auto' }}
-                />
-              </div>
-            </div>
-
-            <div style={s.modalField}>
-              <label style={s.modalLabel}>{t('reschedule_message')} <span style={{ color: '#e86f6f' }}>*</span></label>
-              <p style={s.modalHint}>{t('reschedule_message_hint')}</p>
-              <textarea
-                value={rescheduleMsg}
-                onChange={e => setRescheduleMsg(e.target.value)}
-                placeholder="e.g. We need to move your appointment due to an artist scheduling conflict. Apologies for the inconvenience!"
-                rows={4}
-                style={{ ...s.modalInput, resize: 'vertical', lineHeight: 1.5 }}
-              />
-            </div>
-
-            <div style={{ display: 'flex', gap: '0.6rem', marginTop: '0.5rem' }}>
-              <button
-                style={s.modalCancelBtn}
-                onClick={() => setRescheduleTarget(null)}
-                disabled={rescheduleSaving}
-              >
-                {t('cancel')}
-              </button>
-              <button
-                style={{ ...s.modalSaveBtn, opacity: (!rescheduleStart || !rescheduleEnd || !rescheduleMsg.trim() || rescheduleSaving) ? 0.5 : 1 }}
-                onClick={confirmReschedule}
-                disabled={!rescheduleStart || !rescheduleEnd || !rescheduleMsg.trim() || rescheduleSaving}
-              >
-                {t(rescheduleSaving ? 'saving' : 'reschedule_confirm')}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

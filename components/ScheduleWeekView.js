@@ -189,7 +189,7 @@ export default function ScheduleWeekView({ date, lens, refreshKey, selectedBooki
                       onClose={() => setOpenMore(null)}
                       style={{ top: `${offset(day, chip.displayStart)}%`, height: `${minutes / span * 100}%`, left: `calc((100% - var(--add-strip)) * ${chip.lane / chip.lanes} + 2px)`, width: `calc((100% - var(--add-strip)) / ${chip.lanes} - 4px)` }}
                       alignEnd={dayIndex >= 5} short={minutes < 45}
-                      label={`${chip.bookings.length} more bookings, ${time(chip.displayStart)} – ${time(chip.displayEnd)}: ${names}`}
+                      label={`${chip.bookings.length} more bookings, ${time(chip.displayStart)} – ${time(chip.displayEnd)}: ${names}. Show all bookings at this time`}
                       artistById={artistById} time={time}
                       onOpen={entry => { setOpenMore(null); onOpenDetail(entry); }}
                       onOpenDay={() => { setOpenMore(null); onDayClick(day.date); }}
@@ -246,7 +246,7 @@ function ArtistAvatar({ artist, name }) {
 }
 
 // "+N": bookings that don't fit side by side. Shows the artists' photos; opens a list
-// of those bookings, with a link to the day (Day view has a column per artist).
+// of every booking at that time (the ones showing too), with a link to the day (Day view has a column per artist).
 function MoreChip({ chip, open, onToggle, onClose, style, alignEnd, short, label, artistById, time, onOpen, onOpenDay, dayName }) {
   const chipRef = useRef(null), listRef = useRef(null);
   useEffect(() => {
@@ -258,6 +258,9 @@ function MoreChip({ chip, open, onToggle, onClose, style, alignEnd, short, label
     document.addEventListener('keydown', key);
     return () => { document.removeEventListener('pointerdown', away); document.removeEventListener('keydown', key); };
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+  // The list shows everything at that time, the bookings showing beside the chip too.
+  const list = chip.all ?? chip.bookings;
+  const listEnd = new Date(Math.max(...list.map(b => b.displayEnd.getTime())));
   // Each artist once, so two bookings with the same artist don't repeat their photo.
   const faces = [...new Map(chip.bookings.map(b => [String(b.entry.artistId ?? b.entry.artistName ?? b.entry.bookingId), b])).values()].slice(0, 3);
   return (
@@ -270,11 +273,11 @@ function MoreChip({ chip, open, onToggle, onClose, style, alignEnd, short, label
         </span>
       </button>
       {open && (
-        <div ref={listRef} tabIndex={-1} role="dialog" aria-label={`${chip.bookings.length} more bookings`} className={`${styles.moreList} ${alignEnd ? styles.moreListEnd : ''}`}
+        <div ref={listRef} tabIndex={-1} role="dialog" aria-label={`All ${list.length} bookings at this time`} className={`${styles.moreList} ${alignEnd ? styles.moreListEnd : ''}`}
           style={{ top: style.top, ...(alignEnd ? { right: `calc(var(--add-strip) + (100% - var(--add-strip)) * ${(chip.lanes - chip.lane) / chip.lanes} + 4px)` } : {}) }}>
-          <p className={styles.moreTitle}>{time(chip.displayStart)} – {time(chip.displayEnd)}</p>
+          <p className={styles.moreTitle}>{list.length} bookings · {time(list[0].displayStart)} – {time(listEnd)}</p>
           <ul>
-            {chip.bookings.map(b => (
+            {list.map(b => (
               <li key={b.entry.bookingId}>
                 <button type="button" onClick={() => onOpen(b.entry)}>
                   <ArtistAvatar artist={artistById.get(String(b.entry.artistId))} name={b.entry.artistName} />

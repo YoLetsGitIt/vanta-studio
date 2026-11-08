@@ -6,6 +6,7 @@ import BookTimeModal from '@/components/BookTimeModal';
 import OfferTimesModal from '@/components/OfferTimesModal';
 import AssignArtistModal from '@/components/AssignArtistModal';
 import SendQuoteModal from '@/components/SendQuoteModal';
+import EditBookingModal from '@/components/EditBookingModal';
 import { useBookingManagement } from '@/lib/bookingManagement';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -101,7 +102,6 @@ export default function BookingDetailPanel({
   onSendLink,   // optional fn() — for pending bookings
   onConfirm,    // optional fn() — for requires_confirmation bookings
   onReassign,   // optional fn() — for requires_confirmation bookings
-  onReschedule, // optional fn() — edit booking time
   bookTimeArtists, // optional: studio artists — shows "Book a time" on requests
   depositsReady = false, // the studio can collect deposits (Stripe, PayID or bank)
   onBooked,     // optional fn(bookingId) — after "Book a time"
@@ -115,6 +115,7 @@ export default function BookingDetailPanel({
   const [bookTimeOpen, setBookTimeOpen] = useState(false);
   const [assignOpen, setAssignOpen] = useState(false);
   const [quoteOpen, setQuoteOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   const [resending, setResending] = useState(false);
   const [offerOpen, setOfferOpen] = useState(false);
   const [offer, setOffer] = useState(null); // { booking, data } — times the studio offered the client
@@ -239,7 +240,9 @@ export default function BookingDetailPanel({
   const canSendLink       = (status === 'pending' || status === 'awaiting_payment') && !isStudioRequest;
   const canAcceptReject   = canAccept || canReject; // kept for layout gate
   const canConfirm        = status === 'requires_confirmation';
-  const canReschedule     = status === 'confirmed' && chosenDate && chosenDate > today;
+  // A booked appointment (not finished or cancelled) can have its time, length, artist
+  // and station changed.
+  const canEdit           = Boolean(booking?.chosen_time) && ['confirmed', 'requires_confirmation', 'awaiting_payment'].includes(rawStatus) && !isCompleted;
   // When the studio confirms booking times (Settings → Booking requests), it can book any open
   // request straight into a time, without the artist.
   const canBookTime       = bookingManagement === 'studio' && Boolean(bookTimeArtists) && ['pending', 'awaiting_payment', 'requires_confirmation'].includes(status) && !booking?.deposit_paid_at && !booking?.deposit_confirmed_at;
@@ -1169,11 +1172,15 @@ export default function BookingDetailPanel({
         <SendQuoteModal booking={booking} onClose={() => setQuoteOpen(false)}
           onSent={async () => { showFeedback(`Quote sent. ${clientFirst} has been asked for their availability`, 'success'); forgetBookings(); await onBooked?.(bookingId); }} />
       )}
+      {editOpen && booking && (
+        <EditBookingModal booking={booking} artists={bookTimeArtists} onClose={() => setEditOpen(false)}
+          onSaved={async ({ emailed, first }) => { showFeedback(emailed ? `Booking updated. ${first} has been emailed the new time` : 'Booking updated', 'success'); forgetBookings(); await onBooked?.(bookingId); }} />
+      )}
       {assignOpen && booking && (
         <AssignArtistModal booking={booking} artists={bookTimeArtists} onClose={() => setAssignOpen(false)}
           onAssigned={async name => { showFeedback(`Sent to ${name} to send times`, 'success'); forgetBookings(); await onBooked?.(bookingId); }} />
       )}
-      {!stationStep && (canAcceptReject || canComplete || isFutureConfirmed || canSendLink || canConfirm || canReschedule || canBookTime || canAssignArtist || canSendQuote) && (
+      {!stationStep && (canAcceptReject || canComplete || isFutureConfirmed || canSendLink || canConfirm || canEdit || canBookTime || canAssignArtist || canSendQuote) && (
         <div className="studio-bdp-actions" style={p.actions}>
           {canAssignArtist && (
             <Btn onClick={() => setAssignOpen(true)} disabled={actionLoading} variant="primary">Assign artist</Btn>
@@ -1204,8 +1211,8 @@ export default function BookingDetailPanel({
           {isFutureConfirmed && onCancel && (
             <Btn onClick={onCancel} disabled={actionLoading} variant="danger">{t('cancel')}</Btn>
           )}
-          {canReschedule && onReschedule && (
-            <Btn onClick={onReschedule} disabled={actionLoading} variant="neutral">{t('reschedule')}</Btn>
+          {canEdit && (
+            <Btn onClick={() => setEditOpen(true)} disabled={actionLoading} variant="neutral">Edit booking</Btn>
           )}
           {canComplete && onComplete && (
             <Btn onClick={onComplete} disabled={actionLoading} variant="success" icon={CHECK_ICON}>{t('bdp_mark_complete')}</Btn>

@@ -121,12 +121,6 @@ function useBookingActions(afterChange) {
   const [reassignSaving,   setReassignSaving]   = useState(false);
   const [studioArtists,    setStudioArtists]    = useState([]);
   const [stripeConnected,  setStripeConnected]  = useState(false);
-  const [rescheduleTarget, setRescheduleTarget] = useState(null);
-  const [rescheduleDate,   setRescheduleDate]   = useState('');
-  const [rescheduleStart,  setRescheduleStart]  = useState('');
-  const [rescheduleEnd,    setRescheduleEnd]    = useState('');
-  const [rescheduleMsg,    setRescheduleMsg]    = useState('');
-  const [rescheduleSaving, setRescheduleSaving] = useState(false);
 
   useEffect(() => {
     getStripeStatus().then(s => setStripeConnected(canCollectDeposits(s))).catch(() => {});
@@ -234,54 +228,13 @@ function useBookingActions(afterChange) {
     finally { setReassignSaving(false); }
   }
 
-  function openReschedule() {
-    const booking = detailBooking;
-    const currentTime = booking?.chosen_time ?? booking?.proposed_time_primary ?? null;
-    const chosenDate = currentTime ? currentTime.slice(0, 10) : null;
-    const today = new Date().toLocaleDateString('en-CA');
-    if (chosenDate && chosenDate <= today) return;
-    const dt = currentTime ? new Date(currentTime) : new Date();
-    const pad = n => String(n).padStart(2, '0');
-    const dateStr = `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`;
-    const startHHMM = `${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
-    const durationMins = booking?.duration_minutes ?? selectedEntry?.durationMins ?? 60;
-    const endDt = new Date(dt.getTime() + durationMins * 60000);
-    const endHHMM = `${pad(endDt.getHours())}:${pad(endDt.getMinutes())}`;
-    setRescheduleDate(dateStr);
-    setRescheduleStart(startHHMM);
-    setRescheduleEnd(endHHMM);
-    setRescheduleMsg('');
-    setRescheduleTarget(booking ?? selectedEntry);
-  }
-
-  async function confirmReschedule() {
-    if (!rescheduleStart || !rescheduleEnd || !rescheduleMsg.trim()) return;
-    const [sh, sm] = rescheduleStart.split(':').map(Number);
-    const [eh, em] = rescheduleEnd.split(':').map(Number);
-    const durationMins = (eh * 60 + em) - (sh * 60 + sm);
-    if (durationMins <= 0) { showError('End time must be after start time.'); return; }
-    const id = detailBooking?.id ?? selectedEntry?.bookingId;
-    const newTime = new Date(`${rescheduleDate}T${rescheduleStart}:00`).toISOString();
-    setRescheduleSaving(true);
-    try {
-      await bookingActions.reschedule(id, { newTime, message: rescheduleMsg, durationMinutes: durationMins });
-      setRescheduleTarget(null);
-      closeDetail();
-      afterChange();
-    } catch (e) { showError(e); }
-    finally { setRescheduleSaving(false); }
-  }
-
   return {
     selectedEntry, detailBooking, detailLoading, actionLoading,
     completeTarget, noShowTarget, rejectTarget,
     cancelTarget, sendLinkTarget, sendLinkHours, sendLinkDuration, sendLinkDeposit, sendLinkAmount, sendLinkQuote, sendLinkArtistId, sendLinkSaving,
     reassignTarget, reassignArtistId, reassignResend, reassignSaving, studioArtists, stripeConnected,
-    rescheduleTarget, rescheduleDate, rescheduleStart, rescheduleEnd, rescheduleMsg, rescheduleSaving,
     openDetail, closeDetail, handleAction, afterChange,
     confirmComplete, confirmNoShow, confirmReject, confirmCancel, confirmSendLink, confirmReassign,
-    openReschedule, confirmReschedule,
-    setRescheduleStart, setRescheduleEnd, setRescheduleMsg, setRescheduleTarget,
     setCompleteTarget, setNoShowTarget, setRejectTarget,
     setCancelTarget, setSendLinkTarget, setSendLinkHours, setSendLinkDuration, setSendLinkDeposit, setSendLinkAmount, setSendLinkQuote, setSendLinkArtistId,
     setReassignTarget, setReassignArtistId, setReassignResend,
@@ -307,7 +260,6 @@ function BookingOverlays({ actions: a }) {
           onSendLink={() => a.handleAction('send_link')}
           onConfirm={() => a.handleAction('confirm')}
           onReassign={() => a.handleAction('reassign')}
-          onReschedule={a.openReschedule}
           bookTimeArtists={a.studioArtists}
           depositsReady={a.stripeConnected}
           onBooked={() => { a.closeDetail(); a.afterChange(); }}
@@ -450,72 +402,6 @@ function BookingOverlays({ actions: a }) {
                 onClick={a.confirmReassign} disabled={!a.reassignArtistId || a.reassignSaving}
               >
                 {t(a.reassignSaving ? 'saving' : 'appt_reassign_btn')}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      {a.rescheduleTarget && (
-        <div className="studio-legacy-overlay" style={overlayStyle} onClick={e => e.target === e.currentTarget && a.setRescheduleTarget(null)}>
-          <div className="studio-legacy-modal" style={modalStyle}>
-            <h3 style={{ margin: '0 0 0.25rem', fontSize: '0.95rem', fontWeight: 700, color: 'var(--text)' }}>
-              {t('reschedule_booking')}
-            </h3>
-            <p style={{ margin: '0 0 1rem', fontSize: '0.8rem', color: 'var(--text-ghost)' }}>
-              {a.rescheduleTarget.requester_name ?? a.rescheduleTarget.clientName}
-            </p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', marginBottom: '0.85rem' }}>
-              <label style={labelStyle}>{t('sched_date')}</label>
-              <input
-                type="date"
-                value={a.rescheduleDate}
-                disabled
-                style={{ ...inputStyle, colorScheme: 'auto', opacity: 0.55, cursor: 'not-allowed' }}
-              />
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem', marginBottom: '0.85rem' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                <label style={labelStyle}>{t('nap_start_time')}</label>
-                <input
-                  type="time"
-                  value={a.rescheduleStart}
-                  onChange={e => a.setRescheduleStart(e.target.value)}
-                  style={{ ...inputStyle, colorScheme: 'auto' }}
-                />
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                <label style={labelStyle}>{t('reschedule_end_time')}</label>
-                <input
-                  type="time"
-                  value={a.rescheduleEnd}
-                  onChange={e => a.setRescheduleEnd(e.target.value)}
-                  style={{ ...inputStyle, colorScheme: 'auto' }}
-                />
-              </div>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', marginBottom: '1rem' }}>
-              <label style={labelStyle}>{t('reschedule_message')} <span style={{ color: '#e86f6f' }}>*</span></label>
-              <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-ghost)', lineHeight: 1.4 }}>
-                {t('reschedule_message_hint')}
-              </p>
-              <textarea
-                value={a.rescheduleMsg}
-                onChange={e => a.setRescheduleMsg(e.target.value)}
-                placeholder="e.g. We need to move your appointment due to a scheduling conflict…"
-                rows={4}
-                style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.5 }}
-              />
-            </div>
-            <div style={{ display: 'flex', gap: '0.6rem' }}>
-              <button style={cancelBtnStyle} onClick={() => a.setRescheduleTarget(null)} disabled={a.rescheduleSaving}>
-                {t('cancel')}
-              </button>
-              <button
-                style={{ ...saveBtnStyle, opacity: (!a.rescheduleStart || !a.rescheduleEnd || !a.rescheduleMsg.trim() || a.rescheduleSaving) ? 0.5 : 1 }}
-                onClick={a.confirmReschedule}
-                disabled={!a.rescheduleStart || !a.rescheduleEnd || !a.rescheduleMsg.trim() || a.rescheduleSaving}
-              >
-                {a.rescheduleSaving ? t('saving') : t('reschedule_confirm')}
               </button>
             </div>
           </div>

@@ -91,6 +91,11 @@ test('more than three side by side: two bookings show and the rest fold into a "
   assert.deepEqual([chip.lane, chip.lanes], [2, 3]);
   assert.equal(chip.displayStart.getTime(), new Date('2026-10-26T10:30:00+11:00').getTime());
   assert.equal(chip.displayEnd.getTime(), new Date('2026-10-26T13:00:00+11:00').getTime());
+  // Opening the chip lists everything at that time, the bookings already showing too,
+  // in start order (same start: left to right); the later booking on its own isn't part of it.
+  const lane = Object.fromEntries(chip.all.map(item => [item.entry.bookingId, item.lane]));
+  const sameStart = lane.d < lane.e ? ['d', 'e'] : ['e', 'd'];
+  assert.deepEqual(chip.all.map(item => item.entry.bookingId), ['a', 'b', 'c', ...sameStart, 'f']);
 
   // Folded bookings at separate times get separate chips.
   const apart = capDayLanes(layoutDayLanes(day([
@@ -98,4 +103,5 @@ test('more than three side by side: two bookings show and the rest fold into a "
   ])));
   assert.equal(apart.overflow.length, 2);
   assert.deepEqual(apart.overflow.map(o => o.bookings.length), [2, 2]);
+  assert.deepEqual(apart.overflow.map(o => o.all.map(item => item.entry.bookingId)), [['a', 'b', 'c', 'd'], ['a', 'b', 'e', 'f']]);
 });
