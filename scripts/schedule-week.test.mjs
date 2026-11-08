@@ -68,48 +68,34 @@ test('overlapping bookings get side-by-side lanes; back-to-back bookings stay fu
   assert.deepEqual(lanes.d, [0, 1], 'a separate booking later in the day is full width');
 });
 
-test('more than three side by side: two bookings show and the rest fold into a "+N" chip', async () => {
-  const { layoutDayLanes, capDayLanes } = await import('../lib/scheduleWeek.mjs');
+test('three or more at once become one full-width group card; one or two show as bookings', async () => {
+  const { layoutDayLanes, groupDayLanes } = await import('../lib/scheduleWeek.mjs');
   const at = (id, time, durationMins) => ({ bookingId: id, chosenTime: `2026-10-26T${time}:00+11:00`, durationMins });
   const day = bookings => weekSchedule(bookings, new Date('2026-10-26T12:00:00+11:00'))[0].bookings;
+  const ids = items => items.map(item => item.entry.bookingId);
 
-  // Three at once: nothing folds.
-  const three = capDayLanes(layoutDayLanes(day([at('a', '10:00', 60), at('b', '10:00', 60), at('c', '10:00', 60)])));
-  assert.equal(three.shown.length, 3);
-  assert.deepEqual(three.overflow, []);
+  // Two at once: side by side, no group.
+  const two = groupDayLanes(layoutDayLanes(day([at('a', '10:00', 60), at('b', '10:00', 60)])));
+  assert.deepEqual(two.groups, []);
+  assert.deepEqual(two.shown.map(item => [item.lane, item.lanes]), [[0, 2], [1, 2]]);
 
-  // Six at once, plus a later booking on its own.
-  const six = capDayLanes(layoutDayLanes(day([
+  // Six overlapping, plus a later booking on its own (full width, as usual).
+  const six = groupDayLanes(layoutDayLanes(day([
     at('a', '10:00', 240), at('b', '10:00', 120), at('c', '10:30', 60), at('d', '11:00', 60), at('e', '11:00', 120), at('f', '11:30', 30),
     at('g', '16:00', 60),
   ])));
-  const shown = Object.fromEntries(six.shown.map(item => [item.entry.bookingId, [item.lane, item.lanes]]));
-  assert.deepEqual(shown, { a: [0, 3], b: [1, 3], g: [0, 1] });
-  assert.equal(six.overflow.length, 1);
-  const chip = six.overflow[0];
-  assert.deepEqual(chip.bookings.map(item => item.entry.bookingId).sort(), ['c', 'd', 'e', 'f']);
-  assert.deepEqual([chip.lane, chip.lanes], [2, 3]);
-  assert.equal(chip.displayStart.getTime(), new Date('2026-10-26T10:30:00+11:00').getTime());
-  assert.equal(chip.displayEnd.getTime(), new Date('2026-10-26T13:00:00+11:00').getTime());
-  // Opening the chip lists everything at that time, the bookings already showing too,
-  // in start order (same start: left to right); the later booking on its own isn't part of it.
-  const lane = Object.fromEntries(chip.all.map(item => [item.entry.bookingId, item.lane]));
-  const sameStart = lane.d < lane.e ? ['d', 'e'] : ['e', 'd'];
-  assert.deepEqual(chip.all.map(item => item.entry.bookingId), ['a', 'b', 'c', ...sameStart, 'f']);
+  assert.deepEqual(six.shown.map(item => [item.entry.bookingId, item.lane, item.lanes]), [['g', 0, 1]]);
+  assert.equal(six.groups.length, 1);
+  const group = six.groups[0];
+  // Every booking in it, in start order (same start: left to right), spanning their times.
+  const lane = Object.fromEntries(group.bookings.map(item => [item.entry.bookingId, item.lane]));
+  assert.deepEqual(ids(group.bookings), ['a', 'b', 'c', ...(lane.d < lane.e ? ['d', 'e'] : ['e', 'd']), 'f']);
+  assert.equal(group.displayStart.getTime(), new Date('2026-10-26T10:00:00+11:00').getTime());
+  assert.equal(group.displayEnd.getTime(), new Date('2026-10-26T14:00:00+11:00').getTime());
+  // Each keeps its lane, for the thin bars that show when each one runs.
+  assert.ok(group.lanes >= 3 && group.bookings.every(item => item.lane < group.lanes));
 
-  // Folded bookings at separate times get separate chips.
-  const apart = capDayLanes(layoutDayLanes(day([
-    at('a', '09:00', 600), at('b', '09:00', 600), at('c', '09:00', 60), at('d', '09:00', 60), at('e', '15:00', 60), at('f', '15:00', 60),
-  ])));
-  assert.equal(apart.overflow.length, 2);
-  assert.deepEqual(apart.overflow.map(o => o.bookings.length), [2, 2]);
-  assert.deepEqual(apart.overflow.map(o => o.all.map(item => item.entry.bookingId)), [['a', 'b', 'c', 'd'], ['a', 'b', 'e', 'f']]);
-
-  // A single booking that doesn't fit is shown in the chip's place, not as "+1".
-  const lone = capDayLanes(layoutDayLanes(day([
-    at('a', '09:00', 600), at('b', '09:00', 600), at('c', '09:00', 60), at('d', '09:00', 60), at('e', '15:00', 60),
-  ])));
-  assert.deepEqual(lone.overflow.map(o => o.bookings.length), [2]);
-  const e = lone.shown.find(item => item.entry.bookingId === 'e');
-  assert.deepEqual(e && [e.lane, e.lanes], [2, 3]);
+  // Three at once is already a group.
+  const three = groupDayLanes(layoutDayLanes(day([at('a', '10:00', 60), at('b', '10:00', 60), at('c', '10:00', 60)])));
+  assert.deepEqual([three.shown.length, three.groups.map(g => g.bookings.length)], [0, [3]]);
 });

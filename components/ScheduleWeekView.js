@@ -7,7 +7,7 @@ import { getCached, setCached, invalidatePrefix } from '@/lib/cache';
 import { entryStyle, useAppointmentTypes } from '@/lib/appointmentTypes';
 import { hasArtist } from '@/lib/format';
 import { useLanguage } from '@/lib/i18n';
-import { calendarDayAfter, capDayLanes, layoutDayLanes, localDateKey, weekHourRange, weekStartFor, weekSchedule } from '@/lib/scheduleWeek.mjs';
+import { calendarDayAfter, groupDayLanes, layoutDayLanes, localDateKey, weekHourRange, weekStartFor, weekSchedule } from '@/lib/scheduleWeek.mjs';
 import styles from './ScheduleWeekView.module.css';
 
 // Where the schedule's filter goes: the header next to "Today", or on a rotated phone the
@@ -36,7 +36,7 @@ export default function ScheduleWeekView({ date, lens, refreshKey, selectedBooki
   const [entries, setEntries] = useState([]);
   const [resources, setResources] = useState([]);
   const [artists, setArtists] = useState([]); // for each booking's artist photo
-  const [openMore, setOpenMore] = useState(null); // the "+N" list that's open: `${dayKey}|${start}`
+  const [openMore, setOpenMore] = useState(null); // the group card whose list is open: `${dayKey}|${start}`
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [filter, setFilter] = useState('all');
@@ -176,24 +176,21 @@ export default function ScheduleWeekView({ date, lens, refreshKey, selectedBooki
                 {hours.map(hour => <div key={hour} className={styles.hourLine} style={{ top: `${(hour - startHour) / hours.length * 100}%` }} />)}
                 {day.key === today && now >= day.date && <div className={styles.nowLine} style={{ top: `${offset(day, now)}%` }} aria-hidden="true" />}
                 {(() => {
-                  const { shown, overflow } = capDayLanes(layoutDayLanes(day.bookings));
-                  // A busy day shows every booking the same way (photo and name), so the
-                  // ones with room don't look like a different kind of booking.
-                  const dense = overflow.length > 0 || shown.some(b => b.lanes >= 3);
+                  const { shown, groups } = groupDayLanes(layoutDayLanes(day.bookings));
                   return <>
-                {overflow.map(chip => {
-                  const key = `${day.key}|${chip.displayStart.getTime()}`;
-                  const minutes = (chip.displayEnd - chip.displayStart) / 60000;
-                  const names = chip.bookings.map(b => b.entry.clientName).join(', ');
+                {groups.map(group => {
+                  const key = `${day.key}|${group.displayStart.getTime()}`;
+                  const minutes = (group.displayEnd - group.displayStart) / 60000;
+                  const names = group.bookings.map(b => b.entry.clientName).join(', ');
                   return (
-                    <MoreChip
-                      key={key} chip={chip} open={openMore === key}
+                    <GroupCard
+                      key={key} group={group} open={openMore === key}
                       onToggle={() => setOpenMore(current => (current === key ? null : key))}
                       onClose={() => setOpenMore(null)}
-                      style={{ top: `${offset(day, chip.displayStart)}%`, height: `min(${minutes / span * 100}%, 46px)`, left: `calc((100% - var(--add-strip)) * ${chip.lane / chip.lanes} + 2px)`, width: `calc((100% - var(--add-strip)) / ${chip.lanes} - 4px)` }}
-                      alignEnd={dayIndex >= 5} short={minutes < 45}
-                      label={`${chip.bookings.length} more bookings, ${time(chip.displayStart)} – ${time(chip.displayEnd)}: ${names}. Show all bookings at this time`}
-                      artistById={artistById} time={time}
+                      style={{ top: `${offset(day, group.displayStart)}%`, height: `${minutes / span * 100}%` }}
+                      alignEnd={dayIndex >= 5} short={minutes < 60}
+                      label={`${group.bookings.length} bookings, ${time(group.displayStart)} – ${time(group.displayEnd)}: ${names}. Show them`}
+                      artistById={artistById} time={time} colorOf={entry => entryStyle(entry, typesById).border}
                       onOpen={entry => { setOpenMore(null); onOpenDetail(entry); }}
                       onOpenDay={() => { setOpenMore(null); onDayClick(day.date); }}
                       dayName={day.date.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'short' })}
@@ -212,7 +209,7 @@ export default function ScheduleWeekView({ date, lens, refreshKey, selectedBooki
                   return (
                     <button
                       key={entry.bookingId} type="button" data-booking-id={entry.bookingId} aria-label={label} title={label}
-                      className={`${styles.booking} ${pending ? styles.pending : ''} ${selectedBookingId === entry.bookingId ? styles.selected : ''} ${minutes < 45 ? styles.short : minutes < 75 ? styles.compact : ''} ${booking.lanes >= 3 ? styles.narrow : ''} ${dense ? styles.dense : ''}`}
+                      className={`${styles.booking} ${pending ? styles.pending : ''} ${selectedBookingId === entry.bookingId ? styles.selected : ''} ${minutes < 45 ? styles.short : minutes < 75 ? styles.compact : ''}`}
                       style={{ '--booking-color': source.border, top: `${top}%`, height: `${height}%`, left: `calc((100% - var(--add-strip)) * ${booking.lane / booking.lanes} + 2px)`, width: `calc((100% - var(--add-strip)) / ${booking.lanes} - 4px)` }}
                       onClick={() => onOpenDetail(entry)}
                     >
@@ -248,9 +245,10 @@ function ArtistAvatar({ artist, name }) {
     : <span aria-hidden="true" className={styles.avatar}>{initial}</span>;
 }
 
-// "+N": bookings that don't fit side by side. Shows the artists' photos; opens a list
-// of every booking at that time (the ones showing too), with a link to the day (Day view has a column per artist).
-function MoreChip({ chip, open, onToggle, onClose, style, alignEnd, short, label, artistById, time, onOpen, onOpenDay, dayName }) {
+// Where three or more bookings overlap: one full-width card with the artists' photos,
+// how many bookings and when, and a thin bar per booking showing when it runs. Opens a
+// list of them, with a link to the day (Day view has a column per artist).
+function GroupCard({ group, open, onToggle, onClose, style, alignEnd, short, label, artistById, time, colorOf, onOpen, onOpenDay, dayName }) {
   const chipRef = useRef(null), listRef = useRef(null);
   useEffect(() => {
     if (!open) return undefined;
@@ -266,24 +264,37 @@ function MoreChip({ chip, open, onToggle, onClose, style, alignEnd, short, label
     document.addEventListener('keydown', key);
     return () => { list?.removeEventListener('wheel', wheel); document.removeEventListener('pointerdown', away); document.removeEventListener('keydown', key); };
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
-  // The list shows everything at that time, the bookings showing beside the chip too.
-  const list = chip.all ?? chip.bookings;
-  const listEnd = new Date(Math.max(...list.map(b => b.displayEnd.getTime())));
+  const list = group.bookings;
+  const span = group.displayEnd - group.displayStart;
   // Each artist once, so two bookings with the same artist don't repeat their photo.
-  const faces = [...new Map(chip.bookings.map(b => [String(b.entry.artistId ?? b.entry.artistName ?? b.entry.bookingId), b])).values()].slice(0, 3);
+  const artists = [...new Map(list.map(b => [String(b.entry.artistId ?? b.entry.artistName ?? b.entry.bookingId), b])).values()];
+  const faces = artists.slice(0, 3);
   return (
     <>
-      <button ref={chipRef} type="button" className={`${styles.more} ${short ? styles.moreShort : ''}`} style={style}
+      <button ref={chipRef} type="button" className={`${styles.group} ${short ? styles.groupShort : ''}`} style={style}
         aria-label={label} title={label} aria-expanded={open} aria-haspopup="dialog" onClick={onToggle}>
-        <span className={styles.moreCount}>+{chip.bookings.length}</span>
-        <span className={styles.faces} aria-hidden="true">
-          {faces.map(b => <ArtistAvatar key={b.entry.bookingId} artist={artistById.get(String(b.entry.artistId))} name={b.entry.artistName} />)}
+        <span className={styles.groupText}>
+          <span className={styles.faces} aria-hidden="true">
+            {faces.map(b => <ArtistAvatar key={b.entry.bookingId} artist={artistById.get(String(b.entry.artistId))} name={b.entry.artistName} />)}
+            {artists.length > faces.length && <span className={styles.facesMore}>+{artists.length - faces.length}</span>}
+          </span>
+          <span className={styles.groupCount}>{list.length} bookings</span>
+          <span className={styles.time}><span>{time(group.displayStart)} –</span> <span>{time(group.displayEnd)}</span></span>
+        </span>
+        {/* When each booking runs: one bar per booking, side by side like lanes. */}
+        <span className={styles.groupBars} aria-hidden="true" style={{ width: `${group.lanes * 6 - 2}px` }}>
+          {list.map(b => (
+            <span key={b.entry.bookingId} style={{
+              left: `${b.lane * 6}px`, top: `${(b.displayStart - group.displayStart) / span * 100}%`,
+              height: `${(b.displayEnd - b.displayStart) / span * 100}%`, background: colorOf(b.entry),
+            }} />
+          ))}
         </span>
       </button>
       {open && (
-        <div ref={listRef} tabIndex={-1} role="dialog" aria-label={`All ${list.length} bookings at this time`} className={`${styles.moreList} ${alignEnd ? styles.moreListEnd : ''}`}
-          style={{ top: style.top, ...(alignEnd ? { right: `calc(var(--add-strip) + (100% - var(--add-strip)) * ${(chip.lanes - chip.lane) / chip.lanes} + 4px)` } : {}) }}>
-          <p className={styles.moreTitle}>{list.length} bookings · {time(list[0].displayStart)} – {time(listEnd)}</p>
+        <div ref={listRef} tabIndex={-1} role="dialog" aria-label={`${list.length} bookings`} className={`${styles.moreList} ${alignEnd ? styles.moreListEnd : ''}`}
+          style={{ top: style.top }}>
+          <p className={styles.moreTitle}>{list.length} bookings · {time(group.displayStart)} – {time(group.displayEnd)}</p>
           <ul>
             {list.map(b => (
               <li key={b.entry.bookingId}>
