@@ -43,8 +43,13 @@
 .compact .typeName, .short .time, .short .typeName, .short .resource, .short .status, .short .pendingTag { display: none; }
 /* Three or more side by side: name only; the full details are in the tooltip/label. */
 .narrow { padding-inline: 5px; }
-/* Three or more side by side: just the artist's photo; hover or open it for the rest. */
-.narrow .client { display: none; }
+/* Three or more side by side: the artist's photo on top, the client's name under it
+   with the full width of the block. Hover or open it for the rest. */
+.narrow .head { flex-direction: column; align-items: flex-start; gap: 3px; }
+.narrow .client { width: 100%; font-size: 11px; }
+/* Too short to stack: photo and name side by side. */
+.narrow.short .head { flex-direction: row; align-items: center; gap: 4px; }
+.narrow.short .avatar { width: 14px; height: 14px; font-size: 8px; }
 .narrow .time, .narrow .typeName, .narrow .resource, .narrow .status, .narrow .pendingTag { display: none; }
 .message { padding: 24px; color: var(--text-muted); font-size: 14px; }
 .retry { background: var(--bg-input); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 8px 14px; cursor: pointer; }
