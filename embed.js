@@ -207,6 +207,7 @@
     image_paths:    { enabled: true,  required: false },
     retouch:        { enabled: false, required: false },
     allergies:      { enabled: false, required: false },
+    address:        { enabled: false, required: false },
   };
 
   // Returns {enabled, required} for a field key.
@@ -311,6 +312,19 @@
     phoneRow.appendChild(codeEl);
     phoneRow.appendChild(numEl);
     form.appendChild(fieldWrap('Phone', phoneRow, true, false));
+
+    // Address (only when the studio asks for it)
+    var addressEl = null;
+    var addressCfg = fieldCfg(ff, 'address');
+    if (addressCfg.enabled) {
+      addressEl = mk('input', 'vb-input');
+      addressEl.type = 'text';
+      addressEl.maxLength = 300;
+      addressEl.autocomplete = 'street-address';
+      addressEl.placeholder = 'Street, suburb, state, postcode';
+      if (addressCfg.required) addressEl.required = true;
+      form.appendChild(fieldWrap('Address', addressEl, addressCfg.required));
+    }
 
     // Artist preference
     var artistEl = null;
@@ -694,6 +708,7 @@
           body_location: placements.join(', '),
           design_details: designEl ? designEl.value.trim() : '',
           notes: notesEl ? notesEl.value.trim() : '',
+          address: addressEl ? addressEl.value.trim() : '',
           image_paths: imagePaths,
           skin_tone: skinToneEl ? skinToneEl.value : '',
           size: sizeEl ? (sizeEl.value ? sizeEl.value + ' ' + sizeUnit : '') : '',
