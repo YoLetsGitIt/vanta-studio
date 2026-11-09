@@ -16,7 +16,6 @@ import { WalkInPreview } from '@/components/forms/FormPreviews';
 const FIELDS = [
   { key: 'body_location', label: 'Placement' },
   { key: 'design_details', label: 'Design description' },
-  { key: 'size', label: 'Size' },
   { key: 'skin_tone', label: 'Skin tone' },
   { key: 'allergies', label: 'Allergies' },
   { key: 'notes', label: 'Additional notes' },

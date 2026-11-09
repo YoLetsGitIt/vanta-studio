@@ -596,7 +596,9 @@ textarea {
 }
 
 /* Walk-in artist cards hide their radio button, so show keyboard focus on the card. */
-.walkin-artist-card:has(input:focus-visible) { outline: var(--focus-ring-width) solid var(--focus-ring); outline-offset: 2px; }
+.walkin-artist-trigger:focus-visible,
+.walkin-artist-option:focus-visible { outline: var(--focus-ring-width) solid var(--focus-ring); outline-offset: 2px; }
+@media (hover: hover) { .walkin-artist-option:hover { background: rgba(255,255,255,0.06) !important; } .walkin-artist-option[aria-selected="true"]:hover { background: var(--cf-accent-soft) !important; } }
 
 /* Offer times week view: dragging options is mouse-only, so only mention it there. */
 @media not (pointer: fine) { .offer-week-drag-hint { display: none; } }

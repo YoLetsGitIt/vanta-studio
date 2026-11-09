@@ -25,10 +25,10 @@ function hexToRgbaStr(hex, alpha) {
 }
 
 // One consent form as clients see it at the end of a booking or walk-in form.
-function ConsentBlock({ template, inp, lbl, fld }) {
+function ConsentBlock({ template, inp, lbl, fld, showName = true }) {
   return (
     <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-      <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#fff' }}>{template.name}</span>
+      {showName && <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#fff' }}>{template.name}</span>}
       {(template.fields ?? []).map((f, i) => {
         if (f.type === 'heading') return <p key={i} style={{ fontSize: '0.82rem', fontWeight: 700, color: 'rgba(255,255,255,0.8)', margin: 0 }}>{f.label}</p>;
         if (f.type === 'paragraph') return <p key={i} style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.4)', margin: 0, lineHeight: 1.5 }}>{f.label}</p>;
@@ -242,7 +242,7 @@ export function WalkInPreview({ bg, accent, studioName, logoUrl, fields, consent
       <span style={{ flex: 1, borderTop: `1px dashed ${hexToRgbaStr(accent, 0.35)}` }} />
     </div>
   );
-  const extras = ['body_location', 'design_details', 'skin_tone', 'size', 'notes', 'allergies', 'address'].filter(on);
+  const extras = ['body_location', 'design_details', 'skin_tone', 'notes', 'allergies', 'address'].filter(on);
   return (
     <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-faint)', borderRadius: 12, padding: '1.25rem' }}>
       <p style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)', letterSpacing: '0.06em', textTransform: 'uppercase', margin: '0 0 0.85rem' }}>Example walk-in form</p>
@@ -296,7 +296,6 @@ export function WalkInPreview({ bg, accent, studioName, logoUrl, fields, consent
         )}
         {on('design_details') && <div style={fld}><span style={lbl}>Design description{req('design_details')}</span><div style={{ ...inp, height: 64 }} /></div>}
         {on('skin_tone') && <div style={fld}><span style={lbl}>Skin tone{req('skin_tone')}</span><div style={inp} /></div>}
-        {on('size') && <div style={fld}><span style={lbl}>Size{req('size')}</span><div style={inp} /></div>}
         {on('notes') && <div style={fld}><span style={lbl}>Additional notes{req('notes')}</span><div style={{ ...inp, height: 52 }} /></div>}
         {on('address') && <AddressPreview fld={fld} lbl={lbl} inp={inp} required={Boolean(req('address'))} />}
         {on('allergies') && (
@@ -308,7 +307,7 @@ export function WalkInPreview({ bg, accent, studioName, logoUrl, fields, consent
 
         {group('Consent forms')}
         {consentTemplates?.length
-          ? consentTemplates.map(t => <ConsentBlock key={t.id} template={t} inp={inp} lbl={lbl} fld={fld} />)
+          ? consentTemplates.map(t => <ConsentBlock key={t.id} template={t} inp={inp} lbl={lbl} fld={fld} showName={false} />)
           : <p style={{ margin: 0, fontSize: '0.72rem', color: 'rgba(255,255,255,0.4)' }}>No consent forms yet. Any you create in Consent forms appear here.</p>}
 
         <div style={{ padding: '0.75rem', background: accent, borderRadius: 9, fontSize: '0.85rem', fontWeight: 700, color: light ? '#0e0e0e' : '#ffffff', textAlign: 'center' }}>Book me in</div>

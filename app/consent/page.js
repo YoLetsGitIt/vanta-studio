@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, Suspense } from 'react';
+import BrandLoader from '@/components/BrandLoader';
 import { useSearchParams } from 'next/navigation';
 import { getSupabase } from '@/lib/supabase';
 import { getStudioPublic, getStudioConsentTemplates } from '@/lib/api';
@@ -230,7 +231,7 @@ function ConsentForm({ onStyle }) {
   }
 
   if (!info || session === undefined || (session && !known)) {
-    return <div style={s.card}><div style={s.spinner} /></div>;
+    return <BrandLoader />;
   }
 
   if (!session) {
@@ -573,8 +574,7 @@ export default function ConsentPage() {
   const [style, setStyle] = useState(null);
   return (
     <div style={{ ...s.page, ...consentTheme(style) }}>
-      <style>{'@keyframes spin{to{transform:rotate(360deg)}}'}</style>
-      <Suspense fallback={<div style={s.card}><div style={s.spinner} /></div>}>
+      <Suspense fallback={<BrandLoader />}>
         <ConsentForm onStyle={setStyle} />
       </Suspense>
     </div>
@@ -604,13 +604,6 @@ const s = {
   },
   statusIcon: {
     fontSize: '2rem', textAlign: 'center', marginBottom: '0.25rem',
-  },
-  spinner: {
-    width: 28, height: 28, borderRadius: '50%',
-    border: '3px solid rgba(255,255,255,0.1)',
-    borderTopColor: 'var(--cf-accent)',
-    animation: 'spin 0.8s linear infinite',
-    margin: '2rem auto',
   },
   studioTag: {
     margin: 0,

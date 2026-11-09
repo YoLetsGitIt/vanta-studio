@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import Field from '@/components/ui/Field';
 import AddressFields, { EMPTY_ADDRESS, addressPayload, addressProblem } from '@/components/forms/AddressFields';
 import Button from '@/components/ui/Button';
+import BrandLoader from '@/components/BrandLoader';
 import ClientAuthGate from '@/components/ClientAuthGate';
 import ClientAccountActions from '@/components/ClientAccountActions';
 import DateOfBirthInput from '@/components/ui/DateOfBirthInput';
@@ -150,6 +151,8 @@ function IntakeInner({ mode, onStyle }) {
     if (walkIn) {
       // Walk-ins always choose their artist; extras are only what the studio switched on.
       if (key === 'artist_id') return { enabled: true, required: true };
+      // Walk-in forms don't ask for size, even if an older setting turned it on.
+      if (key === 'size') return { enabled: false, required: false };
       return formConfig?.[key] ?? { enabled: false, required: false };
     }
     // At an "Artists confirm" studio, choosing an artist sends the request straight to
@@ -387,13 +390,13 @@ function IntakeInner({ mode, onStyle }) {
 
   if (!studioId) return <p style={s.msg}>Invalid link — no studio ID.</p>;
   if (studioErr) return <p role="alert" style={{ ...s.msg, color: 'var(--color-danger)' }}>{studioErr}</p>;
-  if (!studio || formConfig === null) return <p style={s.msg}>Loading…</p>;
+  if (!studio || formConfig === null) return <BrandLoader />;
   const blocker = studio && !done ? missingRequirement() : '';
 
-  if (!walkIn && session === undefined) return <p style={s.msg}>Checking your account…</p>;
+  if (!walkIn && session === undefined) return <BrandLoader />;
   if (!session && !guest) return <ClientAuthGate studioId={studioId} studioName={studio.name} logoUrl={studio.logo_url} purpose="booking" onGuest={() => setGuestChosen(true)} />;
   if (!guest && accountError) return <div style={s.card}><p role="alert" style={s.error}>{accountError}</p><Button onClick={() => setAccountRetry(value => value + 1)}>Try again</Button></div>;
-  if (!guest && !accountReady) return <p style={s.msg}>Loading your details…</p>;
+  if (!guest && !accountReady) return <BrandLoader />;
 
   if (done && walkIn) {
     return (
@@ -702,7 +705,7 @@ function IntakeInner({ mode, onStyle }) {
           {consentTemplates.map(t => {
                 const ts = templateState[t.id] ?? {};
                 return (
-                  <Section key={t.id} title={t.name}>
+                  <Section key={t.id} title={walkIn ? null : t.name}>
 
                     {(t.fields ?? []).map(field => (
                       <ConsentFormField
@@ -934,40 +937,105 @@ function Required() {
   return <span aria-hidden="true" style={{ color: 'var(--color-danger)', marginLeft: 3 }}>*</span>;
 }
 
-// Walk-ins pick their artist from tappable cards rather than a dropdown: on some
-// iPhones the dropdown picker didn't keep the choice, and cards are quicker at a
-// front desk. Built on radio buttons, so keyboards and screen readers work too.
+// Walk-ins pick their artist from a custom dropdown, not a native <select>: on some
+// iPhones the native picker didn't keep the choice. Tapping the field opens the list;
+// choosing an artist closes it.
 function ArtistChoice({ artists, value, onChange }) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef(null);
+  const triggerRef = useRef(null);
+  const listRef = useRef(null);
+  const selected = artists.find(a => a.artistId === value);
+
+  useEffect(() => {
+    if (!open) return;
+    listRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    const onDown = e => { if (rootRef.current && !rootRef.current.contains(e.target)) setOpen(false); };
+    const onKey = e => { if (e.key === 'Escape') { setOpen(false); triggerRef.current?.focus(); } };
+    document.addEventListener('pointerdown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => { document.removeEventListener('pointerdown', onDown); document.removeEventListener('keydown', onKey); };
+  }, [open]);
+
+  function choose(id) {
+    onChange(id);
+    setOpen(false);
+    triggerRef.current?.focus();
+  }
+
   return (
-    <fieldset style={{ border: 0, margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '0.45rem', minWidth: 0 }}>
-      <legend style={{ ...s.label, padding: 0, marginBottom: '0.45rem' }}>Artist <span aria-hidden="true">*</span></legend>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 210px), 1fr))', gap: '0.5rem' }}>
-        {artists.map(a => {
-          const on = value === a.artistId;
-          const initials = (a.name || '?').split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase();
-          return (
-            <label key={a.artistId} className="walkin-artist-card" style={{
-              position: 'relative', display: 'flex', alignItems: 'center', gap: '0.6rem', minHeight: 52, padding: '0.55rem 0.7rem', borderRadius: 10, cursor: 'pointer',
-              background: on ? 'var(--cf-accent-soft)' : 'rgba(255,255,255,0.05)',
-              border: `1px solid ${on ? 'var(--cf-accent)' : 'rgba(255,255,255,0.1)'}`,
-              WebkitTapHighlightColor: 'transparent',
-            }}>
-              <input type="radio" name="walkin-artist" value={a.artistId} checked={on} required onChange={() => onChange(a.artistId)}
-                style={{ position: 'absolute', opacity: 0, width: 1, height: 1, margin: 0 }} />
-              {a.profileImage
-                ? <img src={a.profileImage} alt="" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
-                : <span aria-hidden="true" style={{ width: 32, height: 32, borderRadius: '50%', display: 'grid', placeItems: 'center', flexShrink: 0, fontSize: '0.72rem', fontWeight: 700, background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.75)' }}>{initials}</span>}
-              <span style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
-                <span style={{ fontSize: '0.9rem', fontWeight: 600, color: '#fff', overflowWrap: 'anywhere' }}>{a.name}</span>
-                {a.studioType === 'guest' && <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Guest artist</span>}
-              </span>
-              <span aria-hidden="true" style={{ width: 18, height: 18, borderRadius: '50%', flexShrink: 0, border: `2px solid ${on ? 'var(--cf-accent)' : 'rgba(255,255,255,0.3)'}`, background: on ? 'var(--cf-accent)' : 'transparent', boxShadow: on ? 'inset 0 0 0 3px #1a1a1a' : 'none' }} />
-            </label>
-          );
-        })}
-      </div>
+    <div ref={rootRef} style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', minWidth: 0 }}>
+      <span id="walkin-artist-label" style={s.label}>Artist <span aria-hidden="true">*</span></span>
+      <button
+        ref={triggerRef}
+        type="button"
+        className="walkin-artist-trigger"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-labelledby="walkin-artist-label walkin-artist-value"
+        disabled={artists.length === 0}
+        onClick={() => setOpen(o => !o)}
+        style={{
+          ...s.input, display: 'flex', alignItems: 'center', gap: '0.6rem', minHeight: 48, textAlign: 'left', cursor: 'pointer',
+          border: open ? '1px solid var(--cf-accent)' : s.input.border, fontFamily: 'inherit', width: '100%', WebkitTapHighlightColor: 'transparent',
+        }}
+      >
+        {selected && <ArtistAvatar artist={selected} size={26} />}
+        <span id="walkin-artist-value" style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: selected ? '#fff' : 'var(--text-muted)' }}>
+          {selected ? selected.name : 'Choose your artist'}
+        </span>
+        <svg aria-hidden="true" width="12" height="12" viewBox="0 0 12 12" style={{ flexShrink: 0, opacity: 0.6, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 160ms ease' }}>
+          <path d="M2 4.5 6 8.5 10 4.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+      {open && (
+        <div ref={listRef} role="listbox" aria-labelledby="walkin-artist-label" style={{
+          display: 'flex', flexDirection: 'column', padding: '0.3rem', borderRadius: 10, maxHeight: 320, overflowY: 'auto',
+          background: 'rgba(20,20,20,0.98)', border: '1px solid rgba(255,255,255,0.12)', boxShadow: '0 12px 32px rgba(0,0,0,0.45)',
+        }}>
+          {artists.map(a => {
+            const on = value === a.artistId;
+            return (
+              <button
+                key={a.artistId}
+                type="button"
+                role="option"
+                aria-selected={on}
+                className="walkin-artist-option"
+                onClick={() => choose(a.artistId)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '0.6rem', minHeight: 48, padding: '0.45rem 0.6rem', borderRadius: 8,
+                  border: 0, cursor: 'pointer', textAlign: 'left', font: 'inherit', color: '#fff',
+                  background: on ? 'var(--cf-accent-soft)' : 'transparent', WebkitTapHighlightColor: 'transparent',
+                }}
+              >
+                <ArtistAvatar artist={a} size={32} />
+                <span style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
+                  <span style={{ fontSize: '0.9rem', fontWeight: 600, overflowWrap: 'anywhere' }}>{a.name}</span>
+                  {a.studioType === 'guest' && <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Guest artist</span>}
+                </span>
+                {on && (
+                  <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" style={{ flexShrink: 0, color: 'var(--cf-accent)' }}>
+                    <path d="M3.5 8.5 6.5 11.5 12.5 4.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
       {artists.length === 0 && <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)' }}>No artists are available right now. Please ask at the front desk.</p>}
-    </fieldset>
+    </div>
+  );
+}
+
+function ArtistAvatar({ artist, size }) {
+  if (artist.profileImage) {
+    return <img src={artist.profileImage} alt="" style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />;
+  }
+  const initials = (artist.name || '?').split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase();
+  return (
+    <span aria-hidden="true" style={{ width: size, height: size, borderRadius: '50%', display: 'grid', placeItems: 'center', flexShrink: 0, fontSize: '0.7rem', fontWeight: 700, background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.75)' }}>{initials}</span>
   );
 }
 
@@ -982,7 +1050,7 @@ function Section({ title, children, first = false }) {
       borderTop: first ? 'none' : '1px solid rgba(255,255,255,0.06)',
       paddingTop: first ? 0 : '1.5rem',
     }}>
-      <span style={s.sectionTitle}>{title}</span>
+      {title && <span style={s.sectionTitle}>{title}</span>}
       {children}
     </div>
   );
@@ -993,7 +1061,7 @@ export default function BookingIntakePage({ mode = 'booking' }) {
   const [style, setStyle] = useState(null);
   return (
     <div style={{ ...s.page, ...formTheme(style, { card: 'rgba(255,255,255,0.03)', page: '#0e0e0e', accent: '#d5d0c7' }) }}>
-      <Suspense fallback={<p style={s.msg}>Loading…</p>}>
+      <Suspense fallback={<BrandLoader />}>
         <IntakeInner mode={mode} onStyle={setStyle} />
       </Suspense>
     </div>
