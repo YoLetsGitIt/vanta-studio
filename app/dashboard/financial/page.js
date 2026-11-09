@@ -657,7 +657,9 @@ function PayoutPanel({ artist, requirement, onClose, onPaid, onRecorded }) {
   const [error,    setError]    = useState('');
   const [history,  setHistory]  = useState(null); // null = loading
   const [deleting, setDeleting] = useState(null); // payout id being deleted
-  const [reviewOpen, setReviewOpen] = useState(false);
+  // Once there's something to review, the list stays open (it shows 'All recorded' when done).
+  const [reviewOpen] = useState(artist.incomplete_recordings > 0);
+  const locked = artist.incomplete_recordings > 0;
 
   function loadHistory() {
     getArtistPayoutHistory(artist.artist_id)
@@ -671,7 +673,7 @@ function PayoutPanel({ artist, requirement, onClose, onPaid, onRecorded }) {
   const valid  = amount > 0 && amount <= artist.outstanding + 0.001;
 
   async function handlePay() {
-    if (!valid) return;
+    if (!valid || locked) return;
     setSaving(true);
     setError('');
     try {
@@ -730,18 +732,13 @@ function PayoutPanel({ artist, requirement, onClose, onPaid, onRecorded }) {
                   ⚠ {artist.incomplete_recordings} booking{artist.incomplete_recordings > 1 ? 's' : ''} missing required payment recording{artist.incomplete_recordings > 1 ? 's' : ''}
                 </p>
                 <p style={{ margin: '0.25rem 0 0', fontSize: '0.75rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-                  Review and record missing payments before processing this payout.
+                  Record these payments below to unlock this payout.
                 </p>
               </div>
-              {!reviewOpen && (
-                <button type="button" onClick={() => setReviewOpen(true)} style={{ ...st.payBtn, alignSelf: 'flex-start' }}>
-                  Review bookings
-                </button>
-              )}
             </div>
           )}
           {reviewOpen && (
-            <MissingPayments artist={artist} requirement={requirement} onRecorded={onRecorded} onDone={() => setReviewOpen(false)} />
+            <MissingPayments artist={artist} requirement={requirement} onRecorded={onRecorded} />
           )}
           {artist.outstanding > 0 && <>
             {/* Mode toggle */}
@@ -805,11 +802,17 @@ function PayoutPanel({ artist, requirement, onClose, onPaid, onRecorded }) {
 
             <button
               onClick={handlePay}
-              disabled={!valid || saving}
-              style={{ ...st.confirmBtn, opacity: (!valid || saving) ? 0.45 : 1 }}
+              disabled={!valid || saving || locked}
+              aria-describedby={locked ? 'payout-locked-note' : undefined}
+              style={{ ...st.confirmBtn, opacity: (!valid || saving || locked) ? 0.45 : 1, cursor: locked ? 'not-allowed' : st.confirmBtn.cursor }}
             >
-              {saving ? 'Recording…' : `Record payout of ${fmt(amount)}`}
+              {saving ? 'Recording…' : locked ? 'Payout locked' : `Record payout of ${fmt(amount)}`}
             </button>
+            {locked && (
+              <p id="payout-locked-note" style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)', textAlign: 'center' }}>
+                Unlocks once every booking payment above is recorded.
+              </p>
+            )}
           </>}
 
           {/* Payout history */}
@@ -892,7 +895,7 @@ function PayoutPanel({ artist, requirement, onClose, onPaid, onRecorded }) {
 
 // Bookings missing the payment recording the studio requires, shown inside the payout
 // panel so the studio can record them before paying the artist out.
-function MissingPayments({ artist, requirement, onRecorded, onDone }) {
+function MissingPayments({ artist, requirement, onRecorded }) {
   const [entries, setEntries] = useState(null); // null = loading
   const [error, setError] = useState('');
   const [recording, setRecording] = useState(null); // entry being recorded
@@ -931,7 +934,6 @@ function MissingPayments({ artist, requirement, onRecorded, onDone }) {
     <div style={{ marginBottom: '1rem', border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', padding: '0.6rem 0.9rem', borderBottom: '1px solid var(--border-faint)' }}>
         <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text)' }}>Bookings to review</span>
-        <button type="button" onClick={onDone} style={{ background: 'none', border: 0, padding: 0, fontSize: '0.75rem', color: 'var(--text-muted)', cursor: 'pointer' }}>Hide</button>
       </div>
       {entries === null && <p style={{ margin: 0, padding: '0.9rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>Loading bookings…</p>}
       {error && <p role="alert" style={{ margin: 0, padding: '0.9rem', fontSize: '0.8rem', color: 'var(--color-danger)' }}>{error}</p>}
