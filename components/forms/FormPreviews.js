@@ -107,7 +107,7 @@ export function WidgetPreview({ bg, accent, studioName, logoUrl, fields, consent
 
         {/* Address — only when the studio asks for it */}
         {fields?.address?.enabled && (
-          <div style={fld}><span style={lbl}>Address{fields.address.required ? ' *' : ''}</span><div style={inp} /></div>
+          <AddressPreview fld={fld} lbl={lbl} inp={inp} required={fields.address.required} />
         )}
 
         {f('artist_id').enabled && (
@@ -298,7 +298,7 @@ export function WalkInPreview({ bg, accent, studioName, logoUrl, fields, consent
         {on('skin_tone') && <div style={fld}><span style={lbl}>Skin tone{req('skin_tone')}</span><div style={inp} /></div>}
         {on('size') && <div style={fld}><span style={lbl}>Size{req('size')}</span><div style={inp} /></div>}
         {on('notes') && <div style={fld}><span style={lbl}>Additional notes{req('notes')}</span><div style={{ ...inp, height: 52 }} /></div>}
-        {on('address') && <div style={fld}><span style={lbl}>Address{req('address')}</span><div style={inp} /></div>}
+        {on('address') && <AddressPreview fld={fld} lbl={lbl} inp={inp} required={Boolean(req('address'))} />}
         {on('allergies') && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0.2rem 0' }}>
             <div style={{ width: 14, height: 14, borderRadius: 3, border: '1px solid rgba(255,255,255,0.25)', background: 'rgba(255,255,255,0.05)', flexShrink: 0 }} />
@@ -431,4 +431,21 @@ function hexAlpha(hex, alpha) {
   if (!m) return `rgba(245,236,217,${alpha})`;
   const n = parseInt(m[1], 16);
   return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${alpha})`;
+}
+
+// The address as the client fills it in: street, unit, suburb, state + postcode, country.
+function AddressPreview({ fld, lbl, inp, required }) {
+  const star = required ? ' *' : '';
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <div style={fld}><span style={lbl}>Street address{star}</span><div style={inp} /></div>
+      <div style={fld}><span style={lbl}>Apartment, unit or suite</span><div style={inp} /></div>
+      <div style={fld}><span style={lbl}>Suburb or city{star}</span><div style={inp} /></div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+        <div style={fld}><span style={lbl}>State</span><div style={inp} /></div>
+        <div style={fld}><span style={lbl}>Postcode{star}</span><div style={inp} /></div>
+      </div>
+      <div style={fld}><span style={lbl}>Country</span><div style={inp} /></div>
+    </div>
+  );
 }

@@ -25,7 +25,7 @@ import Button, { IconButton } from '@/components/ui/Button';
 import BookingSMS from '@/components/BookingSMS';
 import MarketingConsent from '@/components/MarketingConsent';
 import { Pill, Section, Fact, SkeletonBar, DetailSkeleton, PanelBackdrop, detailStyles } from '@/components/ui/DetailParts';
-import ConsentSubmissionCard from '@/components/ConsentSubmissionCard';
+import ConsentSubmissionCard, { ConsentFlagNotice } from '@/components/ConsentSubmissionCard';
 import { describeAvailability } from '@/lib/availability';
 import panelLayout from '@/components/ui/DetailPanelLayout.module.css';
 
@@ -880,6 +880,7 @@ export default function BookingDetailPanel({
                           {consentStatus === 'outdated' ? `${firstName} signed an older version of your form. Send the current one before the session.` : `${firstName} hasn’t signed a consent form yet.`}
                         </p>
                       )}
+                      {!submissionsLoading && <ConsentFlagNotice submissions={sorted} />}
                       {!submissionsLoading && sorted.length > 0
                         ? <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>{shown.map(sub => <ConsentSubmissionCard key={sub.id} sub={sub} templates={consentTemplates} compact />)}</div>
                         : consent && !consentLoading && (

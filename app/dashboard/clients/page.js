@@ -14,12 +14,13 @@ import { formatDob, ageFromDob } from '@/lib/format';
 import { invalidate } from '@/lib/cache';
 import { COUNTRIES, splitPhone, joinPhone } from '@/lib/phoneCountries';
 import DateOfBirthInput from '@/components/ui/DateOfBirthInput';
+import AddressFields, { addressFrom, addressLines, addressPayload, addressProblem, formatAddress } from '@/components/forms/AddressFields';
 import { useLanguage } from '@/lib/i18n';
 import { showError } from '@/lib/feedback';
 import Button from '@/components/ui/Button';
 import { Select } from '@/components/ui/Field';
 import MarketingConsent from '@/components/MarketingConsent';
-import ConsentSubmissionCard from '@/components/ConsentSubmissionCard';
+import ConsentSubmissionCard, { ConsentFlagNotice } from '@/components/ConsentSubmissionCard';
 import ClientTemplateSend from '@/components/marketing/ClientTemplateSend';
 import { Pill, Section, Fact, SkeletonBar, DetailSkeleton, PanelBackdrop, detailStyles } from '@/components/ui/DetailParts';
 
@@ -437,13 +438,17 @@ function ContactEditor({ client, onSave, onCancel }) {
   const [phoneCountry, setPhoneCountry] = useState(initialPhone.country);
   const [phoneNumber, setPhoneNumber] = useState(initialPhone.number);
   const [dob, setDob] = useState(client.dob ? String(client.dob).slice(0, 10) : '');
-  const [address, setAddress] = useState(client.address ?? '');
+  // The address as a standard address form. Older clients may only have a one-line
+  // address (no parts); it's shown above the empty form and kept unless it's replaced.
+  const [address, setAddress] = useState(() => addressFrom(client.address_parts));
+  const [addressTouched, setAddressTouched] = useState(false);
+  const oldAddress = !client.address_parts && client.address ? client.address : '';
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const phone = joinPhone(phoneCountry, phoneNumber);
   const emailBad = email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
   const phoneBad = phoneNumber.trim() && phone.replace(/[^0-9]/g, '').length < 8;
-  const problem = !firstName.trim() ? 'Enter the client’s first name.' : emailBad ? 'Enter a valid email address.' : phoneBad ? 'Enter a valid phone number.' : '';
+  const problem = !firstName.trim() ? 'Enter the client’s first name.' : emailBad ? 'Enter a valid email address.' : phoneBad ? 'Enter a valid phone number.' : addressTouched ? addressProblem(address) : '';
   const input = { width: '100%', boxSizing: 'border-box', minHeight: 44, padding: '0.6rem 0.75rem', borderRadius: 10, border: '1px solid var(--border-strong)', background: 'var(--bg-input)', color: 'var(--text)', font: 'inherit', fontSize: '0.95rem' };
   const label = { fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-dim)' };
   const field = { display: 'flex', flexDirection: 'column', gap: '0.35rem', minWidth: 0 };
@@ -453,7 +458,7 @@ function ContactEditor({ client, onSave, onCancel }) {
     if (problem || saving) { setError(problem); return; }
     setSaving(true); setError('');
     const name = [firstName.trim(), lastName.trim()].filter(Boolean).join(' ');
-    try { await onSave({ name, email: email.trim(), phone, dob, address: address.trim() }); }
+    try { await onSave({ name, email: email.trim(), phone, dob, ...(addressTouched ? { addressParts: addressPayload(address) } : {}) }); }
     catch (e) { setError(e.message); }
     finally { setSaving(false); }
   }
@@ -479,8 +484,9 @@ function ContactEditor({ client, onSave, onCancel }) {
       </div>
       <div style={field}><span style={label}>Date of birth</span>
         <DateOfBirthInput style={input} required={false} value={dob} onChange={setDob} /></div>
-      <label style={field}><span style={label}>Address</span>
-        <input style={input} value={address} onChange={e => setAddress(e.target.value)} maxLength={300} autoComplete="off" placeholder="Street, suburb, state, postcode" /></label>
+      <AddressFields value={address} onChange={next => { setAddress(next); setAddressTouched(true); }}
+        inputStyle={input} labelStyle={label} fieldStyle={field} autoComplete={false}
+        legendExtra={oldAddress ? <span style={{ display: 'block', fontWeight: 400, color: 'var(--text-muted)', marginTop: '0.2rem' }}>Saved as “{oldAddress}”. Fill in the parts to replace it.</span> : null} />
       {error && <p role="alert" style={{ margin: 0, fontSize: '0.85rem', color: 'var(--color-danger)' }}>{error}</p>}
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
         <Button type="button" variant="secondary" size="sm" onClick={onCancel} disabled={saving}>Cancel</Button>
@@ -653,7 +659,7 @@ function ClientDetail({ client, marketing, onMarketingChange, clientKey, panelDe
           <ContactEditor
             client={client}
             onCancel={() => setEditingContact(false)}
-            onSave={async ({ address, ...fields }) => {
+            onSave={async ({ addressParts, ...fields }) => {
               let id = contactId ?? client.id;
               try {
                 await updateStudioClientContact(id, fields);
@@ -665,8 +671,9 @@ function ClientDetail({ client, marketing, onMarketingChange, clientKey, panelDe
                 setContactId(id);
                 await updateStudioClientContact(id, fields);
               }
-              if ((address ?? '') !== (client.address ?? '')) await patchStudioClient(id, { address });
-              onContactSaved?.({ name: fields.name, email: fields.email || null, phone: fields.phone || null, dob: fields.dob || null, address: address || null });
+              const addressSaved = addressParts ? { address: formatAddress(addressParts) || null, address_parts: Object.keys(addressParts).length ? addressParts : null } : {};
+              if (addressParts) await patchStudioClient(id, { address_parts: addressParts });
+              onContactSaved?.({ name: fields.name, email: fields.email || null, phone: fields.phone || null, dob: fields.dob || null, ...addressSaved });
               setEditingContact(false);
             }}
           />
@@ -682,7 +689,9 @@ function ClientDetail({ client, marketing, onMarketingChange, clientKey, panelDe
             ) : <span style={{ color: 'var(--text-muted)' }}>{t('clients_no_phone')}</span>}
           </Fact>
           {client.dob && <Fact label={t('clients_dob')}>{formatDob(String(client.dob).slice(0, 10))}{age != null ? ` (${age} yrs)` : ''}</Fact>}
-          {client.address && <Fact label="Address">{client.address}</Fact>}
+          {client.address && <Fact label="Address">{client.address_parts
+            ? addressLines(client.address_parts).map(line => <span key={line} style={{ display: 'block' }}>{line}</span>)
+            : client.address}</Fact>}
         </Section>
         )}
 
@@ -700,6 +709,7 @@ function ClientDetail({ client, marketing, onMarketingChange, clientKey, panelDe
                   {consentState === 'outdated' ? `${who} signed an older version of your form. Send the current one before their next session.` : `${who} hasn’t signed a consent form yet.`}
                 </p>
               )}
+              <ConsentFlagNotice submissions={submissions} />
               {shown.length > 0 && <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>{shown.map(sub => <ConsentSubmissionCard key={sub.id} sub={sub} templates={consentTemplates} compact />)}</div>}
               {!sorted.length && legacyConsent?.agreed_at && (
                 <span style={detailStyles.hint}>Signed {new Date(legacyConsent.agreed_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}</span>

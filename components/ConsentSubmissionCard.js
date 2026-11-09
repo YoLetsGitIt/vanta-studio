@@ -12,6 +12,31 @@ const rowStyle = { display: 'flex', alignItems: 'center', gap: '0.7rem', width: 
 const docIconStyle = { width: 32, height: 32, borderRadius: 8, display: 'grid', placeItems: 'center', flexShrink: 0, background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-dim)' };
 const signatureStyle = { maxWidth: '100%', height: 64, objectFit: 'contain', borderRadius: 6, background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', display: 'block' };
 
+// Answers that weren't the expected answer (set on Yes/No questions in the form
+// builder), from every form given, one line each: "Heart condition? Yes (expected No)".
+export function ConsentFlagNotice({ submissions = [] }) {
+  const seen = new Set();
+  const flags = submissions.flatMap(sub => sub.flags ?? []).filter(f => {
+    const key = `${f.label}|${f.answer}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  if (!flags.length) return null;
+  return (
+    <div role="note" style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', padding: '0.6rem 0.75rem', borderRadius: 10, background: 'var(--color-warning-surface)', border: '1px solid var(--color-warning-border, var(--color-warning))' }}>
+      <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--color-warning)' }}>
+        ⚠ {flags.length === 1 ? '1 answer to check' : `${flags.length} answers to check`} before the session
+      </span>
+      {flags.map(f => (
+        <span key={`${f.field_id}|${f.label}|${f.answer}`} style={{ fontSize: '0.85rem', color: 'var(--text)', lineHeight: 1.45 }}>
+          {f.label} <strong>{f.answer}</strong> <span style={{ color: 'var(--text-muted)' }}>(expected {f.expected})</span>
+        </span>
+      ))}
+    </div>
+  );
+}
+
 // One signed consent form as the client completed it: answers (with the form's own
 // question labels where the template still has them), photo ID, signatures and a PDF.
 // Shows its name and signing date; opening it shows the whole form in a window of its own,
@@ -21,6 +46,8 @@ export default function ConsentSubmissionCard({ sub, templates = [], compact = f
   const fields = templates.find(t => t.id === sub.template_id)?.fields ?? [];
   const labelFor = id => fields.find(f => f.id === id)?.label || id;
   const answers = Object.entries(sub.answers ?? {}).filter(([k, v]) => k !== '__agreed__' && v !== '' && v != null);
+  const flagFor = id => (sub.flags ?? []).find(f => f.field_id === id);
+  const flagged = (sub.flags ?? []).length;
   const [open, setOpen] = useState(false);
   const signed = `Signed ${new Date(sub.submitted_at).toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' })}${sub.signer_name ? ` by ${sub.signer_name}` : ''}`;
   const pdfName = `consent-${(sub.signer_name || 'form').replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.pdf`;
@@ -36,6 +63,7 @@ export default function ConsentSubmissionCard({ sub, templates = [], compact = f
         <span style={{ ...d.itemTitle, display: 'flex', alignItems: 'center', gap: '0.4rem', minWidth: 0 }}>
           <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sub.template_name || 'Consent form'}</span>
           {sub.is_minor && <Pill tone="warning">Minor</Pill>}
+          {flagged > 0 && <Pill tone="warning">⚠ Check {flagged === 1 ? '1 answer' : `${flagged} answers`}</Pill>}
         </span>
         <span style={{ ...d.hint, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           Signed {signedOn}{sub.signer_name ? ` · ${sub.signer_name}` : ''}
@@ -53,6 +81,7 @@ export default function ConsentSubmissionCard({ sub, templates = [], compact = f
           <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
             <span style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text)' }}>{sub.template_name || 'Consent form'}</span>
             {sub.is_minor && <Pill tone="warning">Minor</Pill>}
+            {flagged > 0 && <Pill tone="warning">⚠ Check {flagged === 1 ? '1 answer' : `${flagged} answers`}</Pill>}
           </span>
           <span style={d.hint}>{signed}</span>
         </span>
@@ -71,6 +100,7 @@ export default function ConsentSubmissionCard({ sub, templates = [], compact = f
       >
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
       {sub.is_minor && <div><Pill tone="warning">Minor</Pill></div>}
+      <ConsentFlagNotice submissions={[sub]} />
       {answers.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
           {answers.map(([k, v]) => sub.photo_id_urls?.[k] ? (
@@ -81,10 +111,11 @@ export default function ConsentSubmissionCard({ sub, templates = [], compact = f
               </a>
             </div>
           ) : (
-            <div key={k} style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
-              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{labelFor(k)}</span>
-              <span style={{ fontSize: '0.9rem', color: 'var(--text)', lineHeight: 1.5, overflowWrap: 'anywhere' }}>
+            <div key={k} style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem', ...(flagFor(k) ? { paddingLeft: '0.6rem', borderLeft: '3px solid var(--color-warning)' } : {}) }}>
+              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{flagFor(k)?.label || labelFor(k)}</span>
+              <span style={{ fontSize: '0.9rem', color: flagFor(k) ? 'var(--color-warning)' : 'var(--text)', fontWeight: flagFor(k) ? 650 : 400, lineHeight: 1.5, overflowWrap: 'anywhere' }}>
                 {String(v).startsWith('ids/') ? 'Photo ID provided' : v === true || v === 'true' ? 'Yes' : String(v)}
+                {flagFor(k) && <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}> · expected {flagFor(k).expected}</span>}
               </span>
             </div>
           ))}

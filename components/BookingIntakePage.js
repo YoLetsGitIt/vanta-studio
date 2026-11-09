@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Field from '@/components/ui/Field';
+import AddressFields, { EMPTY_ADDRESS, addressPayload, addressProblem } from '@/components/forms/AddressFields';
 import Button from '@/components/ui/Button';
 import ClientAuthGate from '@/components/ClientAuthGate';
 import ClientAccountActions from '@/components/ClientAccountActions';
@@ -120,7 +121,7 @@ function IntakeInner({ mode, onStyle }) {
   const [allergyDetails, setAllergyDetails] = useState('');
   const [notes, setNotes]           = useState('');
   // When the studio's form asks for it (kept on the client's record).
-  const [address, setAddress]       = useState('');
+  const [address, setAddress]       = useState(EMPTY_ADDRESS);
   // Weekly availability: [{ day_of_week, start_time, end_time }]
   const [availability, setAvailability] = useState([]);
   const [earliestDate, setEarliestDate] = useState('');
@@ -237,6 +238,10 @@ function IntakeInner({ mode, onStyle }) {
     if (!phoneNum.trim()) return 'Please provide your phone number.';
     if (!dob) return 'Please provide your date of birth.';
     if (walkIn && !artistId) return 'Please choose your artist.';
+    if (formConfig?.address?.enabled && field('address').enabled) {
+      const problem = addressProblem(address, field('address').required);
+      if (problem) return `Address: ${problem.charAt(0).toLowerCase()}${problem.slice(1)}`;
+    }
     if (field('body_location').enabled && placements.length === 0) return 'Please select at least one placement.';
     if (field('availability_windows').enabled && field('availability_windows').required && availability.length === 0) {
       return 'Please add at least one time you’re available.';
@@ -360,7 +365,7 @@ function IntakeInner({ mode, onStyle }) {
         color:                isPiercing ? '' : colorStyle,
         notes,
         allergies:            hasAllergies ? (allergyDetails.trim() || 'Yes') : '',
-        ...(formConfig?.address?.enabled ? { address: address.trim() } : {}),
+        ...(formConfig?.address?.enabled ? { address_parts: addressPayload(address) } : {}),
         availability_windows: field('availability_windows').enabled
           ? [...availability].sort((a, b) => a.day_of_week - b.day_of_week || a.start_time.localeCompare(b.start_time))
           : [],
@@ -476,9 +481,9 @@ function IntakeInner({ mode, onStyle }) {
               </div>
             </Field>
             {formConfig?.address?.enabled && field('address').enabled && (
-              <Field label={<>Address{field('address').required ? null : <Optional />}</>}>
-                <input style={s.input} value={address} required={field('address').required} onChange={e => setAddress(e.target.value)} maxLength={300} autoComplete="street-address" placeholder="Street, suburb, state, postcode" />
-              </Field>
+              <AddressFields value={address} onChange={setAddress} required={field('address').required}
+                inputStyle={s.input} classes={{ field: 'studio-field', label: 'studio-field-label' }}
+                legendExtra={field('address').required ? null : <Optional />} />
             )}
           </Section>
 

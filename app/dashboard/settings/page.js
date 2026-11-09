@@ -1577,6 +1577,22 @@ export default function SettingsPage() {
                             <span style={{ fontSize: '0.82rem', color: 'var(--text-ghost)' }}>Required</span>
                           </label>
                         )}
+                        {f.type === 'yesno' && (
+                          // An answer other than this one is flagged on the booking and the client.
+                          <div role="radiogroup" aria-label={`Field ${idx + 1} expected answer`} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap', marginTop: '0.35rem' }}>
+                            <span style={{ fontSize: '0.82rem', color: 'var(--text-ghost)' }}>Expected answer</span>
+                            {[['', 'Any'], ['yes', 'Yes'], ['no', 'No']].map(([value, text]) => {
+                              const on = (f.expected ?? '') === value;
+                              return (
+                                <button key={text} type="button" role="radio" aria-checked={on} onClick={() => updateField(f.id, { expected: value })}
+                                  style={{ padding: '0.2rem 0.65rem', borderRadius: 99, border: `1px solid ${on ? 'var(--accent)' : 'var(--border)'}`, background: on ? 'var(--accent-soft, var(--bg-chip))' : 'transparent', color: on ? 'var(--text)' : 'var(--text-muted)', fontSize: '0.78rem', fontWeight: on ? 650 : 500, cursor: 'pointer', fontFamily: 'inherit' }}>
+                                  {text}
+                                </button>
+                              );
+                            })}
+                            {f.expected && <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Answering {f.expected === 'yes' ? 'No' : 'Yes'} flags the booking.</span>}
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
