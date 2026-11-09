@@ -3,7 +3,8 @@
 import Dialog from '@/components/ui/Dialog';
 
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { getStudioRevenueStats, getPayoutSummaries, createPayout, deletePayout, getArtistPayoutHistory, getArtistEarningsBreakdown, getReimbursements, reviewReimbursement, getMyStudioAccount } from '@/lib/api';
+import { getStudioRevenueStats, getPayoutSummaries, createPayout, deletePayout, getArtistPayoutHistory, getArtistEarningsBreakdown, getReimbursements, reviewReimbursement, getMyStudioAccount, recordStudioBookingPayment } from '@/lib/api';
+import CompleteBookingModal from '@/components/CompleteBookingModal';
 import { getSupabase } from '@/lib/supabase';
 import { toISODate } from '@/lib/format';
 import {
@@ -219,6 +220,15 @@ export default function FinancialPage() {
       {payTarget && (
         <PayoutPanel
           artist={payTarget}
+          requirement={paymentRequirement}
+          onRecorded={() => {
+            // Refresh the counts without closing the panel.
+            getPayoutSummaries().then(d => {
+              const list = d.payouts ?? [];
+              setPayouts(list);
+              setPayTarget(pt => (pt && list.find(p => p.artist_id === pt.artist_id)) || pt);
+            }).catch(() => {});
+          }}
           onClose={() => setPayTarget(null)}
           onPaid={() => {
             getPayoutSummaries().then(d => setPayouts(d.payouts ?? [])).catch(() => {});
@@ -637,7 +647,7 @@ function PayoutsSection({ payouts, onPay, onViewEarnings }) {
 
 // ── Payout panel (modal) ──────────────────────────────────────────────────────
 
-function PayoutPanel({ artist, onClose, onPaid }) {
+function PayoutPanel({ artist, requirement, onClose, onPaid, onRecorded }) {
   const { t } = useLanguage();
   const [mode,     setMode]     = useState('full'); // 'full' | 'custom'
   const [custom,   setCustom]   = useState('');
@@ -647,6 +657,7 @@ function PayoutPanel({ artist, onClose, onPaid }) {
   const [error,    setError]    = useState('');
   const [history,  setHistory]  = useState(null); // null = loading
   const [deleting, setDeleting] = useState(null); // payout id being deleted
+  const [reviewOpen, setReviewOpen] = useState(false);
 
   function loadHistory() {
     getArtistPayoutHistory(artist.artist_id)
@@ -712,14 +723,25 @@ function PayoutPanel({ artist, onClose, onPaid }) {
             <div style={{
               background: 'rgba(245,158,58,0.08)', border: '1px solid rgba(245,158,58,0.25)',
               borderRadius: 8, padding: '0.7rem 0.9rem', marginBottom: '1rem',
+              display: 'flex', flexDirection: 'column', gap: '0.6rem',
             }}>
-              <p style={{ margin: 0, fontSize: '0.82rem', color: '#f59e3a', fontWeight: 600 }}>
-                ⚠ {artist.incomplete_recordings} booking{artist.incomplete_recordings > 1 ? 's' : ''} missing required payment recording{artist.incomplete_recordings > 1 ? 's' : ''}
-              </p>
-              <p style={{ margin: '0.25rem 0 0', fontSize: '0.75rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-                Review and record missing payments before processing this payout.
-              </p>
+              <div>
+                <p style={{ margin: 0, fontSize: '0.82rem', color: '#f59e3a', fontWeight: 600 }}>
+                  ⚠ {artist.incomplete_recordings} booking{artist.incomplete_recordings > 1 ? 's' : ''} missing required payment recording{artist.incomplete_recordings > 1 ? 's' : ''}
+                </p>
+                <p style={{ margin: '0.25rem 0 0', fontSize: '0.75rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                  Review and record missing payments before processing this payout.
+                </p>
+              </div>
+              {!reviewOpen && (
+                <button type="button" onClick={() => setReviewOpen(true)} style={{ ...st.payBtn, alignSelf: 'flex-start' }}>
+                  Review bookings
+                </button>
+              )}
             </div>
+          )}
+          {reviewOpen && (
+            <MissingPayments artist={artist} requirement={requirement} onRecorded={onRecorded} onDone={() => setReviewOpen(false)} />
           )}
           {artist.outstanding > 0 && <>
             {/* Mode toggle */}
@@ -867,6 +889,92 @@ function PayoutPanel({ artist, onClose, onPaid }) {
 }
 
 // ── Earnings breakdown panel ──────────────────────────────────────────────────
+
+// Bookings missing the payment recording the studio requires, shown inside the payout
+// panel so the studio can record them before paying the artist out.
+function MissingPayments({ artist, requirement, onRecorded, onDone }) {
+  const [entries, setEntries] = useState(null); // null = loading
+  const [error, setError] = useState('');
+  const [recording, setRecording] = useState(null); // entry being recorded
+  const [saving, setSaving] = useState(false);
+
+  function load() {
+    getArtistEarningsBreakdown(artist.artist_id)
+      .then(d => { setEntries(d.entries ?? []); setError(''); })
+      .catch(e => { setEntries([]); setError(e.message); });
+  }
+  useEffect(load, [artist.artist_id]);
+
+  const has = (e, who) => (e.splits ?? []).some(x => x.recorded_by === who);
+  const needsStudio = e => requirement !== 'artist_only' && !has(e, 'studio');
+  const needsArtist = e => (requirement === 'artist_only' || requirement === 'both') && !has(e, 'artist');
+  // Older backends don't send needs_recording; fall back to the rule without the date cut-off.
+  const missing = (entries ?? []).filter(e => (e.needs_recording ?? (needsStudio(e) || needsArtist(e))));
+
+  async function save(splits) {
+    setSaving(true);
+    try {
+      await recordStudioBookingPayment(recording.booking_id, splits);
+      setRecording(null);
+      load();
+      onRecorded?.();
+    } catch (err) {
+      showError(err);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const fmtDate = iso => iso ? new Date(iso).toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }) : 'No date';
+
+  return (
+    <div style={{ marginBottom: '1rem', border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', padding: '0.6rem 0.9rem', borderBottom: '1px solid var(--border-faint)' }}>
+        <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text)' }}>Bookings to review</span>
+        <button type="button" onClick={onDone} style={{ background: 'none', border: 0, padding: 0, fontSize: '0.75rem', color: 'var(--text-muted)', cursor: 'pointer' }}>Hide</button>
+      </div>
+      {entries === null && <p style={{ margin: 0, padding: '0.9rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>Loading bookings…</p>}
+      {error && <p role="alert" style={{ margin: 0, padding: '0.9rem', fontSize: '0.8rem', color: 'var(--color-danger)' }}>{error}</p>}
+      {entries !== null && !error && missing.length === 0 && (
+        <p style={{ margin: 0, padding: '0.9rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>All payments are recorded.</p>
+      )}
+      {missing.length > 0 && (
+        <ul style={{ listStyle: 'none', margin: 0, padding: 0, maxHeight: 280, overflowY: 'auto' }}>
+          {missing.map(e => {
+            const studioMissing = needsStudio(e);
+            const artistMissing = needsArtist(e);
+            const what = studioMissing && artistMissing ? 'Studio and artist payments not recorded'
+              : studioMissing ? 'Studio payment not recorded'
+              : 'Waiting for the artist to record their payment';
+            return (
+              <li key={e.booking_id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.65rem 0.9rem', borderTop: '1px solid var(--border-faint)' }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ margin: 0, fontSize: '0.82rem', fontWeight: 600, color: 'var(--text)', overflowWrap: 'anywhere' }}>{e.client_name || 'Client'}</p>
+                  <p style={{ margin: '0.1rem 0 0', fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+                    {fmtDate(e.chosen_time)}{e.gross != null ? ` · ${fmt(e.gross)}` : ''}
+                  </p>
+                  <p style={{ margin: '0.1rem 0 0', fontSize: '0.72rem', color: '#f59e3a' }}>{what}</p>
+                </div>
+                {studioMissing && (
+                  <button type="button" onClick={() => setRecording(e)} style={{ ...st.payBtn, flexShrink: 0, whiteSpace: 'nowrap' }}>
+                    Record payment
+                  </button>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {recording && (
+        <CompleteBookingModal mode="record" saving={saving}
+          initialPrice={recording.gross}
+          initialSplits={(recording.splits ?? []).filter(x => x.recorded_by === 'artist')}
+          onCancel={() => setRecording(null)}
+          onConfirm={(_price, splits) => save(splits)} />
+      )}
+    </div>
+  );
+}
 
 function EarningsPanel({ artist, requirement, onClose }) {
   const { t } = useLanguage();
