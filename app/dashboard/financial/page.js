@@ -699,29 +699,28 @@ function PayoutPanel({ artist, requirement, onClose, onPaid, onRecorded, onViewB
   }
 
   return (
-    <Dialog title={artist.artist_name} description={artist.outstanding > 0 ? `Outstanding: ${fmt(artist.outstanding)}` : t('revenue_all_paid')} onClose={onClose} dismissDisabled={saving || !!deleting} maxWidth={440} contentStyle={{ padding: 0 }} footer={<button type="button" style={st.payBtn} disabled={saving || !!deleting} onClick={onClose}>Close</button>}>
+    <Dialog title={artist.artist_name} description={artist.outstanding > 0 ? `${fmt(artist.outstanding)} outstanding` : t('revenue_all_paid')} onClose={onClose} dismissDisabled={saving || !!deleting} maxWidth={440} footer={<button type="button" style={st.payBtn} disabled={saving || !!deleting} onClick={onClose}>Close</button>}>
         <div style={st.panelBody}>
           {/* The detail behind the Payouts table's one line per artist. */}
-          <div style={st.panelFacts}>
-            <div style={st.panelFact}><span>Gross sales</span><span>{fmt(artist.total_earned)}</span></div>
+          <div>
+            <dl style={st.panelStats}>
+              <PanelStat label="Gross sales" value={fmt(artist.total_earned)} />
+              {artist.artist_payout != null && artist.artist_payout !== artist.total_earned && <PanelStat label="Artist payout" value={fmt(artist.artist_payout)} />}
+              {artist.reimbursed > 0 && <PanelStat label="Reimbursed" value={`+ ${fmt(artist.reimbursed)}`} />}
+              <PanelStat label="Paid" value={artist.total_paid > 0 ? fmt(artist.total_paid) : '—'} />
+            </dl>
             {artist.earned_studio > 0 && artist.earned_personal > 0 && (
-              <div style={st.panelFact}><span>Studio · personal</span><span>{fmt(artist.earned_studio)} · {fmt(artist.earned_personal)}</span></div>
+              <p style={st.panelStatNote}>Studio {fmt(artist.earned_studio)} · Personal {fmt(artist.earned_personal)}</p>
             )}
-            {artist.artist_payout != null && artist.artist_payout !== artist.total_earned && (
-              <div style={st.panelFact}><span>Artist payout</span><span>{fmt(artist.artist_payout)}</span></div>
-            )}
-            {artist.reimbursed > 0 && <div style={st.panelFact}><span>Reimbursed</span><span>+ {fmt(artist.reimbursed)}</span></div>}
-            <div style={st.panelFact}><span>Paid</span><span>{artist.total_paid > 0 ? fmt(artist.total_paid) : '—'}</span></div>
-            <button type="button" className={css.quiet} onClick={onViewBookings} disabled={saving || !!deleting} style={{ ...st.quietBtn, alignSelf: 'flex-start', marginTop: '0.2rem' }}>View bookings →</button>
           </div>
           {artist.incomplete_recordings > 0 && (
             <div style={{
-              background: 'rgba(245,158,58,0.08)', border: '1px solid rgba(245,158,58,0.25)',
-              borderRadius: 8, padding: '0.7rem 0.9rem', marginBottom: '1rem',
+              background: 'var(--color-warning-surface)', border: '1px solid var(--color-warning-border)',
+              borderRadius: 8, padding: '0.7rem 0.9rem',
               display: 'flex', flexDirection: 'column', gap: '0.6rem',
             }}>
               <div>
-                <p style={{ margin: 0, fontSize: '0.82rem', color: '#f59e3a', fontWeight: 600 }}>
+                <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--color-warning)', fontWeight: 600 }}>
                   ⚠ {artist.incomplete_recordings} booking{artist.incomplete_recordings > 1 ? 's' : ''} missing required payment recording{artist.incomplete_recordings > 1 ? 's' : ''}
                 </p>
                 <p style={{ margin: '0.25rem 0 0', fontSize: '0.75rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
@@ -809,8 +808,11 @@ function PayoutPanel({ artist, requirement, onClose, onPaid, onRecorded, onViewB
           </>}
 
           {/* Payout history */}
-          <div style={{ marginTop: artist.outstanding > 0 ? '1.5rem' : 0 }}>
-            <p style={st.historyHeading}>{t('revenue_payout_history')}</p>
+          <div>
+            <div style={st.historyHead}>
+              <p style={st.historyHeading}>{t('revenue_payout_history')}</p>
+              <button type="button" className={css.quiet} onClick={onViewBookings} disabled={saving || !!deleting} style={st.quietBtn}>View bookings →</button>
+            </div>
             {history === null && <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{t('loading')}</p>}
             {history !== null && history.length === 0 && (
               <p style={{ fontSize: '0.8rem', color: 'var(--text-ghost)' }}>{t('revenue_no_payouts')}</p>
@@ -826,6 +828,15 @@ function PayoutPanel({ artist, requirement, onClose, onPaid, onRecorded, onViewB
           </div>
         </div>
     </Dialog>
+  );
+}
+
+function PanelStat({ label, value }) {
+  return (
+    <div style={{ minWidth: 0 }}>
+      <dt style={st.panelStatLabel}>{label}</dt>
+      <dd style={st.panelStatValue}>{value}</dd>
+    </div>
   );
 }
 
@@ -1160,9 +1171,12 @@ const st = {
   missingNote: { fontSize: '0.78rem', fontWeight: 600, color: 'var(--color-warning)' },
   rowAction: { minWidth: 78, textAlign: 'center' },
   rowActionQuiet: { background: 'transparent', borderColor: 'var(--border)', color: 'var(--text-dim)' },
-  panelFacts: { display: 'flex', flexDirection: 'column', gap: '0.4rem', paddingBottom: '1rem', borderBottom: '1px solid var(--border-faint)' },
-  panelFact: { display: 'flex', justifyContent: 'space-between', gap: '1rem', fontSize: '0.85rem', color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' },
-  historyHeading: { fontSize: '0.875rem', fontWeight: 650, color: 'var(--text)', margin: '0 0 0.5rem' },
+  panelStats: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(88px, 1fr))', gap: '0.75rem', margin: 0 },
+  panelStatLabel: { fontSize: '0.8rem', color: 'var(--text-muted)' },
+  panelStatValue: { margin: '0.15rem 0 0', fontSize: '0.95rem', fontWeight: 600, color: 'var(--text)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' },
+  panelStatNote: { margin: '0.5rem 0 0', fontSize: '0.8rem', color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' },
+  historyHead: { display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '1rem', marginBottom: '0.5rem' },
+  historyHeading: { fontSize: '0.875rem', fontWeight: 650, color: 'var(--text)', margin: 0 },
   historyList: { maxHeight: 360, overflowY: 'auto', overscrollBehavior: 'contain', border: '1px solid var(--border-faint)', borderRadius: 10 },
   historyRow: { display: 'grid', gridTemplateColumns: '1fr auto 14px', alignItems: 'center', gap: '0.75rem', width: '100%', minHeight: 44, padding: '0 0.75rem', background: 'transparent', border: 0, color: 'var(--text-dim)', font: 'inherit', fontSize: '0.875rem', textAlign: 'left', cursor: 'pointer' },
   historyAmount: { color: 'var(--text)', fontWeight: 600, fontVariantNumeric: 'tabular-nums' },
@@ -1217,7 +1231,7 @@ const st = {
     background: 'none', border: 'none', color: 'var(--text-faint)',
     fontSize: '1rem', cursor: 'pointer', padding: '0.1rem 0.25rem', lineHeight: 1,
   },
-  panelBody: { padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' },
+  panelBody: { display: 'flex', flexDirection: 'column', gap: '1.25rem' },
   modeRow: { display: 'flex', gap: '0.5rem' },
   modeBtn: {
     flex: 1, padding: '0.5rem', borderRadius: 8,
