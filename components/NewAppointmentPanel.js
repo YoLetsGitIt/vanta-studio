@@ -175,6 +175,9 @@ function clockLabel(value) {
   return at.toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' });
 }
 
+const PANEL_SLIDE_MS = 250;
+const PANEL_SLIDE = `transform ${PANEL_SLIDE_MS}ms cubic-bezier(0.4,0,0.2,1)`;
+
 export default function NewAppointmentPanel({ open, onClose, onCreated, initialBookingType = 'personal', initialSlot = null }) {
   const { t } = useLanguage();
   const router = useRouter();
@@ -237,6 +240,10 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const { artists, stations: allStations, hours: studioHours, clients: pastClients, stripeConnected, loading, error: loadError, retry } = useNewAppointmentData(open);
+  // A piercing can only go to an artist who does piercings.
+  const doesPiercing = a => !a.serviceType || a.serviceType === 'piercing' || a.serviceType === 'both';
+  const artistChoices = isPiercing ? artists.filter(doesPiercing) : artists;
+  const noPiercers = isPiercing && artists.length > 0 && artistChoices.length === 0;
 
   useEffect(() => {
     if (!open) return;
@@ -495,6 +502,12 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
   }, [activeStep, open]);
   savingRef.current = saving;
 
+  // Switching to piercing drops an artist who doesn't do them.
+  useEffect(() => {
+    if (!isPiercing || !artistId) return;
+    if (!artistChoices.some(a => String(a.artistId ?? a.artist_id ?? a.id) === String(artistId))) setArtistId('');
+  }, [isPiercing, artistId, artists]); // eslint-disable-line react-hooks/exhaustive-deps
+
   function resetForm() {
     setClientMode('search');
     setClientSearch('');
@@ -512,6 +525,15 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
     setNotes(''); setError('');
   }
 
+  // The form empties once the panel has slid away, so it doesn't jump on the way out.
+  // Opening again before then empties it straight away, ready for the new appointment.
+  useEffect(() => {
+    if (open) return undefined;
+    let done = false;
+    const timer = setTimeout(() => { done = true; resetForm(); }, PANEL_SLIDE_MS);
+    return () => { clearTimeout(timer); if (!done) resetForm(); };
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+
   async function handleClose() {
     if (savingRef.current) return;
     if (dirtyRef.current) {
@@ -523,7 +545,6 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
       });
       if (!confirmed) return;
     }
-    resetForm();
     onClose();
   }
 
@@ -614,7 +635,6 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
       invalidatePrefix('bookings:');
       invalidatePrefix('schedule:');
       window.dispatchEvent(new CustomEvent('booking-created'));
-      resetForm();
       onCreated?.();
       onClose();
       const actions = [{
@@ -663,7 +683,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
         aria-hidden="true"
         style={{ ...bd.backdrop, opacity: open ? 1 : 0, pointerEvents: open ? 'auto' : 'none' }}
       />
-      <div className={`studio-appointment-panel ${styles.panel}`} ref={panelRef} role="dialog" aria-modal="true" aria-hidden={!open} aria-labelledby="new-appointment-title" style={{ ...bd.panel, transform: open ? 'translateX(0)' : 'translateX(100%)', visibility: open ? 'visible' : 'hidden' }}>
+      <div className={`studio-appointment-panel ${styles.panel}`} ref={panelRef} role="dialog" aria-modal="true" aria-hidden={!open} aria-labelledby="new-appointment-title" style={{ ...bd.panel, transform: open ? 'translateX(0)' : 'translateX(100%)', visibility: open ? 'visible' : 'hidden', transition: open ? PANEL_SLIDE : `${PANEL_SLIDE}, visibility 0s linear ${PANEL_SLIDE_MS}ms` }}>
 
         <div style={bd.header}>
           <span id="new-appointment-title" style={bd.title}>{t('nap_title')}</span>
@@ -852,13 +872,14 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
                     <label htmlFor="new-appointment-artist" style={bd.label}>{t('bdp_artist')}</label>
                     <select id="new-appointment-artist" style={bd.select} value={artistId} onChange={e => setArtistId(e.target.value)} required>
                       <option value="">{t('nap_select_artist')}</option>
-                      {artists.map(a => (
+                      {artistChoices.map(a => (
                         <option key={a.artistId ?? a.artist_id ?? a.id} value={a.artistId ?? a.artist_id ?? a.id}>{a.name}</option>
                       ))}
                     </select>
                   </div>
                 </div>
                 {artists.length === 0 && <p role="alert" style={bd.inlineError}>Add or approve an artist before creating an appointment.</p>}
+                {noPiercers && <p role="alert" style={bd.inlineError}>None of your artists do piercings yet.</p>}
                 {allStations.length === 0 && <p role="alert" style={bd.inlineError}>No active station was found. Reload the studio or add a station in Settings before creating an appointment.</p>}
               </FormSection>
 
@@ -1075,7 +1096,6 @@ const bd = {
     background: 'var(--bg-sidebar)',
     borderLeft: '1px solid var(--border)',
     display: 'flex', flexDirection: 'column',
-    transition: 'transform 0.25s cubic-bezier(0.4,0,0.2,1)',
   },
   header: {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',

@@ -617,6 +617,8 @@ textarea {
 .studio-schedule-filter-select:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
 
 /* A quiet text button for secondary actions (e.g. Cancel deposit). */
+.studio-quote-money:focus-within { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+.studio-quote-money input:focus-visible { outline: none; }
 .studio-quiet-link { color: var(--text-muted) !important; font-weight: 600; padding-inline: var(--space-2) !important; }
 @media (hover: hover) and (pointer: fine) {
   .studio-quiet-link:hover:not(:disabled) { color: var(--color-danger) !important; background: var(--color-danger-surface) !important; }

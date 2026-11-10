@@ -312,3 +312,5 @@ button.sectionHead:hover .collapseIcon { background: var(--border-strong); color
 .presets button:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 .presetName { font-size: 0.875rem; font-weight: 600; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .presetMeta { font-size: 0.78rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+
+@media (prefers-reduced-motion: reduce) { .panel { transition: none !important; } }

@@ -11,7 +11,7 @@ import CompleteBookingModal from '@/components/CompleteBookingModal';
 import { useBookingManagement } from '@/lib/bookingManagement';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { setBookingAppointmentType, getStations, getStudioArtists, getClientConsents, getNotes, addNote, deleteNote, getBookingConsentSubmissions, getClientConsentSubmissions, getStudioClients, getStudioClient, generateConsentLink, getStudioBookingPayment, recordStudioBookingPayment, getDepositReceipt, getDepositStatus, getOfferedTimes, listConsentTemplates, requestAvailability } from '@/lib/api';
+import { setBookingQuote, setBookingAppointmentType, getStations, getStudioArtists, getClientConsents, getNotes, addNote, deleteNote, getBookingConsentSubmissions, getClientConsentSubmissions, getStudioClients, getStudioClient, generateConsentLink, getStudioBookingPayment, recordStudioBookingPayment, getDepositReceipt, getDepositStatus, getOfferedTimes, listConsentTemplates, requestAvailability } from '@/lib/api';
 import { useStationAvailability } from '@/lib/useStationAvailability';
 import { statusColors, statusLabel, capitalise as cap } from '@/lib/status';
 import { formatDob as fmtDob, hasArtist, ageFromDob } from '@/lib/format';
@@ -606,21 +606,25 @@ export default function BookingDetailPanel({
   const hasMarketing = Boolean(clientProfile && clientProfile.email_marketing_opt_in !== undefined && email && clientProfile.id);
   const firstName = clientName !== '—' ? clientName.split(' ')[0] : 'Client';
   const ended = ['cancelled', 'rejected', 'declined', 'timed_out'].includes(rawStatus);
+  const wasConfirmed = ['confirmed', 'completed'].includes(rawStatus) || (ended && Boolean(booking?.confirmed_at || depositConfirmedAt));
+  // Older bookings have no confirmed_at: the deposit, or the client's claim (which confirms them), dates it.
+  const confirmedAt = booking?.confirmed_at ?? depositConfirmedAt ?? (wasConfirmed ? clientSaysPaid?.recorded_at : null) ?? null;
+  const toMinute = at => Math.floor(new Date(at).getTime() / 60000);
   const timeline = [
     createdAt && { at: createdAt, label: t('bdp_requested_at'), first: true },
     currentOffer?.email_sent_at && { at: currentOffer.email_sent_at, label: 'Times offered' },
     status === 'awaiting_payment' && updatedAt && { at: updatedAt, label: t('bdp_link_sent') },
     clientSaysPaid?.recorded_at && { at: clientSaysPaid.recorded_at, label: `${firstName} says they paid the deposit` },
     depositPaidAt && { at: depositPaidAt, label: `Deposit paid${depositPaidVia ? ` by ${depositPaidVia}` : ''}` },
-    depositConfirmedAt && { at: depositConfirmedAt, label: 'Booking confirmed' },
+    confirmedAt && { at: confirmedAt, label: 'Booking confirmed' },
     chosenTime && !ended && { at: chosenTime, label: 'Appointment' },
     booking?.artist_outcome_recorded_at && { at: booking.artist_outcome_recorded_at, label: 'Artist recorded the session' },
     outcomeAt && { at: outcomeAt, label: isNoShow ? 'Marked as no show' : 'Marked complete' },
     ended && updatedAt && { at: updatedAt, label: statusLabel(rawStatus) },
   ].filter(item => item && Number.isFinite(new Date(item.at).getTime()))
-    .sort((a, b) => (a.first ? -1 : b.first ? 1 : new Date(a.at) - new Date(b.at)));
-  const wasConfirmed = ['confirmed', 'completed'].includes(rawStatus) || (ended && Boolean(depositConfirmedAt));
-  if (wasConfirmed && !depositConfirmedAt) {
+    // Same minute keeps the order above (they said they paid, then it was confirmed).
+    .sort((a, b) => (a.first ? -1 : b.first ? 1 : toMinute(a.at) - toMinute(b.at)));
+  if (wasConfirmed && !confirmedAt) {
     // Undated: goes just before the appointment, or at the end.
     const at = timeline.findIndex(item => item.label === 'Appointment');
     timeline.splice(at < 0 ? timeline.length : at, 0, { at: null, label: 'Booking confirmed' });
@@ -796,6 +800,7 @@ export default function BookingDetailPanel({
           }[depositState];
           const price = showCompleted && finalPrice != null ? finalPrice : quote;
           const priceLabel = showCompleted && finalPrice != null ? t('bdp_final_price') : t('bdp_quoted');
+          const canEditQuote = ['confirmed', 'requires_confirmation', 'awaiting_payment'].includes(rawStatus) && !isCompleted && !showCompleted;
           // Left to pay at the appointment, once a deposit is in.
           const balance = !isCompleted && !ended && paid && quote != null && depositAmount != null && quote > depositAmount ? quote - depositAmount : null;
           const fee = paid && paidByStripe && depositAmount != null ? (Math.round(depositAmount * 0.03 * 100) + 50) / 100 : 0;
@@ -821,10 +826,20 @@ export default function BookingDetailPanel({
                   {pill && <Pill tone={pill.tone}>{pill.text}</Pill>}
                 </div>
                 <div style={p.payRows}>
-                  <div style={p.summaryRow}>
-                    <span style={p.factLabel}>{priceLabel}</span>
-                    <span style={price != null ? { ...p.factValue, ...p.factStrong } : p.summaryMuted}>{price != null ? money(price) : 'Not set'}</span>
-                  </div>
+                  {canEditQuote ? (
+                    <EditableQuote key={bookingId} label={priceLabel} value={quote} money={money} disabled={actionLoading}
+                      onSave={async value => {
+                        await setBookingQuote(bookingId, value);
+                        setQuoteOverride({ booking: bookingId, value });
+                        showFeedback('Quoted price updated', 'success');
+                        forgetBookings();
+                      }} />
+                  ) : (
+                    <div style={p.summaryRow}>
+                      <span style={p.factLabel}>{priceLabel}</span>
+                      <span style={price != null ? { ...p.factValue, ...p.factStrong } : p.summaryMuted}>{price != null ? money(price) : 'Not set'}</span>
+                    </div>
+                  )}
                   {showCompleted && finalPrice != null && quote != null && quote !== finalPrice && (
                     <div style={p.summaryRow}>
                       <span style={p.factLabel}>{t('bdp_quoted')}</span>
@@ -848,12 +863,12 @@ export default function BookingDetailPanel({
                   <p role="status" style={p.payClaim}>
                     <strong style={p.payClaimTitle}>{firstNm} says they’ve paid</strong>
                     <span style={p.payClaimMeta}>
-                      By <strong>{clientSaysPaid.method === 'payid' ? 'PayID' : 'bank transfer'}</strong> on <strong>{new Date(clientSaysPaid.recorded_at).toLocaleString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}</strong>.
+                      {clientSaysPaid.method === 'payid' ? 'PayID' : 'Bank transfer'} · {new Date(clientSaysPaid.recorded_at).toLocaleString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}
                     </span>
                   </p>
                 ) : note && <p style={{ ...p.hint, margin: 0, lineHeight: 1.45 }}>{note}</p>}
                 {canRecord && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                     <MarkDepositReceivedButton bookingId={bookingId} clientName={clientName !== '—' ? clientName : undefined} disabled={actionLoading}
                       label={clientSaysPaid ? 'Mark received' : 'Mark deposit received'}
                       onReceived={result => setReceivedDeposit({ id: bookingId, at: new Date().toISOString(), status: result?.status, method: result?.method })} />
@@ -1274,6 +1289,54 @@ export default function BookingDetailPanel({
   );
 }
 
+// The quoted price with a quiet Edit; editing happens in the row. Enter saves, Escape cancels.
+function EditableQuote({ label, value, money, disabled, onSave }) {
+  const [draft, setDraft] = useState(null); // null: not editing
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const cancel = () => { setDraft(null); setError(''); };
+  const save = async event => {
+    event.preventDefault();
+    const price = Number(draft.replace(/[$,\s]/g, ''));
+    if (!draft.trim() || !Number.isFinite(price) || price <= 0) { setError('Enter a price above $0.'); return; }
+    if (price === value) { cancel(); return; }
+    setSaving(true);
+    setError('');
+    try { await onSave(price); setDraft(null); }
+    catch (err) { setError(err.message); }
+    finally { setSaving(false); }
+  };
+  if (draft === null) {
+    return (
+      <div style={p.summaryRow}>
+        <span style={p.factLabel}>{label}</span>
+        <span style={p.quoteAmount}>
+          <span style={value != null ? { ...p.factValue, ...p.factStrong } : p.summaryMuted}>{value != null ? money(value) : 'Not set'}</span>
+          <button type="button" className="studio-quote-edit" style={p.quoteEdit} disabled={disabled} aria-label={value != null ? `Edit ${label.toLowerCase()}` : `Add ${label.toLowerCase()}`}
+            onClick={() => setDraft(value != null ? String(value) : '')}>{value != null ? 'Edit' : 'Add'}</button>
+        </span>
+      </div>
+    );
+  }
+  return (
+    <form style={p.quoteForm} onSubmit={save} onKeyDown={event => { if (event.key === 'Escape') { event.stopPropagation(); cancel(); } }}>
+      <div style={p.summaryRow}>
+        <label htmlFor="bdp-quote" style={p.factLabel}>{label}</label>
+        <span style={p.quoteFields}>
+          <span className="studio-quote-money" style={p.quoteMoney}>
+            <span aria-hidden="true" style={p.summaryMuted}>$</span>
+            <input id="bdp-quote" style={p.quoteInput} value={draft} onChange={event => { setDraft(event.target.value); setError(''); }}
+              inputMode="decimal" autoComplete="off" autoFocus onFocus={event => event.target.select()} disabled={saving} aria-invalid={Boolean(error)} />
+          </span>
+          <Button type="submit" size="sm" disabled={saving}>{saving ? 'Saving…' : 'Save'}</Button>
+          <Button type="button" size="sm" variant="ghost" disabled={saving} onClick={cancel}>Cancel</Button>
+        </span>
+      </div>
+      {error && <p role="alert" style={p.quoteError}>{error}</p>}
+    </form>
+  );
+}
+
 // Loading placeholder in the shape of the loaded panel (appointment, payment and consent,
 // then the booking and its timeline side by side), so nothing jumps when it arrives.
 function BookingSkeleton({ label }) {
@@ -1370,9 +1433,16 @@ const p = {
   heroStation: { fontSize: '0.8rem', color: 'var(--text-muted)' },
   heroRelative: { fontSize: '0.75rem', fontWeight: 700, color: 'var(--color-info)', background: 'var(--color-info-surface)', padding: '0.05rem 0.45rem', borderRadius: 99 },
   payRows: { display: 'flex', flexDirection: 'column', gap: '0.55rem' },
-  payClaim: { margin: 0, padding: '0.1rem 0 0.1rem 0.75rem', borderLeft: '3px solid var(--color-warning)', display: 'flex', flexDirection: 'column', gap: '0.2rem', lineHeight: 1.45 },
-  payClaimTitle: { color: 'var(--text)', fontSize: '0.95rem', fontWeight: 650 },
-  payClaimMeta: { color: 'var(--text)', fontSize: '0.9rem', fontWeight: 400 },
+  payClaim: { margin: 0, paddingTop: '0.7rem', borderTop: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '0.15rem', lineHeight: 1.4 },
+  payClaimTitle: { color: 'var(--text)', fontSize: '0.92rem', fontWeight: 600 },
+  payClaimMeta: { color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 400 },
+  quoteAmount: { display: 'inline-flex', alignItems: 'baseline', gap: '0.5rem' },
+  quoteEdit: { background: 'none', border: 0, padding: '0.1rem 0.15rem', margin: 0, cursor: 'pointer', color: 'var(--text-muted)', fontFamily: 'inherit', fontSize: '0.82rem', fontWeight: 600, textDecoration: 'underline', textUnderlineOffset: 2 },
+  quoteForm: { display: 'flex', flexDirection: 'column', gap: '0.35rem' },
+  quoteFields: { display: 'inline-flex', alignItems: 'center', gap: '0.35rem' },
+  quoteMoney: { display: 'inline-flex', alignItems: 'center', gap: '0.2rem', padding: '0 0.55rem', height: 34, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)' },
+  quoteInput: { width: '5.5rem', border: 0, outline: 'none', background: 'transparent', color: 'var(--text)', fontFamily: 'inherit', fontSize: 16, fontWeight: 600, textAlign: 'right', padding: 0 },
+  quoteError: { margin: 0, textAlign: 'right', color: 'var(--color-danger)', fontSize: '0.82rem' },
   payBalance: { paddingTop: '0.55rem', borderTop: '1px dashed var(--border)' },
   typeTag: { display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-dim)', padding: '0.2rem 0.6rem', borderRadius: 20, border: '1px solid var(--border)', background: 'var(--bg-card)', whiteSpace: 'nowrap' },
   typeDot: { width: 8, height: 8, borderRadius: '50%', flexShrink: 0, boxSizing: 'border-box' },
