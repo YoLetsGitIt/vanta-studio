@@ -1,6 +1,6 @@
 'use client';
 
-// An artist's performance, opened from Financial → Artists & Payouts: each number from the
+// An artist's performance, opened from Financial → Performance: each number from the
 // Artists table against the studio and the previous period, the sales trend, where bookings come from, their busiest
 // days and their clients. The date range here doesn't affect the page behind.
 import { useEffect, useMemo, useState } from 'react';

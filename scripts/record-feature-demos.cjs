@@ -58,7 +58,7 @@ const demos=[
   ['See their sessions and revenue at a glance.',async p=>{await point(p,p.getByText('Total sessions',{exact:true}));}],
   ['Manage the timetable behind their availability.',async p=>{await point(p,p.getByRole('button',{name:'Edit',exact:true}),true);await point(p,p.getByLabel('Mon start time'));}],
  ]},
- {id:'payouts',title:'Artist earnings & payouts',route:'financial.html',setup:async p=>{await p.getByRole('button',{name:'Artists & Payouts',exact:true}).click();return p.locator('.studio-financial-page')},steps:[
+ {id:'payouts',title:'Artist earnings & payouts',route:'financial.html',setup:async p=>{await p.getByRole('button',{name:/^Payouts/}).click();return p.locator('.studio-financial-page')},steps:[
   ['See earnings, paid amounts and outstanding balances.',async p=>{await point(p,p.getByRole('button',{name:'View payout history for Alex Morgan',exact:true}));}],
   ['Open an artist’s payout record.',async p=>{await point(p,p.getByRole('button',{name:'View payout history for Alex Morgan',exact:true}),true);await focus(p,p.locator('dialog[open]'));}],
   ['Keep the payment method and history together.',async p=>{await point(p,p.getByRole('combobox',{name:'Payout method',exact:true}));}],

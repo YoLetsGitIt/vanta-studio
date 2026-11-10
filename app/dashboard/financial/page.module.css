@@ -1,10 +1,10 @@
-/* Artists & Payouts tables. */
+/* Payouts and Performance tables. */
 .row { transition: background-color 150ms ease; }
 @media (hover: hover) and (pointer: fine) {
   .row:hover { background: var(--bg-row-hover); }
-  .name:hover, .quiet:hover { color: var(--text); text-decoration: underline; text-underline-offset: 2px; }
+  .quiet:hover { color: var(--text); text-decoration: underline; text-underline-offset: 2px; }
 }
-.name:focus-visible, .quiet:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; border-radius: 3px; }
+.quiet:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; border-radius: 3px; }
 .actions { display: inline-flex; align-items: center; justify-content: flex-end; gap: 0.85rem; }
 /* Keeps History in line on rows with no payment button. */
 .actionSlot { display: inline-block; width: 78px; }
@@ -17,11 +17,11 @@
 @media (hover: hover) and (pointer: fine) { .historyRow:hover { background: var(--bg-row-hover) !important; } }
 @media (prefers-reduced-motion: reduce) { .chevron { transition: none; } }
 
-/* The Artists table has the most columns: closer together, and the extras go first as room runs out. */
+/* The Performance table has the most columns: closer together, and the extras go first as room runs out. */
 .tight th, .tight td { padding-inline: 0.7rem; }
 .tight th:first-child, .tight td:first-child { padding-left: 1rem; }
 .tight th:last-child, .tight td:last-child { padding-right: 1rem; }
-@media (max-width: 1279px) { .wider { display: none; } }
+@media (max-width: 1023px) { .wider { display: none; } }
 @media (max-width: 860px) { .tight .wide { display: none; } }
 
 .bookingLink:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; border-radius: 4px; }
@@ -42,8 +42,10 @@
 @keyframes payoutBookingIn { from { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .payoutDialog { transition: none; } .payoutBooking { animation: none; } }
 
-/* On a phone: who, how much is owed, and what to do. The rest is in the artist's panel. */
+/* On a phone: who, how much is owed, and what to do. The rest is in the artist's panel.
+   Lock moves up beside the title so the three tabs keep one line. */
 @media (max-width: 760px) {
+  .lock { position: absolute; top: 0.6rem; right: 1rem; }
   .wide { display: none; }
   .actionSlot { display: none; }
   .compact th, .compact td { padding-inline: 0.6rem !important; }

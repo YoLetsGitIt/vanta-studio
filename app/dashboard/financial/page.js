@@ -20,7 +20,7 @@ import { requestConfirmation, showError } from '@/lib/feedback';
 import { getBookingSourceLabel } from '@/lib/bookingType';
 import css from './page.module.css';
 
-// This entire page (Financial + Artists & Payouts) is password-protected, but
+// This entire page (Financial, Payouts and Performance) is password-protected, but
 // only for the initial entry each browser session — unlock state persists in
 // sessionStorage so navigating away and back doesn't re-prompt. It re-locks
 // on "Lock" or once the browser tab is closed.
@@ -57,13 +57,14 @@ export default function FinancialPage() {
   const [startDate,   setStartDate]   = useState(() => dateFromDaysAgo(7));
   const [endDate,     setEndDate]     = useState(today);
   const [activeQuick, setActiveQuick] = useState('1w');
-  const [tab,         setTab]         = useState('financial'); // 'financial' | 'artists'
+  const [tab,         setTab]         = useState('financial'); // 'financial' | 'payouts' | 'performance'
   const [unlocked,    setUnlocked]    = useState(false);
   const [userEmail,   setUserEmail]   = useState('');
   const [stats,       setStats]       = useState(null);
   const [loading,     setLoading]     = useState(true);
   const [error,       setError]       = useState('');
   const [payouts,      setPayouts]      = useState([]);
+  const [payoutsReady, setPayoutsReady] = useState(false);
   const [reimbursements, setReimbursements] = useState([]);
   const [reviewingReimbursement, setReviewingReimbursement] = useState(null); // id being reviewed
   const [payTarget,    setPayTarget]    = useState(null); // ArtistPayoutSummary open in the panel
@@ -101,6 +102,7 @@ export default function FinancialPage() {
     Promise.all([getPayoutSummaries(), getReimbursements(), getMyStudioAccount()])
       .then(([payoutData, reimbursementData, accountData]) => {
         setPayouts(payoutData.payouts ?? []);
+        setPayoutsReady(true);
         setReimbursements(reimbursementData.reimbursements ?? []);
         setPaymentRequirement(accountData.studio?.payment_recording_requirement ?? 'studio_only');
       })
@@ -193,9 +195,9 @@ export default function FinancialPage() {
   const weeklyChart = salesChart.rows;
 
   const s = stats?.summary;
+  const toPay = payouts.filter(p => p.outstanding > 0).length;
 
-  // On the Financial tab they set the whole page. On Artists & Payouts only Artist
-  // performance uses them (payouts are all-time), so they sit beside that table.
+  // For the Financial and Performance tabs. Payouts are always all-time, so they have none.
   const dateControls = (
     <div className="studio-report-controls" style={st.controls}>
       <div style={st.quickPicker}>
@@ -231,7 +233,7 @@ export default function FinancialPage() {
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div className="studio-feature-header" style={st.header}>
         <h1 style={st.title}>{t('revenue_financial')}</h1>
-        {tab === 'financial' && dateControls}
+        {tab !== 'payouts' && dateControls}
       </div>
 
       {/* ── Tab bar ────────────────────────────────────────────────────────── */}
@@ -240,11 +242,15 @@ export default function FinancialPage() {
           style={{ ...st.tabBtn, ...(tab === 'financial' ? st.tabActive : {}) }}>
           {t('revenue_financial')}
         </button>
-        <button aria-pressed={tab === 'artists'} onClick={() => setTab('artists')}
-          style={{ ...st.tabBtn, ...(tab === 'artists' ? st.tabActive : {}) }}>
-          Artists & Payouts
+        <button aria-pressed={tab === 'payouts'} onClick={() => setTab('payouts')} aria-label={toPay > 0 ? `Payouts, ${toPay} to pay` : 'Payouts'}
+          style={{ ...st.tabBtn, ...(tab === 'payouts' ? st.tabActive : {}) }}>
+          Payouts{toPay > 0 && <span style={st.tabCount}>{toPay}</span>}
         </button>
-        <button onClick={handleLock} style={st.lockBtn} title="Lock">
+        <button aria-pressed={tab === 'performance'} onClick={() => setTab('performance')}
+          style={{ ...st.tabBtn, ...(tab === 'performance' ? st.tabActive : {}) }}>
+          Performance
+        </button>
+        <button onClick={handleLock} className={css.lock} style={st.lockBtn} title="Lock">
           {t('revenue_lock')}
         </button>
       </div>
@@ -301,16 +307,20 @@ export default function FinancialPage() {
           <FinancialContent s={s} weeklyChart={weeklyChart} daily={salesChart.daily} startDate={startDate} endDate={endDate} isLight={isLight} />
         )}
 
-        {tab === 'artists' && (
+        {tab === 'payouts' && (
           <>
-            <ArtistsSection payouts={payouts} stats={stats} loading={loading} controls={dateControls}
-              onPay={p => { setPanelView('pay'); setPayTarget(p); }} onHistory={p => { setPanelView('history'); setPayTarget(p); }} onPerformance={setPerformanceTarget} />
+            <PayoutsSection payouts={payouts} ready={payoutsReady}
+              onPay={p => { setPanelView('pay'); setPayTarget(p); }} onHistory={p => { setPanelView('history'); setPayTarget(p); }} />
             <ReimbursementsSection
               reimbursements={reimbursements}
               reviewingId={reviewingReimbursement}
               onReview={handleReviewReimbursement}
             />
           </>
+        )}
+
+        {tab === 'performance' && (
+          <PerformanceSection payouts={payouts} stats={stats} loading={loading} onOpen={setPerformanceTarget} />
         )}
       </div>
     </div>
@@ -572,81 +582,57 @@ function ReimbursementsSection({ reimbursements, reviewingId, onReview }) {
   );
 }
 
-// ── Artists ───────────────────────────────────────────────────────────────────
+// ── Payouts ───────────────────────────────────────────────────────────────────
 
-// One row per artist. Everything but Owed follows the date range; Owed is always the
-// current all-time total. On narrower screens the panel has the columns that don't fit.
-function ArtistsSection({ payouts, stats, loading, controls, onPay, onHistory, onPerformance }) {
+// Who to pay, always all-time: ready to pay first, then needs review, then settled.
+function PayoutsSection({ payouts, ready, onPay, onHistory }) {
   const { t } = useLanguage();
-  const byArtist = new Map((stats?.by_artist ?? []).map(a => [a.artist_id, a]));
-  const seen = new Set(payouts.map(p => p.artist_id));
-  const list = [
-    ...payouts.map(p => ({ id: p.artist_id, name: p.artist_name, payout: p, period: byArtist.get(p.artist_id) })),
-    // Sold in this period but with nothing on the payout list.
-    ...(stats?.by_artist ?? []).filter(a => !seen.has(a.artist_id)).map(a => ({ id: a.artist_id, name: a.artist_name, payout: null, period: a })),
-  ];
-  // One order to scan: ready to pay, then needs review, then settled. Most owed first in each.
-  const stage = ({ payout: p }) => (p?.outstanding > 0 ? (p.incomplete_recordings > 0 ? 1 : 0) : 2);
-  const owedOf = r => r.payout?.outstanding ?? 0;
-  const rows = [...list].sort((a, b) => stage(a) - stage(b) || owedOf(b) - owedOf(a) || (b.period?.gross_sales ?? 0) - (a.period?.gross_sales ?? 0));
-  const owed = rows.filter(r => owedOf(r) > 0);
-  const totalOwed = owed.reduce((sum, r) => sum + owedOf(r), 0);
+  const stage = p => (p.outstanding > 0 ? (p.incomplete_recordings > 0 ? 1 : 0) : 2);
+  const rows = [...payouts].sort((a, b) => stage(a) - stage(b) || b.outstanding - a.outstanding);
+  const owed = rows.filter(p => p.outstanding > 0);
+  const totalOwed = owed.reduce((sum, p) => sum + p.outstanding, 0);
   const middle = { verticalAlign: 'middle' };
-  const num = { ...st.td, ...st.num, ...middle };
+  const paidOn = iso => new Date(iso).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
   return (
-    <Section title="Artists" aside={controls}>
+    <Section title="Artists to pay">
       {rows.length === 0 ? (
-        !loading && <p style={st.msg}>No artist sales or payouts yet.</p>
+        ready && <p style={st.msg}>No payouts yet.</p>
       ) : <>
         <p style={{ ...st.sectionMeta, margin: 0 }}>
           {owed.length > 0
             ? <><strong style={{ color: 'var(--text)', fontWeight: 650 }}>{fmt(totalOwed)}</strong> owed to {owed.length} artist{owed.length > 1 ? 's' : ''}</>
             : 'Everyone is paid up'}
-          <span role="status" style={{ marginLeft: '0.75rem' }}>{loading ? 'Updating sales…' : ''}</span>
         </p>
-        <div aria-busy={loading} style={st.tableCard}>
+        <div style={st.tableCard}>
           <div style={st.tableScroll}>
-            <table className={`${css.compact} ${css.tight}`} style={st.tableFlat}>
+            <table className={css.compact} style={st.tableFlat}>
               <thead>
                 <tr>
                   <th style={st.th}>{t('revenue_artist')}</th>
-                  <th style={{ ...st.th, ...st.num }} className={css.wide}>{t('revenue_tattoos')}</th>
-                  <th style={{ ...st.th, ...st.num }} className={css.wide}>{t('revenue_gross_sales')}</th>
-                  <th style={{ ...st.th, ...st.num }} className={css.wider}>{t('revenue_avg_ticket')}</th>
-                  <th style={{ ...st.th, ...st.num }} className={css.wider}>Deposits</th>
-                  <th style={{ ...st.th, ...st.num }} className={css.wider} title={t('revenue_hours_note')}>{t('revenue_hours')}</th>
-                  <th style={{ ...st.th, ...st.num }} className={css.wider}>{t('revenue_sales_hr')}</th>
-                  <th style={{ ...st.th, ...st.num }} title="Everything still to be paid, whatever dates are selected">Owed <span style={{ fontWeight: 500 }}>(all time)</span></th>
+                  <th style={st.th} className={css.wide}>Last payout</th>
+                  <th style={{ ...st.th, ...st.num }}>Owed</th>
                   <th style={st.th}><span style={st.srOnly}>Actions</span></th>
                 </tr>
               </thead>
               <tbody>
-                {rows.map((r, i) => {
-                  const p = r.payout;
-                  const missing = p?.incomplete_recordings > 0;
-                  const label = p?.outstanding > 0 ? (missing ? 'Review' : 'Pay out') : null;
+                {rows.map((p, i) => {
+                  const missing = p.incomplete_recordings > 0;
+                  const label = p.outstanding > 0 ? (missing ? 'Review' : 'Pay out') : null;
                   return (
-                    <tr key={r.id} className={css.row} style={{ ...(i < rows.length - 1 ? st.tr : {}), cursor: 'pointer' }} onClick={() => onPerformance({ artist_id: r.id, artist_name: r.name, outstanding: p?.outstanding ?? null })}>
+                    <tr key={p.artist_id} className={css.row} style={{ ...(i < rows.length - 1 ? st.tr : {}), cursor: 'pointer' }} onClick={() => onHistory(p)}>
                       <td style={{ ...st.tdName, ...middle }}>
                         <span style={st.nameLine}>
-                          <button type="button" className={css.name} onClick={e => { e.stopPropagation(); onPerformance({ artist_id: r.id, artist_name: r.name, outstanding: p?.outstanding ?? null }); }} aria-label={`Performance for ${r.name}`} style={st.artistLink}>{r.name}</button>
+                          <span>{p.artist_name}</span>
                           {missing && <span style={st.missingNote}>{p.incomplete_recordings} payment{p.incomplete_recordings > 1 ? 's' : ''} not recorded</span>}
                         </span>
                       </td>
-                      {/* These follow the date range, so only these show as loading. */}
-                      <td style={num} className={css.wide}>{loading ? <LoadingCell w={24} /> : (r.period?.session_count || '—')}</td>
-                      <td style={num} className={css.wide}>{loading ? <LoadingCell w={56} /> : (r.period ? fmtWhole(r.period.gross_sales) : '—')}</td>
-                      <td style={num} className={css.wider}>{loading ? <LoadingCell w={40} /> : (r.period ? fmtWhole(r.period.avg_ticket) : '—')}</td>
-                      <td style={num} className={css.wider}>{loading ? <LoadingCell w={40} /> : (r.period ? fmtWhole(r.period.deposits_collected) : '—')}</td>
-                      <td style={num} className={css.wider}>{loading ? <LoadingCell w={32} /> : (r.period ? fmtHours(r.period.estimated_hours) : '—')}</td>
-                      <td style={num} className={css.wider}>{loading ? <LoadingCell w={40} /> : (r.period?.sales_per_hour > 0 ? fmtWhole(r.period.sales_per_hour) : '—')}</td>
-                      <td style={{ ...num, fontWeight: 650, color: owedOf(r) > 0 ? 'var(--text)' : 'var(--text-muted)' }}>{p ? fmt(p.outstanding) : '—'}</td>
+                      <td style={{ ...st.td, ...middle, color: 'var(--text-muted)', whiteSpace: 'nowrap' }} className={css.wide}>{p.last_paid_at ? paidOn(p.last_paid_at) : '—'}</td>
+                      <td style={{ ...st.td, ...st.num, ...middle, fontWeight: 650, color: p.outstanding > 0 ? 'var(--text)' : 'var(--text-muted)' }}>{fmt(p.outstanding)}</td>
                       <td style={{ ...st.tdActions, ...middle }}>
                         <span className={css.actions}>
-                          <button type="button" className={css.quiet} onClick={e => { e.stopPropagation(); onPerformance({ artist_id: r.id, artist_name: r.name, outstanding: p?.outstanding ?? null }); }} aria-label={`Performance for ${r.name}`} style={st.quietBtn}>Performance</button>
-                          {p && <button type="button" className={css.quiet} onClick={e => { e.stopPropagation(); onHistory(p); }} aria-label={`Payout history for ${r.name}`} style={st.quietBtn}>History</button>}
+                          <button type="button" className={css.quiet} onClick={e => { e.stopPropagation(); onHistory(p); }} aria-label={`Payout history for ${p.artist_name}`} style={st.quietBtn}>History</button>
                           {label
-                            ? <button type="button" onClick={e => { e.stopPropagation(); onPay(p); }} aria-label={`${label}: ${r.name}`}
+                            ? <button type="button" onClick={e => { e.stopPropagation(); onPay(p); }} aria-label={`${label}: ${p.artist_name}`}
                                 style={{ ...st.payBtn, ...st.rowAction, ...(label === 'Pay out' ? {} : st.rowActionQuiet) }}>{label}</button>
                             : <span aria-hidden="true" className={css.actionSlot} />}
                         </span>
@@ -654,6 +640,69 @@ function ArtistsSection({ payouts, stats, loading, controls, onPay, onHistory, o
                     </tr>
                   );
                 })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </>}
+    </Section>
+  );
+}
+
+// ── Performance ───────────────────────────────────────────────────────────────
+
+// Each artist over the selected dates, best sellers first. Opens the artist's Performance
+// pop-up; on narrower screens that has the columns that don't fit.
+function PerformanceSection({ payouts, stats, loading, onOpen }) {
+  const { t } = useLanguage();
+  const byArtist = new Map((stats?.by_artist ?? []).map(a => [a.artist_id, a]));
+  const owedTo = new Map(payouts.map(p => [p.artist_id, p.outstanding]));
+  const seen = new Set(byArtist.keys());
+  const rows = [
+    ...(stats?.by_artist ?? []).map(a => ({ id: a.artist_id, name: a.artist_name })),
+    ...payouts.filter(p => !seen.has(p.artist_id)).map(p => ({ id: p.artist_id, name: p.artist_name })),
+  ].map(r => ({ ...r, period: byArtist.get(r.id) }))
+    .sort((a, b) => (b.period?.gross_sales ?? 0) - (a.period?.gross_sales ?? 0) || a.name.localeCompare(b.name));
+  const middle = { verticalAlign: 'middle' };
+  const num = { ...st.td, ...st.num, ...middle };
+  const open = r => onOpen({ artist_id: r.id, artist_name: r.name, outstanding: owedTo.get(r.id) ?? null });
+  const cell = (r, w, value) => (loading ? <LoadingCell w={w} /> : (r.period ? value(r.period) : '—'));
+  return (
+    <Section title="Sales by artist">
+      {rows.length === 0 ? (
+        !loading && <p style={st.msg}>No artist sales in these dates.</p>
+      ) : <>
+        <span role="status" style={st.srOnly}>{loading ? 'Updating sales…' : ''}</span>
+        <div aria-busy={loading} style={st.tableCard}>
+          <div style={st.tableScroll}>
+            <table className={`${css.compact} ${css.tight}`} style={st.tableFlat}>
+              <thead>
+                <tr>
+                  <th style={st.th}>{t('revenue_artist')}</th>
+                  <th style={{ ...st.th, ...st.num }} className={css.wide}>{t('revenue_tattoos')}</th>
+                  <th style={{ ...st.th, ...st.num }}>{t('revenue_gross_sales')}</th>
+                  <th style={{ ...st.th, ...st.num }} className={css.wider}>{t('revenue_avg_ticket')}</th>
+                  <th style={{ ...st.th, ...st.num }} className={css.wider}>Deposits</th>
+                  <th style={{ ...st.th, ...st.num }} className={css.wider} title={t('revenue_hours_note')}>{t('revenue_hours')}</th>
+                  <th style={{ ...st.th, ...st.num }} className={css.wider}>{t('revenue_sales_hr')}</th>
+                  <th style={st.th}><span style={st.srOnly}>Actions</span></th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r, i) => (
+                  <tr key={r.id} className={css.row} style={{ ...(i < rows.length - 1 ? st.tr : {}), cursor: 'pointer' }} onClick={() => open(r)}>
+                    <td style={{ ...st.tdName, ...middle }}>{r.name}</td>
+                    <td style={num} className={css.wide}>{cell(r, 24, a => a.session_count || '—')}</td>
+                    <td style={{ ...num, fontWeight: 650 }}>{cell(r, 56, a => fmtWhole(a.gross_sales))}</td>
+                    <td style={num} className={css.wider}>{cell(r, 40, a => fmtWhole(a.avg_ticket))}</td>
+                    <td style={num} className={css.wider}>{cell(r, 40, a => fmtWhole(a.deposits_collected))}</td>
+                    <td style={num} className={css.wider}>{cell(r, 32, a => fmtHours(a.estimated_hours))}</td>
+                    <td style={num} className={css.wider}>{cell(r, 40, a => (a.sales_per_hour > 0 ? fmtWhole(a.sales_per_hour) : '—'))}</td>
+                    <td style={{ ...st.tdActions, ...middle }}>
+                      <button type="button" className={css.quiet} onClick={e => { e.stopPropagation(); open(r); }} aria-label={`Performance for ${r.name}`} style={st.quietBtn}>View</button>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
@@ -1126,7 +1175,7 @@ function EarningsPanel({ artist, requirement, onClose }) {
 // ── Styles ────────────────────────────────────────────────────────────────────
 
 const st = {
-  page:    { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' },
+  page:    { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' },
   header:  {
     padding: '1.25rem 2rem', borderBottom: '1px solid var(--border-faint)',
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -1162,7 +1211,8 @@ const st = {
     fontSize: '0.95rem', fontWeight: 500, color: 'var(--text-dim)',
     cursor: 'pointer', transition: 'color 0.12s',
   },
-  tabActive: { color: 'var(--text)', borderBottomColor: 'var(--accent)' },
+  tabCount: { display: 'inline-block', marginLeft: '0.4rem', minWidth: '1.15rem', padding: '0 0.3rem', borderRadius: 999, background: 'var(--color-warning-surface)', color: 'var(--color-warning)', fontSize: '0.72rem', fontWeight: 700, lineHeight: '1.15rem', textAlign: 'center' },
+  tabActive: { color: 'var(--text)', borderBottom: '2px solid var(--accent)' },
   lockBtn: {
     marginLeft: 'auto', padding: '0.4rem 0.85rem', borderRadius: 8,
     border: '1px solid var(--border-strong)', background: 'transparent',
@@ -1248,10 +1298,6 @@ const st = {
     padding: '0.3rem 0.75rem', borderRadius: 6,
     border: '1px solid var(--accent-tint-border)', background: 'var(--accent-tint)',
     color: 'var(--accent)', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer',
-  },
-  artistLink: {
-    background: 'transparent', color: 'inherit', font: 'inherit', textAlign: 'left', border: 0,
-    cursor: 'pointer', padding: 0,
   },
   paidBadge: {
     display: 'inline-flex', alignItems: 'center', gap: '0.3rem',

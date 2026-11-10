@@ -895,8 +895,9 @@ export default function BookingDetailPanel({
                     const needsForm = email && !loading && (consentStatus === 'none' || consentStatus === 'outdated');
                     return <>
                       {needsForm && (
-                        <p style={{ ...p.hint, margin: 0, lineHeight: 1.45 }}>
-                          {consentStatus === 'outdated' ? `${firstName} signed an older version of your form. Send the current one before the session.` : `${firstName} hasn’t signed a consent form yet.`}
+                        <p style={p.consentNeed}>
+                          <strong style={p.payClaimTitle}>{consentStatus === 'outdated' ? 'Signed an older form' : 'No form signed yet'}</strong>
+                          <span style={p.payClaimMeta}>Send {firstName} {consentStatus === 'outdated' ? 'the current version' : 'the link'} to sign{apptPassed || isCompleted ? '' : ' before the session'}.</span>
                         </p>
                       )}
                       {!submissionsLoading && <ConsentFlagNotice submissions={sorted} />}
@@ -906,17 +907,17 @@ export default function BookingDetailPanel({
                           <span style={p.hint}>Signed {new Date(consent.agreed_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
                         )}
                       {(needsForm || earlier > 0) && (
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
-                          {earlier > 0 ? (
-                            <button type="button" onClick={toggleOlderForms} disabled={consentMore?.loading} style={p.textLink} aria-expanded={showOlderForms}>
-                              {consentMore?.loading ? 'Loading…' : showOlderForms ? 'Hide earlier forms' : `Show ${earlier} earlier form${earlier === 1 ? '' : 's'}`}
-                            </button>
-                          ) : <span />}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
                           {needsForm && (
                             <Button variant="secondary" size="sm" onClick={() => handleSendConsentLink('__inline__')}
                               loading={linkGeneratingId === '__inline__'} loadingLabel="Sending…" disabled={linkSentId === '__inline__'}>
                               {linkSentId === '__inline__' ? 'Link sent ✓' : 'Send consent link'}
                             </Button>
+                          )}
+                          {earlier > 0 && (
+                            <button type="button" onClick={toggleOlderForms} disabled={consentMore?.loading} style={p.textLink} aria-expanded={showOlderForms}>
+                              {consentMore?.loading ? 'Loading…' : showOlderForms ? 'Hide earlier forms' : `Show ${earlier} earlier form${earlier === 1 ? '' : 's'}`}
+                            </button>
                           )}
                         </div>
                       )}
@@ -1436,6 +1437,7 @@ const p = {
   payClaim: { margin: 0, paddingTop: '0.7rem', borderTop: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '0.15rem', lineHeight: 1.4 },
   payClaimTitle: { color: 'var(--text)', fontSize: '0.92rem', fontWeight: 600 },
   payClaimMeta: { color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 400 },
+  consentNeed: { margin: 0, display: 'flex', flexDirection: 'column', gap: '0.15rem', lineHeight: 1.4 },
   quoteAmount: { display: 'inline-flex', alignItems: 'baseline', gap: '0.5rem' },
   quoteEdit: { background: 'none', border: 0, padding: '0.1rem 0.15rem', margin: 0, cursor: 'pointer', color: 'var(--text-muted)', fontFamily: 'inherit', fontSize: '0.82rem', fontWeight: 600, textDecoration: 'underline', textUnderlineOffset: 2 },
   quoteForm: { display: 'flex', flexDirection: 'column', gap: '0.35rem' },
