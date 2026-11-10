@@ -232,6 +232,8 @@ export default function FinancialPage() {
       {payTarget && (
         <PayoutPanel
           artist={payTarget}
+          period={stats?.by_artist?.find(a => a.artist_id === payTarget.artist_id) ?? null}
+          periodLabel={rangeLabel(startDate, endDate)}
           requirement={paymentRequirement}
           onRecorded={() => {
             // Refresh the counts without closing the panel.
@@ -268,16 +270,14 @@ export default function FinancialPage() {
           <FinancialContent s={s} weeklyChart={weeklyChart} daily={salesChart.daily} startDate={startDate} endDate={endDate} isLight={isLight} />
         )}
 
-        {/* What needs doing first, then the reporting. Payouts don't wait for the date range. */}
         {tab === 'artists' && (
           <>
-            <PayoutsSection payouts={payouts} onPay={setPayTarget} />
+            <ArtistsSection payouts={payouts} stats={stats} loading={loading} controls={dateControls} onPay={setPayTarget} />
             <ReimbursementsSection
               reimbursements={reimbursements}
               reviewingId={reviewingReimbursement}
               onReview={handleReviewReimbursement}
             />
-            <ArtistPerformance stats={stats} loading={loading} controls={dateControls} />
           </>
         )}
       </div>
@@ -540,112 +540,88 @@ function ReimbursementsSection({ reimbursements, reviewingId, onReview }) {
   );
 }
 
-// ── Artist performance ────────────────────────────────────────────────────────
+// ── Artists ───────────────────────────────────────────────────────────────────
 
-function ArtistPerformance({ stats, loading, controls }) {
+// One row per artist. Tattoos and Sales follow the date range; Owed is always the
+// current all-time total. The rest of each artist's numbers are in their panel.
+function ArtistsSection({ payouts, stats, loading, controls, onPay }) {
   const { t } = useLanguage();
-  const artists = stats?.by_artist ?? [];
-  const num = { ...st.td, ...st.num };
+  const byArtist = new Map((stats?.by_artist ?? []).map(a => [a.artist_id, a]));
+  const seen = new Set(payouts.map(p => p.artist_id));
+  const list = [
+    ...payouts.map(p => ({ id: p.artist_id, name: p.artist_name, payout: p, period: byArtist.get(p.artist_id) })),
+    // Sold in this period but with nothing on the payout list.
+    ...(stats?.by_artist ?? []).filter(a => !seen.has(a.artist_id)).map(a => ({ id: a.artist_id, name: a.artist_name, payout: null, period: a })),
+  ];
+  // One order to scan: ready to pay, then needs review, then settled. Most owed first in each.
+  const stage = ({ payout: p }) => (p?.outstanding > 0 ? (p.incomplete_recordings > 0 ? 1 : 0) : 2);
+  const owedOf = r => r.payout?.outstanding ?? 0;
+  const rows = [...list].sort((a, b) => stage(a) - stage(b) || owedOf(b) - owedOf(a) || (b.period?.gross_sales ?? 0) - (a.period?.gross_sales ?? 0));
+  const owed = rows.filter(r => owedOf(r) > 0);
+  const totalOwed = owed.reduce((sum, r) => sum + owedOf(r), 0);
+  const middle = { verticalAlign: 'middle' };
+  const num = { ...st.td, ...st.num, ...middle };
+  // The period's numbers dim while a new date range loads; everything else stays put.
+  const periodCell = { ...num, opacity: loading ? 0.55 : 1, transition: 'opacity 150ms ease' };
   return (
-    <Section title={t('revenue_artist_perf')} aside={controls}>
-      {!stats ? (loading && <p role="status" style={st.msg}>{t('loading')}</p>)
-        : artists.length === 0 ? (!loading && <p style={st.msg}>No completed sessions in this period.</p>)
-        : (
-          // The last results stay in place, dimmed, while a new date range loads.
-          <div aria-busy={loading} style={{ ...st.tableCard, opacity: loading ? 0.55 : 1, transition: 'opacity 150ms ease' }}>
-            <div style={st.tableScroll}>
-              <table style={st.tableFlat}>
-                <thead>
-                  <tr>
-                    <th style={st.th}>{t('revenue_artist')}</th>
-                    {[t('revenue_tattoos'), t('revenue_gross_sales'), t('revenue_avg_ticket'), t('revenue_deposits'), t('revenue_hours'), t('revenue_sales_hr')].map(h => <th key={h} style={{ ...st.th, ...st.num }}>{h}</th>)}
-                  </tr>
-                </thead>
-                <tbody>
-                  {artists.map((ar, i) => (
-                    <tr key={ar.artist_id} style={i < artists.length - 1 ? st.tr : undefined}>
-                      <td style={{ ...st.tdName, whiteSpace: 'nowrap' }}>{ar.artist_name}</td>
-                      <td style={num}>{ar.session_count}</td>
-                      <td style={{ ...num, color: 'var(--text)', fontWeight: 600 }}>{fmtWhole(ar.gross_sales)}</td>
-                      <td style={num}>{fmtWhole(ar.avg_ticket)}</td>
-                      <td style={num}>{fmtWhole(ar.deposits_collected)}</td>
-                      <td style={num}>{fmtHours(ar.estimated_hours)}</td>
-                      <td style={num}>{ar.sales_per_hour > 0 ? fmtWhole(ar.sales_per_hour) : '—'}</td>
+    <Section title="Artists" aside={controls}>
+      {rows.length === 0 ? (
+        !loading && <p style={st.msg}>No artist sales or payouts yet.</p>
+      ) : <>
+        <p style={{ ...st.sectionMeta, margin: 0 }}>
+          {owed.length > 0
+            ? <><strong style={{ color: 'var(--text)', fontWeight: 650 }}>{fmt(totalOwed)}</strong> owed to {owed.length} artist{owed.length > 1 ? 's' : ''}</>
+            : 'Everyone is paid up'}
+        </p>
+        <div style={st.tableCard}>
+          <div style={st.tableScroll}>
+            <table className={css.compact} style={st.tableFlat}>
+              <thead>
+                <tr>
+                  <th style={st.th}>{t('revenue_artist')}</th>
+                  <th style={{ ...st.th, ...st.num }} className={css.wide}>{t('revenue_tattoos')}</th>
+                  <th style={{ ...st.th, ...st.num }} className={css.wide}>{t('revenue_gross_sales')}</th>
+                  <th style={{ ...st.th, ...st.num }} title="Everything still to be paid, whatever dates are selected">Owed <span style={{ fontWeight: 500 }}>(all time)</span></th>
+                  <th style={st.th}><span style={st.srOnly}>Actions</span></th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r, i) => {
+                  const p = r.payout;
+                  const missing = p?.incomplete_recordings > 0;
+                  const label = p ? (p.outstanding > 0 ? (missing ? 'Review' : 'Pay out') : 'History') : null;
+                  return (
+                    <tr key={r.id} className={p ? css.row : undefined} style={{ ...(i < rows.length - 1 ? st.tr : {}), ...(p ? { cursor: 'pointer' } : {}) }} onClick={p ? () => onPay(p) : undefined}>
+                      <td style={{ ...st.tdName, ...middle }}>
+                        <span style={st.nameLine}>
+                          {p
+                            ? <button type="button" className={css.name} onClick={e => { e.stopPropagation(); onPay(p); }} aria-label={`Open ${r.name}`} style={st.artistLink}>{r.name}</button>
+                            : r.name}
+                          {missing && <span style={st.missingNote}>{p.incomplete_recordings} payment{p.incomplete_recordings > 1 ? 's' : ''} not recorded</span>}
+                        </span>
+                      </td>
+                      <td style={periodCell} className={css.wide}>{r.period?.session_count || '—'}</td>
+                      <td style={periodCell} className={css.wide}>{r.period ? fmtWhole(r.period.gross_sales) : '—'}</td>
+                      <td style={{ ...num, fontWeight: 650, color: owedOf(r) > 0 ? 'var(--text)' : 'var(--text-muted)' }}>{p ? fmt(p.outstanding) : '—'}</td>
+                      <td style={{ ...st.tdActions, ...middle }}>
+                        {p && (
+                          <button type="button" onClick={e => { e.stopPropagation(); onPay(p); }} aria-label={`${label}: ${r.name}`}
+                            style={{ ...st.payBtn, ...st.rowAction, ...(label === 'Pay out' ? {} : st.rowActionQuiet) }}>{label}</button>
+                        )}
+                      </td>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
-        )}
-      {artists.some(a => a.estimated_hours > 0) && <p style={st.note}>{t('revenue_hours_note')}</p>}
-    </Section>
-  );
-}
-
-// ── Payouts section ───────────────────────────────────────────────────────────
-
-function PayoutsSection({ payouts, onPay }) {
-  const { t } = useLanguage();
-  if (!payouts?.length) return null;
-  const earned = p => p.artist_payout ?? p.total_earned;
-  // One order to scan: ready to pay, then needs review, then settled. Largest first in each.
-  const stage = p => (p.outstanding > 0 ? (p.incomplete_recordings > 0 ? 1 : 0) : 2);
-  const rows = [...payouts].sort((a, b) => stage(a) - stage(b) || (b.outstanding ?? 0) - (a.outstanding ?? 0));
-  const owed = rows.filter(p => p.outstanding > 0);
-  const totalOwed = owed.reduce((sum, p) => sum + p.outstanding, 0);
-  const num = { ...st.td, ...st.num };
-  return (
-    <Section title="Payouts" aside={(
-      <span style={st.sectionMeta}>
-        {owed.length > 0
-          ? <><strong style={{ color: 'var(--text)', fontWeight: 650 }}>{fmt(totalOwed)}</strong> owed to {owed.length} artist{owed.length > 1 ? 's' : ''} · all time</>
-          : 'Everyone is paid up · all time'}
-      </span>
-    )}>
-      <div style={st.tableCard}>
-        <div style={st.tableScroll}>
-          <table className={css.compact} style={st.tableFlat}>
-            <thead>
-              <tr>
-                <th style={st.th}>{t('revenue_artist')}</th>
-                <th style={{ ...st.th, ...st.num }} className={css.wide}>Earned</th>
-                <th style={{ ...st.th, ...st.num }} className={css.wide}>Paid</th>
-                <th style={{ ...st.th, ...st.num }}>Owed</th>
-                <th style={st.th}><span style={st.srOnly}>Actions</span></th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((p, i) => {
-                const missing = p.incomplete_recordings > 0;
-                const label = p.outstanding > 0 ? (missing ? 'Review' : 'Pay out') : 'History';
-                return (
-                  <tr key={p.artist_id} className={css.row} style={{ ...(i < rows.length - 1 ? st.tr : {}), cursor: 'pointer' }} onClick={() => onPay(p)}>
-                    <td style={{ ...st.tdName, verticalAlign: 'middle' }}>
-                      <span style={st.nameLine}>
-                        <button type="button" className={css.name} onClick={e => { e.stopPropagation(); onPay(p); }} aria-label={`Open payouts for ${p.artist_name}`} style={st.artistLink}>{p.artist_name}</button>
-                        {missing && <span style={st.missingNote}>{p.incomplete_recordings} payment{p.incomplete_recordings > 1 ? 's' : ''} not recorded</span>}
-                      </span>
-                    </td>
-                    <td style={{ ...num, verticalAlign: 'middle' }} className={css.wide}>{fmt(earned(p))}</td>
-                    <td style={{ ...num, verticalAlign: 'middle' }} className={css.wide}>{p.total_paid > 0 ? fmt(p.total_paid) : '—'}</td>
-                    <td style={{ ...num, verticalAlign: 'middle', fontWeight: 650, color: p.outstanding > 0 ? 'var(--text)' : 'var(--text-muted)' }}>{fmt(p.outstanding)}</td>
-                    <td style={{ ...st.tdActions, verticalAlign: 'middle' }}>
-                      <button type="button" onClick={e => { e.stopPropagation(); onPay(p); }} aria-label={`${label}: ${p.artist_name}`}
-                        style={{ ...st.payBtn, ...st.rowAction, ...(label === 'Pay out' ? {} : st.rowActionQuiet) }}>{label}</button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
         </div>
-      </div>
+      </>}
     </Section>
   );
 }
 
-function PayoutPanel({ artist, requirement, onClose, onPaid, onRecorded, onViewBookings }) {
+function PayoutPanel({ artist, period, periodLabel, requirement, onClose, onPaid, onRecorded, onViewBookings }) {
   const { t } = useLanguage();
   const [mode,     setMode]     = useState('full'); // 'full' | 'custom'
   const [custom,   setCustom]   = useState('');
@@ -702,7 +678,9 @@ function PayoutPanel({ artist, requirement, onClose, onPaid, onRecorded, onViewB
     <Dialog title={artist.artist_name} description={artist.outstanding > 0 ? `${fmt(artist.outstanding)} outstanding` : t('revenue_all_paid')} onClose={onClose} dismissDisabled={saving || !!deleting} maxWidth={440} footer={<button type="button" style={st.payBtn} disabled={saving || !!deleting} onClick={onClose}>Close</button>}>
         <div style={st.panelBody}>
           {/* The detail behind the Payouts table's one line per artist. */}
+          {/* The detail behind this artist's row. */}
           <div>
+            <p style={st.panelCaption}>All time</p>
             <dl style={st.panelStats}>
               <PanelStat label="Gross sales" value={fmt(artist.total_earned)} />
               {artist.artist_payout != null && artist.artist_payout !== artist.total_earned && <PanelStat label="Artist payout" value={fmt(artist.artist_payout)} />}
@@ -713,6 +691,19 @@ function PayoutPanel({ artist, requirement, onClose, onPaid, onRecorded, onViewB
               <p style={st.panelStatNote}>Studio {fmt(artist.earned_studio)} · Personal {fmt(artist.earned_personal)}</p>
             )}
           </div>
+          {period && (
+            <div>
+              <p style={st.panelCaption}>{periodLabel}</p>
+              <dl style={st.panelStats}>
+                <PanelStat label={t('revenue_tattoos')} value={period.session_count} />
+                <PanelStat label={t('revenue_gross_sales')} value={fmtWhole(period.gross_sales)} />
+                <PanelStat label={t('revenue_avg_ticket')} value={fmtWhole(period.avg_ticket)} />
+                <PanelStat label={t('revenue_deposits')} value={fmtWhole(period.deposits_collected)} />
+                <PanelStat label={`${t('revenue_hours')} (est.)`} value={fmtHours(period.estimated_hours)} />
+                <PanelStat label={t('revenue_sales_hr')} value={period.sales_per_hour > 0 ? fmtWhole(period.sales_per_hour) : '—'} />
+              </dl>
+            </div>
+          )}
           {artist.incomplete_recordings > 0 && (
             <div style={{
               background: 'var(--color-warning-surface)', border: '1px solid var(--color-warning-border)',
@@ -1172,6 +1163,7 @@ const st = {
   rowAction: { minWidth: 78, textAlign: 'center' },
   rowActionQuiet: { background: 'transparent', borderColor: 'var(--border)', color: 'var(--text-dim)' },
   panelStats: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(88px, 1fr))', gap: '0.75rem', margin: 0 },
+  panelCaption: { margin: '0 0 0.45rem', fontSize: '0.8rem', fontWeight: 650, color: 'var(--text)' },
   panelStatLabel: { fontSize: '0.8rem', color: 'var(--text-muted)' },
   panelStatValue: { margin: '0.15rem 0 0', fontSize: '0.95rem', fontWeight: 600, color: 'var(--text)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' },
   panelStatNote: { margin: '0.5rem 0 0', fontSize: '0.8rem', color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' },
