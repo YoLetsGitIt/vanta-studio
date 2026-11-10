@@ -7,6 +7,14 @@
 .name:focus-visible, .quiet:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; border-radius: 3px; }
 .actions { display: inline-flex; align-items: center; justify-content: flex-end; gap: 0.85rem; }
 
+/* Payout history rows. */
+.historyItem + .historyItem { border-top: 1px solid var(--border-faint); }
+.chevron { color: var(--text-muted); font-size: 1rem; line-height: 1; text-align: center; transition: transform 150ms ease-out; }
+.chevron[data-open] { transform: rotate(90deg); }
+.historyRow:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; border-radius: 8px; }
+@media (hover: hover) and (pointer: fine) { .historyRow:hover { background: var(--bg-row-hover) !important; } }
+@media (prefers-reduced-motion: reduce) { .chevron { transition: none; } }
+
 /* On a phone: who, how much is owed, and what to do. The rest is in the artist's panel. */
 @media (max-width: 760px) {
   .wide { display: none; }

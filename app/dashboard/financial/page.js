@@ -2,7 +2,7 @@
 
 import Dialog from '@/components/ui/Dialog';
 
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useId } from 'react';
 import { getStudioRevenueStats, getPayoutSummaries, createPayout, deletePayout, getArtistPayoutHistory, getArtistEarningsBreakdown, getReimbursements, reviewReimbursement, getMyStudioAccount, recordStudioBookingPayment } from '@/lib/api';
 import CompleteBookingModal from '@/components/CompleteBookingModal';
 import { getSupabase } from '@/lib/supabase';
@@ -300,19 +300,12 @@ function FinancialContent({ s, weeklyChart, daily, startDate, endDate, isLight }
         {(() => {
           const sessions = s?.completed_sessions ?? 0;
           const showNet = s?.net_sales != null && s.net_sales !== s.gross_sales;
-          // The part of Sales paid at the appointments (the rest was paid as deposits).
-          const atAppointments = s?.remaining_balances ?? 0;
           return (
             <div className="studio-revenue-summary" style={st.summaryPanel}>
               <div style={st.summaryCol}>
                 <span style={st.summaryLabel}>{t('revenue_gross_sales')}</span>
                 <span style={st.summaryValue}>{fmt(s?.gross_sales)}</span>
                 <span style={st.summaryHint}>{sessions ? `From ${sessions} completed ${sessions === 1 ? 'session' : 'sessions'}` : 'No completed sessions in this period'}</span>
-                {sessions > 0 && (
-                  <dl style={st.summaryRows}>
-                    <div style={st.summaryRow}><dt style={st.summaryRowLabel}><span aria-hidden="true" style={{ ...st.summaryDot, background: 'var(--color-success)' }} />Paid on the day</dt><dd style={st.summaryRowValue}>{fmt(atAppointments)}</dd></div>
-                  </dl>
-                )}
                 {showNet && <span style={st.summaryHint}>{t('revenue_net_sales')}: {fmt(s?.net_sales)} after refunds and discounts</span>}
               </div>
               <div className="studio-revenue-summary-divider" style={st.summaryDivider} aria-hidden="true" />
@@ -662,6 +655,7 @@ function PayoutPanel({ artist, requirement, onClose, onPaid, onRecorded, onViewB
   const [error,    setError]    = useState('');
   const [history,  setHistory]  = useState(null); // null = loading
   const [deleting, setDeleting] = useState(null); // payout id being deleted
+  const [openPayout, setOpenPayout] = useState(null); // the history row showing its details
   // Once there's something to review, the list stays open (it shows 'All recorded' when done).
   const [reviewOpen] = useState(artist.incomplete_recordings > 0);
   const locked = artist.incomplete_recordings > 0;
@@ -702,25 +696,6 @@ function PayoutPanel({ artist, requirement, onClose, onPaid, onRecorded, onViewB
     } finally {
       setDeleting(null);
     }
-  }
-
-  function fmtShortDate(iso) {
-    if (!iso) return '—';
-    return new Date(iso).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
-  }
-
-  function fmtLongDate(iso) {
-    if (!iso) return '—';
-    return new Date(iso).toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
-  }
-
-  function fmtMethod(m) {
-    return ({ cash: 'Cash', bank_transfer: 'Bank transfer', card: 'Card', online: 'Online', other: 'Other' })[m] ?? m;
-  }
-
-  function fmtSessionType(s) {
-    if (!s) return null;
-    return s.charAt(0).toUpperCase() + s.slice(1).replace(/_/g, ' ');
   }
 
   return (
@@ -835,77 +810,56 @@ function PayoutPanel({ artist, requirement, onClose, onPaid, onRecorded, onViewB
 
           {/* Payout history */}
           <div style={{ marginTop: artist.outstanding > 0 ? '1.5rem' : 0 }}>
-            <p style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-ghost)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '0.6rem' }}>
-              {t('revenue_payout_history')}
-            </p>
+            <p style={st.historyHeading}>{t('revenue_payout_history')}</p>
             {history === null && <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{t('loading')}</p>}
             {history !== null && history.length === 0 && (
               <p style={{ fontSize: '0.8rem', color: 'var(--text-ghost)' }}>{t('revenue_no_payouts')}</p>
             )}
             {history !== null && history.length > 0 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', maxHeight: '400px', overflowY: 'auto', paddingRight: '0.25rem' }}>
-                {history.map(p => {
-                  const bookings = p.bookings ?? [];
-                  return (
-                    <div key={p.id} style={{ background: 'var(--bg-chip)', borderRadius: 8, border: '1px solid var(--border-faint)', overflow: 'hidden' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '0.65rem 0.75rem' }}>
-                        <div>
-                          <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem', flexWrap: 'wrap' }}>
-                            <span style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text)' }}>{fmt(p.amount)}</span>
-                            <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Paid {fmtLongDate(p.paid_at)}</span>
-                          </div>
-                          <div style={{ fontSize: '0.75rem', color: 'var(--text-ghost)', marginTop: '0.15rem' }}>
-                            {p.payment_method ? fmtMethod(p.payment_method) : 'Method not recorded'}
-                            {p.recorded_by_email && <> · Recorded by {p.recorded_by_email}</>}
-                          </div>
-                          {p.note && <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>{p.note}</div>}
-                        </div>
-                        <button
-                          onClick={() => handleDelete(p.id)}
-                          disabled={deleting === p.id}
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-ghost)', fontSize: '0.75rem', padding: '0.2rem 0.4rem', opacity: deleting === p.id ? 0.4 : 1, flexShrink: 0 }}
-                          title="Delete payout record"
-                        >✕</button>
-                      </div>
-                      <div style={{ borderTop: '1px solid var(--border-faint)', padding: '0.5rem 0.75rem 0.6rem' }}>
-                        <p style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-ghost)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 0.4rem' }}>
-                          {bookings.length > 0
-                            ? `Covers ${bookings.length} booking${bookings.length > 1 ? 's' : ''}`
-                            : 'Bookings covered'}
-                        </p>
-                        {bookings.length === 0 && (
-                          <p style={{ fontSize: '0.75rem', color: 'var(--text-ghost)', margin: 0 }}>
-                            Not linked to specific bookings (recorded before per-booking tracking, or a manual adjustment).
-                          </p>
-                        )}
-                        {bookings.length > 0 && (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                            {bookings.map(b => (
-                              <div key={b.booking_id} style={{ paddingBottom: '0.4rem', borderBottom: '1px solid var(--border-faint)' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', fontSize: '0.78rem' }}>
-                                  <span style={{ color: 'var(--text)', fontWeight: 500 }}>
-                                    {fmtShortDate(b.chosen_time)} · {b.client_name}
-                                  </span>
-                                  <span style={{ color: 'var(--text)', fontWeight: 600, whiteSpace: 'nowrap' }}>{fmt(b.artist_cut)}</span>
-                                </div>
-                                <div style={{ fontSize: '0.72rem', color: 'var(--text-ghost)', marginTop: '0.15rem' }}>
-                                  {fmtSessionType(b.session_type) && <>{fmtSessionType(b.session_type)} · </>}
-                                  Gross {fmt(b.gross)}
-                                  {b.payment_method && <> · {fmtMethod(b.payment_method)}</>}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
+              <div style={st.historyList}>
+                {[...history].sort((x, y) => new Date(y.paid_at) - new Date(x.paid_at)).map(p => (
+                  <PayoutHistoryRow key={p.id} payout={p} open={openPayout === p.id} deleting={deleting === p.id}
+                    onToggle={() => setOpenPayout(id => (id === p.id ? null : p.id))} onDelete={() => handleDelete(p.id)} />
+                ))}
               </div>
             )}
           </div>
         </div>
     </Dialog>
+  );
+}
+
+// One past payout: its date and amount. Opens to show how it was paid and the bookings it covered.
+function PayoutHistoryRow({ payout: p, open, deleting, onToggle, onDelete }) {
+  const panelId = useId();
+  const bookings = p.bookings ?? [];
+  const shortDate = iso => (iso ? new Date(iso).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }) : '—');
+  const method = p.payment_method ? ({ cash: 'Cash', bank_transfer: 'Bank transfer', card: 'Card', online: 'Online', other: 'Other' })[p.payment_method] ?? p.payment_method : 'Method not recorded';
+  return (
+    <div className={css.historyItem}>
+      <button type="button" className={css.historyRow} aria-expanded={open} aria-controls={panelId} onClick={onToggle} style={st.historyRow}>
+        <span>{shortDate(p.paid_at)}</span>
+        <span style={st.historyAmount}>{fmt(p.amount)}</span>
+        <span aria-hidden="true" className={css.chevron} data-open={open || undefined}>›</span>
+      </button>
+      {open && (
+        <div id={panelId} style={st.historyDetail}>
+          <p style={st.historyLine}>{method}{p.recorded_by_email ? ` · Recorded by ${p.recorded_by_email}` : ''}</p>
+          {p.note && <p style={st.historyLine}>{p.note}</p>}
+          {bookings.length > 0 ? (
+            <ul style={st.historyBookings} aria-label={`${bookings.length} booking${bookings.length > 1 ? 's' : ''} covered`}>
+              {bookings.map(b => (
+                <li key={b.booking_id} style={st.historyBooking}>
+                  <span style={{ minWidth: 0 }}>{shortDate(b.chosen_time)} · {b.client_name}</span>
+                  <span style={{ fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{fmt(b.artist_cut)}</span>
+                </li>
+              ))}
+            </ul>
+          ) : <p style={st.historyLine}>Not linked to specific bookings.</p>}
+          <button type="button" className={css.quiet} onClick={onDelete} disabled={deleting} style={{ ...st.quietBtn, alignSelf: 'flex-start', color: 'var(--color-danger)', opacity: deleting ? 0.5 : 1 }}>Delete payout</button>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -1173,10 +1127,6 @@ const st = {
   summaryLabel: { fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-dim)' },
   summaryValue: { fontSize: '2rem', fontWeight: 700, letterSpacing: '-0.03em', color: 'var(--text)', fontVariantNumeric: 'tabular-nums', lineHeight: 1.15 },
   summaryHint: { fontSize: '0.85rem', lineHeight: 1.45, color: 'var(--text-muted)', maxWidth: '42ch' },
-  summaryRows: { margin: '0.6rem 0 0', paddingTop: '0.7rem', borderTop: '1px solid var(--border-faint)', display: 'flex', flexDirection: 'column', gap: '0.45rem', maxWidth: 360 },
-  summaryRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', fontSize: '0.88rem' },
-  summaryRowLabel: { display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-dim)', minWidth: 0 },
-  summaryRowValue: { margin: 0, fontWeight: 600, color: 'var(--text)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' },
   summaryDot: { width: 8, height: 8, borderRadius: 2, flexShrink: 0 },
   kpiCard: {
     background: 'var(--bg-card)', border: '1px solid var(--border)',
@@ -1212,6 +1162,14 @@ const st = {
   rowActionQuiet: { background: 'transparent', borderColor: 'var(--border)', color: 'var(--text-dim)' },
   panelFacts: { display: 'flex', flexDirection: 'column', gap: '0.4rem', paddingBottom: '1rem', borderBottom: '1px solid var(--border-faint)' },
   panelFact: { display: 'flex', justifyContent: 'space-between', gap: '1rem', fontSize: '0.85rem', color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' },
+  historyHeading: { fontSize: '0.875rem', fontWeight: 650, color: 'var(--text)', margin: '0 0 0.5rem' },
+  historyList: { maxHeight: 360, overflowY: 'auto', overscrollBehavior: 'contain', border: '1px solid var(--border-faint)', borderRadius: 10 },
+  historyRow: { display: 'grid', gridTemplateColumns: '1fr auto 14px', alignItems: 'center', gap: '0.75rem', width: '100%', minHeight: 44, padding: '0 0.75rem', background: 'transparent', border: 0, color: 'var(--text-dim)', font: 'inherit', fontSize: '0.875rem', textAlign: 'left', cursor: 'pointer' },
+  historyAmount: { color: 'var(--text)', fontWeight: 600, fontVariantNumeric: 'tabular-nums' },
+  historyDetail: { display: 'flex', flexDirection: 'column', gap: '0.45rem', padding: '0 0.75rem 0.75rem' },
+  historyLine: { margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: 1.4, overflowWrap: 'anywhere' },
+  historyBookings: { listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '0.3rem' },
+  historyBooking: { display: 'flex', justifyContent: 'space-between', gap: '0.75rem', fontSize: '0.8rem', color: 'var(--text-dim)' },
   quietBtn: { background: 'transparent', border: 0, padding: 0, color: 'var(--text-muted)', font: 'inherit', fontSize: '0.8rem', fontWeight: 500, cursor: 'pointer' },
   tr: { borderBottom: '1px solid var(--border-faint)' },
   td: { padding: '0.75rem 1rem', fontSize: '0.875rem', color: 'var(--text-muted)', fontWeight: 500, verticalAlign: 'top' },
