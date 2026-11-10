@@ -242,6 +242,7 @@ export default function FinancialPage() {
             }).catch(() => {});
           }}
           onClose={() => setPayTarget(null)}
+          onViewBookings={() => { setEarningsTarget(payTarget); setPayTarget(null); }}
           onPaid={() => {
             getPayoutSummaries().then(d => setPayouts(d.payouts ?? [])).catch(() => {});
             setPayTarget(null);
@@ -270,7 +271,7 @@ export default function FinancialPage() {
         {/* What needs doing first, then the reporting. Payouts don't wait for the date range. */}
         {tab === 'artists' && (
           <>
-            <PayoutsSection payouts={payouts} onPay={setPayTarget} onViewEarnings={setEarningsTarget} />
+            <PayoutsSection payouts={payouts} onPay={setPayTarget} />
             <ReimbursementsSection
               reimbursements={reimbursements}
               reviewingId={reviewingReimbursement}
@@ -591,16 +592,16 @@ function ArtistPerformance({ stats, loading, controls }) {
 
 // ── Payouts section ───────────────────────────────────────────────────────────
 
-function PayoutsSection({ payouts, onPay, onViewEarnings }) {
+function PayoutsSection({ payouts, onPay }) {
   const { t } = useLanguage();
   if (!payouts?.length) return null;
-  const hasCut = payouts.some(p => p.artist_payout != null && p.artist_payout !== p.total_earned);
-  // Who's owed the most first; anyone settled goes to the bottom.
-  const rows = [...payouts].sort((a, b) => (b.outstanding ?? 0) - (a.outstanding ?? 0));
+  const earned = p => p.artist_payout ?? p.total_earned;
+  // One order to scan: ready to pay, then needs review, then settled. Largest first in each.
+  const stage = p => (p.outstanding > 0 ? (p.incomplete_recordings > 0 ? 1 : 0) : 2);
+  const rows = [...payouts].sort((a, b) => stage(a) - stage(b) || (b.outstanding ?? 0) - (a.outstanding ?? 0));
   const owed = rows.filter(p => p.outstanding > 0);
   const totalOwed = owed.reduce((sum, p) => sum + p.outstanding, 0);
   const num = { ...st.td, ...st.num };
-  const sub = { fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 2, fontWeight: 500, whiteSpace: 'nowrap' };
   return (
     <Section title="Payouts" aside={(
       <span style={st.sectionMeta}>
@@ -615,41 +616,30 @@ function PayoutsSection({ payouts, onPay, onViewEarnings }) {
             <thead>
               <tr>
                 <th style={st.th}>{t('revenue_artist')}</th>
-                <th style={{ ...st.th, ...st.num }} className={css.wide}>{hasCut ? t('revenue_gross') : 'Earned'}</th>
-                {hasCut && <th style={{ ...st.th, ...st.num }} className={css.wide}>Artist payout</th>}
-                <th style={{ ...st.th, ...st.num }} className={css.wide}>Paid out</th>
-                <th style={{ ...st.th, ...st.num }}>Outstanding</th>
+                <th style={{ ...st.th, ...st.num }} className={css.wide}>Earned</th>
+                <th style={{ ...st.th, ...st.num }} className={css.wide}>Paid</th>
+                <th style={{ ...st.th, ...st.num }}>Owed</th>
                 <th style={st.th}><span style={st.srOnly}>Actions</span></th>
               </tr>
             </thead>
             <tbody>
               {rows.map((p, i) => {
                 const missing = p.incomplete_recordings > 0;
+                const label = p.outstanding > 0 ? (missing ? 'Review' : 'Pay out') : 'History';
                 return (
                   <tr key={p.artist_id} className={css.row} style={{ ...(i < rows.length - 1 ? st.tr : {}), cursor: 'pointer' }} onClick={() => onPay(p)}>
-                    <td style={st.tdName}>
-                      <button type="button" className={css.name} onClick={e => { e.stopPropagation(); onPay(p); }} aria-label={`Open payouts for ${p.artist_name}`} style={st.artistLink}>{p.artist_name}</button>
-                      {missing && <div style={{ ...sub, color: 'var(--color-warning)', fontWeight: 600, whiteSpace: 'normal' }}>{p.incomplete_recordings} payment{p.incomplete_recordings > 1 ? 's' : ''} not recorded</div>}
-                    </td>
-                    <td style={num} className={css.wide}>
-                      {fmt(p.total_earned)}
-                      {p.earned_studio > 0 && p.earned_personal > 0 && <div style={sub}>Studio {fmt(p.earned_studio)} · Personal {fmt(p.earned_personal)}</div>}
-                    </td>
-                    {hasCut && (
-                      <td style={num} className={css.wide}>
-                        {fmt(p.artist_payout)}
-                        {p.reimbursed > 0 && <div style={sub}>+ {fmt(p.reimbursed)} reimbursed</div>}
-                      </td>
-                    )}
-                    <td style={num} className={css.wide}>{fmt(p.total_paid)}</td>
-                    <td style={{ ...num, fontWeight: 650, color: p.outstanding > 0 ? 'var(--text)' : 'var(--text-muted)' }}>{fmt(p.outstanding)}</td>
-                    <td style={st.tdActions}>
-                      <span className={css.actions}>
-                        <button type="button" className={css.quiet} onClick={e => { e.stopPropagation(); onViewEarnings(p); }} aria-label={`View bookings for ${p.artist_name}`} style={st.quietBtn}>Bookings</button>
-                        {p.outstanding > 0
-                          ? <button type="button" onClick={e => { e.stopPropagation(); onPay(p); }} aria-label={`${missing ? 'Review' : 'Pay out'} ${p.artist_name}`} style={st.payBtn}>{missing ? 'Review' : 'Pay out'}</button>
-                          : <button type="button" className={css.quiet} onClick={e => { e.stopPropagation(); onPay(p); }} aria-label={`Payout history for ${p.artist_name}`} style={st.quietBtn}>History</button>}
+                    <td style={{ ...st.tdName, verticalAlign: 'middle' }}>
+                      <span style={st.nameLine}>
+                        <button type="button" className={css.name} onClick={e => { e.stopPropagation(); onPay(p); }} aria-label={`Open payouts for ${p.artist_name}`} style={st.artistLink}>{p.artist_name}</button>
+                        {missing && <span style={st.missingNote}>{p.incomplete_recordings} payment{p.incomplete_recordings > 1 ? 's' : ''} not recorded</span>}
                       </span>
+                    </td>
+                    <td style={{ ...num, verticalAlign: 'middle' }} className={css.wide}>{fmt(earned(p))}</td>
+                    <td style={{ ...num, verticalAlign: 'middle' }} className={css.wide}>{p.total_paid > 0 ? fmt(p.total_paid) : '—'}</td>
+                    <td style={{ ...num, verticalAlign: 'middle', fontWeight: 650, color: p.outstanding > 0 ? 'var(--text)' : 'var(--text-muted)' }}>{fmt(p.outstanding)}</td>
+                    <td style={{ ...st.tdActions, verticalAlign: 'middle' }}>
+                      <button type="button" onClick={e => { e.stopPropagation(); onPay(p); }} aria-label={`${label}: ${p.artist_name}`}
+                        style={{ ...st.payBtn, ...st.rowAction, ...(label === 'Pay out' ? {} : st.rowActionQuiet) }}>{label}</button>
                     </td>
                   </tr>
                 );
@@ -662,7 +652,7 @@ function PayoutsSection({ payouts, onPay, onViewEarnings }) {
   );
 }
 
-function PayoutPanel({ artist, requirement, onClose, onPaid, onRecorded }) {
+function PayoutPanel({ artist, requirement, onClose, onPaid, onRecorded, onViewBookings }) {
   const { t } = useLanguage();
   const [mode,     setMode]     = useState('full'); // 'full' | 'custom'
   const [custom,   setCustom]   = useState('');
@@ -736,6 +726,19 @@ function PayoutPanel({ artist, requirement, onClose, onPaid, onRecorded }) {
   return (
     <Dialog title={artist.artist_name} description={artist.outstanding > 0 ? `Outstanding: ${fmt(artist.outstanding)}` : t('revenue_all_paid')} onClose={onClose} dismissDisabled={saving || !!deleting} maxWidth={440} contentStyle={{ padding: 0 }} footer={<button type="button" style={st.payBtn} disabled={saving || !!deleting} onClick={onClose}>Close</button>}>
         <div style={st.panelBody}>
+          {/* The detail behind the Payouts table's one line per artist. */}
+          <div style={st.panelFacts}>
+            <div style={st.panelFact}><span>Gross sales</span><span>{fmt(artist.total_earned)}</span></div>
+            {artist.earned_studio > 0 && artist.earned_personal > 0 && (
+              <div style={st.panelFact}><span>Studio · personal</span><span>{fmt(artist.earned_studio)} · {fmt(artist.earned_personal)}</span></div>
+            )}
+            {artist.artist_payout != null && artist.artist_payout !== artist.total_earned && (
+              <div style={st.panelFact}><span>Artist payout</span><span>{fmt(artist.artist_payout)}</span></div>
+            )}
+            {artist.reimbursed > 0 && <div style={st.panelFact}><span>Reimbursed</span><span>+ {fmt(artist.reimbursed)}</span></div>}
+            <div style={st.panelFact}><span>Paid</span><span>{artist.total_paid > 0 ? fmt(artist.total_paid) : '—'}</span></div>
+            <button type="button" className={css.quiet} onClick={onViewBookings} disabled={saving || !!deleting} style={{ ...st.quietBtn, alignSelf: 'flex-start', marginTop: '0.2rem' }}>View bookings →</button>
+          </div>
           {artist.incomplete_recordings > 0 && (
             <div style={{
               background: 'rgba(245,158,58,0.08)', border: '1px solid rgba(245,158,58,0.25)',
@@ -1203,6 +1206,12 @@ const st = {
   num: { textAlign: 'right', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' },
   srOnly: { position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap' },
   statusTag: { fontSize: '0.75rem', fontWeight: 600, padding: '0.2rem 0.55rem', borderRadius: 20 },
+  nameLine: { display: 'flex', alignItems: 'baseline', flexWrap: 'wrap', gap: '0.1rem 0.6rem' },
+  missingNote: { fontSize: '0.78rem', fontWeight: 600, color: 'var(--color-warning)' },
+  rowAction: { minWidth: 78, textAlign: 'center' },
+  rowActionQuiet: { background: 'transparent', borderColor: 'var(--border)', color: 'var(--text-dim)' },
+  panelFacts: { display: 'flex', flexDirection: 'column', gap: '0.4rem', paddingBottom: '1rem', borderBottom: '1px solid var(--border-faint)' },
+  panelFact: { display: 'flex', justifyContent: 'space-between', gap: '1rem', fontSize: '0.85rem', color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' },
   quietBtn: { background: 'transparent', border: 0, padding: 0, color: 'var(--text-muted)', font: 'inherit', fontSize: '0.8rem', fontWeight: 500, cursor: 'pointer' },
   tr: { borderBottom: '1px solid var(--border-faint)' },
   td: { padding: '0.75rem 1rem', fontSize: '0.875rem', color: 'var(--text-muted)', fontWeight: 500, verticalAlign: 'top' },
