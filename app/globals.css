@@ -51,6 +51,7 @@
   --bg-modal:       #181818;
   --bg-card:        #161616;
   --bg-row-active:  #1d1d1d;
+  --bg-row-hover:   rgba(255,255,255,0.055);
   --bg-input:       #242424;
   --bg-chip:        #202020;
 
@@ -115,6 +116,7 @@
   --bg-modal:       #ffffff;
   --bg-card:        rgba(0,0,0,0.025);
   --bg-row-active:  rgba(0,0,0,0.035);
+  --bg-row-hover:   rgba(0,0,0,0.04);
   --bg-input:       rgba(0,0,0,0.04);
   --bg-chip:        rgba(0,0,0,0.05);
 
