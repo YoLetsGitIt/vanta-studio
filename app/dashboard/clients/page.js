@@ -22,6 +22,7 @@ import { Select } from '@/components/ui/Field';
 import MarketingConsent from '@/components/MarketingConsent';
 import ConsentSubmissionCard, { ConsentFlagNotice } from '@/components/ConsentSubmissionCard';
 import ClientTemplateSend from '@/components/marketing/ClientTemplateSend';
+import DuplicateClientsReview from '@/components/DuplicateClientsReview';
 import { Pill, Section, Fact, SkeletonBar, DetailSkeleton, PanelBackdrop, detailStyles } from '@/components/ui/DetailParts';
 
 import panelLayout from '@/components/ui/DetailPanelLayout.module.css';
@@ -243,6 +244,7 @@ function ClientsInner() {
           </button>
           */}
         </div>
+        <DuplicateClientsReview onMerged={() => setLoadAttempt(value => value + 1)} />
         <div style={s.searchWrap}>
           <input
             type="search"
