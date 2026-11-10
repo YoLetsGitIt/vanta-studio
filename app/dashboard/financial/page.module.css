@@ -1,0 +1,15 @@
+/* Artists & Payouts tables. */
+.row { transition: background-color 150ms ease; }
+@media (hover: hover) and (pointer: fine) {
+  .row:hover { background: var(--bg-row-hover); }
+  .name:hover, .quiet:hover { color: var(--text); text-decoration: underline; text-underline-offset: 2px; }
+}
+.name:focus-visible, .quiet:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; border-radius: 3px; }
+.actions { display: inline-flex; align-items: center; justify-content: flex-end; gap: 0.85rem; }
+
+/* On a phone: who, how much is owed, and what to do. The rest is in the artist's panel. */
+@media (max-width: 760px) {
+  .wide { display: none; }
+  .compact th, .compact td { padding-inline: 0.6rem !important; }
+  .actions { flex-direction: column-reverse; align-items: flex-end; gap: 0.4rem; }
+}
