@@ -21,6 +21,13 @@
 .period > summary::-webkit-details-marker { display: none; }
 .period[open] .chevron { transform: rotate(90deg); }
 
+/* The Artists table has the most columns: closer together, and the extras go first as room runs out. */
+.tight th, .tight td { padding-inline: 0.7rem; }
+.tight th:first-child, .tight td:first-child { padding-left: 1rem; }
+.tight th:last-child, .tight td:last-child { padding-right: 1rem; }
+@media (max-width: 1240px) { .wider { display: none; } }
+@media (max-width: 860px) { .tight .wide { display: none; } }
+
 /* On a phone: who, how much is owed, and what to do. The rest is in the artist's panel. */
 @media (max-width: 760px) {
   .wide { display: none; }
