@@ -6,6 +6,8 @@ import { useState, useEffect, useRef, useMemo, useId } from 'react';
 import { getStudioRevenueStats, getPayoutSummaries, createPayout, deletePayout, getArtistPayoutHistory, getArtistEarningsBreakdown, getReimbursements, reviewReimbursement, getMyStudioAccount, recordStudioBookingPayment } from '@/lib/api';
 import CompleteBookingModal from '@/components/CompleteBookingModal';
 import { SkeletonBar } from '@/components/ui/DetailParts';
+import ArtistPerformanceModal from '@/components/ArtistPerformanceModal';
+import { ATTENTION_CHANGED_EVENT, openBookingPanel } from '@/components/GlobalBookingPanel';
 import { getSupabase } from '@/lib/supabase';
 import { toISODate } from '@/lib/format';
 import {
@@ -63,7 +65,8 @@ export default function FinancialPage() {
   const [reimbursements, setReimbursements] = useState([]);
   const [reviewingReimbursement, setReviewingReimbursement] = useState(null); // id being reviewed
   const [payTarget,    setPayTarget]    = useState(null); // ArtistPayoutSummary open in the panel
-  const [panelView,    setPanelView]    = useState('history'); // 'history' | 'details' | 'pay'
+  const [panelView,    setPanelView]    = useState('history'); // 'history' | 'pay'
+  const [performanceTarget, setPerformanceTarget] = useState(null); // { artist_id, artist_name }
   const [earningsTarget, setEarningsTarget] = useState(null); // { artist_id, artist_name } for earnings breakdown
   const [paymentRequirement, setPaymentRequirement] = useState('studio_only');
   const [isLight,     setIsLight]     = useState(false);
@@ -100,6 +103,14 @@ export default function FinancialPage() {
         setPaymentRequirement(accountData.studio?.payment_recording_requirement ?? 'studio_only');
       })
       .catch(error => setError(error?.message || 'Financial data could not be loaded.'));
+  }, [unlocked]);
+
+  // A payment recorded in the booking panel can unlock an artist's payout.
+  useEffect(() => {
+    if (!unlocked) return undefined;
+    const refresh = () => getPayoutSummaries().then(d => setPayouts(d.payouts ?? [])).catch(() => {});
+    window.addEventListener(ATTENTION_CHANGED_EVENT, refresh);
+    return () => window.removeEventListener(ATTENTION_CHANGED_EVENT, refresh);
   }, [unlocked]);
 
   async function handleReviewReimbursement(id, action) {
@@ -237,8 +248,6 @@ export default function FinancialPage() {
         <PayoutPanel
           artist={payTarget}
           initialView={panelView}
-          period={stats?.by_artist?.find(a => a.artist_id === payTarget.artist_id) ?? null}
-          periodLabel={rangeLabel(startDate, endDate)}
           requirement={paymentRequirement}
           onRecorded={() => {
             // Refresh the counts without closing the panel.
@@ -254,6 +263,17 @@ export default function FinancialPage() {
             getPayoutSummaries().then(d => setPayouts(d.payouts ?? [])).catch(() => {});
             setPayTarget(null);
           }}
+        />
+      )}
+
+      {performanceTarget && (
+        <ArtistPerformanceModal
+          artist={performanceTarget}
+          startDate={startDate}
+          endDate={endDate}
+          quickLabel={activeQuick}
+          onClose={() => setPerformanceTarget(null)}
+          onViewBookings={() => { setEarningsTarget(performanceTarget); setPerformanceTarget(null); }}
         />
       )}
 
@@ -278,7 +298,7 @@ export default function FinancialPage() {
         {tab === 'artists' && (
           <>
             <ArtistsSection payouts={payouts} stats={stats} loading={loading} controls={dateControls}
-              onPay={p => { setPanelView('pay'); setPayTarget(p); }} onHistory={p => { setPanelView('history'); setPayTarget(p); }} onDetails={p => { setPanelView('details'); setPayTarget(p); }} />
+              onPay={p => { setPanelView('pay'); setPayTarget(p); }} onHistory={p => { setPanelView('history'); setPayTarget(p); }} onPerformance={setPerformanceTarget} />
             <ReimbursementsSection
               reimbursements={reimbursements}
               reviewingId={reviewingReimbursement}
@@ -550,7 +570,7 @@ function ReimbursementsSection({ reimbursements, reviewingId, onReview }) {
 
 // One row per artist. Everything but Owed follows the date range; Owed is always the
 // current all-time total. On narrower screens the panel has the columns that don't fit.
-function ArtistsSection({ payouts, stats, loading, controls, onPay, onHistory, onDetails }) {
+function ArtistsSection({ payouts, stats, loading, controls, onPay, onHistory, onPerformance }) {
   const { t } = useLanguage();
   const byArtist = new Map((stats?.by_artist ?? []).map(a => [a.artist_id, a]));
   const seen = new Set(payouts.map(p => p.artist_id));
@@ -600,12 +620,10 @@ function ArtistsSection({ payouts, stats, loading, controls, onPay, onHistory, o
                   const missing = p?.incomplete_recordings > 0;
                   const label = p?.outstanding > 0 ? (missing ? 'Review' : 'Pay out') : null;
                   return (
-                    <tr key={r.id} className={p ? css.row : undefined} style={{ ...(i < rows.length - 1 ? st.tr : {}), ...(p ? { cursor: 'pointer' } : {}) }} onClick={p ? () => onDetails(p) : undefined}>
+                    <tr key={r.id} className={css.row} style={{ ...(i < rows.length - 1 ? st.tr : {}), cursor: 'pointer' }} onClick={() => onPerformance({ artist_id: r.id, artist_name: r.name })}>
                       <td style={{ ...st.tdName, ...middle }}>
                         <span style={st.nameLine}>
-                          {p
-                            ? <button type="button" className={css.name} onClick={e => { e.stopPropagation(); onDetails(p); }} aria-label={`Open ${r.name}`} style={st.artistLink}>{r.name}</button>
-                            : r.name}
+                          <button type="button" className={css.name} onClick={e => { e.stopPropagation(); onPerformance({ artist_id: r.id, artist_name: r.name }); }} aria-label={`Performance for ${r.name}`} style={st.artistLink}>{r.name}</button>
                           {missing && <span style={st.missingNote}>{p.incomplete_recordings} payment{p.incomplete_recordings > 1 ? 's' : ''} not recorded</span>}
                         </span>
                       </td>
@@ -618,15 +636,14 @@ function ArtistsSection({ payouts, stats, loading, controls, onPay, onHistory, o
                       <td style={num} className={css.wider}>{loading ? <LoadingCell w={40} /> : (r.period?.sales_per_hour > 0 ? fmtWhole(r.period.sales_per_hour) : '—')}</td>
                       <td style={{ ...num, fontWeight: 650, color: owedOf(r) > 0 ? 'var(--text)' : 'var(--text-muted)' }}>{p ? fmt(p.outstanding) : '—'}</td>
                       <td style={{ ...st.tdActions, ...middle }}>
-                        {p && (
-                          <span className={css.actions}>
-                            <button type="button" className={css.quiet} onClick={e => { e.stopPropagation(); onHistory(p); }} aria-label={`Payout history for ${r.name}`} style={st.quietBtn}>History</button>
-                            {label
-                              ? <button type="button" onClick={e => { e.stopPropagation(); onPay(p); }} aria-label={`${label}: ${r.name}`}
-                                  style={{ ...st.payBtn, ...st.rowAction, ...(label === 'Pay out' ? {} : st.rowActionQuiet) }}>{label}</button>
-                              : <span aria-hidden="true" className={css.actionSlot} />}
-                          </span>
-                        )}
+                        <span className={css.actions}>
+                          <button type="button" className={css.quiet} onClick={e => { e.stopPropagation(); onPerformance({ artist_id: r.id, artist_name: r.name }); }} aria-label={`Performance for ${r.name}`} style={st.quietBtn}>Performance</button>
+                          {p && <button type="button" className={css.quiet} onClick={e => { e.stopPropagation(); onHistory(p); }} aria-label={`Payout history for ${r.name}`} style={st.quietBtn}>History</button>}
+                          {label
+                            ? <button type="button" onClick={e => { e.stopPropagation(); onPay(p); }} aria-label={`${label}: ${r.name}`}
+                                style={{ ...st.payBtn, ...st.rowAction, ...(label === 'Pay out' ? {} : st.rowActionQuiet) }}>{label}</button>
+                            : <span aria-hidden="true" className={css.actionSlot} />}
+                        </span>
                       </td>
                     </tr>
                   );
@@ -641,7 +658,7 @@ function ArtistsSection({ payouts, stats, loading, controls, onPay, onHistory, o
   );
 }
 
-function PayoutPanel({ artist, initialView = 'details', period, periodLabel, requirement, onClose, onPaid, onRecorded, onViewBookings }) {
+function PayoutPanel({ artist, initialView = 'history', requirement, onClose, onPaid, onRecorded, onViewBookings }) {
   const { t } = useLanguage();
   const [mode,     setMode]     = useState('full'); // 'full' | 'custom'
   const [custom,   setCustom]   = useState('');
@@ -653,11 +670,9 @@ function PayoutPanel({ artist, initialView = 'details', period, periodLabel, req
   const [deleting, setDeleting] = useState(null); // payout id being deleted
   const [openPayout, setOpenPayout] = useState(null); // the history row showing its details
   // Once there's something to review, the list stays open (it shows 'All recorded' when done).
-  // 'history' is only the past payouts; 'details' adds the artist's numbers; 'pay' adds the payment form.
-  const [view, setView] = useState(initialView);
-  const paying = view === 'pay';
-  const historyOnly = view === 'history';
-  const payLabel = artist.outstanding > 0 ? (artist.incomplete_recordings > 0 ? 'Review' : 'Pay out') : null;
+  // 'history' is only the past payouts; 'pay' adds the artist's figures and the payment form.
+  const paying = initialView === 'pay';
+  const historyOnly = !paying;
   const [reviewOpen] = useState(artist.incomplete_recordings > 0);
   const locked = artist.incomplete_recordings > 0;
 
@@ -700,10 +715,7 @@ function PayoutPanel({ artist, initialView = 'details', period, periodLabel, req
   }
 
   return (
-    <Dialog title={artist.artist_name} description={historyOnly ? t('revenue_payout_history') : artist.outstanding > 0 ? `${fmt(artist.outstanding)} outstanding` : t('revenue_all_paid')} onClose={onClose} dismissDisabled={saving || !!deleting} maxWidth={440} footer={<>
-      <button type="button" style={{ ...st.payBtn, ...st.rowActionQuiet }} disabled={saving || !!deleting} onClick={onClose}>Close</button>
-      {view === 'details' && payLabel && <button type="button" style={st.payBtn} onClick={() => setView('pay')}>{payLabel}</button>}
-    </>}>
+    <Dialog title={artist.artist_name} description={historyOnly ? t('revenue_payout_history') : artist.outstanding > 0 ? `${fmt(artist.outstanding)} outstanding` : t('revenue_all_paid')} onClose={onClose} dismissDisabled={saving || !!deleting} maxWidth={440} footer={<button type="button" style={{ ...st.payBtn, ...st.rowActionQuiet }} disabled={saving || !!deleting} onClick={onClose}>Close</button>}>
         <div style={st.panelBody}>
           {/* The detail behind the Payouts table's one line per artist. */}
           {/* The detail behind this artist's row. */}
@@ -718,22 +730,6 @@ function PayoutPanel({ artist, initialView = 'details', period, periodLabel, req
               <p style={st.panelStatNote}>Studio {fmt(artist.earned_studio)} · Personal {fmt(artist.earned_personal)}</p>
             )}
           </div>}
-          {/* The selected dates: a summary line, opening to the rest. */}
-          {!historyOnly && period && (
-            <details className={css.period} style={st.periodBox}>
-              <summary className={css.historyRow} style={st.historyRow}>
-                <span>{periodLabel}</span>
-                <span style={st.historyAmount}>{period.session_count} {period.session_count === 1 ? 'tattoo' : 'tattoos'} · {fmtWhole(period.gross_sales)}</span>
-                <span aria-hidden="true" className={css.chevron}>›</span>
-              </summary>
-              <dl style={st.periodRows}>
-                <PeriodRow label={t('revenue_avg_ticket')} value={fmtWhole(period.avg_ticket)} />
-                <PeriodRow label={t('revenue_deposits')} value={fmtWhole(period.deposits_collected)} />
-                <PeriodRow label={`${t('revenue_hours')} (est.)`} value={fmtHours(period.estimated_hours)} />
-                <PeriodRow label={t('revenue_sales_hr')} value={period.sales_per_hour > 0 ? fmtWhole(period.sales_per_hour) : '—'} />
-              </dl>
-            </details>
-          )}
           {paying && artist.incomplete_recordings > 0 && (
             <div style={{
               background: 'var(--color-warning-surface)', border: '1px solid var(--color-warning-border)',
@@ -751,7 +747,11 @@ function PayoutPanel({ artist, initialView = 'details', period, periodLabel, req
             </div>
           )}
           {paying && reviewOpen && (
-            <MissingPayments artist={artist} requirement={requirement} onRecorded={onRecorded} />
+            <MissingPayments artist={artist} requirement={requirement} onRecorded={onRecorded} onOpenBooking={e => {
+              // The booking panel can't show over this pop-up, so this closes first.
+              onClose();
+              openBookingPanel(e.booking_id, { requester_name: e.client_name, chosen_time: e.chosen_time });
+            }} />
           )}
           {paying && artist.outstanding > 0 && <>
             {/* Mode toggle */}
@@ -857,15 +857,6 @@ function LoadingCell({ w }) {
   return <span style={{ display: 'inline-block', verticalAlign: 'middle', width: w }}><SkeletonBar w="100%" h={12} /></span>;
 }
 
-function PeriodRow({ label, value }) {
-  return (
-    <div style={st.historyBooking}>
-      <dt>{label}</dt>
-      <dd style={{ margin: 0, fontVariantNumeric: 'tabular-nums' }}>{value}</dd>
-    </div>
-  );
-}
-
 function PanelStat({ label, value }) {
   return (
     <div style={{ minWidth: 0 }}>
@@ -916,7 +907,7 @@ function PayoutHistoryRow({ payout: p, open, deleting, onToggle, onDelete }) {
 
 // Bookings missing the payment recording the studio requires, shown inside the payout
 // panel so the studio can record them before paying the artist out.
-function MissingPayments({ artist, requirement, onRecorded }) {
+function MissingPayments({ artist, requirement, onRecorded, onOpenBooking }) {
   const [entries, setEntries] = useState(null); // null = loading
   const [error, setError] = useState('');
   const [recording, setRecording] = useState(null); // entry being recorded
@@ -971,13 +962,13 @@ function MissingPayments({ artist, requirement, onRecorded }) {
               : 'Waiting for the artist to record their payment';
             return (
               <li key={e.booking_id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.65rem 0.9rem', borderTop: '1px solid var(--border-faint)' }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ margin: 0, fontSize: '0.82rem', fontWeight: 600, color: 'var(--text)', overflowWrap: 'anywhere' }}>{e.client_name || 'Client'}</p>
-                  <p style={{ margin: '0.1rem 0 0', fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+                <button type="button" className={css.bookingLink} onClick={() => onOpenBooking(e)} aria-label={`Open booking for ${e.client_name || 'client'}`} style={st.bookingLink}>
+                  <span className={css.bookingName} style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text)', overflowWrap: 'anywhere' }}>{e.client_name || 'Client'}</span>
+                  <span style={{ display: 'block', marginTop: '0.1rem', fontSize: '0.74rem', color: 'var(--text-muted)' }}>
                     {fmtDate(e.chosen_time)}{e.gross != null ? ` · ${fmt(e.gross)}` : ''}
-                  </p>
-                  <p style={{ margin: '0.1rem 0 0', fontSize: '0.72rem', color: '#f59e3a' }}>{what}</p>
-                </div>
+                  </span>
+                  <span style={{ display: 'block', marginTop: '0.1rem', fontSize: '0.72rem', color: 'var(--color-warning)' }}>{what}</span>
+                </button>
                 {studioMissing && (
                   <button type="button" onClick={() => setRecording(e)} style={{ ...st.payBtn, flexShrink: 0, whiteSpace: 'nowrap' }}>
                     Record payment
@@ -1209,9 +1200,8 @@ const st = {
   missingNote: { fontSize: '0.78rem', fontWeight: 600, color: 'var(--color-warning)' },
   rowAction: { minWidth: 78, textAlign: 'center' },
   rowActionQuiet: { background: 'transparent', borderColor: 'var(--border)', color: 'var(--text-dim)' },
+  bookingLink: { flex: 1, minWidth: 0, padding: 0, background: 'transparent', border: 0, font: 'inherit', textAlign: 'left', cursor: 'pointer' },
   panelStats: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(88px, 1fr))', gap: '0.75rem', margin: 0 },
-  periodBox: { border: '1px solid var(--border-faint)', borderRadius: 10 },
-  periodRows: { display: 'flex', flexDirection: 'column', gap: '0.3rem', margin: 0, padding: '0 0.75rem 0.75rem' },
   historyFoot: { display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '0.75rem', paddingTop: '0.5rem', borderTop: '1px solid var(--border-faint)', fontSize: '0.8rem', color: 'var(--text-muted)' },
   panelStatLabel: { fontSize: '0.8rem', color: 'var(--text-muted)' },
   panelStatValue: { margin: '0.15rem 0 0', fontSize: '0.95rem', fontWeight: 600, color: 'var(--text)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' },

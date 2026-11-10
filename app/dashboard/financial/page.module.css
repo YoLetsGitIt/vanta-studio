@@ -17,16 +17,15 @@
 @media (hover: hover) and (pointer: fine) { .historyRow:hover { background: var(--bg-row-hover) !important; } }
 @media (prefers-reduced-motion: reduce) { .chevron { transition: none; } }
 
-.period > summary { list-style: none; }
-.period > summary::-webkit-details-marker { display: none; }
-.period[open] .chevron { transform: rotate(90deg); }
-
 /* The Artists table has the most columns: closer together, and the extras go first as room runs out. */
 .tight th, .tight td { padding-inline: 0.7rem; }
 .tight th:first-child, .tight td:first-child { padding-left: 1rem; }
 .tight th:last-child, .tight td:last-child { padding-right: 1rem; }
-@media (max-width: 1240px) { .wider { display: none; } }
+@media (max-width: 1279px) { .wider { display: none; } }
 @media (max-width: 860px) { .tight .wide { display: none; } }
+
+.bookingLink:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; border-radius: 4px; }
+@media (hover: hover) and (pointer: fine) { .bookingLink:hover .bookingName { text-decoration: underline; text-underline-offset: 2px; } }
 
 /* On a phone: who, how much is owed, and what to do. The rest is in the artist's panel. */
 @media (max-width: 760px) {

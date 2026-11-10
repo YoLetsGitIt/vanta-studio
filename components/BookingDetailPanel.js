@@ -1207,6 +1207,8 @@ export default function BookingDetailPanel({
                 setPaidOverride({ booking: bookingId, total: splits.reduce((n, x) => n + x.amount, 0), methods: [...new Set(splits.map(x => x.method))].join(',') });
                 forgetBookings();
                 setRecordOpen(false);
+                // ATTENTION_CHANGED_EVENT (GlobalBookingPanel imports this file): Financial and the sidebar refresh.
+                window.dispatchEvent(new Event('vanta:attention-changed'));
                 showFeedback('Payment recorded', 'success');
               } catch (err) { showError(err); }
               finally { setRecordSaving(false); }

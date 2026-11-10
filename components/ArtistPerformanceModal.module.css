@@ -1,0 +1,49 @@
+.body { display: flex; flex-direction: column; gap: 1.25rem; }
+.ranges { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.range { min-height: 32px; padding: 0 0.7rem; border: 1px solid var(--border); border-radius: 99px; background: transparent; color: var(--text-muted); font: inherit; font-size: 0.8rem; font-weight: 500; cursor: pointer; transition: background-color 150ms ease, color 150ms ease; }
+.range[aria-pressed='true'] { background: var(--accent); border-color: var(--accent); color: var(--accent-contrast); font-weight: 600; }
+.range:focus-visible, .link:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+@media (hover: hover) and (pointer: fine) { .range:not([aria-pressed='true']):hover { background: var(--bg-row-hover); color: var(--text); } .link:hover { color: var(--text); text-decoration: underline; text-underline-offset: 2px; } }
+
+.kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.75rem; margin: 0; }
+.kpi { min-width: 0; }
+.kpiLabel { font-size: 0.8rem; color: var(--text-muted); }
+.kpiValue { margin: 0.15rem 0 0; font-size: 1.35rem; font-weight: 650; letter-spacing: -0.02em; color: var(--text); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.change { display: block; margin-top: 0.1rem; font-size: 0.78rem; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text-muted); }
+.up { color: var(--color-success); }
+.down { color: var(--color-danger); }
+.compared { margin: -0.6rem 0 0; font-size: 0.78rem; color: var(--text-muted); }
+
+.card { padding: 0.9rem 1rem; border: 1px solid var(--border-faint); border-radius: 12px; min-width: 0; }
+.cardHead { display: flex; align-items: baseline; justify-content: space-between; gap: 0.75rem; margin: 0 0 0.7rem; font-size: 0.875rem; font-weight: 650; color: var(--text); }
+.cardNote { font-size: 0.8rem; font-weight: 500; color: var(--text-muted); text-align: right; }
+.columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem; }
+
+.bars { display: flex; flex-direction: column; gap: 0.55rem; }
+.barTop { display: flex; justify-content: space-between; gap: 0.75rem; font-size: 0.8rem; color: var(--text-dim); margin-bottom: 0.2rem; }
+.barTop span:last-child { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.track { height: 6px; border-radius: 99px; background: var(--border-faint); overflow: hidden; }
+.fill { height: 100%; border-radius: 99px; background: var(--accent); }
+
+.week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 0.35rem; align-items: end; height: 92px; }
+.dayCol { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 0.25rem; height: 100%; min-width: 0; }
+.dayCount { font-size: 0.72rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.dayBar { width: 100%; max-width: 26px; min-height: 2px; border-radius: 4px 4px 0 0; background: var(--border-strong); }
+.dayBarTop { background: var(--accent); }
+.dayLabel { font-size: 0.72rem; color: var(--text-muted); }
+
+.clientStats { display: flex; gap: 1.5rem; margin: 0 0 0.75rem; }
+.clientList { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.35rem; }
+.clientRow { display: flex; justify-content: space-between; gap: 0.75rem; font-size: 0.8rem; color: var(--text-dim); }
+.clientName { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.clientRow span:last-child { font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+.link { background: transparent; border: 0; padding: 0; color: var(--text-muted); font: inherit; font-size: 0.8rem; font-weight: 500; cursor: pointer; }
+.empty { margin: 0; padding: 2rem 0; text-align: center; font-size: 0.875rem; color: var(--text-muted); }
+.skeletons { display: flex; flex-direction: column; gap: 0.9rem; }
+
+@media (max-width: 620px) {
+  .kpis, .columns { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .columns { grid-template-columns: minmax(0, 1fr); }
+  .kpiValue { font-size: 1.15rem; }
+}
