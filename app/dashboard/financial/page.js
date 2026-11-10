@@ -7,7 +7,9 @@ import { getStudioRevenueStats, getPayoutSummaries, createPayout, deletePayout, 
 import CompleteBookingModal from '@/components/CompleteBookingModal';
 import { SkeletonBar } from '@/components/ui/DetailParts';
 import ArtistPerformanceModal from '@/components/ArtistPerformanceModal';
-import { ATTENTION_CHANGED_EVENT, openBookingPanel } from '@/components/GlobalBookingPanel';
+import BookingDetailPanel from '@/components/BookingDetailPanel';
+import { ATTENTION_CHANGED_EVENT } from '@/components/GlobalBookingPanel';
+import { loadBooking } from '@/lib/bookingCache';
 import { getSupabase } from '@/lib/supabase';
 import { toISODate } from '@/lib/format';
 import {
@@ -108,7 +110,11 @@ export default function FinancialPage() {
   // A payment recorded in the booking panel can unlock an artist's payout.
   useEffect(() => {
     if (!unlocked) return undefined;
-    const refresh = () => getPayoutSummaries().then(d => setPayouts(d.payouts ?? [])).catch(() => {});
+    const refresh = () => getPayoutSummaries().then(d => {
+      const list = d.payouts ?? [];
+      setPayouts(list);
+      setPayTarget(pt => (pt && list.find(p => p.artist_id === pt.artist_id)) || pt);
+    }).catch(() => {});
     window.addEventListener(ATTENTION_CHANGED_EVENT, refresh);
     return () => window.removeEventListener(ATTENTION_CHANGED_EVENT, refresh);
   }, [unlocked]);
@@ -673,6 +679,19 @@ function PayoutPanel({ artist, initialView = 'history', requirement, onClose, on
   // 'history' is only the past payouts; 'pay' adds the artist's figures and the payment form.
   const paying = initialView === 'pay';
   const historyOnly = !paying;
+  // The booking opened from "Bookings to review", shown to the right in this same pop-up.
+  const [openBooking, setOpenBooking] = useState(null); // { id, summary, full, loading }
+  const bookingOpen = Boolean(openBooking);
+  const openBookingId = openBooking?.id;
+  useEffect(() => {
+    if (!openBookingId) return undefined;
+    return loadBooking(openBookingId, {
+      onBooking: (full, { cached }) => setOpenBooking(b => (b?.id === openBookingId ? { ...b, full, loading: cached ? false : b.loading } : b)),
+      onError: showError,
+      onDone: () => setOpenBooking(b => (b?.id === openBookingId ? { ...b, loading: false } : b)),
+    });
+  }, [openBookingId]);
+  const toggleBooking = e => setOpenBooking(b => (b?.id === e.booking_id ? null : { id: e.booking_id, summary: e, full: null, loading: true }));
   const [reviewOpen] = useState(artist.incomplete_recordings > 0);
   const locked = artist.incomplete_recordings > 0;
 
@@ -715,9 +734,9 @@ function PayoutPanel({ artist, initialView = 'history', requirement, onClose, on
   }
 
   return (
-    <Dialog title={artist.artist_name} description={historyOnly ? t('revenue_payout_history') : artist.outstanding > 0 ? `${fmt(artist.outstanding)} outstanding` : t('revenue_all_paid')} onClose={onClose} dismissDisabled={saving || !!deleting} maxWidth={440} footer={<button type="button" style={{ ...st.payBtn, ...st.rowActionQuiet }} disabled={saving || !!deleting} onClick={onClose}>Close</button>}>
+    <Dialog title={artist.artist_name} description={historyOnly ? t('revenue_payout_history') : artist.outstanding > 0 ? `${fmt(artist.outstanding)} outstanding` : t('revenue_all_paid')} onClose={onClose} dismissDisabled={saving || !!deleting} maxWidth={bookingOpen ? 1180 : 440} className={css.payoutDialog} contentStyle={bookingOpen ? st.payoutSplit : undefined} footer={<button type="button" style={{ ...st.payBtn, ...st.rowActionQuiet }} disabled={saving || !!deleting} onClick={onClose}>Close</button>}>
+        <div style={bookingOpen ? st.payoutMain : undefined}>
         <div style={st.panelBody}>
-          {/* The detail behind the Payouts table's one line per artist. */}
           {/* The detail behind this artist's row. */}
           {!historyOnly && <div>
             <dl style={st.panelStats}>
@@ -747,11 +766,7 @@ function PayoutPanel({ artist, initialView = 'history', requirement, onClose, on
             </div>
           )}
           {paying && reviewOpen && (
-            <MissingPayments artist={artist} requirement={requirement} onRecorded={onRecorded} onOpenBooking={e => {
-              // The booking panel can't show over this pop-up, so this closes first.
-              onClose();
-              openBookingPanel(e.booking_id, { requester_name: e.client_name, chosen_time: e.chosen_time });
-            }} />
+            <MissingPayments artist={artist} requirement={requirement} onRecorded={onRecorded} activeId={openBookingId} onOpenBooking={toggleBooking} />
           )}
           {paying && artist.outstanding > 0 && <>
             {/* Mode toggle */}
@@ -848,6 +863,20 @@ function PayoutPanel({ artist, initialView = 'history', requirement, onClose, on
             )}
           </div>
         </div>
+        </div>
+        {bookingOpen && (
+          <div className={css.payoutBooking} style={st.payoutBooking}>
+            <BookingDetailPanel
+              embedded
+              booking={openBooking.loading ? null : openBooking.full}
+              entry={{ bookingId: openBooking.id, clientName: openBooking.full?.requester_name ?? openBooking.summary.client_name, chosenTime: openBooking.summary.chosen_time, status: openBooking.full?.status ?? 'completed' }}
+              loading={openBooking.loading}
+              onClose={() => setOpenBooking(null)}
+              onLeave={onClose}
+              onBooked={() => setOpenBooking(null)}
+            />
+          </div>
+        )}
     </Dialog>
   );
 }
@@ -907,7 +936,7 @@ function PayoutHistoryRow({ payout: p, open, deleting, onToggle, onDelete }) {
 
 // Bookings missing the payment recording the studio requires, shown inside the payout
 // panel so the studio can record them before paying the artist out.
-function MissingPayments({ artist, requirement, onRecorded, onOpenBooking }) {
+function MissingPayments({ artist, requirement, onRecorded, activeId, onOpenBooking }) {
   const [entries, setEntries] = useState(null); // null = loading
   const [error, setError] = useState('');
   const [recording, setRecording] = useState(null); // entry being recorded
@@ -919,6 +948,11 @@ function MissingPayments({ artist, requirement, onRecorded, onOpenBooking }) {
       .catch(e => { setEntries([]); setError(e.message); });
   }
   useEffect(load, [artist.artist_id]);
+  // A payment recorded in the booking opened beside this list.
+  useEffect(() => {
+    window.addEventListener(ATTENTION_CHANGED_EVENT, load);
+    return () => window.removeEventListener(ATTENTION_CHANGED_EVENT, load);
+  }, [artist.artist_id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const has = (e, who) => (e.splits ?? []).some(x => x.recorded_by === who);
   const needsStudio = e => requirement !== 'artist_only' && !has(e, 'studio');
@@ -961,8 +995,8 @@ function MissingPayments({ artist, requirement, onRecorded, onOpenBooking }) {
               : studioMissing ? 'Studio payment not recorded'
               : 'Waiting for the artist to record their payment';
             return (
-              <li key={e.booking_id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.65rem 0.9rem', borderTop: '1px solid var(--border-faint)' }}>
-                <button type="button" className={css.bookingLink} onClick={() => onOpenBooking(e)} aria-label={`Open booking for ${e.client_name || 'client'}`} style={st.bookingLink}>
+              <li key={e.booking_id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.65rem 0.9rem', borderTop: '1px solid var(--border-faint)', background: activeId === e.booking_id ? 'var(--bg-row-hover)' : undefined }}>
+                <button type="button" className={css.bookingLink} onClick={() => onOpenBooking(e)} aria-expanded={activeId === e.booking_id} aria-label={`${e.client_name || 'Client'} booking details`} style={st.bookingLink}>
                   <span className={css.bookingName} style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text)', overflowWrap: 'anywhere' }}>{e.client_name || 'Client'}</span>
                   <span style={{ display: 'block', marginTop: '0.1rem', fontSize: '0.74rem', color: 'var(--text-muted)' }}>
                     {fmtDate(e.chosen_time)}{e.gross != null ? ` · ${fmt(e.gross)}` : ''}
@@ -1201,6 +1235,9 @@ const st = {
   rowAction: { minWidth: 78, textAlign: 'center' },
   rowActionQuiet: { background: 'transparent', borderColor: 'var(--border)', color: 'var(--text-dim)' },
   bookingLink: { flex: 1, minWidth: 0, padding: 0, background: 'transparent', border: 0, font: 'inherit', textAlign: 'left', cursor: 'pointer' },
+  payoutSplit: { display: 'flex', padding: 0, overflow: 'hidden', height: 'min(780px, calc(100dvh - 12rem))' },
+  payoutMain: { flex: '0 0 min(440px, 46%)', minWidth: 0, overflowY: 'auto', overscrollBehavior: 'contain', padding: '0 var(--space-6, 1.5rem) var(--space-6, 1.5rem)', boxSizing: 'border-box' },
+  payoutBooking: { flex: 1, minWidth: 0, borderLeft: '1px solid var(--border-faint)' },
   panelStats: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(88px, 1fr))', gap: '0.75rem', margin: 0 },
   historyFoot: { display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '0.75rem', paddingTop: '0.5rem', borderTop: '1px solid var(--border-faint)', fontSize: '0.8rem', color: 'var(--text-muted)' },
   panelStatLabel: { fontSize: '0.8rem', color: 'var(--text-muted)' },

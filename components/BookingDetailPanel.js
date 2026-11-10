@@ -106,6 +106,8 @@ export default function BookingDetailPanel({
   bookTimeArtists, // optional: studio artists — shows "Book a time" on requests
   depositsReady = false, // the studio can collect deposits (Stripe, PayID or bank)
   onBooked,     // optional fn(bookingId) — after "Book a time"
+  embedded = false, // sits inside another surface: fills it, with no backdrop
+  onLeave,      // optional fn() — when embedded, close the surface too before going to another page
 }) {
   const router = useRouter();
   const { t } = useLanguage();
@@ -565,13 +567,15 @@ export default function BookingDetailPanel({
   }
 
 
+  const panelStyle = embedded ? { ...p.panel, position: 'relative', top: 'auto', right: 'auto', bottom: 'auto', width: '100%', height: '100%', borderLeft: 0, boxShadow: 'none', zIndex: 'auto' } : p.panel;
+
   // While the full booking is fetching, show only the header + a loading state —
   // keep the detail sections hidden rather than rendering them from partial data.
   if (loading) {
     return (
       <>
-      <PanelBackdrop onClose={onClose} />
-      <aside className={`studio-booking-detail ${panelLayout.panel}`} aria-label={`${clientName} booking details`} aria-busy="true" style={p.panel}>
+      {!embedded && <PanelBackdrop onClose={onClose} />}
+      <aside className={`studio-booking-detail ${panelLayout.panel}`} aria-label={`${clientName} booking details`} aria-busy="true" style={panelStyle}>
         <div style={p.header}>
           <div style={p.headerText}>
             <span style={p.title}>{clientName}</span>
@@ -626,8 +630,8 @@ export default function BookingDetailPanel({
 
   return (
     <>
-    <PanelBackdrop onClose={onClose} />
-    <aside className={`studio-booking-detail ${panelLayout.panel}`} aria-label={`${clientName} booking details`} style={p.panel}>
+    {!embedded && <PanelBackdrop onClose={onClose} />}
+    <aside className={`studio-booking-detail ${panelLayout.panel}`} aria-label={`${clientName} booking details`} style={panelStyle}>
       <div className="studio-bdp-header" style={p.header}>
         <div className="studio-bdp-headtext" style={p.headerText}>
           <span style={p.title}>{clientName}</span>
@@ -646,7 +650,7 @@ export default function BookingDetailPanel({
               {(email || (clientName && clientName !== '—')) && (
                 <button type="button" style={{ ...p.textLink, marginLeft: '0.35rem' }} onClick={() => {
                   const key = email || clientName;
-                  onClose?.();
+                  (onLeave ?? onClose)?.();
                   router.push(`/dashboard/clients?client=${encodeURIComponent(key)}`);
                 }}>{t('bdp_view_client')}</button>
               )}

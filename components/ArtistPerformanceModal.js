@@ -124,10 +124,7 @@ export default function ArtistPerformanceModal({ artist, startDate, endDate, qui
           {compared && <p className={styles.compared}>Compared with {niceRange(data.previous.range.start, data.previous.range.end)}</p>}
 
           <section className={styles.card} aria-label="Sales trend">
-            <h3 className={styles.cardHead}>
-              Sales by {data.unit}
-              {topTrend.sales > 0 && <span className={styles.cardNote}>Best: {topTrend.label} · {money(topTrend.sales)}</span>}
-            </h3>
+            <h3 className={styles.cardHead}>Sales by {data.unit}</h3>
             <div role="img" aria-label={`Sales by ${data.unit}. Highest was ${money(topTrend.sales)} on ${topTrend.label}.`}>
               <ResponsiveContainer width="100%" height={170}>
                 <BarChart data={data.trend} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
@@ -143,7 +140,7 @@ export default function ArtistPerformanceModal({ artist, startDate, endDate, qui
 
           <div className={styles.columns}>
             <section className={styles.card}>
-              <h3 className={styles.cardHead}>Where bookings come from</h3>
+              <h3 className={styles.cardHead}>Bookings by source</h3>
               <div className={styles.bars}>
                 {data.sources.map(s => (
                   <div key={s.source}>
@@ -155,10 +152,7 @@ export default function ArtistPerformanceModal({ artist, startDate, endDate, qui
             </section>
 
             <section className={styles.card}>
-              <h3 className={styles.cardHead}>
-                Busiest days
-                {data.busiest && <span className={styles.cardNote}>{data.busiest.label}</span>}
-              </h3>
+              <h3 className={styles.cardHead}>Busiest days</h3>
               <div className={styles.week}>
                 {data.weekdays.map(d => (
                   <div key={d.label} className={styles.dayCol} title={`${d.label}: ${d.count} ${d.count === 1 ? 'tattoo' : 'tattoos'}, ${money(d.sales)}`}>

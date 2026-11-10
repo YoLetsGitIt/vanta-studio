@@ -27,6 +27,12 @@
 .bookingLink:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; border-radius: 4px; }
 @media (hover: hover) and (pointer: fine) { .bookingLink:hover .bookingName { text-decoration: underline; text-underline-offset: 2px; } }
 
+/* The artist's pop-up widens to show a booking beside the list. */
+.payoutDialog { transition: max-width 220ms cubic-bezier(0.23, 1, 0.32, 1); }
+.payoutBooking { animation: payoutBookingIn 200ms cubic-bezier(0.23, 1, 0.32, 1); }
+@keyframes payoutBookingIn { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .payoutDialog { transition: none; } .payoutBooking { animation: none; } }
+
 /* On a phone: who, how much is owed, and what to do. The rest is in the artist's panel. */
 @media (max-width: 760px) {
   .wide { display: none; }
