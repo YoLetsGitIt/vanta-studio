@@ -88,3 +88,35 @@ test('nothing in the range is an empty result, not an error', () => {
   assert.equal(p.busiest, null);
   assert.deepEqual(p.sources, []);
 });
+
+const artist = (id, session_count, gross_sales, avg_ticket, deposits_collected, estimated_hours, sales_per_hour) => ({ artist_id: id, session_count, gross_sales, avg_ticket, deposits_collected, estimated_hours, sales_per_hour });
+const studio = [artist('a', 10, 5000, 500, 800, 40, 125), artist('b', 6, 3000, 500, 1000, 20, 150), artist('c', 2, 1000, 500, 200, 10, 100)];
+const metric = (metrics, key) => metrics.find(m => m.key === key);
+
+test('every table column is a metric, ranked against the studio', async () => {
+  const { compareArtist } = await import('../lib/artistPerformance.mjs');
+  const metrics = compareArtist(studio, 'b');
+  assert.deepEqual(metrics.map(m => m.key), ['session_count', 'gross_sales', 'avg_ticket', 'deposits_collected', 'estimated_hours', 'sales_per_hour']);
+  const sales = metric(metrics, 'gross_sales');
+  assert.deepEqual([sales.value, sales.rank, sales.of, sales.top], [3000, 2, 3, 5000]);
+  assert.equal(sales.avg, 3000);
+  assert.equal(metric(metrics, 'sales_per_hour').rank, 1);
+  // Everyone equal: all share first place.
+  assert.equal(metric(metrics, 'avg_ticket').rank, 1);
+});
+
+test('metrics show the change on the previous period, when there is one', async () => {
+  const { compareArtist } = await import('../lib/artistPerformance.mjs');
+  const before = [artist('b', 3, 2000, 400, 0, 10, 0)];
+  const metrics = compareArtist(studio, 'b', before);
+  assert.equal(metric(metrics, 'gross_sales').change, 50);
+  assert.equal(metric(metrics, 'session_count').change, 100);
+  assert.equal(metric(metrics, 'deposits_collected').change, null);
+  assert.equal(compareArtist(studio, 'b')[0].change, null);
+});
+
+test('an artist with nothing in the period is unranked at zero', async () => {
+  const { compareArtist } = await import('../lib/artistPerformance.mjs');
+  const m = metric(compareArtist(studio, 'nobody'), 'gross_sales');
+  assert.deepEqual([m.value, m.rank, m.of], [0, null, 3]);
+});

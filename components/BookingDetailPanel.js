@@ -567,7 +567,7 @@ export default function BookingDetailPanel({
   }
 
 
-  const panelStyle = embedded ? { ...p.panel, position: 'relative', top: 'auto', right: 'auto', bottom: 'auto', width: '100%', height: '100%', borderLeft: 0, boxShadow: 'none', zIndex: 'auto' } : p.panel;
+  const panelStyle = embedded ? { ...p.panel, position: 'relative', top: 'auto', right: 'auto', bottom: 'auto', width: '100%', height: '100%', borderLeft: 0, boxShadow: 'none', zIndex: 'auto', background: 'var(--bg-modal)' } : p.panel;
 
   // While the full booking is fetching, show only the header + a loading state —
   // keep the detail sections hidden rather than rendering them from partial data.

@@ -1,15 +1,14 @@
 'use client';
 
-// An artist's performance, opened from Financial → Artists & Payouts: the key numbers
-// against the previous period, the sales trend, where bookings come from, their busiest
-// days and their clients. Worked out from their completed bookings, so the date range
-// here changes instantly and doesn't affect the page behind.
+// An artist's performance, opened from Financial → Artists & Payouts: each number from the
+// Artists table against the studio and the previous period, the sales trend, where bookings come from, their busiest
+// days and their clients. The date range here doesn't affect the page behind.
 import { useEffect, useMemo, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import Dialog from '@/components/ui/Dialog';
 import { SkeletonBar } from '@/components/ui/DetailParts';
-import { getArtistEarningsBreakdown } from '@/lib/api';
-import { artistPerformance } from '@/lib/artistPerformance.mjs';
+import { getArtistEarningsBreakdown, getStudioRevenueStats } from '@/lib/api';
+import { artistPerformance, compareArtist, rangeBefore } from '@/lib/artistPerformance.mjs';
 import { getBookingSourceLabel } from '@/lib/bookingType';
 import { toISODate } from '@/lib/format';
 import styles from './ArtistPerformanceModal.module.css';
@@ -24,6 +23,8 @@ const RANGES = [
 ];
 
 const money = n => '$' + Math.round(Number(n) || 0).toLocaleString('en-US');
+const moneyExact = n => '$' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const formatMetric = (key, v) => (key === 'session_count' ? String(Math.round(v)) : key === 'estimated_hours' ? `${(Number(v) || 0).toFixed(1)}h` : money(v));
 const moneyAxis = v => '$' + (v >= 1000 ? `${Math.round(v / 100) / 10}k` : v);
 function daysAgo(n) { const d = new Date(); d.setDate(d.getDate() - n); return toISODate(d); }
 function niceRange(start, end) {
@@ -33,11 +34,37 @@ function niceRange(start, end) {
   return `${a.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', ...(sameYear ? {} : { year: 'numeric' }) })} – ${b.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}`;
 }
 
-function Change({ value, compared }) {
-  if (!compared) return null;
-  if (value == null) return <span className={styles.change}>No earlier data</span>;
-  if (value === 0) return <span className={styles.change}>No change</span>;
-  return <span className={`${styles.change} ${value > 0 ? styles.up : styles.down}`}><span aria-hidden="true">{value > 0 ? '▲' : '▼'}</span> {Math.abs(value)}%<span style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>{value > 0 ? ' up' : ' down'} on the previous period</span></span>;
+function Change({ value, compared, inline = false }) {
+  if (!compared || (inline && value == null)) return null;
+  const base = inline ? `${styles.change} ${styles.changeInline}` : styles.change;
+  if (value == null) return <span className={base}>No earlier data</span>;
+  if (value === 0) return <span className={base}>No change</span>;
+  return <span className={`${base} ${value > 0 ? styles.up : styles.down}`}><span aria-hidden="true">{value > 0 ? '▲' : '▼'}</span> {Math.abs(value)}%<span style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>{value > 0 ? ' up' : ' down'} on the previous period</span></span>;
+}
+
+// One number from the Artists table: its value, change and rank, and a bar for where it
+// sits against the studio's top artist, with a marker at the studio average.
+function MetricCard({ metric: m, compared }) {
+  const scale = v => (m.top > 0 ? Math.min(100, (v / m.top) * 100) : 0);
+  const value = formatMetric(m.key, m.value);
+  const ranked = m.rank && m.of > 1;
+  return (
+    <div className={styles.metric}>
+      <div className={styles.metricHead}>
+        <dt className={styles.metricLabel}>{m.label}</dt>
+        {ranked && <span className={m.rank === 1 ? `${styles.rank} ${styles.rankTop}` : styles.rank}>#{m.rank} of {m.of}</span>}
+      </div>
+      <dd className={styles.metricValue}>
+        {value}
+        <span style={{ marginLeft: '0.4rem' }}><Change value={m.change} compared={compared} inline /></span>
+      </dd>
+      <dd className={styles.bullet} aria-hidden="true">
+        <div className={styles.bulletFill} style={{ width: `${scale(m.value)}%` }} />
+        {m.of > 1 && <div className={styles.bulletAvg} style={{ left: `${scale(m.avg)}%` }} />}
+      </dd>
+      {m.of > 1 && <dd className={styles.metricFoot}>Studio avg {formatMetric(m.key, m.avg)}</dd>}
+    </div>
+  );
 }
 
 function TrendTooltip({ active, payload, label }) {
@@ -78,17 +105,28 @@ export default function ArtistPerformanceModal({ artist, startDate, endDate, qui
     }
   }
 
+  // The Artists table's numbers for this range and the one before it.
+  const [studio, setStudio] = useState(null); // { key, current, previous } or { key, failed }
+  const rangeKey = `${range.start}|${range.end}|${range.compare}`;
+  useEffect(() => {
+    let live = true;
+    const before = range.compare ? rangeBefore(range.start, range.end) : null;
+    Promise.all([
+      getStudioRevenueStats(range.start, range.end),
+      before ? getStudioRevenueStats(before.start, before.end) : null,
+    ])
+      .then(([now, then]) => { if (live) setStudio({ key: rangeKey, current: now.by_artist ?? [], previous: then ? then.by_artist ?? [] : null }); })
+      .catch(() => { if (live) setStudio({ key: rangeKey, failed: true }); });
+    return () => { live = false; };
+  }, [rangeKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  const studioReady = studio?.key === rangeKey && !studio.failed;
+  const metrics = useMemo(() => (studioReady ? compareArtist(studio.current, artist.artist_id, studio.previous) : null), [studioReady, studio, artist.artist_id]);
+
   const data = useMemo(() => (entries ? artistPerformance(entries, range.start, range.end, { compare: range.compare }) : null), [entries, range]);
   const compared = Boolean(data?.previous);
-  const hasData = data && data.current.tattoos > 0;
+  const hasData = data && (data.current.tattoos > 0 || Boolean(metrics?.some(m => m.value > 0)));
   const topDay = data ? Math.max(1, ...data.weekdays.map(d => d.count)) : 1;
   const topTrend = data?.trend.reduce((best, t) => (t.sales > best.sales ? t : best), { sales: 0, label: '' });
-  const kpis = data ? [
-    ['Sales', money(data.current.sales), data.change.sales],
-    ['Tattoos', data.current.tattoos, data.change.tattoos],
-    ['Avg ticket', money(data.current.avgTicket), data.change.avgTicket],
-    ['Artist earnings', money(data.current.earnings), data.change.earnings],
-  ] : [];
 
   return (
     <Dialog title={artist.artist_name} description={`Performance · ${niceRange(range.start, range.end)}`} onClose={onClose} maxWidth={680}
@@ -112,16 +150,18 @@ export default function ArtistPerformanceModal({ artist, startDate, endDate, qui
         {data && !failed && !hasData && <p className={styles.empty}>No completed sessions in this period.</p>}
 
         {data && !failed && hasData && <>
-          <dl className={styles.kpis}>
-            {kpis.map(([label, value, change]) => (
-              <div key={label} className={styles.kpi} style={{ position: 'relative' }}>
-                <dt className={styles.kpiLabel}>{label}</dt>
-                <dd className={styles.kpiValue}>{value}</dd>
-                <dd style={{ margin: 0 }}><Change value={change} compared={compared} /></dd>
-              </div>
-            ))}
-          </dl>
-          {compared && <p className={styles.compared}>Compared with {niceRange(data.previous.range.start, data.previous.range.end)}</p>}
+          {studio?.key === rangeKey && studio.failed
+            ? <p className={styles.compared} role="alert">The studio comparison couldn’t be loaded.</p>
+            : metrics
+              ? <dl className={styles.metrics}>{metrics.map(m => <MetricCard key={m.key} metric={m} compared={compared} />)}</dl>
+              : <div className={styles.metrics} role="status" aria-label="Loading numbers">{Array.from({ length: 6 }, (_, i) => <SkeletonBar key={i} h={104} />)}</div>}
+          <p className={styles.compared}>
+            Bars are measured against your top artist; the line marks the studio average.{compared ? ` Changes compare with ${niceRange(data.previous.range.start, data.previous.range.end)}.` : ''}
+          </p>
+          <p className={styles.summaryLine}>
+            <span>Artist earnings <strong>{money(data.current.earnings)}</strong></span>
+            {artist.outstanding != null && <span>Owed (all time) <strong>{moneyExact(artist.outstanding)}</strong></span>}
+          </p>
 
           <section className={styles.card} aria-label="Sales trend">
             <h3 className={styles.cardHead}>Sales by {data.unit}</h3>

@@ -626,10 +626,10 @@ function ArtistsSection({ payouts, stats, loading, controls, onPay, onHistory, o
                   const missing = p?.incomplete_recordings > 0;
                   const label = p?.outstanding > 0 ? (missing ? 'Review' : 'Pay out') : null;
                   return (
-                    <tr key={r.id} className={css.row} style={{ ...(i < rows.length - 1 ? st.tr : {}), cursor: 'pointer' }} onClick={() => onPerformance({ artist_id: r.id, artist_name: r.name })}>
+                    <tr key={r.id} className={css.row} style={{ ...(i < rows.length - 1 ? st.tr : {}), cursor: 'pointer' }} onClick={() => onPerformance({ artist_id: r.id, artist_name: r.name, outstanding: p?.outstanding ?? null })}>
                       <td style={{ ...st.tdName, ...middle }}>
                         <span style={st.nameLine}>
-                          <button type="button" className={css.name} onClick={e => { e.stopPropagation(); onPerformance({ artist_id: r.id, artist_name: r.name }); }} aria-label={`Performance for ${r.name}`} style={st.artistLink}>{r.name}</button>
+                          <button type="button" className={css.name} onClick={e => { e.stopPropagation(); onPerformance({ artist_id: r.id, artist_name: r.name, outstanding: p?.outstanding ?? null }); }} aria-label={`Performance for ${r.name}`} style={st.artistLink}>{r.name}</button>
                           {missing && <span style={st.missingNote}>{p.incomplete_recordings} payment{p.incomplete_recordings > 1 ? 's' : ''} not recorded</span>}
                         </span>
                       </td>
@@ -643,7 +643,7 @@ function ArtistsSection({ payouts, stats, loading, controls, onPay, onHistory, o
                       <td style={{ ...num, fontWeight: 650, color: owedOf(r) > 0 ? 'var(--text)' : 'var(--text-muted)' }}>{p ? fmt(p.outstanding) : '—'}</td>
                       <td style={{ ...st.tdActions, ...middle }}>
                         <span className={css.actions}>
-                          <button type="button" className={css.quiet} onClick={e => { e.stopPropagation(); onPerformance({ artist_id: r.id, artist_name: r.name }); }} aria-label={`Performance for ${r.name}`} style={st.quietBtn}>Performance</button>
+                          <button type="button" className={css.quiet} onClick={e => { e.stopPropagation(); onPerformance({ artist_id: r.id, artist_name: r.name, outstanding: p?.outstanding ?? null }); }} aria-label={`Performance for ${r.name}`} style={st.quietBtn}>Performance</button>
                           {p && <button type="button" className={css.quiet} onClick={e => { e.stopPropagation(); onHistory(p); }} aria-label={`Payout history for ${r.name}`} style={st.quietBtn}>History</button>}
                           {label
                             ? <button type="button" onClick={e => { e.stopPropagation(); onPay(p); }} aria-label={`${label}: ${r.name}`}
@@ -734,8 +734,8 @@ function PayoutPanel({ artist, initialView = 'history', requirement, onClose, on
   }
 
   return (
-    <Dialog title={artist.artist_name} description={historyOnly ? t('revenue_payout_history') : artist.outstanding > 0 ? `${fmt(artist.outstanding)} outstanding` : t('revenue_all_paid')} onClose={onClose} dismissDisabled={saving || !!deleting} maxWidth={bookingOpen ? 1180 : 440} className={css.payoutDialog} contentStyle={bookingOpen ? st.payoutSplit : undefined} footer={<button type="button" style={{ ...st.payBtn, ...st.rowActionQuiet }} disabled={saving || !!deleting} onClick={onClose}>Close</button>}>
-        <div style={bookingOpen ? st.payoutMain : undefined}>
+    <Dialog title={artist.artist_name} description={historyOnly ? t('revenue_payout_history') : artist.outstanding > 0 ? `${fmt(artist.outstanding)} outstanding` : t('revenue_all_paid')} onClose={onClose} dismissDisabled={saving || !!deleting} maxWidth={bookingOpen ? 1180 : 440} className={`${css.payoutDialog} ${bookingOpen ? css.payoutSplit : ''}`} footer={<button type="button" style={{ ...st.payBtn, ...st.rowActionQuiet }} disabled={saving || !!deleting} onClick={onClose}>Close</button>}>
+        <div className={bookingOpen ? css.payoutMain : undefined}>
         <div style={st.panelBody}>
           {/* The detail behind this artist's row. */}
           {!historyOnly && <div>
@@ -749,26 +749,12 @@ function PayoutPanel({ artist, initialView = 'history', requirement, onClose, on
               <p style={st.panelStatNote}>Studio {fmt(artist.earned_studio)} · Personal {fmt(artist.earned_personal)}</p>
             )}
           </div>}
-          {paying && artist.incomplete_recordings > 0 && (
-            <div style={{
-              background: 'var(--color-warning-surface)', border: '1px solid var(--color-warning-border)',
-              borderRadius: 8, padding: '0.7rem 0.9rem',
-              display: 'flex', flexDirection: 'column', gap: '0.6rem',
-            }}>
-              <div>
-                <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--color-warning)', fontWeight: 600 }}>
-                  ⚠ {artist.incomplete_recordings} booking{artist.incomplete_recordings > 1 ? 's' : ''} missing required payment recording{artist.incomplete_recordings > 1 ? 's' : ''}
-                </p>
-                <p style={{ margin: '0.25rem 0 0', fontSize: '0.75rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-                  Record these payments below to unlock this payout.
-                </p>
-              </div>
-            </div>
-          )}
           {paying && reviewOpen && (
             <MissingPayments artist={artist} requirement={requirement} onRecorded={onRecorded} activeId={openBookingId} onOpenBooking={toggleBooking} />
           )}
           {paying && artist.outstanding > 0 && <>
+            {/* Nothing to fill in until the payout is unlocked. */}
+            {!locked && <>
             {/* Mode toggle */}
             <div style={st.modeRow}>
               <button
@@ -825,6 +811,7 @@ function PayoutPanel({ artist, initialView = 'history', requirement, onClose, on
               placeholder="Note (optional)"
               style={st.noteInput}
             />
+            </>}
 
             {error && <p role="alert" style={{ fontSize: '0.78rem', color: 'var(--color-danger)', margin: 0 }}>{error}</p>}
 
@@ -837,8 +824,8 @@ function PayoutPanel({ artist, initialView = 'history', requirement, onClose, on
               {saving ? 'Recording…' : locked ? 'Payout locked' : `Record payout of ${fmt(amount)}`}
             </button>
             {locked && (
-              <p id="payout-locked-note" style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)', textAlign: 'center' }}>
-                Unlocks once every booking payment above is recorded.
+              <p id="payout-locked-note" style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)', textAlign: 'center' }}>
+                Unlocks once every booking above is recorded.
               </p>
             )}
           </>}
@@ -865,7 +852,7 @@ function PayoutPanel({ artist, initialView = 'history', requirement, onClose, on
         </div>
         </div>
         {bookingOpen && (
-          <div className={css.payoutBooking} style={st.payoutBooking}>
+          <div className={css.payoutBooking}>
             <BookingDetailPanel
               embedded
               booking={openBooking.loading ? null : openBooking.full}
@@ -977,9 +964,10 @@ function MissingPayments({ artist, requirement, onRecorded, activeId, onOpenBook
   const fmtDate = iso => iso ? new Date(iso).toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }) : 'No date';
 
   return (
-    <div style={{ marginBottom: '1rem', border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', padding: '0.6rem 0.9rem', borderBottom: '1px solid var(--border-faint)' }}>
-        <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text)' }}>Bookings to review</span>
+    <div style={{ border: '1px solid var(--border-faint)', borderRadius: 12, overflow: 'hidden' }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '0.5rem', padding: '0.7rem 0.9rem' }}>
+        <span style={{ fontSize: '0.875rem', fontWeight: 650, color: 'var(--text)' }}>Bookings to review</span>
+        {missing.length > 0 && <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-warning)', fontVariantNumeric: 'tabular-nums' }}>{missing.length} not recorded</span>}
       </div>
       {entries === null && <p style={{ margin: 0, padding: '0.9rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>Loading bookings…</p>}
       {error && <p role="alert" style={{ margin: 0, padding: '0.9rem', fontSize: '0.8rem', color: 'var(--color-danger)' }}>{error}</p>}
@@ -987,13 +975,13 @@ function MissingPayments({ artist, requirement, onRecorded, activeId, onOpenBook
         <p style={{ margin: 0, padding: '0.9rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>All payments are recorded.</p>
       )}
       {missing.length > 0 && (
-        <ul style={{ listStyle: 'none', margin: 0, padding: 0, maxHeight: 280, overflowY: 'auto' }}>
+        <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
           {missing.map(e => {
             const studioMissing = needsStudio(e);
             const artistMissing = needsArtist(e);
-            const what = studioMissing && artistMissing ? 'Studio and artist payments not recorded'
-              : studioMissing ? 'Studio payment not recorded'
-              : 'Waiting for the artist to record their payment';
+            // Every row needs recording, so only say so when someone else has to do it.
+            const what = !studioMissing ? 'Waiting for the artist to record their payment'
+              : artistMissing ? 'Artist needs to record theirs too' : null;
             return (
               <li key={e.booking_id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.65rem 0.9rem', borderTop: '1px solid var(--border-faint)', background: activeId === e.booking_id ? 'var(--bg-row-hover)' : undefined }}>
                 <button type="button" className={css.bookingLink} onClick={() => onOpenBooking(e)} aria-expanded={activeId === e.booking_id} aria-label={`${e.client_name || 'Client'} booking details`} style={st.bookingLink}>
@@ -1001,11 +989,11 @@ function MissingPayments({ artist, requirement, onRecorded, activeId, onOpenBook
                   <span style={{ display: 'block', marginTop: '0.1rem', fontSize: '0.74rem', color: 'var(--text-muted)' }}>
                     {fmtDate(e.chosen_time)}{e.gross != null ? ` · ${fmt(e.gross)}` : ''}
                   </span>
-                  <span style={{ display: 'block', marginTop: '0.1rem', fontSize: '0.72rem', color: 'var(--color-warning)' }}>{what}</span>
+                  {what && <span style={{ display: 'block', marginTop: '0.1rem', fontSize: '0.75rem', color: 'var(--color-warning)' }}>{what}</span>}
                 </button>
                 {studioMissing && (
-                  <button type="button" onClick={() => setRecording(e)} style={{ ...st.payBtn, flexShrink: 0, whiteSpace: 'nowrap' }}>
-                    Record payment
+                  <button type="button" onClick={() => setRecording(e)} aria-label={`Record payment for ${e.client_name || 'client'}`} style={{ ...st.payBtn, flexShrink: 0, whiteSpace: 'nowrap' }}>
+                    Record
                   </button>
                 )}
               </li>
@@ -1235,9 +1223,6 @@ const st = {
   rowAction: { minWidth: 78, textAlign: 'center' },
   rowActionQuiet: { background: 'transparent', borderColor: 'var(--border)', color: 'var(--text-dim)' },
   bookingLink: { flex: 1, minWidth: 0, padding: 0, background: 'transparent', border: 0, font: 'inherit', textAlign: 'left', cursor: 'pointer' },
-  payoutSplit: { display: 'flex', padding: 0, overflow: 'hidden', height: 'min(780px, calc(100dvh - 12rem))' },
-  payoutMain: { flex: '0 0 min(440px, 46%)', minWidth: 0, overflowY: 'auto', overscrollBehavior: 'contain', padding: '0 var(--space-6, 1.5rem) var(--space-6, 1.5rem)', boxSizing: 'border-box' },
-  payoutBooking: { flex: 1, minWidth: 0, borderLeft: '1px solid var(--border-faint)' },
   panelStats: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(88px, 1fr))', gap: '0.75rem', margin: 0 },
   historyFoot: { display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '0.75rem', paddingTop: '0.5rem', borderTop: '1px solid var(--border-faint)', fontSize: '0.8rem', color: 'var(--text-muted)' },
   panelStatLabel: { fontSize: '0.8rem', color: 'var(--text-muted)' },

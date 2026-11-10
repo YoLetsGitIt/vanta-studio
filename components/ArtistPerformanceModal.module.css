@@ -5,11 +5,22 @@
 .range:focus-visible, .link:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 @media (hover: hover) and (pointer: fine) { .range:not([aria-pressed='true']):hover { background: var(--bg-row-hover); color: var(--text); } .link:hover { color: var(--text); text-decoration: underline; text-underline-offset: 2px; } }
 
-.kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.75rem; margin: 0; }
-.kpi { min-width: 0; }
-.kpiLabel { font-size: 0.8rem; color: var(--text-muted); }
-.kpiValue { margin: 0.15rem 0 0; font-size: 1.35rem; font-weight: 650; letter-spacing: -0.02em; color: var(--text); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.75rem; margin: 0; }
+.metric { min-width: 0; padding: 0.8rem 0.9rem; border: 1px solid var(--border-faint); border-radius: 12px; }
+.metric dd { margin: 0; }
+.metricHead { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+.metricLabel { font-size: 0.8rem; color: var(--text-muted); }
+.rank { flex-shrink: 0; padding: 0.05rem 0.45rem; border-radius: 99px; background: var(--bg-chip); color: var(--text-muted); font-size: 0.72rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.rankTop { background: var(--accent); color: var(--accent-contrast); }
+.metric .metricValue { margin-top: 0.3rem; font-size: 1.3rem; font-weight: 650; letter-spacing: -0.02em; color: var(--text); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.metric .bullet { position: relative; height: 6px; margin-top: 0.6rem; border-radius: 99px; background: var(--border-faint); }
+.bulletFill { height: 100%; border-radius: 99px; background: var(--accent); }
+.bulletAvg { position: absolute; top: -3px; width: 2px; height: 12px; margin-left: -1px; border-radius: 1px; background: var(--text-muted); box-shadow: 0 0 0 1.5px var(--bg-modal); }
+.metric .metricFoot { margin-top: 0.4rem; font-size: 0.75rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.summaryLine { display: flex; flex-wrap: wrap; gap: 0.25rem 1.5rem; margin: -0.5rem 0 0; font-size: 0.85rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.summaryLine strong { color: var(--text); font-weight: 650; }
 .change { display: block; margin-top: 0.1rem; font-size: 0.78rem; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text-muted); }
+.changeInline { display: inline; margin: 0; letter-spacing: 0; }
 .up { color: var(--color-success); }
 .down { color: var(--color-danger); }
 .compared { margin: -0.6rem 0 0; font-size: 0.78rem; color: var(--text-muted); }
@@ -43,7 +54,7 @@
 .skeletons { display: flex; flex-direction: column; gap: 0.9rem; }
 
 @media (max-width: 620px) {
-  .kpis, .columns { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .columns { grid-template-columns: minmax(0, 1fr); }
-  .kpiValue { font-size: 1.15rem; }
+  .metric .metricValue { font-size: 1.15rem; }
 }

@@ -1164,7 +1164,6 @@ export default function SchedulePage() {
   }, []);
 
   const today          = new Date();
-  const isCurrentMonth = isSameMonth(monthStart, today);
 
   function goToDayView(day) {
     setDayDate(day);
@@ -1184,7 +1183,6 @@ export default function SchedulePage() {
   const weekLabel = weekRangeLabel(dayDate, locale);
   const period = view === 'month' ? 'month' : view === 'week' ? 'week' : 'day';
   const periodLabel = view === 'month' ? monthLabel : view === 'week' ? weekLabel : dayLabel;
-  const isCurrentPeriod = view === 'month' ? isCurrentMonth : view === 'week' ? toISO(getMonday(dayDate)) === toISO(getMonday(today)) : toISO(dayDate) === toISO(today);
 
   function changeView(nextView) {
     if (view === 'month' && nextView !== 'month' && !isSameMonth(dayDate, monthStart)) setDayDate(monthStart);
@@ -1195,7 +1193,9 @@ export default function SchedulePage() {
     if (view === 'month') setMonthStart(date => getMonthStart(new Date(date.getFullYear(), date.getMonth() + offset, 1)));
     else setDayDate(date => addDays(date, offset * (view === 'week' ? 7 : 1)));
   }
-  function goToday() { setDayDate(new Date()); setMonthStart(getMonthStart(new Date())); }
+  // Today always means today's Day view, whichever view you're in.
+  function goToday() { setDayDate(new Date()); setMonthStart(getMonthStart(new Date())); setView('day'); }
+  const showingToday = view === 'day' && toISO(dayDate) === toISO(today);
 
   // Keep the sidebar calendar on the period shown here.
   useEffect(() => {
@@ -1237,7 +1237,7 @@ export default function SchedulePage() {
 
         <div className="studio-schedule-date-nav" style={s.nav}>
           <div className="studio-schedule-filter-slot" style={{ display: 'contents' }} />
-          <button onClick={goToday} disabled={isCurrentPeriod} style={{ ...s.todayBtn, ...(isCurrentPeriod ? s.todayBtnOff : {}) }} title={isCurrentPeriod ? `Showing this ${period}` : `Back to this ${period}`}>{t('today')}</button>
+          <button onClick={goToday} disabled={showingToday} style={{ ...s.todayBtn, ...(showingToday ? s.todayBtnOff : {}) }} title={showingToday ? 'Showing today' : 'Go to today'}>{t('today')}</button>
           <button aria-label={`Previous ${period}`} title={`Previous ${period}`} onClick={() => navigate(-1)} style={s.navBtn}><ChevronIcon dir="left" /></button>
           <span className="studio-schedule-date-label" style={s.navLabel} aria-live="polite">{headerLabel}</span>
           <button aria-label={`Next ${period}`} title={`Next ${period}`} onClick={() => navigate(1)} style={s.navBtn}><ChevronIcon dir="right" /></button>

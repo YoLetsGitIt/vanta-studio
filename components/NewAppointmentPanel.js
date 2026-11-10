@@ -29,10 +29,6 @@ const DURATION_OPTIONS = [
   { label: '8 hr',   value: 480 },
 ];
 
-function todayStr() {
-  return new Date().toLocaleDateString('en-CA');
-}
-
 function nextAppointmentSlot() {
   const d = new Date();
   d.setMinutes(d.getMinutes() >= 30 ? 60 : 30, 0, 0);
@@ -370,7 +366,6 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
     }) ?? null;
   }, [artistId, chosenDateTime?.getTime(), durationMins, daySchedule]); // eslint-disable-line react-hooks/exhaustive-deps
   const validationError = timeError
-    || (dateInPast ? 'Choose a time that has not already passed.' : '')
     || (emailInvalid ? 'Enter a valid client email address.' : '')
     || (phoneInvalid ? 'Enter a valid client phone number.' : '')
     || (artistConflict ? 'This artist already has an appointment at that time.' : '')
@@ -392,7 +387,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
       ? Boolean(selectedClient)
       : Boolean(firstName.trim() && lastName.trim() && (clientEmail.trim() || clientPhone.trim())) && !emailInvalid && !phoneInvalid,
     appointment: Boolean(appointmentType && artistId) && !artistConflict,
-    schedule: scheduleTouched && Boolean(bookingDate && startTime && durationMins && stationId) && !timeError && !dateInPast && !artistConflict,
+    schedule: scheduleTouched && Boolean(bookingDate && startTime && durationMins && stationId) && !timeError && !artistConflict,
     // Ticked once there's a price; the deposit choice is optional.
     payment: quote > 0 && !depositInvalid && (depositMode !== 'paid' || Boolean(depositMethod)),
   };
@@ -408,7 +403,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
           emailInvalid && 'a valid email', phoneInvalid && 'a valid phone',
         ].filter(Boolean),
     appointment: [!appointmentType && 'tattoo or piercing', !artistId && 'artist', artistConflict && 'a free artist'].filter(Boolean),
-    schedule: [!bookingDate && 'date', !startTime && 'time', !durationMins && 'duration', !stationId && 'station', (timeError || dateInPast) && 'a valid time'].filter(Boolean),
+    schedule: [!bookingDate && 'date', !startTime && 'time', !durationMins && 'duration', !stationId && 'station', timeError && 'a valid time'].filter(Boolean),
     payment: [!(quote > 0) && 'estimated price', depositInvalid && 'deposit amount', depositMode === 'paid' && !depositMethod && 'how the deposit was paid'].filter(Boolean),
   };
   for (const key of Object.keys(stepMissing)) stepMissing[key] = stepMissing[key].filter(Boolean);
@@ -481,7 +476,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
     schedule: sectionDone.schedule ? [preset?.name, chosenDateTime?.toLocaleString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }), durationName, stationName].filter(Boolean).join(' · ') : null,
     payment: depositMode ? [{ none: 'No deposit', later: stripeConnected ? 'Deposit to collect' : 'Deposit due later', paid: `Deposit paid${depositMethod ? ` by ${DEPOSIT_METHODS.find(m => m.value === depositMethod)?.phrase}` : ''}` }[depositMode] + (depositEnabled && deposit > 0 ? ` $${deposit.toFixed(2)}` : ''), quote > 0 ? `$${quote.toFixed(2)} quoted` : null].filter(Boolean).join(' · ') : null,
   };
-  const essentialsComplete = Boolean(clientName && artistId && bookingDate && startTime && durationMins && stationId && !timeError && !dateInPast && !artistConflict);
+  const essentialsComplete = Boolean(clientName && artistId && bookingDate && startTime && durationMins && stationId && !timeError && !artistConflict);
   // The station is picked automatically and the artist can come from the clicked slot, so
   // neither counts as an edit on its own.
   const dirty = Boolean(selectedClient || firstName || lastName || clientEmail || clientPhone || clientDob || (artistId && artistId !== (initialSlot?.artistId || '')) || appointmentType || size || retouch || finalPrice || depositAmount || depositMode || notes || bookingType || presetId);
@@ -557,6 +552,16 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
   async function handleSubmit(e) {
     e.preventDefault();
     if (disabledReason) { setError(disabledReason); return; }
+    // A past time is allowed (back-filling a session), but only on purpose.
+    if (dateInPast) {
+      const when = chosenDateTime.toLocaleString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
+      const go = await requestConfirmation({
+        title: 'This appointment has already passed',
+        message: `${when} is in the past. Do you want to create this appointment anyway?`,
+        confirmLabel: 'Create anyway',
+      });
+      if (!go) return;
+    }
     setSaving(true); setError('');
     try {
       const chosenTime = new Date(`${bookingDate}T${startTime}:00`).toISOString();
@@ -877,7 +882,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
                 <div className={styles.fieldRow}>
                   <div style={bd.field}>
                     <label htmlFor="new-appointment-date" style={bd.label}>{t('sched_date')}</label>
-                    <input style={bd.input} type="date" min={todayStr()} id="new-appointment-date" value={bookingDate} onChange={e => { setBookingDate(e.target.value); setScheduleTouched(true); }} required />
+                    <input style={bd.input} type="date" id="new-appointment-date" value={bookingDate} onChange={e => { setBookingDate(e.target.value); setScheduleTouched(true); }} required />
                   </div>
                   <div style={bd.field}>
                     <span style={bd.label}>{t('nap_start_time')}</span>
@@ -914,6 +919,7 @@ export default function NewAppointmentPanel({ open, onClose, onCreated, initialB
                 ) : bookingDate && !studioHours.length ? (
                   <p style={bd.hint}>{t('nap_no_hours_hint')}</p>
                 ) : null}
+                {dateInPast && <div role="status" style={bd.timeWarning}><span style={bd.timeWarningIcon}>⚠</span>This time has already passed.</div>}
                 {artistConflict && <div role="alert" style={bd.timeWarning}><span style={bd.timeWarningIcon}>⚠</span>This artist already has an appointment that overlaps this time.</div>}
                 {scheduleError && <p role="status" style={bd.availabilityNotice}>{scheduleError} The server will verify it when you create the appointment.</p>}
               </FormSection>
