@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { getSupabase } from '@/lib/supabase';
-import { getMyStudioAccount, startBillingCheckout, openBillingPortal } from '@/lib/api';
+import { getMyStudioAccount, getStudioArtists, startBillingCheckout, openBillingPortal } from '@/lib/api';
 import { initTheme } from '@/lib/theme';
 import { useLanguage, LanguageProvider } from '@/lib/i18n';
 import NewAppointmentPanel from '@/components/NewAppointmentPanel';
@@ -144,6 +144,22 @@ function DashboardShell({ children }) {
   const [tourStep, setTourStep] = useState(null);
   const [moreOpen, setMoreOpen] = useState(false);
   const [fullNavigation, setFullNavigation] = useState(false);
+  const [pendingArtists, setPendingArtists] = useState(0);
+
+  // How many artists are waiting for approval, shown on the Artists tab. Checked on each
+  // page change and when the window regains focus; the Artists page reports changes itself.
+  useEffect(() => {
+    if (!ready) return undefined;
+    let live = true;
+    const check = () => getStudioArtists('pending').then(d => { if (live) setPendingArtists((d.artists ?? []).length); }).catch(() => {});
+    const reported = event => setPendingArtists(event.detail);
+    check();
+    window.addEventListener('focus', check);
+    window.addEventListener('vanta:pending-artists', reported);
+    return () => { live = false; window.removeEventListener('focus', check); window.removeEventListener('vanta:pending-artists', reported); };
+  }, [ready, pathname]);
+  const pendingFor = href => (href === '/dashboard/artists' ? pendingArtists : 0);
+  const navLabel = (href, text) => (pendingFor(href) > 0 ? `${text}, ${pendingFor(href)} pending` : undefined);
 
   useEffect(() => {
     const openNavigation = () => { setFullNavigation(true); setMoreOpen(true); };
@@ -307,6 +323,7 @@ function DashboardShell({ children }) {
                     key={href}
                     href={href}
                     aria-current={active ? "page" : undefined}
+                    aria-label={navLabel(href, t(tKey))}
                     style={{
                       ...s.navItem,
                       ...(active ? s.navActive : {}),
@@ -316,6 +333,7 @@ function DashboardShell({ children }) {
                   >
                     <Icon size={16} />
                     <span style={{ fontWeight: active ? 600 : 400 }}>{t(tKey)}</span>
+                    {pendingFor(href) > 0 && <span aria-hidden="true" style={s.navCount}>{pendingFor(href)}</span>}
                   </Link>
                 );
               })}
@@ -362,7 +380,7 @@ function DashboardShell({ children }) {
           <div className="studio-mobile-needs-action"><SidebarNeedsAction paymentRecording={paymentRecording} onNavigate={() => setMoreOpen(false)} /></div>
           <nav className="studio-mobile-menu" aria-label="More studio navigation">
             {(fullNavigation ? [...NAV, MORE_NAV.find(item => item.href === '/dashboard/settings')] : MORE_NAV).map(({ href, tKey, icon: Icon }) => (
-              <Link key={href} href={href} onClick={() => setMoreOpen(false)} aria-current={pathname.startsWith(href) ? 'page' : undefined}><Icon size={20} />{t(tKey)}</Link>
+              <Link key={href} href={href} onClick={() => setMoreOpen(false)} aria-current={pathname.startsWith(href) ? 'page' : undefined} aria-label={navLabel(href, t(tKey))}><Icon size={20} />{t(tKey)}{pendingFor(href) > 0 && <span aria-hidden="true" style={s.navCount}>{pendingFor(href)}</span>}</Link>
             ))}
           </nav>
         </Dialog>
@@ -685,6 +703,12 @@ const s = {
     flexDirection: 'column',
     gap: '2px',
     padding: '0 0.75rem',
+  },
+  navCount: {
+    marginLeft: 'auto', minWidth: 18, height: 18, padding: '0 5px', boxSizing: 'border-box', borderRadius: 999,
+    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+    background: 'var(--color-danger-surface)', color: 'var(--color-danger)', border: '1px solid var(--color-danger-border)',
+    fontSize: '0.68rem', fontWeight: 700, fontVariantNumeric: 'tabular-nums',
   },
   navItem: {
     display: 'flex',

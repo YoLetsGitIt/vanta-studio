@@ -6,6 +6,8 @@
 }
 .name:focus-visible, .quiet:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; border-radius: 3px; }
 .actions { display: inline-flex; align-items: center; justify-content: flex-end; gap: 0.85rem; }
+/* Keeps History in line on rows with no payment button. */
+.actionSlot { display: inline-block; width: 78px; }
 
 /* Payout history rows. */
 .historyItem + .historyItem { border-top: 1px solid var(--border-faint); }
@@ -15,9 +17,14 @@
 @media (hover: hover) and (pointer: fine) { .historyRow:hover { background: var(--bg-row-hover) !important; } }
 @media (prefers-reduced-motion: reduce) { .chevron { transition: none; } }
 
+.period > summary { list-style: none; }
+.period > summary::-webkit-details-marker { display: none; }
+.period[open] .chevron { transform: rotate(90deg); }
+
 /* On a phone: who, how much is owed, and what to do. The rest is in the artist's panel. */
 @media (max-width: 760px) {
   .wide { display: none; }
+  .actionSlot { display: none; }
   .compact th, .compact td { padding-inline: 0.6rem !important; }
   .actions { flex-direction: column-reverse; align-items: flex-end; gap: 0.4rem; }
 }

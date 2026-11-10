@@ -56,6 +56,9 @@ function ArtistsInner() {
   const [studioNameCopied, setStudioNameCopied] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
 
+  // Keeps the count on the sidebar's Artists tab in step with this page.
+  const reportPending = list => window.dispatchEvent(new CustomEvent('vanta:pending-artists', { detail: list.length }));
+
   const load = useCallback(async (bust = false) => {
     if (bust) invalidatePrefix('artists:');
     const cachedApproved = getCached('artists:approved');
@@ -64,6 +67,7 @@ function ArtistsInner() {
     if (cachedApproved && cachedPending && cachedRemoved) {
       setApproved(cachedApproved);
       setPending(cachedPending);
+      reportPending(cachedPending);
       setRemoved(cachedRemoved);
       setLoading(false);
       return;
@@ -84,6 +88,7 @@ function ArtistsInner() {
       setCached('artists:removed', r);
       setApproved(a);
       setPending(p);
+      reportPending(p);
       setRemoved(r);
     } catch (e) {
       setError(e.message);
