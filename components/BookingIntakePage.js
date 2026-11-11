@@ -12,6 +12,8 @@ import DateOfBirthInput from '@/components/ui/DateOfBirthInput';
 import { ensureClientProfile, subscribeClientSession } from '@/lib/client-account';
 import { getSupabase } from '@/lib/supabase';
 import WeeklyAvailabilityGrid from '@/components/WeeklyAvailabilityGrid';
+import InstantTimePicker from '@/components/InstantTimePicker';
+import { formatMoney, formatWhen, paymentReturn, returnURL } from '@/lib/booking-instant.mjs';
 import PhotoIdField from '@/components/PhotoIdField';
 import { uploadPhotoIdAnswers, signStudioPhotoId } from '@/lib/photoId';
 import { getStudioPublic, createWalkIn, createGuestStudioBooking, createWalkInBooking, getWalkInFormConfigPublic, getStudioHoursPublic, walkinUploadSign, signatureUploadSign, getStudioConsentTemplates, getFormConfigPublic } from '@/lib/api';
@@ -143,6 +145,18 @@ function IntakeInner({ mode, onStyle }) {
   const [, setValidityTick] = useState(0);
   const [submitError, setSubmitError] = useState('');
   const [done, setDone]             = useState(false);
+
+  // Instant booking: the chosen artist's open times, booked by paying the deposit.
+  const [instantInfo, setInstantInfo] = useState(null);
+  const [instantType, setInstantType] = useState('');
+  const [instantStart, setInstantStart] = useState('');
+  const [payment, setPayment] = useState(() => {
+    if (typeof window === 'undefined') return null;
+    const back = paymentReturn(new URLSearchParams(window.location.search));
+    return back ? { ...back, state: 'checking' } : null;
+  });
+  const instantMode = !walkIn && Boolean(artistId) && Boolean(instantInfo?.available) && instantInfo?.studio?.id === studioId;
+  const instantChoice = instantMode ? instantInfo.types.find(t => t.id === instantType) : null;
   const bookingPhone = phoneNum.trim().startsWith('+') ? phoneNum.trim() : `${COUNTRIES.find(c => c.id === phoneCode)?.dial ?? ''} ${phoneNum}`.trim();
 
   const availabilityForArtist = !walkIn && studio?.booking_management === 'artist' && Boolean(artistId);
@@ -157,6 +171,8 @@ function IntakeInner({ mode, onStyle }) {
     }
     // At an "Artists confirm" studio, choosing an artist sends the request straight to
     // them, so the client gives their availability now for the artist to send times.
+    // Booking an open time instantly replaces weekly availability.
+    if (key === 'availability_windows' && instantMode) return { enabled: false, required: false };
     if (key === 'availability_windows' && availabilityForArtist) return { enabled: true, required: true };
     // Weekly availability is newer than the other fields, so it stays off unless the studio turned it on.
     return formConfig?.[key] ?? { enabled: key !== 'availability_windows', required: false };
@@ -174,11 +190,53 @@ function IntakeInner({ mode, onStyle }) {
     ]).then(([studioData, configData, consentData, hoursData]) => {
       setStudioHours(hoursData.hours ?? []);
       setStudio(studioData);
+      // ?a=<artist> picks the artist, e.g. from the artist's own booking page.
+      const preset = params.get('a');
+      if (!walkIn && preset && studioData?.artists?.some(a => a.artistId === preset)) setArtistId(preset);
       onStyle?.(studioData?.form_style ?? null);
       setFormConfig(configData.fields ?? {});
       setConsentTemplates(consentData.templates ?? []);
     }).catch(e => setStudioErr(e.message));
   }, [studioId]);
+
+  // Whether the chosen artist can be booked straight into an open time here.
+  useEffect(() => {
+    setInstantInfo(null);
+    setInstantType('');
+    setInstantStart('');
+    if (walkIn || !artistId) return;
+    const controller = new AbortController();
+    fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/artists/${artistId}/instant-booking`, { signal: controller.signal, cache: 'no-store' })
+      .then(res => (res.ok ? res.json() : null))
+      .then(setInstantInfo)
+      .catch(() => {});
+    return () => controller.abort();
+  }, [artistId, walkIn]);
+
+  // Back from payment: confirm the booking, or give the time back if they cancelled.
+  useEffect(() => {
+    if (!payment || payment.state !== 'checking') return;
+    let live = true;
+    const backend = process.env.NEXT_PUBLIC_BACKEND_URL;
+    const { booking, token, result } = payment;
+    if (result === 'cancelled') {
+      fetch(`${backend}/bookings/${booking}/instant-release`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token }) })
+        .catch(() => {})
+        .finally(() => { if (live) setPayment(p => ({ ...p, state: 'released' })); });
+      return () => { live = false; };
+    }
+    let tries = 0;
+    async function check() {
+      const res = await fetch(`${backend}/bookings/${booking}/instant-status?t=${encodeURIComponent(token)}`, { cache: 'no-store' }).catch(() => null);
+      const data = res?.ok ? await res.json().catch(() => null) : null;
+      if (!live) return;
+      if (data?.state === 'booked' || data?.state === 'closed') { setPayment(p => ({ ...p, ...data })); return; }
+      if (++tries >= 15) { setPayment(p => ({ ...p, ...(data || {}), state: 'waiting' })); return; }
+      setTimeout(check, 2000);
+    }
+    check();
+    return () => { live = false; };
+  }, [payment]);
 
   function handlePhotoChange(e) {
     const files = Array.from(e.target.files).slice(0, 5);
@@ -241,6 +299,8 @@ function IntakeInner({ mode, onStyle }) {
     if (!phoneNum.trim()) return 'Please provide your phone number.';
     if (!dob) return 'Please provide your date of birth.';
     if (walkIn && !artistId) return 'Please choose your artist.';
+    if (instantMode && !instantChoice) return 'Please choose your appointment.';
+    if (instantMode && !instantStart) return 'Please choose a time.';
     if (formConfig?.address?.enabled && field('address').enabled) {
       const problem = addressProblem(address, field('address').required);
       if (problem) return `Address: ${problem.charAt(0).toLowerCase()}${problem.slice(1)}`;
@@ -352,7 +412,7 @@ function IntakeInner({ mode, onStyle }) {
         });
       }
 
-      await (walkIn ? createWalkInBooking : guest ? createGuestStudioBooking : createWalkIn)(studioId, {
+      const created = await (walkIn ? createWalkInBooking : guest ? createGuestStudioBooking : createWalkIn)(studioId, {
         artist_id:            artistId,
         name:                 clientName,
         email: bookingEmail,
@@ -376,22 +436,64 @@ function IntakeInner({ mode, onStyle }) {
         image_paths:          imagePaths,
         consent_accepted:     consentSubmissions.length > 0,
         consent_submissions:  consentSubmissions,
+        ...(instantMode ? { instant: { appointment_type_id: instantType, start_time: instantStart, return_url: returnURL(window.location.href) } } : {}),
       });
+      if (instantMode && created?.instant?.checkout_url) {
+        // The time is held: pay the deposit to lock it in.
+        if (!guest) getSupabase().auth.updateUser({ data: { full_name: fullName.trim(), name: fullName.trim(), dob, phone: bookingPhone } }).catch(() => {});
+        window.location.assign(created.instant.checkout_url);
+        return;
+      }
       // Match consent: remember reviewed details for the next visit.
       if (!guest) getSupabase().auth.updateUser({ data: { full_name: fullName.trim(), name: fullName.trim(), dob, phone: bookingPhone } }).catch(() => {});
       if (walkIn) setBookedArtist(studio.artists.find(a => a.artistId === artistId)?.name || '');
       setDone(true);
     } catch (err) {
+      if (instantMode && err.status === 409) setInstantStart('');
       setSubmitError(err.message);
-    } finally {
       setSubmitting(false);
+      return;
     }
+    setSubmitting(false);
+  }
+
+  function bookAgain() {
+    window.location.assign(returnURL(window.location.href));
   }
 
   if (!studioId) return <p style={s.msg}>Invalid link — no studio ID.</p>;
   if (studioErr) return <p role="alert" style={{ ...s.msg, color: 'var(--color-danger)' }}>{studioErr}</p>;
   if (!studio || formConfig === null) return <BrandLoader />;
   const blocker = studio && !done ? missingRequirement() : '';
+
+  if (payment) {
+    const zone = instantInfo?.timezone || studio.timezone;
+    return (
+      <div style={s.card} aria-live="polite">
+        {payment.state === 'checking' && <><h2 style={s.successTitle}>{payment.result === 'paid' ? 'Confirming your booking…' : 'One moment…'}</h2><p style={s.successSub}>This only takes a few seconds.</p></>}
+        {payment.state === 'booked' && <>
+          <div style={s.successIcon}>✓</div>
+          <h2 style={s.successTitle}>You’re booked in</h2>
+          <p style={s.successSub}>{payment.chosen_time && zone ? `${formatWhen(payment.chosen_time, zone)} at ${studio.name}. ` : ''}Your deposit is paid and a confirmation is on its way to your email.</p>
+        </>}
+        {payment.state === 'waiting' && <>
+          <div style={s.successIcon}>✓</div>
+          <h2 style={s.successTitle}>Payment received</h2>
+          <p style={s.successSub}>We’re confirming your booking now. You’ll get an email as soon as it’s done.</p>
+        </>}
+        {payment.state === 'closed' && <>
+          <h2 style={s.successTitle}>This time is no longer held</h2>
+          <p style={s.successSub}>The hold ran out before payment finished, so you haven’t been charged for it. Pick a time again to book.</p>
+          <Button onClick={bookAgain}>Pick a time</Button>
+        </>}
+        {payment.state === 'released' && <>
+          <h2 style={s.successTitle}>Payment cancelled</h2>
+          <p style={s.successSub}>You haven’t been charged and the time wasn’t booked. You can pick a time again whenever you’re ready.</p>
+          <Button onClick={bookAgain}>Book again</Button>
+        </>}
+      </div>
+    );
+  }
 
   if (!walkIn && session === undefined) return <BrandLoader />;
   if (!session && !guest) return <ClientAuthGate studioId={studioId} studioName={studio.name} logoUrl={studio.logo_url} purpose="booking" onGuest={() => setGuestChosen(true)} />;
@@ -512,6 +614,12 @@ function IntakeInner({ mode, onStyle }) {
                   ))}
                 </select>
               </Field>
+            )}
+
+            {instantMode && (
+              <p style={{ ...s.sectionHint, marginTop: '-0.25rem' }}>
+                {studio.artists.find(a => a.artistId === artistId)?.name || 'This artist'} can be booked straight away: pick a time below and pay the deposit to lock it in.
+              </p>
             )}
 
             {field('body_location').enabled && (
@@ -664,6 +772,14 @@ function IntakeInner({ mode, onStyle }) {
             )}
           </Section>
 
+          {/* ── Instant booking: one of the artist's open times ── */}
+          {instantMode && (
+            <Section title="Pick a time">
+              <InstantTimePicker backend={process.env.NEXT_PUBLIC_BACKEND_URL} artistId={artistId} info={instantInfo}
+                typeId={instantType} onType={setInstantType} start={instantStart} onStart={setInstantStart} />
+            </Section>
+          )}
+
           {/* ── Weekly availability ── */}
           {field('availability_windows').enabled && (
             <Section title="Your availability">
@@ -787,7 +903,8 @@ function IntakeInner({ mode, onStyle }) {
               Send me one SMS reminder before this appointment. Optional; I can stop SMS reminders using the link in the message.
             </label>}
             {submitError && <p role="alert" style={s.error}>{submitError}</p>}
-            <Button type="submit" loading={submitting} loadingLabel="Submitting…" fullWidth disabled={!!blocker} aria-describedby={blocker ? 'booking-blocker' : undefined}>{walkIn ? 'Book me in' : 'Request booking'}</Button>
+            <Button type="submit" loading={submitting} loadingLabel="Submitting…" fullWidth disabled={!!blocker} aria-describedby={blocker ? 'booking-blocker' : undefined}>{walkIn ? 'Book me in' : instantMode ? (instantChoice && instantStart ? `Pay ${formatMoney(instantChoice.deposit)} deposit` : 'Book and pay deposit') : 'Request booking'}</Button>
+            {instantMode && instantChoice && instantStart && <p style={{ ...s.sectionHint, marginTop: 10, textAlign: 'center' }}>{formatWhen(instantStart, instantInfo.timezone)}. Your time is held for 30 minutes while you pay.</p>}
             {blocker && !submitError && <p id="booking-blocker" style={s.blocker}>{blocker}</p>}
           </div>
 
