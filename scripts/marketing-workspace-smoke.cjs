@@ -188,7 +188,7 @@ async function screenshot(page, name) {
       const { context, page, writes, unexpected, errors } = await setup(browser, width, { initialTemplates, deleteFailures: 1 });
       await page.goto(`${base}/dashboard/marketing.html`, { waitUntil: 'networkidle' });
       const library = page.getByRole('navigation', { name: 'Email campaigns', exact: true });
-      const saved = library.locator('details[aria-labelledby="saved-template-heading"]');
+      const saved = library.locator('section[aria-labelledby="saved-template-heading"]');
       const examples = library.locator('details[aria-labelledby="example-template-heading"]');
       const toggle = page.getByRole('button', { name: 'Choose a saved email campaign or example', exact: true });
       const editor = page.getByRole('region', { name: 'Email campaign editor', exact: true });
@@ -197,9 +197,6 @@ async function screenshot(page, name) {
       const deletions = () => writes.filter(w => w.method === 'DELETE');
       await saved.getByRole('button', { name: /^Saved one/ }).waitFor();
       assert.equal(await examples.getAttribute('open'), null);
-      await saved.locator('summary').focus(); await page.keyboard.press('Enter');
-      assert.equal(await saved.getByRole('button', { name: /^Saved one/ }).isVisible(), false);
-      await page.keyboard.press('Enter');
       await saved.getByRole('button', { name: /^Saved one/ }).click();
       await editor.waitFor();
       assert.equal(await library.isVisible(), false);
@@ -492,7 +489,7 @@ async function screenshot(page, name) {
         const examples = library.locator('details[aria-labelledby="example-template-heading"]');
         assert.equal(await examples.getAttribute('open'), null, 'Examples start collapsed when saved templates exist');
         assert.equal(await library.getByRole('button', {name:'Flash day',exact:true}).isVisible(), false);
-        const savedGroup = await library.locator('details[aria-labelledby="saved-template-heading"]').boundingBox();
+        const savedGroup = await library.locator('section[aria-labelledby="saved-template-heading"]').boundingBox();
         const examplesGroup = await examples.boundingBox();
         assert.ok(Math.abs(savedGroup.width-chooser.width)<=1, 'Saved templates should use the main chooser width');
         assert.ok(examplesGroup.y>=savedGroup.y+savedGroup.height, 'Examples should follow saved templates');
@@ -500,8 +497,8 @@ async function screenshot(page, name) {
         await noOverflow(page); await screenshot(page, `saved-first-${width}-${theme}`);
         await examples.locator('summary').focus(); await page.keyboard.press('Enter');
         await library.getByRole('button',{name:'Flash day',exact:true}).waitFor();
-        const promotions = await library.locator('[data-tone="promotion"]').boundingBox();
-        const care = await library.locator('[data-tone="care"]').boundingBox();
+        const promotions = await library.getByRole('heading',{name:'Promotions',exact:true}).locator('..').boundingBox();
+        const care = await library.getByRole('heading',{name:'Client care',exact:true}).locator('..').boundingBox();
         if (chooser.width >= 500) {
           assert.ok(promotions.x + promotions.width <= care.x && Math.abs(promotions.y - care.y) <= 1, 'Example categories should sit side by side when space allows');
         } else {

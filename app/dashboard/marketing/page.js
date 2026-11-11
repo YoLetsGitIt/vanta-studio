@@ -81,7 +81,7 @@ export default function MarketingPage() {
         <div className={styles.marketingIntro}>
           <p className={styles.marketingEyebrow}>{mt('Marketing')}</p>
           <h1 className={styles.title}>{mt(SECTION_COPY[tab][0])}</h1>
-          <p className={styles.subtitle}>{mt(tab === 'templates' ? 'Create email campaigns and send them to your clients.' : SECTION_COPY[tab][1])}</p>
+          {tab !== 'templates' && <p className={styles.subtitle}>{mt(SECTION_COPY[tab][1])}</p>}
           {tab !== 'templates' && <Button id="tab-templates" size="sm" className={styles.returnToCreate} aria-controls="panel-templates" onClick={() => selectTab('templates')}><span aria-hidden="true">←</span>{mt('Create and send')}</Button>}
         </div>
         <nav aria-label={mt('Marketing sections')} className={styles.marketingUtilities}>
