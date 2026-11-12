@@ -1,9 +1,10 @@
 'use client';
 
-// Settings → Payments: how clients can pay deposits. Three methods, each with its
-// own switch: card (through the studio's Stripe account), PayID and bank transfer.
-// A switched-off method keeps its details. Any one method that's on is enough to
-// send deposit links; clients see every method that's on.
+// Settings → Payments: how clients pay deposits. Either through Vanta (card, Apple
+// Pay or from their bank, into the studio's Stripe account) or straight to the
+// studio (its own PayID or bank details). Clients see one or the other, never both,
+// so every client pays the same total however they pay. With Vanta payments on,
+// the studio's own details are kept but not shown to clients.
 import { useEffect, useState } from 'react';
 import Button from '@/components/ui/Button';
 import { getDepositMethods, updateDepositMethods } from '@/lib/api';
@@ -44,7 +45,9 @@ export default function DepositPaymentOptions({ styles: s, stripe }) {
     payid: saved.payid_enabled && !!saved.payid,
     bank: saved.bank_enabled && !!(saved.bank_account_name && saved.bank_bsb && saved.bank_account_number),
   };
-  const methods = [on.card && 'card', on.payid && 'PayID', on.bank && 'bank transfer'].filter(Boolean);
+  // Through Vanta, the studio's own details aren't offered to clients.
+  const methods = on.card ? [] : [on.payid && 'PayID', on.bank && 'bank transfer'].filter(Boolean);
+  const vantaOn = stripeActive && form.card_enabled;
 
   async function save(e) {
     e?.preventDefault();
@@ -70,33 +73,35 @@ export default function DepositPaymentOptions({ styles: s, stripe }) {
     <section style={s.card} aria-labelledby="deposit-options-title">
       <h2 id="deposit-options-title" style={s.sectionTitle}>Deposit payment options</h2>
       <p style={s.sectionDesc}>
-        Choose how clients can pay deposits. The deposit email shows every option that’s on, with a booking reference.
+        Choose how clients pay deposits: through Vanta, or straight to you with your own PayID or bank details. Clients see one or the other, so every client pays the same total however they pay.
       </p>
-      <p role="status" style={{ ...o.summary, ...(methods.length ? {} : o.summaryWarn) }}>
-        {methods.length
-          ? `Clients can pay by ${methods.length > 1 ? `${methods.slice(0, -1).join(', ')} or ${methods.at(-1)}` : methods[0]}.`
-          : 'No way to pay is switched on yet, so you can’t ask for deposits.'}
+      <p role="status" style={{ ...o.summary, ...(on.card || methods.length ? {} : o.summaryWarn) }}>
+        {on.card
+          ? 'Clients pay deposits through Vanta.'
+          : methods.length
+            ? `Clients pay you directly by ${methods.join(' or ')}.`
+            : 'No way to pay is switched on yet, so you can’t ask for deposits.'}
       </p>
 
       <form onSubmit={save} style={o.list}>
-        {/* Card, through the studio's Stripe account */}
+        {/* Through Vanta, into the studio's Stripe account */}
         <div style={o.method}>
           <div style={o.methodHead}>
             <div style={o.methodText}>
-              <span style={o.methodName}>Card</span>
-              <span style={o.methodHint}>Clients pay a small card fee on top, so you get the whole deposit. Confirmed automatically.</span>
+              <span style={o.methodName}>Vanta payments</span>
+              <span style={o.methodHint}>Clients pay online through Vanta and the booking is confirmed automatically. You get the whole deposit.</span>
             </div>
             {stripeActive && (
-              <Switch label="Card payments" checked={form.card_enabled} onChange={flip('card_enabled')} disabled={saving} s={s} />
+              <Switch label="Vanta payments" checked={form.card_enabled} onChange={flip('card_enabled')} disabled={saving} s={s} />
             )}
           </div>
-          {/* How the card fee works: the client pays it, the studio keeps the full deposit. */}
-          <div style={o.feeBox} aria-label="How card fees work">
+          {/* The Vanta booking fee: the client pays it to Vanta, the studio keeps the full deposit. */}
+          <div style={o.feeBox} aria-label="What clients pay through Vanta">
             <div style={o.feeRow}><span>Deposit you ask for</span><span style={o.feeNum}>$100.00</span></div>
-            <div style={o.feeRow}><span>Card fee, paid by the client (3% + 50c)</span><span style={o.feeNum}>+ $3.50</span></div>
+            <div style={o.feeRow}><span>Vanta booking fee, paid by the client (3% + 50c)</span><span style={o.feeNum}>+ $3.50</span></div>
             <div style={{ ...o.feeRow, ...o.feeTotal }}><span>Client pays</span><span style={o.feeNum}>$103.50</span></div>
             <div style={{ ...o.feeRow, ...o.feeYou }}><span>You receive in Stripe</span><span style={{ ...o.feeNum, color: "var(--color-success)" }}>$100.00</span></div>
-            <p style={o.feeNote}>The card fee covers Stripe’s processing costs, so nothing comes out of your deposit.</p>
+            <p style={o.feeNote}>Clients pay Vanta a booking fee for booking through Vanta. It’s the same however they pay, they see it with the total before paying, and nothing comes out of your deposit.</p>
           </div>
           {stripe.status === null ? (
             <div style={s.loadingDot} />
@@ -117,6 +122,12 @@ export default function DepositPaymentOptions({ styles: s, stripe }) {
           )}
           {stripe.error && <p role="alert" style={s.errorText}>{stripe.error}</p>}
         </div>
+
+        {vantaOn && (
+          <p role="note" style={o.directNote}>
+            Your own PayID and bank details below aren’t shown to clients while Vanta payments are on. They’re kept, and clients see them instead if you switch Vanta payments off.
+          </p>
+        )}
 
         {/* PayID */}
         <div style={o.method}>
@@ -212,6 +223,7 @@ const o = {
   field: { flex: '1 1 220px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.35rem' },
   optional: { fontWeight: 400, color: 'var(--text-secondary)' },
   offNote: { margin: 0, fontSize: '0.82rem', color: 'var(--text-ghost)' },
+  directNote: { margin: 0, fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.45 },
   stripeRow: { display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' },
   stripeStatus: { display: 'inline-flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.88rem', fontWeight: 500, color: 'var(--text)', marginRight: 'auto' },
   dot: { width: 8, height: 8, borderRadius: '50%', flexShrink: 0 },

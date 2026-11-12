@@ -773,7 +773,7 @@ export default function SettingsPage() {
   }
 
   async function handleStripeDisconnect() {
-    if (!await requestConfirmation({ title: 'Disconnect Stripe?', message: 'Clients won’t be able to pay deposits by card. PayID and bank transfer stay as they are.', confirmLabel: 'Disconnect', danger: true })) return;
+    if (!await requestConfirmation({ title: 'Disconnect Stripe?', message: 'Clients won’t be able to pay deposits through Vanta. They’ll see your own PayID or bank details instead, if you have them saved and switched on.', confirmLabel: 'Disconnect', danger: true })) return;
     setStripeError('');
     try {
       await disconnectStripe();

@@ -66,7 +66,7 @@ async function mock(browser, width, state) {
       await section.getByRole('button', { name: 'Save payment options' }).click();
       await section.getByRole('button', { name: 'Saved' }).waitFor();
       assert.equal(await section.getByLabel('BSB').inputValue(), '062-000');
-      await section.getByText('Clients can pay by PayID or bank transfer.').waitFor();
+      await section.getByText('Clients pay you directly by PayID or bank transfer.').waitFor();
       const put = writes.filter(w => w.path === '/studio/me/deposit-methods').pop().body;
       assert.equal(put.payid, 'bookings@ink.example');
       if (shots) await section.screenshot({ path: `${shots}/settings.png` });

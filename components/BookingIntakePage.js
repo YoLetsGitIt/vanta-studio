@@ -14,6 +14,7 @@ import { getSupabase } from '@/lib/supabase';
 import WeeklyAvailabilityGrid from '@/components/WeeklyAvailabilityGrid';
 import InstantTimePicker from '@/components/InstantTimePicker';
 import { formatMoney, formatWhen, paymentReturn, returnURL } from '@/lib/booking-instant.mjs';
+import { depositCharge, money, payWays, BOOKING_FEE_NOTE } from '@/lib/booking-fee.mjs';
 import PhotoIdField from '@/components/PhotoIdField';
 import { uploadPhotoIdAnswers, signStudioPhotoId } from '@/lib/photoId';
 import { getStudioPublic, createWalkIn, createGuestStudioBooking, createWalkInBooking, getWalkInFormConfigPublic, getStudioHoursPublic, walkinUploadSign, signatureUploadSign, getStudioConsentTemplates, getFormConfigPublic } from '@/lib/api';
@@ -903,8 +904,8 @@ function IntakeInner({ mode, onStyle }) {
               Send me one SMS reminder before this appointment. Optional; I can stop SMS reminders using the link in the message.
             </label>}
             {submitError && <p role="alert" style={s.error}>{submitError}</p>}
-            <Button type="submit" loading={submitting} loadingLabel="Submitting…" fullWidth disabled={!!blocker} aria-describedby={blocker ? 'booking-blocker' : undefined}>{walkIn ? 'Book me in' : instantMode ? (instantChoice && instantStart ? `Pay ${formatMoney(instantChoice.deposit)} deposit` : 'Book and pay deposit') : 'Request booking'}</Button>
-            {instantMode && instantChoice && instantStart && <p style={{ ...s.sectionHint, marginTop: 10, textAlign: 'center' }}>{formatWhen(instantStart, instantInfo.timezone)}. Your time is held for 30 minutes while you pay.</p>}
+            <Button type="submit" loading={submitting} loadingLabel="Submitting…" fullWidth disabled={!!blocker} aria-describedby={blocker ? 'booking-blocker' : undefined}>{walkIn ? 'Book me in' : instantMode ? (instantChoice && instantStart ? `Pay ${money(depositCharge(instantChoice.deposit).total)}` : 'Book and pay deposit') : 'Request booking'}</Button>
+            {instantMode && instantChoice && instantStart && <p style={{ ...s.sectionHint, marginTop: 10, textAlign: 'center' }}>{formatWhen(instantStart, instantInfo.timezone)}. Your time is held for 30 minutes while you pay. {formatMoney(instantChoice.deposit)} deposit + {money(depositCharge(instantChoice.deposit).fee)} Vanta booking fee = {money(depositCharge(instantChoice.deposit).total)} in total. {BOOKING_FEE_NOTE} {payWays(false)}</p>}
             {blocker && !submitError && <p id="booking-blocker" style={s.blocker}>{blocker}</p>}
           </div>
 

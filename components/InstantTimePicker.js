@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { addDays, formatDay, formatLength, formatMoney, formatTime, todayIn, zoneNote } from '@/lib/booking-instant.mjs';
+import { depositCharge, money } from '@/lib/booking-fee.mjs';
 
 const DAYS_PER_PAGE = 14;
 
@@ -50,7 +51,7 @@ export default function InstantTimePicker({ backend, artistId, info, typeId, onT
                 <span style={st.name}>{t.name}</span>
                 <span style={st.meta}>{formatLength(t.duration_minutes)}</span>
               </span>
-              <span style={{ ...st.meta, marginTop: 0, flexShrink: 0 }}>{formatMoney(t.deposit)} deposit</span>
+              <span style={{ ...st.meta, marginTop: 0, flexShrink: 0 }}>{money(depositCharge(t.deposit).total)} to book<span style={{ display: 'block', fontSize: '0.72rem', textAlign: 'right' }}>{formatMoney(t.deposit)} deposit + {money(depositCharge(t.deposit).fee)} Vanta booking fee</span></span>
             </button>
           );
         })}

@@ -317,7 +317,7 @@ export default function BookingDetailPanel({
     return () => { live = false; };
   }, [bookingId, depositPaidAt, depositReceived?.method]);
   const depositPaidVia = bookingId && depositReceipt?.booking === bookingId ? depositMethodLabel(depositReceipt.method) : null;
-  // Paid with no PayID / bank / cash record means it went through Stripe, which adds a card fee.
+  // Paid with no PayID / bank / cash record means it was paid through Vanta, with the Vanta booking fee.
   const paidByStripe = Boolean(depositPaidAt && depositReceipt?.booking === bookingId && !depositReceipt.method);
 
   // The client says they paid by PayID / bank transfer: the studio checks it arrived.
@@ -805,9 +805,9 @@ export default function BookingDetailPanel({
           const balance = !isCompleted && !ended && paid && quote != null && depositAmount != null && quote > depositAmount ? quote - depositAmount : null;
           const fee = paid && paidByStripe && depositAmount != null ? (Math.round(depositAmount * 0.03 * 100) + 50) / 100 : 0;
           const paidOn = paid ? new Date(depositPaidAt || depositConfirmedAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }) : null;
-          const paidHow = depositPaidVia ? `by ${depositPaidVia}` : paidByStripe ? 'by card' : null;
+          const paidHow = depositPaidVia ? `by ${depositPaidVia}` : paidByStripe ? 'through Vanta' : null;
           const note = {
-            paid: [`Paid ${[paidHow, paidOn && `on ${paidOn}`].filter(Boolean).join(' ')}.`, fee ? `${firstNm} was charged ${money(depositAmount + fee)}, including a ${money(fee)} card fee.` : null, isNoShow ? `${firstNm} didn’t show.` : null, ended ? 'The booking was cancelled after the deposit was paid.' : null].filter(Boolean).join(' '),
+            paid: [`Paid ${[paidHow, paidOn && `on ${paidOn}`].filter(Boolean).join(' ')}.`, fee ? `${firstNm} paid ${money(depositAmount + fee)}, including the ${money(fee)} Vanta booking fee.` : null, isNoShow ? `${firstNm} didn’t show.` : null, ended ? 'The booking was cancelled after the deposit was paid.' : null].filter(Boolean).join(' '),
             unconfirmed: `Paid ${[paidHow, paidOn && `on ${paidOn}`].filter(Boolean).join(' ')}. Check it’s arrived.`,
             link: `${firstNm} has been sent a link to pay${selectionTokenExpiresAt ? `. It expires ${new Date(selectionTokenExpiresAt).toLocaleString('en-AU', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}` : ''}.`,
             expired: `${firstNm} didn’t pay before the payment link expired.`,
