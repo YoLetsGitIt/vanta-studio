@@ -1,7 +1,7 @@
 1:"$Sreact.fragment"
-3:I[9766,[],""]
-4:I[98924,[],""]
-b:I[57150,[],""]
+3:I[15739,[],""]
+4:I[17959,[],""]
+b:I[929,[],""]
 :HL["/_next/static/media/36966cca54120369-s.p.woff2","font",{"crossOrigin":"","type":"font/woff2"}]
 :HL["/_next/static/css/d62bde288b7a6c55.css","style"]
 2:T72f,(function () {
@@ -53,13 +53,13 @@ b:I[57150,[],""]
       } catch (err) {}
     });
   }
-})();0:{"P":null,"b":"6YfME_wJj6YrkKQgNTGHt","p":"","c":["","availability"],"i":false,"f":[[["",{"children":["availability",{"children":["__PAGE__",{}]}]},"$undefined","$undefined",true],["",["$","$1","c",{"children":[[["$","link","0",{"rel":"stylesheet","href":"/_next/static/css/d62bde288b7a6c55.css","precedence":"next","crossOrigin":"$undefined","nonce":"$undefined"}]],["$","html",null,{"lang":"en","suppressHydrationWarning":true,"children":[["$","head",null,{"children":["$","script",null,{"dangerouslySetInnerHTML":{"__html":"$2"}}]}],["$","body",null,{"className":"__variable_627500","children":[["$","script",null,{"dangerouslySetInnerHTML":{"__html":"(function(){var theme='dark';try{var saved=window.localStorage.getItem('vanta-theme');if(saved==='dark'||saved==='light'||saved==='nature'||saved==='space')theme=saved;}catch(error){}document.documentElement.setAttribute('data-theme',theme);document.documentElement.style.colorScheme=(theme==='dark'||theme==='space')?'dark':'light';}());"}}],["$","$L3",null,{"parallelRouterKey":"children","error":"$undefined","errorStyles":"$undefined","errorScripts":"$undefined","template":["$","$L4",null,{}],"templateStyles":"$undefined","templateScripts":"$undefined","notFound":[[["$","title",null,{"children":"404: This page could not be found."}],["$","div",null,{"style":{"fontFamily":"system-ui,\"Segoe UI\",Roboto,Helvetica,Arial,sans-serif,\"Apple Color Emoji\",\"Segoe UI Emoji\"","height":"100vh","textAlign":"center","display":"flex","flexDirection":"column","alignItems":"center","justifyContent":"center"},"children":["$","div",null,{"children":[["$","style",null,{"dangerouslySetInnerHTML":{"__html":"body{color:#000;background:#fff;margin:0}.next-error-h1{border-right:1px solid rgba(0,0,0,.3)}@media (prefers-color-scheme:dark){body{color:#fff;background:#000}.next-error-h1{border-right:1px solid rgba(255,255,255,.3)}}"}}],"$L5","$L6"]}]}]],[]],"forbidden":"$undefined","unauthorized":"$undefined"}],"$L7"]}]]}]]}],{"children":["availability","$L8",{"children":["__PAGE__","$L9",{},null,false]},null,false]},null,false],"$La",false]],"m":"$undefined","G":["$b",[]],"s":false,"S":true}
-c:I[25602,["7177","static/chunks/app/layout-6ed7b8f68cf63f5f.js"],"default"]
-d:I[1345,["5730","static/chunks/44530001-699706df5f232cb6.js","7817","static/chunks/7817-d36e9add24ee35aa.js","867","static/chunks/867-5036d1cc35dbf29e.js","3820","static/chunks/app/availability/page-ffb35ed509e9c2d3.js"],"default"]
-e:I[24431,[],"OutletBoundary"]
-10:I[15278,[],"AsyncMetadataOutlet"]
-12:I[24431,[],"ViewportBoundary"]
-14:I[24431,[],"MetadataBoundary"]
+})();0:{"P":null,"b":"pmKCZR70gPGA3iL2_Mdn4","p":"","c":["","availability"],"i":false,"f":[[["",{"children":["availability",{"children":["__PAGE__",{}]}]},"$undefined","$undefined",true],["",["$","$1","c",{"children":[[["$","link","0",{"rel":"stylesheet","href":"/_next/static/css/d62bde288b7a6c55.css","precedence":"next","crossOrigin":"$undefined","nonce":"$undefined"}]],["$","html",null,{"lang":"en","suppressHydrationWarning":true,"children":[["$","head",null,{"children":["$","script",null,{"dangerouslySetInnerHTML":{"__html":"$2"}}]}],["$","body",null,{"className":"__variable_627500","children":[["$","script",null,{"dangerouslySetInnerHTML":{"__html":"(function(){var theme='dark';try{var saved=window.localStorage.getItem('vanta-theme');if(saved==='dark'||saved==='light'||saved==='nature'||saved==='space')theme=saved;}catch(error){}document.documentElement.setAttribute('data-theme',theme);document.documentElement.style.colorScheme=(theme==='dark'||theme==='space')?'dark':'light';}());"}}],["$","$L3",null,{"parallelRouterKey":"children","error":"$undefined","errorStyles":"$undefined","errorScripts":"$undefined","template":["$","$L4",null,{}],"templateStyles":"$undefined","templateScripts":"$undefined","notFound":[[["$","title",null,{"children":"404: This page could not be found."}],["$","div",null,{"style":{"fontFamily":"system-ui,\"Segoe UI\",Roboto,Helvetica,Arial,sans-serif,\"Apple Color Emoji\",\"Segoe UI Emoji\"","height":"100vh","textAlign":"center","display":"flex","flexDirection":"column","alignItems":"center","justifyContent":"center"},"children":["$","div",null,{"children":[["$","style",null,{"dangerouslySetInnerHTML":{"__html":"body{color:#000;background:#fff;margin:0}.next-error-h1{border-right:1px solid rgba(0,0,0,.3)}@media (prefers-color-scheme:dark){body{color:#fff;background:#000}.next-error-h1{border-right:1px solid rgba(255,255,255,.3)}}"}}],"$L5","$L6"]}]}]],[]],"forbidden":"$undefined","unauthorized":"$undefined"}],"$L7"]}]]}]]}],{"children":["availability","$L8",{"children":["__PAGE__","$L9",{},null,false]},null,false]},null,false],"$La",false]],"m":"$undefined","G":["$b",[]],"s":false,"S":true}
+c:I[87453,["7177","static/chunks/app/layout-2b4a0151ac3cb1e1.js"],"default"]
+d:I[43755,["9598","static/chunks/a88f6240-c4cee8dca7fed598.js","566","static/chunks/566-2614e9116d6711b4.js","81","static/chunks/81-f8cfb80aea0a4ca8.js","3820","static/chunks/app/availability/page-b256c8a4f7a626d9.js"],"default"]
+e:I[84882,[],"OutletBoundary"]
+10:I[98535,[],"AsyncMetadataOutlet"]
+12:I[84882,[],"ViewportBoundary"]
+14:I[84882,[],"MetadataBoundary"]
 15:"$Sreact.suspense"
 5:["$","h1",null,{"className":"next-error-h1","style":{"display":"inline-block","margin":"0 20px 0 0","padding":"0 23px 0 0","fontSize":24,"fontWeight":500,"verticalAlign":"top","lineHeight":"49px"},"children":404}]
 6:["$","div",null,{"style":{"display":"inline-block"},"children":["$","h2",null,{"style":{"fontSize":14,"fontWeight":400,"lineHeight":"49px","margin":0},"children":"This page could not be found."}]}]
@@ -69,6 +69,6 @@ e:I[24431,[],"OutletBoundary"]
 a:["$","$1","h",{"children":[null,[["$","$L12",null,{"children":"$L13"}],["$","meta",null,{"name":"next-size-adjust","content":""}]],["$","$L14",null,{"children":["$","div",null,{"hidden":true,"children":["$","$15",null,{"fallback":null,"children":"$L16"}]}]}]]}]
 13:[["$","meta","0",{"charSet":"utf-8"}],["$","meta","1",{"name":"viewport","content":"width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content"}]]
 f:null
-17:I[80622,[],"IconMark"]
+17:I[21207,[],"IconMark"]
 11:{"metadata":[["$","title","0",{"children":"Send your availability"}],["$","meta","1",{"name":"description","content":"Studio management platform for Vanta artists."}],["$","link","2",{"rel":"manifest","href":"/manifest.webmanifest","crossOrigin":"$undefined"}],["$","meta","3",{"name":"mobile-web-app-capable","content":"yes"}],["$","meta","4",{"name":"apple-mobile-web-app-title","content":"Vanta Studio"}],["$","meta","5",{"name":"apple-mobile-web-app-status-bar-style","content":"black"}],["$","link","6",{"rel":"icon","href":"/favicon.ico"}],["$","link","7",{"rel":"apple-touch-icon","href":"/app/apple-touch-icon.png"}],["$","$L17","8",{}]],"error":null,"digest":"$undefined"}
 16:"$11:metadata"
