@@ -43,7 +43,7 @@ const base = process.env.STUDIO_TEST_URL || 'http://127.0.0.1:3059';
           await panel.waitFor();
           await page.waitForFunction(() => document.querySelector('.studio-booking-detail')?.getAttribute('aria-busy') !== 'true');
           if (kind === 'offered') await panel.getByRole('list', { name: 'Offered times' }).waitFor();
-          if (kind === 'paid') await panel.getByText(/Paid by bank transfer/i).waitFor();
+          if (kind === 'paid') await panel.getByText(/^Paid by bank transfer on/i).waitFor();
           await panel.getByRole('button', { name: 'Close booking details' }).click();
           await panel.waitFor({ state: 'detached' });
           assert.deepEqual(errors, [], 'Loading, rendering and closing must not throw');

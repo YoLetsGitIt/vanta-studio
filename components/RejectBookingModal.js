@@ -10,6 +10,7 @@ export default function RejectBookingModal({
   title = 'Reject Booking',
   placeholder = 'e.g. Not available on the requested date, design outside my style…',
   confirmLabel = 'Reject Booking',
+  notice = null, // optional line above the reason, e.g. what happens to the deposit
 }) {
   const { t } = useLanguage();
   const reasonRef = useRef(null);
@@ -39,6 +40,7 @@ export default function RejectBookingModal({
         </>
       )}
     >
+      {notice && <p role="status" style={{ margin: '0 0 14px', fontSize: 14, lineHeight: 1.5, color: 'var(--text-secondary)' }}>{notice}</p>}
       <Field label={t('reason')} required error={error}>
         <Textarea
           ref={reasonRef}

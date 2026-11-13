@@ -11,7 +11,7 @@ import CompleteBookingModal from '@/components/CompleteBookingModal';
 import { useBookingManagement } from '@/lib/bookingManagement';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { setBookingQuote, setBookingAppointmentType, getStations, getStudioArtists, getClientConsents, getNotes, addNote, deleteNote, getBookingConsentSubmissions, getClientConsentSubmissions, getStudioClients, getStudioClient, generateConsentLink, getStudioBookingPayment, recordStudioBookingPayment, getDepositReceipt, getDepositStatus, getOfferedTimes, listConsentTemplates, requestAvailability } from '@/lib/api';
+import { setBookingQuote, setBookingAppointmentType, getStations, getStudioArtists, getClientConsents, getNotes, addNote, deleteNote, getBookingConsentSubmissions, getClientConsentSubmissions, getStudioClients, getStudioClient, generateConsentLink, getStudioBookingPayment, recordStudioBookingPayment, getDepositReceipt, getDepositStatus, getOfferedTimes, listConsentTemplates, requestAvailability, dismissRescheduleRequest, markRefundSent } from '@/lib/api';
 import { useStationAvailability } from '@/lib/useStationAvailability';
 import { statusColors, statusLabel, capitalise as cap } from '@/lib/status';
 import { formatDob as fmtDob, hasArtist, ageFromDob } from '@/lib/format';
@@ -120,6 +120,7 @@ export default function BookingDetailPanel({
   const [quoteOpen, setQuoteOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [resending, setResending] = useState(false);
+  const [changeSaving, setChangeSaving] = useState(false); // closing a reschedule request / marking a refund sent
   const [offerOpen, setOfferOpen] = useState(false);
   const [offer, setOffer] = useState(null); // { booking, data } — times the studio offered the client
   const bookingManagement = useBookingManagement();
@@ -203,7 +204,9 @@ export default function BookingDetailPanel({
     ? new Date(`${String(booking.earliest_date).slice(0, 10)}T12:00:00`).toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })
     : null;
   const refImages   = booking?.reference_images  ?? [];
-  const quote       = (quoteOverride?.booking === bookingId ? quoteOverride.value : null) ?? booking?.estimated_quote ?? entry?.estimatedQuote ?? null;
+  // quoteOverride is null until a type reprices it, and bookingId is undefined until the
+  // booking loads, so check both (null?.booking === undefined would otherwise match).
+  const quote       = (quoteOverride && quoteOverride.booking === bookingId ? quoteOverride.value : null) ?? booking?.estimated_quote ?? entry?.estimatedQuote ?? null;
   const duration    = booking?.proposed_duration_minutes ?? entry?.durationMins ?? null;
   const chosenTime  = booking?.chosen_time       ?? entry?.chosenTime     ?? null;
   const proposedTime = booking?.proposed_time_primary    ?? null;
@@ -271,6 +274,12 @@ export default function BookingDetailPanel({
   const waitingOnAvailability = status === 'pending' && isStudioRequest && !hasAvailabilityWindows && Boolean(availabilityRequest?.requested_at) && !availabilityRequest?.received_at;
   const canSendQuote      = bookingManagement === 'studio' && isStudioRequest && status === 'pending' && !hasAvailabilityWindows && Boolean(booking?.requester_email);
   const clientFirst       = (booking?.requester_name ?? entry?.clientName ?? 'The client').split(' ')[0];
+  // Cancellations and reschedules: an open request for a new time, and a deposit the
+  // studio has to send back itself (or one that was refunded).
+  const rescheduleRequest = booking?.status === 'confirmed' ? booking?.reschedule_request ?? null : null;
+  const refundOwed        = booking?.deposit_refund_required === true;
+  const refundedAt        = booking?.deposit_refunded_at ?? null;
+  const refundOwedAmount  = `$${Number(booking?.deposit_refund_amount ?? booking?.deposit_amount ?? 0).toFixed(2).replace(/\.00$/, '')}`;
 
   const displayStatus = isNoShow ? 'no_show' : status;
   const sc = statusColors(displayStatus);
@@ -768,6 +777,53 @@ export default function BookingDetailPanel({
             </div>
           )}
           {cancelReason && <span style={p.heroNote}>{t('bdp_cancelled_reason')}: {cancelReason}</span>}
+          {rescheduleRequest && (
+            <div role="status" style={p.changeBox}>
+              <span style={p.changeTitle}>{clientFirst} asked for a new time</span>
+              {rescheduleRequest.message && <span style={p.changeText}>“{rescheduleRequest.message}”</span>}
+              <span style={p.changeText}>
+                Asked {new Date(rescheduleRequest.created_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}. Moving it uses up {clientFirst}’s one free reschedule; the deposit moves with it.
+              </span>
+              <div style={p.changeActions}>
+                <Button size="sm" variant="primary" onClick={() => setEditOpen(true)} disabled={changeSaving}>Move booking</Button>
+                <Button size="sm" variant="secondary" disabled={changeSaving} onClick={async () => {
+                  setChangeSaving(true);
+                  try {
+                    await dismissRescheduleRequest(bookingId);
+                    showFeedback(`Request closed. Let ${clientFirst} know the time can’t change`, 'success');
+                    window.dispatchEvent(new Event('vanta:attention-changed'));
+                    forgetBookings();
+                    await onBooked?.(bookingId);
+                  } catch (e) { showError(e); } finally { setChangeSaving(false); }
+                }}>Can’t move it</Button>
+              </div>
+            </div>
+          )}
+          {refundOwed && (
+            <div role="alert" style={p.changeBox}>
+              <span style={p.changeTitle}>Send {clientFirst} their {refundOwedAmount} deposit</span>
+              <span style={p.changeText}>
+                They paid it to you directly, so Vanta can’t refund it. Send it back the way they paid, then mark it sent.
+              </span>
+              <div style={p.changeActions}>
+                <Button size="sm" variant="primary" disabled={changeSaving} onClick={async () => {
+                  setChangeSaving(true);
+                  try {
+                    await markRefundSent(bookingId);
+                    showFeedback('Refund marked as sent', 'success');
+                    window.dispatchEvent(new Event('vanta:attention-changed'));
+                    forgetBookings();
+                    await onBooked?.(bookingId);
+                  } catch (e) { showError(e); } finally { setChangeSaving(false); }
+                }}>Mark refund sent</Button>
+              </div>
+            </div>
+          )}
+          {refundedAt && !refundOwed && (
+            <span style={p.hint}>
+              Refunded {refundOwedAmount} on {new Date(refundedAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}.
+            </span>
+          )}
         </div>
 
         {/* ── Payment and consent ── */}
@@ -807,7 +863,7 @@ export default function BookingDetailPanel({
           const paidOn = paid ? new Date(depositPaidAt || depositConfirmedAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }) : null;
           const paidHow = depositPaidVia ? `by ${depositPaidVia}` : paidByStripe ? 'through Vanta' : null;
           const note = {
-            paid: [`Paid ${[paidHow, paidOn && `on ${paidOn}`].filter(Boolean).join(' ')}.`, fee ? `${firstNm} paid ${money(depositAmount + fee)}, including the ${money(fee)} Vanta booking fee.` : null, isNoShow ? `${firstNm} didn’t show.` : null, ended ? 'The booking was cancelled after the deposit was paid.' : null].filter(Boolean).join(' '),
+            paid: [`Paid ${[paidHow, paidOn && `on ${paidOn}`].filter(Boolean).join(' ')}.`, fee ? `${firstNm} paid ${money(depositAmount + fee)}, including the ${money(fee)} Vanta booking fee.` : null, isNoShow ? `${firstNm} didn’t show.` : null, ended ? (refundedAt ? `The booking was cancelled and ${refundOwedAmount} was refunded.` : refundOwed ? 'The booking was cancelled; the deposit needs to be sent back.' : 'The booking was cancelled and the deposit was kept under the cancellation policy.') : null].filter(Boolean).join(' '),
             unconfirmed: `Paid ${[paidHow, paidOn && `on ${paidOn}`].filter(Boolean).join(' ')}. Check it’s arrived.`,
             link: `${firstNm} has been sent a link to pay${selectionTokenExpiresAt ? `. It expires ${new Date(selectionTokenExpiresAt).toLocaleString('en-AU', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}` : ''}.`,
             expired: `${firstNm} didn’t pay before the payment link expired.`,
@@ -1462,6 +1518,10 @@ const p = {
   summaryMuted: { fontSize: '0.9rem', fontWeight: 500, color: 'var(--text-muted)' },
   summaryDivider: { borderTop: '1px solid var(--border)' },
   heroNote: { marginTop: '0.4rem', fontSize: '0.9rem', color: 'var(--color-danger)', fontWeight: 600 },
+  changeBox: { marginTop: '0.6rem', display: 'flex', flexDirection: 'column', gap: '0.35rem', padding: '0.8rem 0.9rem', borderRadius: 12, background: 'var(--bg-input)', border: '1px solid var(--color-warning)' },
+  changeTitle: { fontSize: '0.95rem', fontWeight: 600, color: 'var(--text)' },
+  changeText: { fontSize: '0.88rem', lineHeight: 1.45, color: 'var(--text-secondary)', overflowWrap: 'anywhere' },
+  changeActions: { display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.3rem' },
   collapseHead: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', width: '100%', background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' },
   outcomeSub: { borderTop: '1px solid var(--border)', paddingTop: '0.7rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' },
   thumb: { display: 'block', borderRadius: 8, overflow: 'hidden', width: 84, height: 84, flexShrink: 0, border: '1px solid var(--border)' },

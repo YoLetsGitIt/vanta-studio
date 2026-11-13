@@ -239,6 +239,9 @@ function useIsMobile() {
   return mobile;
 }
 
+// Notice periods for the cancellation policy (hours → label).
+const CANCEL_NOTICE_LABEL = { 24: '24 hours', 48: '48 hours', 72: '3 days', 168: '7 days' };
+
 export default function SettingsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -261,6 +264,10 @@ export default function SettingsPage() {
   const [personalCut, setPersonalCut] = useState('0');
   const [paymentRecordingReq, setPaymentRecordingReq] = useState('studio_only');
   const [payForfeitedDeposits, setPayForfeitedDeposits] = useState(false);
+  // Cancellation policy: whether a deposit comes back when the client cancels in time,
+  // and how much notice "in time" means (also the notice needed to reschedule).
+  const [depositRefundable, setDepositRefundable] = useState(false);
+  const [cancelWindow, setCancelWindow] = useState(48);
   // Artist's share of a forfeited deposit, as typed; '' = their usual commission share.
   const [forfeitPct, setForfeitPct] = useState('');
   // The studio's form colours (booking form + website widget, walk-in form, consent
@@ -403,6 +410,8 @@ export default function SettingsPage() {
         setPersonalCut(String(account.studio?.personal_cut_percent ?? account.studio?.studio_cut_percent ?? 0));
         setPaymentRecordingReq(account.studio?.payment_recording_requirement ?? 'studio_only');
         setPayForfeitedDeposits(account.studio?.pay_artist_on_forfeited_deposits ?? false);
+        setDepositRefundable(account.studio?.deposit_refundable ?? false);
+        setCancelWindow(account.studio?.reschedule_window_hours ?? 48);
         setForfeitPct(account.studio?.forfeited_deposit_artist_percent != null ? String(Number(account.studio.forfeited_deposit_artist_percent)) : '');
         setSendReminder7d(account.studio?.send_reminder_7d ?? true);
         setSendReminder3d(account.studio?.send_reminder_3d ?? false);
@@ -483,7 +492,7 @@ export default function SettingsPage() {
       const pc = parseFloat(personalCut);
       const fp = forfeitPct.trim() === '' ? null : parseFloat(forfeitPct);
       if (fp != null && !(fp >= 0 && fp <= 100)) { setProfileError('The artist’s share of forfeited deposits must be between 0 and 100%.'); setSaving(false); return; }
-      await updateStudioProfile(name.trim(), address.trim(), undefined, undefined, isNaN(wc) ? 0 : wc, isNaN(pc) ? 0 : pc, aftercareInstructions, timezone, addressLat, addressLng, paymentRecordingReq, undefined, widgetConsentTemplateId || null, sendReminder7d, sendReminder24h, payForfeitedDeposits, schedulingMode, piercingAftercareInstructions, sendReminder3d, fp);
+      await updateStudioProfile(name.trim(), address.trim(), undefined, undefined, isNaN(wc) ? 0 : wc, isNaN(pc) ? 0 : pc, aftercareInstructions, timezone, addressLat, addressLng, paymentRecordingReq, cancelWindow, widgetConsentTemplateId || null, sendReminder7d, sendReminder24h, payForfeitedDeposits, schedulingMode, piercingAftercareInstructions, sendReminder3d, fp, depositRefundable);
       invalidate('studio-account');
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
@@ -1234,6 +1243,42 @@ export default function SettingsPage() {
                 <option value="studio_only">Studio only</option>
                 <option value="artist_only">Artist only</option>
                 <option value="both">Studio and artist</option>
+              </select>
+            </div>
+            <div className="studio-payment-setting" style={s.paymentSetting}>
+              <div style={s.paymentSettingCopy}>
+                <label htmlFor="cancellation-policy" style={s.paymentSettingTitle}>Cancellation policy</label>
+                <p style={s.paymentSettingDescription}>
+                  {depositRefundable
+                    ? `Clients get their deposit back if they cancel at least ${CANCEL_NOTICE_LABEL[cancelWindow] ?? `${cancelWindow} hours`} before. Later than that, you keep it.`
+                    : 'You keep the deposit whenever the client cancels.'}
+                  {' '}If you cancel, the client always gets back everything they paid. Clients see this before they pay, and changes only apply to deposits paid after you save.
+                </p>
+              </div>
+              <select
+                id="cancellation-policy"
+                style={s.paymentSettingSelect}
+                value={depositRefundable ? 'refundable' : 'kept'}
+                onChange={e => setDepositRefundable(e.target.value === 'refundable')}
+              >
+                <option value="refundable">Refundable with notice</option>
+                <option value="kept">Non-refundable</option>
+              </select>
+            </div>
+            <div className="studio-payment-setting" style={{ ...s.paymentSetting, paddingTop: 0, borderTop: 'none' }}>
+              <div style={s.paymentSettingCopy}>
+                <label htmlFor="cancel-notice" style={s.paymentSettingTitle}>Notice needed</label>
+                <p style={s.paymentSettingDescription}>
+                  {depositRefundable ? 'How far ahead a client must cancel to get their deposit back. ' : ''}Clients can move a booking themselves once, up to this long before it.
+                </p>
+              </div>
+              <select
+                id="cancel-notice"
+                style={s.paymentSettingSelect}
+                value={cancelWindow}
+                onChange={e => setCancelWindow(Number(e.target.value))}
+              >
+                {[24, 48, 72, 168].map(h => <option key={h} value={h}>{CANCEL_NOTICE_LABEL[h]}</option>)}
               </select>
             </div>
             <div className="studio-payment-setting" style={s.paymentSetting}>

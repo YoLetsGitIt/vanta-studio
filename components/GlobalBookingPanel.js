@@ -9,7 +9,7 @@ import BookingDetailPanel from '@/components/BookingDetailPanel';
 import CompleteBookingModal from '@/components/CompleteBookingModal';
 import RejectBookingModal from '@/components/RejectBookingModal';
 import SendSelectionLinkModal from '@/components/SendSelectionLinkModal';
-import { getStudioArtists, getStripeStatus } from '@/lib/api';
+import { getStudioArtists, getStripeStatus, getCancelPreview } from '@/lib/api';
 import { fetchBooking, forgetBookings, loadBooking, startBookingPrefetch } from '@/lib/bookingCache';
 import { bookingActions } from '@/lib/bookingActions';
 import { canCollectDeposits } from '@/lib/deposits';
@@ -31,6 +31,20 @@ export default function GlobalBookingPanel() {
   const [artists, setArtists] = useState([]);
   const [depositsReady, setDepositsReady] = useState(false);
   const [modal, setModal] = useState(null); // 'complete' | 'noShow' | 'reject' | 'cancel' | 'sendLink'
+  // What cancelling does to the client's deposit, shown in the cancel dialog.
+  const [cancelNotice, setCancelNotice] = useState(null);
+  useEffect(() => {
+    if (modal !== 'cancel' || !booking?.id) { setCancelNotice(null); return; }
+    let live = true;
+    getCancelPreview(booking.id).then(p => {
+      if (!live || p.deposit !== 'refund') return;
+      const amount = `$${Number(p.refund_amount).toFixed(2).replace(/\.00$/, '')}`;
+      setCancelNotice(p.paid_through_vanta
+        ? `The client will be refunded everything they paid (${amount}, including the Vanta booking fee) automatically.`
+        : `The client paid their ${amount} deposit to you directly, so you’ll need to send it back. It will be listed under Refunds to send.`);
+    }).catch(() => {});
+    return () => { live = false; };
+  }, [modal, booking?.id]);
 
   useEffect(() => {
     startBookingPrefetch();
@@ -146,6 +160,7 @@ export default function GlobalBookingPanel() {
             title={t('cancel_booking_title')}
             placeholder="Reason for cancellation…"
             confirmLabel={t('cancel_booking_confirm')}
+            notice={cancelNotice}
             saving={saving}
             onConfirm={reason => act(() => bookingActions.cancel(id, reason), 'Booking cancelled')}
             onCancel={() => setModal(null)}

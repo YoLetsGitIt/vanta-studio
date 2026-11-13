@@ -75,6 +75,16 @@ export default function SidebarNeedsAction({ paymentRecording, onNavigate }) {
   const groups = [
     { key: 'pending', title: 'Pending requests', tone: 'warning', items: bookings.filter(b => b.status === 'pending' && !withArtist(b) && !awaitingClient.has(b.id)).map(b => bookingItem(b, [when(b)])) },
     { key: 'confirm', title: 'To confirm', tone: 'info', items: bookings.filter(b => b.status === 'requires_confirmation').map(b => bookingItem(b, [when(b)])) },
+    // Clients asking to move their booking; the panel has "Move booking" and "Can't move it".
+    { key: 'reschedule', title: 'New time requested', tone: 'warning', items: (data.reschedule_requests ?? []).map(q => ({
+      id: q.booking_id, title: q.requester_name ?? 'Client', booking: { id: q.booking_id, requester_name: q.requester_name, chosen_time: q.chosen_time },
+      lines: [q.message ? `“${q.message.length > 60 ? `${q.message.slice(0, 60)}…` : q.message}”` : 'Wants a different time', `Booked: ${q.chosen_time ? shortDate(q.chosen_time) : '—'}${q.artist_name ? ` · ${q.artist_name}` : ''}`],
+    })) },
+    // Deposits paid to the studio's own PayID (or a refund Stripe refused): the studio sends them back.
+    { key: 'refunds', title: 'Refunds to send', tone: 'danger', items: (data.refunds_owed ?? []).map(r => ({
+      id: r.booking_id, title: r.requester_name ?? 'Client', booking: { id: r.booking_id, requester_name: r.requester_name, chosen_time: r.chosen_time },
+      lines: [`$${Number(r.amount ?? 0).toFixed(2)} deposit${r.cancelled_at ? ` · cancelled ${shortDate(r.cancelled_at)}` : ''}`],
+    })) },
     { key: 'check', title: 'Deposits to check', tone: 'info', items: bookings.filter(b => needsDeposit(b) && claims[b.id]).map(b => bookingItem(b, [`Says paid by ${claims[b.id].method === 'payid' ? 'PayID' : 'bank transfer'}${claims[b.id].recorded_at ? ` · ${shortDate(claims[b.id].recorded_at)}` : ''}`, `Appointment: ${shortDate(b.chosen_time)}`])) },
     { key: 'deposit', title: 'Unpaid deposits', tone: 'danger', items: bookings.filter(b => needsDeposit(b) && !claims[b.id]).map(b => bookingItem(b, [`Appointment: ${shortDate(b.chosen_time)}`])) },
     { key: 'overdue', title: 'Past sessions to finish', tone: 'warning', items: recordsOutcomes ? bookings.filter(b => isOverdue(b, now)).sort((a, b) => new Date(a.chosen_time) - new Date(b.chosen_time)).map(b => bookingItem(b, [`${b.artist_name ?? 'No artist'} · ${shortDate(b.chosen_time)}`])) : [] },
