@@ -1,0 +1,6 @@
+# Source models and the authored scene are reproducible using the scripts.
+# Keep local working copies; don't publish them as website assets.
+assets/
+*.blend
+*.blend1
+__pycache__/
