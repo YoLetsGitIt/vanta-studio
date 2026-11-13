@@ -122,18 +122,18 @@ function Chevron({ left = false }) {
 }
 
 const st = {
-  option: { display: 'flex', alignItems: 'center', gap: '0.75rem', width: '100%', textAlign: 'left', padding: '0.75rem 0.9rem', borderRadius: 10, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-dim, #ddd)', fontFamily: 'inherit', cursor: 'pointer', transition: 'background-color 150ms ease, border-color 150ms ease' },
+  option: { display: 'flex', alignItems: 'center', gap: '0.75rem', width: '100%', textAlign: 'left', padding: '0.75rem 0.9rem', borderRadius: 10, background: 'rgba(var(--ink-rgb), 0.05)', border: '1px solid rgba(var(--ink-rgb), 0.1)', color: 'var(--text-dim, #ddd)', fontFamily: 'inherit', cursor: 'pointer', transition: 'background-color 150ms ease, border-color 150ms ease' },
   on: { background: 'var(--cf-accent-soft)', border: '1px solid var(--cf-accent)', boxShadow: 'inset 0 0 0 1px var(--cf-accent)', color: 'var(--cf-accent)' },
   off: { opacity: 0.3, cursor: 'not-allowed' },
   name: { display: 'block', fontSize: '0.9rem', fontWeight: 600 },
   meta: { display: 'block', fontSize: '0.75rem', opacity: 0.75, marginTop: 2 },
   label: { fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-muted)' },
   hint: { fontSize: '0.78rem', color: 'var(--text-muted)', margin: 0, lineHeight: 1.5 },
-  pager: { width: 30, height: 30, padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: 8, border: '1px solid rgba(255,255,255,0.12)', background: 'none', color: 'inherit', cursor: 'pointer' },
+  pager: { width: 30, height: 30, padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: 8, border: '1px solid rgba(var(--ink-rgb), 0.12)', background: 'none', color: 'inherit', cursor: 'pointer' },
   dayRow: { display: 'flex', gap: '0.4rem', overflowX: 'auto', paddingBottom: 4, overscrollBehaviorX: 'contain' },
-  day: { flex: '0 0 auto', width: 58, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, padding: '0.5rem 0', borderRadius: 10, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-dim, #ddd)', fontFamily: 'inherit', cursor: 'pointer' },
+  day: { flex: '0 0 auto', width: 58, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, padding: '0.5rem 0', borderRadius: 10, background: 'rgba(var(--ink-rgb), 0.05)', border: '1px solid rgba(var(--ink-rgb), 0.1)', color: 'var(--text-dim, #ddd)', fontFamily: 'inherit', cursor: 'pointer' },
   slotGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(86px, 1fr))', gap: '0.4rem' },
-  slot: { padding: '0.6rem 0', borderRadius: 8, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-dim, #ddd)', fontFamily: 'inherit', fontSize: '0.85rem', fontWeight: 500, cursor: 'pointer', fontVariantNumeric: 'tabular-nums' },
+  slot: { padding: '0.6rem 0', borderRadius: 8, background: 'rgba(var(--ink-rgb), 0.05)', border: '1px solid rgba(var(--ink-rgb), 0.1)', color: 'var(--text-dim, #ddd)', fontFamily: 'inherit', fontSize: '0.85rem', fontWeight: 500, cursor: 'pointer', fontVariantNumeric: 'tabular-nums' },
   error: { fontSize: '0.78rem', color: 'var(--color-danger)', margin: 0 },
   link: { background: 'none', border: 'none', padding: 0, color: 'inherit', textDecoration: 'underline', font: 'inherit', cursor: 'pointer' },
 };

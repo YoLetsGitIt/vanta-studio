@@ -3,5 +3,6 @@ export const metadata = {
 };
 
 export default function WalkInLayout({ children }) {
-  return <div data-theme="dark" style={{ colorScheme: 'dark' }}>{children}</div>;
+  // The form sets its own theme: light, or dark when the studio chose a dark background.
+  return children;
 }

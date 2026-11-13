@@ -20,7 +20,8 @@ import { uploadPhotoIdAnswers, signStudioPhotoId } from '@/lib/photoId';
 import { getStudioPublic, createWalkIn, createGuestStudioBooking, createWalkInBooking, getWalkInFormConfigPublic, getStudioHoursPublic, walkinUploadSign, signatureUploadSign, getStudioConsentTemplates, getFormConfigPublic } from '@/lib/api';
 
 import { COUNTRIES, detectCountry } from '@/lib/phoneCountries';
-import { formTheme } from '@/lib/formTheme';
+import { formTheme, formThemeMode } from '@/lib/formTheme';
+import { signatureBlob } from '@/lib/signature';
 
 const PIERCING_PLACEMENTS = ['Earlobe', 'Helix', 'Tragus', 'Conch', 'Daith', 'Rook', 'Industrial', 'Nostril', 'Septum', 'Eyebrow', 'Lip', 'Tongue', 'Navel', 'Nipple', 'Other'];
 
@@ -688,7 +689,7 @@ function IntakeInner({ mode, onStyle }) {
                     onKeyDown={e => ['e','E','+','-'].includes(e.key) && e.preventDefault()}
                     placeholder="e.g. 10"
                   />
-                  <div style={{ display: 'flex', background: 'rgba(255,255,255,0.06)', borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)', flexShrink: 0 }}>
+                  <div style={{ display: 'flex', background: 'rgba(var(--ink-rgb), 0.06)', borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(var(--ink-rgb), 0.1)', flexShrink: 0 }}>
                     {['cm', 'in'].map(u => (
                       <button
                         key={u} type="button" aria-pressed={sizeUnit === u}
@@ -696,8 +697,8 @@ function IntakeInner({ mode, onStyle }) {
                         style={{
                           padding: '0.55rem 0.75rem', border: 'none', cursor: 'pointer',
                           fontSize: '0.82rem', fontWeight: 600, fontFamily: 'inherit',
-                          background: sizeUnit === u ? 'rgba(255,255,255,0.15)' : 'transparent',
-                          color: sizeUnit === u ? '#fff' : 'rgba(255,255,255,0.4)',
+                          background: sizeUnit === u ? 'rgba(var(--ink-rgb), 0.15)' : 'transparent',
+                          color: sizeUnit === u ? 'var(--text)' : 'rgba(var(--ink-rgb), 0.4)',
                         }}
                       >
                         {u}
@@ -729,10 +730,10 @@ function IntakeInner({ mode, onStyle }) {
                       style={{
                         flex: 1,
                         padding: '0.6rem 0',
-                        border: `1px solid ${active ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.1)'}`,
+                        border: `1px solid ${active ? 'rgba(var(--ink-rgb), 0.45)' : 'rgba(var(--ink-rgb), 0.1)'}`,
                         borderRadius: 8,
-                        background: active ? 'rgba(255,255,255,0.13)' : 'rgba(255,255,255,0.05)',
-                        color: active ? '#fff' : 'rgba(255,255,255,0.55)',
+                        background: active ? 'rgba(var(--ink-rgb), 0.13)' : 'rgba(var(--ink-rgb), 0.05)',
+                        color: active ? 'var(--text)' : 'rgba(var(--ink-rgb), 0.55)',
                         fontSize: '0.85rem',
                         fontWeight: active ? 600 : 500,
                         cursor: 'pointer',
@@ -949,9 +950,9 @@ function ConsentFormField({ field, value, onChange }) {
                 onClick={() => onChange(opt)}
                 style={{
                   padding: '0.45rem 1.2rem', borderRadius: 8,
-                  border: `1px solid ${value === opt ? 'var(--cf-accent)' : 'rgba(255,255,255,0.12)'}`,
-                  background: value === opt ? 'var(--cf-accent-soft)' : 'rgba(255,255,255,0.04)',
-                  color: value === opt ? 'var(--cf-accent)' : 'rgba(255,255,255,0.5)',
+                  border: `1px solid ${value === opt ? 'var(--cf-accent)' : 'rgba(var(--ink-rgb), 0.12)'}`,
+                  background: value === opt ? 'var(--cf-accent-soft)' : 'rgba(var(--ink-rgb), 0.04)',
+                  color: value === opt ? 'var(--cf-accent)' : 'rgba(var(--ink-rgb), 0.5)',
                   fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
                 }}>{opt}</button>
             ))}
@@ -1021,7 +1022,7 @@ function SignaturePad({ onCapture, label = 'Client signature' }) {
   function endDraw() {
     if (!drawing) return;
     setDrawing(false);
-    if (hasDrawn) canvasRef.current.toBlob(blob => onCapture(blob), 'image/png');
+    if (hasDrawn) signatureBlob(canvasRef.current, blob => onCapture(blob));
   }
 
   function clear() {
@@ -1099,7 +1100,7 @@ function ArtistChoice({ artists, value, onChange }) {
         }}
       >
         {selected && <ArtistAvatar artist={selected} size={26} />}
-        <span id="walkin-artist-value" style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: selected ? '#fff' : 'var(--text-muted)' }}>
+        <span id="walkin-artist-value" style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: selected ? 'var(--text)' : 'var(--text-muted)' }}>
           {selected ? selected.name : 'Choose your artist'}
         </span>
         <svg aria-hidden="true" width="12" height="12" viewBox="0 0 12 12" style={{ flexShrink: 0, opacity: 0.6, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 160ms ease' }}>
@@ -1109,7 +1110,7 @@ function ArtistChoice({ artists, value, onChange }) {
       {open && (
         <div ref={listRef} role="listbox" aria-labelledby="walkin-artist-label" style={{
           display: 'flex', flexDirection: 'column', padding: '0.3rem', borderRadius: 10, maxHeight: 320, overflowY: 'auto',
-          background: 'rgba(20,20,20,0.98)', border: '1px solid rgba(255,255,255,0.12)', boxShadow: '0 12px 32px rgba(0,0,0,0.45)',
+          background: 'var(--bg-modal)', border: '1px solid rgba(var(--ink-rgb), 0.12)', boxShadow: '0 12px 32px rgba(0,0,0,0.45)',
         }}>
           {artists.map(a => {
             const on = value === a.artistId;
@@ -1123,7 +1124,7 @@ function ArtistChoice({ artists, value, onChange }) {
                 onClick={() => choose(a.artistId)}
                 style={{
                   display: 'flex', alignItems: 'center', gap: '0.6rem', minHeight: 48, padding: '0.45rem 0.6rem', borderRadius: 8,
-                  border: 0, cursor: 'pointer', textAlign: 'left', font: 'inherit', color: '#fff',
+                  border: 0, cursor: 'pointer', textAlign: 'left', font: 'inherit', color: 'var(--text)',
                   background: on ? 'var(--cf-accent-soft)' : 'transparent', WebkitTapHighlightColor: 'transparent',
                 }}
               >
@@ -1153,7 +1154,7 @@ function ArtistAvatar({ artist, size }) {
   }
   const initials = (artist.name || '?').split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase();
   return (
-    <span aria-hidden="true" style={{ width: size, height: size, borderRadius: '50%', display: 'grid', placeItems: 'center', flexShrink: 0, fontSize: '0.7rem', fontWeight: 700, background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.75)' }}>{initials}</span>
+    <span aria-hidden="true" style={{ width: size, height: size, borderRadius: '50%', display: 'grid', placeItems: 'center', flexShrink: 0, fontSize: '0.7rem', fontWeight: 700, background: 'rgba(var(--ink-rgb), 0.08)', color: 'rgba(var(--ink-rgb), 0.75)' }}>{initials}</span>
   );
 }
 
@@ -1165,7 +1166,7 @@ function Section({ title, children, first = false }) {
   return (
     <div style={{
       display: 'flex', flexDirection: 'column', gap: '0.9rem',
-      borderTop: first ? 'none' : '1px solid rgba(255,255,255,0.06)',
+      borderTop: first ? 'none' : '1px solid rgba(var(--ink-rgb), 0.06)',
       paddingTop: first ? 0 : '1.5rem',
     }}>
       {title && <span style={s.sectionTitle}>{title}</span>}
@@ -1178,7 +1179,7 @@ export default function BookingIntakePage({ mode = 'booking' }) {
   // The studio's form colours, once its details load.
   const [style, setStyle] = useState(null);
   return (
-    <div style={{ ...s.page, ...formTheme(style, { card: 'rgba(255,255,255,0.03)', page: '#0e0e0e', accent: '#d5d0c7' }) }}>
+    <div data-theme={formThemeMode(style)} style={{ ...s.page, ...formTheme(style, { card: '#ffffff', page: '#f6f5f2' }) }}>
       <Suspense fallback={<BrandLoader />}>
         <IntakeInner mode={mode} onStyle={setStyle} />
       </Suspense>
@@ -1200,7 +1201,7 @@ const s = {
     width: '100%',
     maxWidth: 480,
     background: 'var(--cf-card)',
-    border: '1px solid rgba(255,255,255,0.08)',
+    border: '1px solid rgba(var(--ink-rgb), 0.08)',
     borderRadius: 16,
     padding: '2rem',
     display: 'flex',
@@ -1216,14 +1217,14 @@ const s = {
   studioHeader: {
     display: 'flex', flexDirection: 'column', gap: '0.25rem',
     paddingBottom: '1.25rem',
-    borderBottom: '1px solid rgba(255,255,255,0.06)',
+    borderBottom: '1px solid rgba(var(--ink-rgb), 0.06)',
   },
   studioLabel: {
     fontSize: '0.7rem', fontWeight: 600, letterSpacing: '0.08em',
     textTransform: 'uppercase', color: 'var(--text-muted)',
   },
   studioName: {
-    fontSize: '1.5rem', fontWeight: 700, color: '#ffffff',
+    fontSize: '1.5rem', fontWeight: 700, color: 'var(--text)',
     margin: 0, letterSpacing: '-0.02em',
   },
   studioAddress: {
@@ -1244,16 +1245,16 @@ const s = {
   },
   submitSection: {
     display: 'flex', flexDirection: 'column', gap: '0.75rem',
-    borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '1.5rem',
+    borderTop: '1px solid rgba(var(--ink-rgb), 0.06)', paddingTop: '1.5rem',
   },
   label: {
     fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-muted)',
   },
   input: {
-    background: 'rgba(255,255,255,0.05)',
-    border: '1px solid rgba(255,255,255,0.1)',
+    background: 'rgba(var(--ink-rgb), 0.05)',
+    border: '1px solid rgba(var(--ink-rgb), 0.1)',
     borderRadius: 8,
-    color: '#ffffff',
+    color: 'var(--text)',
     fontSize: '0.875rem',
     minHeight: 44,
     padding: '0.65rem 0.85rem',
@@ -1285,8 +1286,8 @@ const s = {
     display: 'flex', flexWrap: 'wrap', gap: '0.4rem',
   },
   placementChip: {
-    background: 'rgba(255,255,255,0.05)',
-    border: '1px solid rgba(255,255,255,0.1)',
+    background: 'rgba(var(--ink-rgb), 0.05)',
+    border: '1px solid rgba(var(--ink-rgb), 0.1)',
     borderRadius: 20,
     color: 'var(--text-dim)',
     fontSize: '0.78rem', fontWeight: 500,
@@ -1305,13 +1306,13 @@ const s = {
   },
 
   photoGrid: { display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.5rem' },
-  photoThumb: { position: 'relative', width: 72, height: 72, borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)' },
+  photoThumb: { position: 'relative', width: 72, height: 72, borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(var(--ink-rgb), 0.1)' },
   thumbImg: { width: '100%', height: '100%', objectFit: 'cover' },
   thumbRemove: { position: 'absolute', top: 2, right: 2, width: 18, height: 18, borderRadius: '50%', background: 'rgba(0,0,0,0.65)', border: 'none', color: '#fff', fontSize: '0.65rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 },
   nameRow: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.9rem' },
   blocker: { margin: '0.6rem 0 0', fontSize: '0.8rem', color: 'var(--text-muted)', textAlign: 'center' },
   sigWrap: { display: 'flex', flexDirection: 'column', gap: '0.4rem' },
-  sigCanvas: { width: '100%', height: 140, borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.12)', display: 'block', touchAction: 'none', cursor: 'crosshair' },
+  sigCanvas: { width: '100%', height: 140, borderRadius: 8, background: 'rgba(var(--ink-rgb), 0.04)', border: '1px solid rgba(var(--ink-rgb), 0.12)', display: 'block', touchAction: 'none', cursor: 'crosshair' },
   sigFooter: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
   sigHint: { fontSize: '0.7rem', color: 'var(--text-muted)' },
   sigClear: { background: 'none', border: 'none', fontSize: '0.72rem', color: 'var(--text-muted)', cursor: 'pointer', padding: '0.15rem 0', fontFamily: 'inherit' },
@@ -1349,7 +1350,7 @@ const s = {
     display: 'flex', alignItems: 'center', justifyContent: 'center',
   },
   successTitle: {
-    fontSize: '1.3rem', fontWeight: 700, color: '#ffffff', margin: 0,
+    fontSize: '1.3rem', fontWeight: 700, color: 'var(--text)', margin: 0,
   },
   successSub: {
     fontSize: '0.85rem', color: 'var(--text-muted)', margin: 0, lineHeight: 1.6,

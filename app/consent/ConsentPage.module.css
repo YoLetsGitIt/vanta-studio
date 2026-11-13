@@ -33,7 +33,7 @@
 
 .socialTerms {
   margin: 0;
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(var(--ink-rgb), 0.5);
   font-size: 0.75rem;
   line-height: 1.6;
 }
@@ -46,7 +46,7 @@
 
 .socialError {
   margin: 0;
-  color: #ff9696;
+  color: var(--color-danger);
   font-size: 0.8rem;
   line-height: 1.5;
 }
@@ -56,7 +56,7 @@
   align-items: center;
   gap: 12px;
   margin-top: 4px;
-  color: rgba(255, 255, 255, 0.45);
+  color: rgba(var(--ink-rgb), 0.45);
   font-size: 0.75rem;
 }
 
@@ -65,5 +65,5 @@
   content: '';
   flex: 1;
   height: 1px;
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(var(--ink-rgb), 0.12);
 }

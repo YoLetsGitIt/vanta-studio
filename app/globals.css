@@ -1,5 +1,7 @@
 :root,
 [data-theme="dark"] {
+  /* Text colour as r, g, b for translucent text and lines: rgba(var(--ink-rgb), 0.5). */
+  --ink-rgb: 255, 255, 255;
   color-scheme: dark;
 
   /* Shared scales. Keep feature layouts on these tokens as they are migrated. */
@@ -99,6 +101,7 @@
 }
 
 [data-theme="light"] {
+  --ink-rgb: 17, 16, 8;
   color-scheme: light;
   --panel-backdrop: rgba(17, 16, 8, 0.22);
   --segment-track: #f0f0f0;
@@ -157,6 +160,7 @@
 
 /* Nature matches the phone app's VantaPalette.nature: parchment, forest ink and green. */
 [data-theme="nature"] {
+  --ink-rgb: 23, 36, 28;
   --panel-backdrop: rgba(23, 36, 28, 0.22);
   color-scheme: light;
   --text: #17241c;
@@ -239,6 +243,7 @@ html[data-theme="nature"] #account-preferences-heading::after {
 /* Space follows VantaPalette.space on the phone: cosmic ink and starlight.
    Lift the shared accent for readable links as well as filled controls. */
 [data-theme="space"] {
+  --ink-rgb: 237, 240, 250;
   color-scheme: dark;
   --text: #edf0fa;
   --text-dim: #b8bac8;

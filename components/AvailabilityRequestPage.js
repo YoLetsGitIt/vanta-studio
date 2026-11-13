@@ -115,7 +115,7 @@ function Inner() {
 
 export default function AvailabilityRequestPage() {
   return (
-    <div style={s.page} data-theme="dark">
+    <div style={s.page} data-theme="light">
       <Suspense fallback={<p style={s.msg}>Loading…</p>}>
         <Inner />
       </Suspense>
@@ -124,26 +124,26 @@ export default function AvailabilityRequestPage() {
 }
 
 const s = {
-  page: { minHeight: '100vh', background: '#0e0e0e', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '2rem 1rem 4rem', fontFamily: 'var(--font-body, system-ui, sans-serif)' },
-  card: { width: '100%', maxWidth: 520, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1.25rem', boxSizing: 'border-box' },
-  header: { display: 'flex', flexDirection: 'column', gap: '0.25rem', paddingBottom: '1.25rem', borderBottom: '1px solid rgba(255,255,255,0.06)' },
+  page: { minHeight: '100vh', background: 'var(--bg-base)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '2rem 1rem 4rem', fontFamily: 'var(--font-body, system-ui, sans-serif)' },
+  card: { width: '100%', maxWidth: 520, background: 'rgba(var(--ink-rgb), 0.03)', border: '1px solid rgba(var(--ink-rgb), 0.08)', borderRadius: 16, padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1.25rem', boxSizing: 'border-box' },
+  header: { display: 'flex', flexDirection: 'column', gap: '0.25rem', paddingBottom: '1.25rem', borderBottom: '1px solid rgba(var(--ink-rgb), 0.06)' },
   logo: { maxHeight: 64, maxWidth: 220, objectFit: 'contain', alignSelf: 'flex-start', marginBottom: '0.5rem' },
   label: { fontSize: '0.7rem', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)' },
-  studio: { fontSize: '1.5rem', fontWeight: 700, color: '#ffffff', margin: 0, letterSpacing: '-0.02em' },
-  intro: { margin: 0, fontSize: '0.95rem', lineHeight: 1.55, color: 'rgba(255,255,255,0.85)' },
-  quote: { margin: 0, display: 'flex', flexDirection: 'column', gap: '0.45rem', padding: '0.85rem 1rem', borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' },
+  studio: { fontSize: '1.5rem', fontWeight: 700, color: 'var(--text)', margin: 0, letterSpacing: '-0.02em' },
+  intro: { margin: 0, fontSize: '0.95rem', lineHeight: 1.55, color: 'rgba(var(--ink-rgb), 0.85)' },
+  quote: { margin: 0, display: 'flex', flexDirection: 'column', gap: '0.45rem', padding: '0.85rem 1rem', borderRadius: 12, background: 'rgba(var(--ink-rgb), 0.04)', border: '1px solid rgba(var(--ink-rgb), 0.08)' },
   quoteRow: { display: 'flex', justifyContent: 'space-between', gap: '1rem', fontSize: '0.9rem', color: 'var(--text-muted)' },
-  quoteValue: { margin: 0, fontWeight: 700, color: '#ffffff', fontVariantNumeric: 'tabular-nums' },
+  quoteValue: { margin: 0, fontWeight: 700, color: 'var(--text)', fontVariantNumeric: 'tabular-nums' },
   note: { margin: 0, fontSize: '0.85rem', color: 'var(--color-success)' },
   form: { display: 'flex', flexDirection: 'column', gap: '1.25rem' },
   field: { display: 'flex', flexDirection: 'column', gap: '0.45rem' },
-  fieldLabel: { fontSize: '0.8rem', fontWeight: 600, color: 'rgba(255,255,255,0.8)' },
+  fieldLabel: { fontSize: '0.8rem', fontWeight: 600, color: 'rgba(var(--ink-rgb), 0.8)' },
   optional: { fontWeight: 400, color: 'var(--text-muted)' },
   hint: { margin: 0, fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.5 },
-  input: { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, color: '#ffffff', fontSize: '16px', minHeight: 44, padding: '0.65rem 0.85rem', width: '100%', boxSizing: 'border-box', fontFamily: 'inherit', colorScheme: 'dark' },
+  input: { background: 'rgba(var(--ink-rgb), 0.05)', border: '1px solid rgba(var(--ink-rgb), 0.1)', borderRadius: 8, color: 'var(--text)', fontSize: '16px', minHeight: 44, padding: '0.65rem 0.85rem', width: '100%', boxSizing: 'border-box', fontFamily: 'inherit', colorScheme: 'dark' },
   error: { margin: 0, fontSize: '0.85rem', color: 'var(--color-danger)' },
   msg: { color: 'var(--text-muted)', fontSize: '0.875rem', padding: '2rem' },
   successIcon: { width: 48, height: 48, borderRadius: '50%', background: 'rgba(76,201,138,0.15)', color: 'var(--color-success)', fontSize: '1.4rem', display: 'flex', alignItems: 'center', justifyContent: 'center' },
-  title: { fontSize: '1.3rem', fontWeight: 700, color: '#ffffff', margin: 0 },
+  title: { fontSize: '1.3rem', fontWeight: 700, color: 'var(--text)', margin: 0 },
   sub: { fontSize: '0.9rem', color: 'var(--text-muted)', margin: 0, lineHeight: 1.6 },
 };

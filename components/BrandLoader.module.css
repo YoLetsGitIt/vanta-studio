@@ -3,7 +3,7 @@
   position: fixed;
   inset: 0;
   z-index: 50;
-  background: #11151b;
+  background: var(--bg-base);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -16,7 +16,7 @@
   font-weight: 800;
   line-height: 0.9;
   white-space: nowrap;
-  color: #f5eddd;
+  color: var(--text);
 }
 
 .muted {
@@ -24,7 +24,7 @@
 }
 
 .dot {
-  color: #c2b699;
+  color: var(--text-muted);
 }
 
 .muted .dot {

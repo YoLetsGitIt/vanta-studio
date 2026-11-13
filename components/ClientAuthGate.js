@@ -80,7 +80,7 @@ export default function ClientAuthGate({ studioId, studioName, logoUrl, purpose 
         // One tap each: returning clients go straight to sign-in, new ones to sign-up.
         <div style={s.linkRow}>
           <button type="button" disabled={busy} onClick={() => { setMode('signin'); setShowEmail(true); }} style={s.linkBtn}>Sign in with email</button>
-          <span aria-hidden="true" style={{ color: 'rgba(255,255,255,0.3)' }}>·</span>
+          <span aria-hidden="true" style={{ color: 'rgba(var(--ink-rgb), 0.3)' }}>·</span>
           <button type="button" disabled={busy} onClick={() => { setMode('signup'); setShowEmail(true); }} style={s.linkBtn}>Create account</button>
         </div>
       )}
@@ -95,18 +95,18 @@ export default function ClientAuthGate({ studioId, studioName, logoUrl, purpose 
         <input style={s.input} type="email" required autoComplete="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="Email" />
         <input style={s.input} type="password" required minLength={6} autoComplete={mode === 'signup' ? 'new-password' : 'current-password'} value={password} onChange={e => setPassword(e.target.value)} placeholder="Password" />
         {mode === 'signup' && (
-          <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.55rem', fontSize: '0.8rem', lineHeight: '18px', color: 'rgba(255,255,255,0.7)', cursor: 'pointer' }}>
+          <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.55rem', fontSize: '0.8rem', lineHeight: '18px', color: 'rgba(var(--ink-rgb), 0.7)', cursor: 'pointer' }}>
             <input type="checkbox" checked={agreed} onChange={e => setAgreed(e.target.checked)} style={{ flexShrink: 0, margin: '1px 0 0', width: 16, height: 16, minWidth: 'auto', accentColor: 'var(--cf-accent, #f5ecd9)' }} />
             <span>
               I agree to the{' '}
               <a href="https://www.vanta.tattoo/terms" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--cf-accent, #f5ecd9)' }}>Terms of Use</a>
               {' '}and{' '}
               <a href="https://www.vanta.tattoo/privacy" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--cf-accent, #f5ecd9)' }}>Privacy Policy</a>{' '}
-              <span style={{ color: '#e86f6f' }}>*</span>
+              <span style={{ color: 'var(--color-danger)' }}>*</span>
             </span>
           </label>
         )}
-        {mode === 'signup' && collectMarketing && <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.55rem', fontSize: '0.8rem', lineHeight: '18px', color: 'rgba(255,255,255,0.7)', cursor: 'pointer' }}>
+        {mode === 'signup' && collectMarketing && <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.55rem', fontSize: '0.8rem', lineHeight: '18px', color: 'rgba(var(--ink-rgb), 0.7)', cursor: 'pointer' }}>
           <input type="checkbox" checked={marketing} onChange={event => setMarketing(event.target.checked)} style={{ flexShrink: 0, margin: '1px 0 0', width: 16, height: 16, minWidth: 'auto', accentColor: 'var(--cf-accent, #f5ecd9)' }} />
           <span>Send me offers and updates from {studioName} by email &amp; text.</span>
         </label>}
@@ -127,7 +127,7 @@ export default function ClientAuthGate({ studioId, studioName, logoUrl, purpose 
 const s = {
   card: {
     background: 'var(--cf-card, #1a2026)',
-    border: '1px solid rgba(255,255,255,0.08)',
+    border: '1px solid rgba(var(--ink-rgb), 0.08)',
     borderRadius: 16,
     padding: '2rem 1.75rem',
     width: '100%', maxWidth: 540,
@@ -140,25 +140,25 @@ const s = {
   },
   heading: {
     margin: 0,
-    fontSize: '1.4rem', fontWeight: 700, color: '#fff',
+    fontSize: '1.4rem', fontWeight: 700, color: 'var(--text)',
     letterSpacing: '-0.01em',
   },
   muted: {
     margin: 0,
-    fontSize: '0.855rem', color: 'rgba(255,255,255,0.5)', lineHeight: 1.6,
+    fontSize: '0.855rem', color: 'rgba(var(--ink-rgb), 0.5)', lineHeight: 1.6,
   },
   hint: {
     margin: 0,
-    fontSize: '0.78rem', color: 'rgba(255,255,255,0.3)',
+    fontSize: '0.78rem', color: 'rgba(var(--ink-rgb), 0.3)',
   },
   form: {
     display: 'flex', flexDirection: 'column', gap: '1.5rem', marginTop: '0.5rem',
   },
   input: {
-    background: 'rgba(255,255,255,0.06)',
-    border: '1px solid rgba(255,255,255,0.12)',
+    background: 'rgba(var(--ink-rgb), 0.06)',
+    border: '1px solid rgba(var(--ink-rgb), 0.12)',
     borderRadius: 8, padding: '0.65rem 0.85rem',
-    fontSize: '0.9rem', color: '#fff', outline: 'none',
+    fontSize: '0.9rem', color: 'var(--text)', outline: 'none',
     width: '100%', minWidth: 0, minHeight: 44, boxSizing: 'border-box',
     fontFamily: 'inherit',
   },
@@ -168,18 +168,18 @@ const s = {
     color: 'var(--cf-accent-text, #11151b)', cursor: 'pointer', transition: 'opacity 0.15s',
   },
   error: {
-    margin: 0, fontSize: '0.8rem', color: '#e86f6f',
+    margin: 0, fontSize: '0.8rem', color: 'var(--color-danger)',
   },
   guestBtn: {
     minHeight: 52, marginTop: '0.75rem', fontSize: '1rem', fontFamily: 'inherit',
   },
   divider: {
     display: 'flex', alignItems: 'center', gap: 12, marginTop: '0.5rem',
-    color: 'rgba(255,255,255,0.45)', fontSize: '0.75rem',
+    color: 'rgba(var(--ink-rgb), 0.45)', fontSize: '0.75rem',
   },
-  dividerLine: { flex: 1, height: 1, background: 'rgba(255,255,255,0.12)' },
+  dividerLine: { flex: 1, height: 1, background: 'rgba(var(--ink-rgb), 0.12)' },
   linkBtn: {
-    background: 'none', border: 'none', color: 'rgba(255,255,255,0.7)', cursor: 'pointer',
+    background: 'none', border: 'none', color: 'rgba(var(--ink-rgb), 0.7)', cursor: 'pointer',
     fontSize: '0.82rem', fontFamily: 'inherit', textDecoration: 'underline', textUnderlineOffset: 3,
     minHeight: 44, padding: '0 4px',
   },

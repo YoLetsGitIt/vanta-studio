@@ -32,7 +32,7 @@ function openDays(hours) {
   return days;
 }
 
-export default function WeeklyAvailabilityGrid({ value, onChange, hours, accent = 'rgba(255,255,255,0.85)' }) {
+export default function WeeklyAvailabilityGrid({ value, onChange, hours, accent = 'rgba(var(--ink-rgb), 0.85)' }) {
   const days = openDays(hours);
   const known = Object.keys(days).length > 0;
   const range = known
@@ -200,7 +200,7 @@ export default function WeeklyAvailabilityGrid({ value, onChange, hours, accent 
             const label = `${day} ${formatTime(w.start_time)} – ${formatTime(w.end_time)}`;
             return (
               <li key={`${w.day_of_week}-${w.start_time}`} style={g.item}>
-                <span><span style={{ fontWeight: 600, color: '#fff' }}>{day}</span> · {formatTime(w.start_time)} – {formatTime(w.end_time)}</span>
+                <span><span style={{ fontWeight: 600, color: 'var(--text)' }}>{day}</span> · {formatTime(w.start_time)} – {formatTime(w.end_time)}</span>
                 <button type="button" aria-label={`Remove ${label}`} onClick={() => remove(w)} style={g.remove}>✕</button>
               </li>
             );
@@ -219,13 +219,13 @@ const g = {
   hourLabel: { position: 'absolute', right: 5, fontSize: '0.6rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', lineHeight: '10px' },
   col: {
     flex: '1 1 0', minWidth: 0, position: 'relative', cursor: 'crosshair',
-    background: 'rgba(255,255,255,0.06)', borderLeft: '1px solid rgba(255,255,255,0.05)',
+    background: 'rgba(var(--ink-rgb), 0.06)', borderLeft: '1px solid rgba(var(--ink-rgb), 0.05)',
     touchAction: 'none',
   },
-  closedCol: { cursor: 'not-allowed', background: 'rgba(255,255,255,0.02)' },
+  closedCol: { cursor: 'not-allowed', background: 'rgba(var(--ink-rgb), 0.02)' },
   closedLabel: { position: 'absolute', top: 8, left: 0, right: 0, textAlign: 'center', fontSize: '0.6rem', color: 'var(--text-muted)', writingMode: 'vertical-rl', margin: '0 auto', pointerEvents: 'none' },
   shut: { position: 'absolute', left: 0, right: 0, background: 'repeating-linear-gradient(135deg, rgba(0,0,0,0.35) 0 4px, rgba(0,0,0,0.15) 4px 8px)', pointerEvents: 'none' },
-  hourLine: { position: 'absolute', left: 0, right: 0, height: 1, background: 'rgba(255,255,255,0.08)', pointerEvents: 'none' },
+  hourLine: { position: 'absolute', left: 0, right: 0, height: 1, background: 'rgba(var(--ink-rgb), 0.08)', pointerEvents: 'none' },
   block: { position: 'absolute', left: 2, right: 2, borderRadius: 4, pointerEvents: 'none' },
   hint: { fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 },
   list: { listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '0.25rem' },

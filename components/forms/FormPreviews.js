@@ -1,4 +1,13 @@
 // Shared by the live Studio settings and the guided product walkthrough.
+import { hexRgb, formThemeMode, DEFAULT_LIGHT_ACCENT, DEFAULT_DARK_ACCENT } from '@/lib/formTheme';
+
+// The form's own colours as clients see them: light unless the studio chose a dark
+// background, with the matching default highlight.
+function previewColours(bg, accent) {
+  const card = hexRgb(bg) ? bg : '#ffffff';
+  const mode = formThemeMode({ bg_color: card });
+  return { bg: card, mode, accent: hexRgb(accent) ? accent : mode === 'dark' ? DEFAULT_DARK_ACCENT : DEFAULT_LIGHT_ACCENT };
+}
 
 function isLightColor(hex) {
   if (!hex || hex[0] !== '#') return false;
@@ -27,58 +36,59 @@ function hexToRgbaStr(hex, alpha) {
 // One consent form as clients see it at the end of a booking or walk-in form.
 function ConsentBlock({ template, inp, lbl, fld, showName = true }) {
   return (
-    <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-      {showName && <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#fff' }}>{template.name}</span>}
+    <div style={{ background: 'rgba(var(--ink-rgb), 0.03)', border: '1px solid rgba(var(--ink-rgb), 0.1)', borderRadius: 10, padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+      {showName && <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text)' }}>{template.name}</span>}
       {(template.fields ?? []).map((f, i) => {
-        if (f.type === 'heading') return <p key={i} style={{ fontSize: '0.82rem', fontWeight: 700, color: 'rgba(255,255,255,0.8)', margin: 0 }}>{f.label}</p>;
-        if (f.type === 'paragraph') return <p key={i} style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.4)', margin: 0, lineHeight: 1.5 }}>{f.label}</p>;
+        if (f.type === 'heading') return <p key={i} style={{ fontSize: '0.82rem', fontWeight: 700, color: 'rgba(var(--ink-rgb), 0.8)', margin: 0 }}>{f.label}</p>;
+        if (f.type === 'paragraph') return <p key={i} style={{ fontSize: '0.72rem', color: 'rgba(var(--ink-rgb), 0.4)', margin: 0, lineHeight: 1.5 }}>{f.label}</p>;
         if (f.type === 'checkbox') return (
           <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
-            <div style={{ width: 13, height: 13, borderRadius: 3, border: '1px solid rgba(255,255,255,0.2)', marginTop: 2, flexShrink: 0 }} />
-            <span style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>{f.label}</span>
+            <div style={{ width: 13, height: 13, borderRadius: 3, border: '1px solid rgba(var(--ink-rgb), 0.2)', marginTop: 2, flexShrink: 0 }} />
+            <span style={{ fontSize: '0.72rem', color: 'rgba(var(--ink-rgb), 0.5)', lineHeight: 1.5 }}>{f.label}</span>
           </div>
         );
         if (f.type === 'photo_id') return (
           <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <span style={{ fontSize: '0.65rem', fontWeight: 600, color: 'rgba(255,255,255,0.4)' }}>{f.label || 'Photo ID'}</span>
-            <div style={{ padding: '0.5rem', borderRadius: 7, border: '1px dashed rgba(255,255,255,0.25)', fontSize: '0.7rem', color: 'rgba(255,255,255,0.5)', textAlign: 'center' }}>Take or choose a photo of your ID</div>
+            <span style={{ fontSize: '0.65rem', fontWeight: 600, color: 'rgba(var(--ink-rgb), 0.4)' }}>{f.label || 'Photo ID'}</span>
+            <div style={{ padding: '0.5rem', borderRadius: 7, border: '1px dashed rgba(var(--ink-rgb), 0.25)', fontSize: '0.7rem', color: 'rgba(var(--ink-rgb), 0.5)', textAlign: 'center' }}>Take or choose a photo of your ID</div>
           </div>
         );
         if (f.type === 'yesno') return (
           <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <span style={{ fontSize: '0.65rem', fontWeight: 600, color: 'rgba(255,255,255,0.4)' }}>{f.label}</span>
+            <span style={{ fontSize: '0.65rem', fontWeight: 600, color: 'rgba(var(--ink-rgb), 0.4)' }}>{f.label}</span>
             <div style={{ display: 'flex', gap: 5 }}>
-              {['Yes', 'No'].map(o => <div key={o} style={{ padding: '0.3rem 0.9rem', borderRadius: 7, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', fontSize: '0.72rem', color: 'rgba(255,255,255,0.4)' }}>{o}</div>)}
+              {['Yes', 'No'].map(o => <div key={o} style={{ padding: '0.3rem 0.9rem', borderRadius: 7, border: '1px solid rgba(var(--ink-rgb), 0.1)', background: 'rgba(var(--ink-rgb), 0.04)', fontSize: '0.72rem', color: 'rgba(var(--ink-rgb), 0.4)' }}>{o}</div>)}
             </div>
           </div>
         );
         return <div key={i} style={{ ...fld }}><span style={lbl}>{f.label}</span><div style={{ ...inp, height: 52 }} /></div>;
       })}
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
-        <div style={{ width: 13, height: 13, borderRadius: 3, border: '1px solid rgba(255,255,255,0.2)', marginTop: 2, flexShrink: 0 }} />
-        <span style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>I have read and agreed to the above *</span>
+        <div style={{ width: 13, height: 13, borderRadius: 3, border: '1px solid rgba(var(--ink-rgb), 0.2)', marginTop: 2, flexShrink: 0 }} />
+        <span style={{ fontSize: '0.72rem', color: 'rgba(var(--ink-rgb), 0.5)', lineHeight: 1.5 }}>I have read and agreed to the above *</span>
       </div>
     </div>
   );
 }
 
-export function WidgetPreview({ bg, accent, studioName, logoUrl, fields, consentTemplate }) {
+export function WidgetPreview({ bg: bgIn, accent: accentIn, studioName, logoUrl, fields, consentTemplate }) {
+  const { bg, accent, mode } = previewColours(bgIn, accentIn);
   const light = isLightColor(accent);
-  const inp = { height: 38, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8 };
-  const lbl = { fontSize: '0.65rem', fontWeight: 600, color: 'rgba(255,255,255,0.4)', marginBottom: 4, display: 'block' };
+  const inp = { height: 38, background: 'rgba(var(--ink-rgb), 0.05)', border: '1px solid rgba(var(--ink-rgb), 0.1)', borderRadius: 8 };
+  const lbl = { fontSize: '0.65rem', fontWeight: 600, color: 'rgba(var(--ink-rgb), 0.4)', marginBottom: 4, display: 'block' };
   const fld = { display: 'flex', flexDirection: 'column' };
   // fields may be null while loading — default all enabled for preview
   const f = (key) => fields?.[key] ?? { enabled: true, required: false };
   return (
     <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-faint)', borderRadius: 12, padding: '1.25rem' }}>
       <p style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)', letterSpacing: '0.06em', textTransform: 'uppercase', margin: '0 0 0.85rem' }}>Preview</p>
-      <div style={{ background: bg, border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      <div data-theme={mode} style={{ background: bg, color: 'var(--text)', border: '1px solid rgba(var(--ink-rgb), 0.08)', borderRadius: 14, padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
 
         {/* Header */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, paddingBottom: '1rem', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, paddingBottom: '1rem', borderBottom: '1px solid rgba(var(--ink-rgb), 0.06)' }}>
           {logoUrl && <img src={logoUrl} alt="" style={{ maxHeight: 44, maxWidth: 160, objectFit: 'contain', alignSelf: 'flex-start', marginBottom: 6 }} />}
-          <span style={{ fontSize: '0.62rem', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)' }}>Studio booking</span>
-          <span style={{ fontSize: '1.2rem', fontWeight: 700, color: '#fff', letterSpacing: '-0.02em' }}>{studioName}</span>
+          <span style={{ fontSize: '0.62rem', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(var(--ink-rgb), 0.3)' }}>Studio booking</span>
+          <span style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em' }}>{studioName}</span>
         </div>
 
         {/* First + Last — always shown */}
@@ -91,7 +101,7 @@ export function WidgetPreview({ bg, accent, studioName, logoUrl, fields, consent
         <div style={fld}>
           <span style={lbl}>Date of birth *</span>
           <div style={{ display: 'grid', gridTemplateColumns: '0.8fr 1.1fr 1fr', gap: 6 }}>
-            {['Day', 'Month', 'Year'].map(p => <div key={p} style={{ ...inp, display: 'flex', alignItems: 'center', padding: '0 10px', fontSize: '0.72rem', color: 'rgba(255,255,255,0.35)' }}>{p}</div>)}
+            {['Day', 'Month', 'Year'].map(p => <div key={p} style={{ ...inp, display: 'flex', alignItems: 'center', padding: '0 10px', fontSize: '0.72rem', color: 'rgba(var(--ink-rgb), 0.35)' }}>{p}</div>)}
           </div>
         </div>
 
@@ -114,7 +124,7 @@ export function WidgetPreview({ bg, accent, studioName, logoUrl, fields, consent
           <div style={fld}><span style={lbl}>Artist preference</span><div style={inp} /></div>
         )}
 
-        <div style={fld}><span style={lbl}>Appointment type *</span><div style={{ ...inp, display: 'flex', alignItems: 'center', padding: '0 10px', fontSize: '0.75rem', color: '#fff' }}>Tattoo / Piercing</div></div>
+        <div style={fld}><span style={lbl}>Appointment type *</span><div style={{ ...inp, display: 'flex', alignItems: 'center', padding: '0 10px', fontSize: '0.75rem', color: 'var(--text)' }}>Tattoo / Piercing</div></div>
 
         {/* Placement chips */}
         {f('body_location').enabled && (
@@ -124,9 +134,9 @@ export function WidgetPreview({ bg, accent, studioName, logoUrl, fields, consent
               {ALL_PLACEMENTS.map((p, i) => (
                 <span key={p} style={{
                   padding: '0.25rem 0.6rem', borderRadius: 20, fontSize: '0.7rem', fontWeight: 500,
-                  background: i === 0 ? hexToRgbaStr(accent, 0.12) : 'rgba(255,255,255,0.05)',
-                  border: `1px solid ${i === 0 ? accent : 'rgba(255,255,255,0.1)'}`,
-                  color: i === 0 ? accent : 'rgba(255,255,255,0.5)',
+                  background: i === 0 ? hexToRgbaStr(accent, 0.12) : 'rgba(var(--ink-rgb), 0.05)',
+                  border: `1px solid ${i === 0 ? accent : 'rgba(var(--ink-rgb), 0.1)'}`,
+                  color: i === 0 ? accent : 'rgba(var(--ink-rgb), 0.5)',
                 }}>{p}</span>
               ))}
             </div>
@@ -146,9 +156,9 @@ export function WidgetPreview({ bg, accent, studioName, logoUrl, fields, consent
             <span style={lbl}>Size{f('size').required ? ' *' : ''}</span>
             <div style={{ display: 'flex', gap: 5 }}>
               <div style={{ ...inp, flex: 1 }} />
-              <div style={{ display: 'flex', background: 'rgba(255,255,255,0.06)', borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)', flexShrink: 0 }}>
+              <div style={{ display: 'flex', background: 'rgba(var(--ink-rgb), 0.06)', borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(var(--ink-rgb), 0.1)', flexShrink: 0 }}>
                 {['cm', 'in'].map(u => (
-                  <div key={u} style={{ padding: '0 0.6rem', display: 'flex', alignItems: 'center', fontSize: '0.7rem', fontWeight: 600, color: u === 'cm' ? '#fff' : 'rgba(255,255,255,0.35)', background: u === 'cm' ? 'rgba(255,255,255,0.13)' : 'transparent' }}>{u}</div>
+                  <div key={u} style={{ padding: '0 0.6rem', display: 'flex', alignItems: 'center', fontSize: '0.7rem', fontWeight: 600, color: u === 'cm' ? 'var(--text)' : 'rgba(var(--ink-rgb), 0.35)', background: u === 'cm' ? 'rgba(var(--ink-rgb), 0.13)' : 'transparent' }}>{u}</div>
                 ))}
               </div>
             </div>
@@ -157,7 +167,7 @@ export function WidgetPreview({ bg, accent, studioName, logoUrl, fields, consent
 
         {f('retouch').enabled && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0.3rem 0' }}>
-            <div style={{ width: 14, height: 14, borderRadius: 3, border: '1px solid rgba(255,255,255,0.25)', background: 'rgba(255,255,255,0.05)', flexShrink: 0 }} />
+            <div style={{ width: 14, height: 14, borderRadius: 3, border: '1px solid rgba(var(--ink-rgb), 0.25)', background: 'rgba(var(--ink-rgb), 0.05)', flexShrink: 0 }} />
             <span style={{ ...lbl, margin: 0 }}>This is a touch-up / retouch</span>
           </div>
         )}
@@ -167,7 +177,7 @@ export function WidgetPreview({ bg, accent, studioName, logoUrl, fields, consent
           <span style={lbl}>Colour</span>
           <div style={{ display: 'flex', gap: 5 }}>
             {['Black & grey', 'Colour'].map((opt, i) => (
-              <div key={opt} style={{ flex: 1, padding: '0.35rem 0', borderRadius: 7, fontSize: '0.72rem', fontWeight: i === 0 ? 600 : 500, textAlign: 'center', border: `1px solid ${i === 0 ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.1)'}`, background: i === 0 ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.04)', color: i === 0 ? '#fff' : 'rgba(255,255,255,0.45)' }}>{opt}</div>
+              <div key={opt} style={{ flex: 1, padding: '0.35rem 0', borderRadius: 7, fontSize: '0.72rem', fontWeight: i === 0 ? 600 : 500, textAlign: 'center', border: `1px solid ${i === 0 ? 'rgba(var(--ink-rgb), 0.35)' : 'rgba(var(--ink-rgb), 0.1)'}`, background: i === 0 ? 'rgba(var(--ink-rgb), 0.1)' : 'rgba(var(--ink-rgb), 0.04)', color: i === 0 ? 'var(--text)' : 'rgba(var(--ink-rgb), 0.45)' }}>{opt}</div>
             ))}
           </div>
         </div>
@@ -178,7 +188,7 @@ export function WidgetPreview({ bg, accent, studioName, logoUrl, fields, consent
 
         {f('allergies').enabled && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0.3rem 0' }}>
-            <div style={{ width: 14, height: 14, borderRadius: 3, border: '1px solid rgba(255,255,255,0.25)', background: 'rgba(255,255,255,0.05)', flexShrink: 0 }} />
+            <div style={{ width: 14, height: 14, borderRadius: 3, border: '1px solid rgba(var(--ink-rgb), 0.25)', background: 'rgba(var(--ink-rgb), 0.05)', flexShrink: 0 }} />
             <span style={{ ...lbl, margin: 0 }}>I have allergies or sensitivities{f('allergies').required ? '' : ' (optional)'}</span>
           </div>
         )}
@@ -188,13 +198,13 @@ export function WidgetPreview({ bg, accent, studioName, logoUrl, fields, consent
             <span style={lbl}>Earliest date you can come in (optional)</span>
             <div style={{ ...inp, marginBottom: '0.5rem' }} />
             <span style={lbl}>Your availability{fields.availability_windows.required ? ' *' : ' (optional)'}</span>
-            <span style={{ fontSize: '0.62rem', color: 'rgba(255,255,255,0.45)' }}>Press and drag down a day to mark the times that work.</span>
+            <span style={{ fontSize: '0.62rem', color: 'rgba(var(--ink-rgb), 0.45)' }}>Press and drag down a day to mark the times that work.</span>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2 }}>
               {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d, i) => (
                 <div key={d} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                  <span style={{ fontSize: '0.62rem', fontWeight: 600, textAlign: 'center', color: 'rgba(255,255,255,0.45)' }}>{d}</span>
-                  <div style={{ position: 'relative', height: 64, borderRadius: 3, background: 'rgba(255,255,255,0.06)' }}>
-                    {(i === 1 || i === 5) && <div style={{ position: 'absolute', left: 2, right: 2, top: i === 1 ? 10 : 6, height: i === 1 ? 30 : 20, borderRadius: 3, background: 'rgba(255,255,255,0.85)' }} />}
+                  <span style={{ fontSize: '0.62rem', fontWeight: 600, textAlign: 'center', color: 'rgba(var(--ink-rgb), 0.45)' }}>{d}</span>
+                  <div style={{ position: 'relative', height: 64, borderRadius: 3, background: 'rgba(var(--ink-rgb), 0.06)' }}>
+                    {(i === 1 || i === 5) && <div style={{ position: 'absolute', left: 2, right: 2, top: i === 1 ? 10 : 6, height: i === 1 ? 30 : 20, borderRadius: 3, background: 'rgba(var(--ink-rgb), 0.85)' }} />}
                   </div>
                 </div>
               ))}
@@ -206,14 +216,14 @@ export function WidgetPreview({ bg, accent, studioName, logoUrl, fields, consent
         {f('image_paths').enabled && (
           <div style={fld}>
             <span style={lbl}>Reference photos{f('image_paths').required ? ' *' : ' (optional, up to 5)'}</span>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '0.5rem 0.85rem', fontSize: '0.78rem', color: 'rgba(255,255,255,0.45)', alignSelf: 'flex-start' }}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(var(--ink-rgb), 0.05)', border: '1px solid rgba(var(--ink-rgb), 0.1)', borderRadius: 8, padding: '0.5rem 0.85rem', fontSize: '0.78rem', color: 'rgba(var(--ink-rgb), 0.45)', alignSelf: 'flex-start' }}>
               + Add photos
             </div>
           </div>
         )}
 
         {/* Button */}
-        <div style={{ padding: '0.75rem', background: accent, borderRadius: 9, fontSize: '0.85rem', fontWeight: 700, color: light ? '#0e0e0e' : '#ffffff', textAlign: 'center' }}>
+        <div style={{ padding: '0.75rem', background: accent, borderRadius: 9, fontSize: '0.85rem', fontWeight: 700, color: light ? '#0e0e0e' : 'var(--text)', textAlign: 'center' }}>
           Request booking
         </div>
 
@@ -229,10 +239,11 @@ export function WidgetPreview({ bg, accent, studioName, logoUrl, fields, consent
 // The walk-in form as clients see it: the details every walk-in gives, the extra
 // fields the studio turned on, then all of the studio's consent forms. Small
 // captions mark each group so studios can see what comes from where.
-export function WalkInPreview({ bg, accent, studioName, logoUrl, fields, consentTemplates }) {
+export function WalkInPreview({ bg: bgIn, accent: accentIn, studioName, logoUrl, fields, consentTemplates }) {
+  const { bg, accent, mode } = previewColours(bgIn, accentIn);
   const light = isLightColor(accent);
-  const inp = { height: 38, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8 };
-  const lbl = { fontSize: '0.65rem', fontWeight: 600, color: 'rgba(255,255,255,0.4)', marginBottom: 4, display: 'block' };
+  const inp = { height: 38, background: 'rgba(var(--ink-rgb), 0.05)', border: '1px solid rgba(var(--ink-rgb), 0.1)', borderRadius: 8 };
+  const lbl = { fontSize: '0.65rem', fontWeight: 600, color: 'rgba(var(--ink-rgb), 0.4)', marginBottom: 4, display: 'block' };
   const fld = { display: 'flex', flexDirection: 'column' };
   const on = key => fields?.[key]?.enabled;
   const req = key => (fields?.[key]?.required ? ' *' : '');
@@ -246,11 +257,11 @@ export function WalkInPreview({ bg, accent, studioName, logoUrl, fields, consent
   return (
     <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-faint)', borderRadius: 12, padding: '1.25rem' }}>
       <p style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)', letterSpacing: '0.06em', textTransform: 'uppercase', margin: '0 0 0.85rem' }}>Example walk-in form</p>
-      <div style={{ background: bg, border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, paddingBottom: '0.9rem', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+      <div data-theme={mode} style={{ background: bg, color: 'var(--text)', border: '1px solid rgba(var(--ink-rgb), 0.08)', borderRadius: 14, padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, paddingBottom: '0.9rem', borderBottom: '1px solid rgba(var(--ink-rgb), 0.06)' }}>
           {logoUrl && <img src={logoUrl} alt="" style={{ maxHeight: 44, maxWidth: 160, objectFit: 'contain', alignSelf: 'flex-start', marginBottom: 6 }} />}
-          <span style={{ fontSize: '0.62rem', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)' }}>Walk-in</span>
-          <span style={{ fontSize: '1.2rem', fontWeight: 700, color: '#fff', letterSpacing: '-0.02em' }}>{studioName}</span>
+          <span style={{ fontSize: '0.62rem', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(var(--ink-rgb), 0.3)' }}>Walk-in</span>
+          <span style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em' }}>{studioName}</span>
         </div>
 
         {group('Always asked')}
@@ -261,7 +272,7 @@ export function WalkInPreview({ bg, accent, studioName, logoUrl, fields, consent
         <div style={fld}>
           <span style={lbl}>Date of birth *</span>
           <div style={{ display: 'grid', gridTemplateColumns: '0.8fr 1.1fr 1fr', gap: 6 }}>
-            {['Day', 'Month', 'Year'].map(p => <div key={p} style={{ ...inp, display: 'flex', alignItems: 'center', padding: '0 10px', fontSize: '0.72rem', color: 'rgba(255,255,255,0.35)' }}>{p}</div>)}
+            {['Day', 'Month', 'Year'].map(p => <div key={p} style={{ ...inp, display: 'flex', alignItems: 'center', padding: '0 10px', fontSize: '0.72rem', color: 'rgba(var(--ink-rgb), 0.35)' }}>{p}</div>)}
           </div>
         </div>
         <div style={fld}><span style={lbl}>Email *</span><div style={inp} /></div>
@@ -273,24 +284,24 @@ export function WalkInPreview({ bg, accent, studioName, logoUrl, fields, consent
           <span style={lbl}>Artist *</span>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
             {['Artist one', 'Artist two'].map((name, i) => (
-              <div key={name} style={{ ...inp, display: 'flex', alignItems: 'center', gap: 6, padding: '0 8px', border: `1px solid ${i === 0 ? accent : 'rgba(255,255,255,0.1)'}`, background: i === 0 ? hexToRgbaStr(accent, 0.12) : 'rgba(255,255,255,0.05)' }}>
-                <span style={{ width: 18, height: 18, borderRadius: '50%', background: 'rgba(255,255,255,0.12)', flexShrink: 0 }} />
-                <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#fff' }}>{name}</span>
+              <div key={name} style={{ ...inp, display: 'flex', alignItems: 'center', gap: 6, padding: '0 8px', border: `1px solid ${i === 0 ? accent : 'rgba(var(--ink-rgb), 0.1)'}`, background: i === 0 ? hexToRgbaStr(accent, 0.12) : 'rgba(var(--ink-rgb), 0.05)' }}>
+                <span style={{ width: 18, height: 18, borderRadius: '50%', background: 'rgba(var(--ink-rgb), 0.12)', flexShrink: 0 }} />
+                <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text)' }}>{name}</span>
               </div>
             ))}
           </div>
         </div>
 
         {group('Your extra fields')}
-        {extras.length === 0 && <p style={{ margin: 0, fontSize: '0.72rem', color: 'rgba(255,255,255,0.4)' }}>None turned on. Switch fields on to ask for more.</p>}
+        {extras.length === 0 && <p style={{ margin: 0, fontSize: '0.72rem', color: 'rgba(var(--ink-rgb), 0.4)' }}>None turned on. Switch fields on to ask for more.</p>}
         {on('body_location') && (
           <div style={fld}>
             <span style={lbl}>Placement{req('body_location')}</span>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
               {ALL_PLACEMENTS.slice(0, 8).map((p, i) => (
-                <span key={p} style={{ padding: '0.25rem 0.6rem', borderRadius: 20, fontSize: '0.7rem', fontWeight: 500, background: i === 0 ? hexToRgbaStr(accent, 0.12) : 'rgba(255,255,255,0.05)', border: `1px solid ${i === 0 ? accent : 'rgba(255,255,255,0.1)'}`, color: i === 0 ? accent : 'rgba(255,255,255,0.5)' }}>{p}</span>
+                <span key={p} style={{ padding: '0.25rem 0.6rem', borderRadius: 20, fontSize: '0.7rem', fontWeight: 500, background: i === 0 ? hexToRgbaStr(accent, 0.12) : 'rgba(var(--ink-rgb), 0.05)', border: `1px solid ${i === 0 ? accent : 'rgba(var(--ink-rgb), 0.1)'}`, color: i === 0 ? accent : 'rgba(var(--ink-rgb), 0.5)' }}>{p}</span>
               ))}
-              <span style={{ padding: '0.25rem 0.4rem', fontSize: '0.7rem', color: 'rgba(255,255,255,0.35)' }}>…</span>
+              <span style={{ padding: '0.25rem 0.4rem', fontSize: '0.7rem', color: 'rgba(var(--ink-rgb), 0.35)' }}>…</span>
             </div>
           </div>
         )}
@@ -300,7 +311,7 @@ export function WalkInPreview({ bg, accent, studioName, logoUrl, fields, consent
         {on('address') && <AddressPreview fld={fld} lbl={lbl} inp={inp} required={Boolean(req('address'))} />}
         {on('allergies') && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0.2rem 0' }}>
-            <div style={{ width: 14, height: 14, borderRadius: 3, border: '1px solid rgba(255,255,255,0.25)', background: 'rgba(255,255,255,0.05)', flexShrink: 0 }} />
+            <div style={{ width: 14, height: 14, borderRadius: 3, border: '1px solid rgba(var(--ink-rgb), 0.25)', background: 'rgba(var(--ink-rgb), 0.05)', flexShrink: 0 }} />
             <span style={{ ...lbl, margin: 0 }}>I have allergies or sensitivities{fields?.allergies?.required ? '' : ' (optional)'}</span>
           </div>
         )}
@@ -308,9 +319,9 @@ export function WalkInPreview({ bg, accent, studioName, logoUrl, fields, consent
         {group('Consent forms')}
         {consentTemplates?.length
           ? consentTemplates.map(t => <ConsentBlock key={t.id} template={t} inp={inp} lbl={lbl} fld={fld} showName={false} />)
-          : <p style={{ margin: 0, fontSize: '0.72rem', color: 'rgba(255,255,255,0.4)' }}>No consent forms yet. Any you create in Consent forms appear here.</p>}
+          : <p style={{ margin: 0, fontSize: '0.72rem', color: 'rgba(var(--ink-rgb), 0.4)' }}>No consent forms yet. Any you create in Consent forms appear here.</p>}
 
-        <div style={{ padding: '0.75rem', background: accent, borderRadius: 9, fontSize: '0.85rem', fontWeight: 700, color: light ? '#0e0e0e' : '#ffffff', textAlign: 'center' }}>Book me in</div>
+        <div style={{ padding: '0.75rem', background: accent, borderRadius: 9, fontSize: '0.85rem', fontWeight: 700, color: light ? '#0e0e0e' : 'var(--text)', textAlign: 'center' }}>Book me in</div>
       </div>
     </div>
   );
@@ -318,52 +329,53 @@ export function WalkInPreview({ bg, accent, studioName, logoUrl, fields, consent
 
 // bg / accent: the consent form's own colours (Settings → Consent form); the defaults
 // match the client page's standard look.
-export const CONSENT_DEFAULT_BG = '#1a2026';
-export const CONSENT_DEFAULT_ACCENT = '#f5ecd9';
-export function ConsentFormPreview({ name, fields, requiresSig, requiresGuardian, bg = CONSENT_DEFAULT_BG, accent = CONSENT_DEFAULT_ACCENT, studioName }) {
-  const accentText = isLightColor(accent) ? '#11151b' : '#ffffff';
-  const inp = { height: 36, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8 };
-  const lbl = { fontSize: '0.7rem', fontWeight: 600, color: 'rgba(255,255,255,0.4)', marginBottom: 3, display: 'block' };
+export const CONSENT_DEFAULT_BG = '#ffffff';
+export const CONSENT_DEFAULT_ACCENT = DEFAULT_LIGHT_ACCENT;
+export function ConsentFormPreview({ name, fields, requiresSig, requiresGuardian, bg: bgIn = CONSENT_DEFAULT_BG, accent: accentIn = CONSENT_DEFAULT_ACCENT, studioName }) {
+  const { bg, accent, mode } = previewColours(bgIn, accentIn);
+  const accentText = isLightColor(accent) ? '#11151b' : 'var(--text)';
+  const inp = { height: 36, background: 'rgba(var(--ink-rgb), 0.05)', border: '1px solid rgba(var(--ink-rgb), 0.1)', borderRadius: 8 };
+  const lbl = { fontSize: '0.7rem', fontWeight: 600, color: 'rgba(var(--ink-rgb), 0.4)', marginBottom: 3, display: 'block' };
   return (
     <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-faint)', borderRadius: 12, padding: '1.25rem' }}>
       <p style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)', letterSpacing: '0.06em', textTransform: 'uppercase', margin: '0 0 0.85rem' }}>Preview</p>
-      <div style={{ background: bg, border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: '1.35rem', display: 'flex', flexDirection: 'column', gap: '0.85rem', transition: 'background-color 0.2s ease' }}>
+      <div data-theme={mode} style={{ background: bg, color: 'var(--text)', border: '1px solid rgba(var(--ink-rgb), 0.07)', borderRadius: 12, padding: '1.35rem', display: 'flex', flexDirection: 'column', gap: '0.85rem', transition: 'background-color 0.2s ease' }}>
         {studioName && <span style={{ fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: accent }}>{studioName}</span>}
         {name ? (
-          <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#fff', margin: 0 }}>{name}</h3>
+          <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text)', margin: 0 }}>{name}</h3>
         ) : (
-          <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'rgba(255,255,255,0.2)', margin: 0, fontStyle: 'italic' }}>Form name</h3>
+          <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'rgba(var(--ink-rgb), 0.2)', margin: 0, fontStyle: 'italic' }}>Form name</h3>
         )}
 
         {fields.length === 0 && (
-          <p style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.2)', margin: 0, fontStyle: 'italic' }}>Add fields to preview the form…</p>
+          <p style={{ fontSize: '0.75rem', color: 'rgba(var(--ink-rgb), 0.2)', margin: 0, fontStyle: 'italic' }}>Add fields to preview the form…</p>
         )}
 
         {fields.map(f => {
           if (f.type === 'heading') return (
-            <div key={f.id} style={{ paddingBottom: '0.5rem', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-              <span style={{ fontSize: '0.87rem', fontWeight: 700, color: 'rgba(255,255,255,0.8)' }}>{f.label || <em style={{ color: 'rgba(255,255,255,0.2)' }}>Section heading</em>}</span>
+            <div key={f.id} style={{ paddingBottom: '0.5rem', borderBottom: '1px solid rgba(var(--ink-rgb), 0.06)' }}>
+              <span style={{ fontSize: '0.87rem', fontWeight: 700, color: 'rgba(var(--ink-rgb), 0.8)' }}>{f.label || <em style={{ color: 'rgba(var(--ink-rgb), 0.2)' }}>Section heading</em>}</span>
             </div>
           );
           if (f.type === 'paragraph') return (
-            <p key={f.id} style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)', lineHeight: 1.6, margin: 0 }}>
+            <p key={f.id} style={{ fontSize: '0.75rem', color: 'rgba(var(--ink-rgb), 0.4)', lineHeight: 1.6, margin: 0 }}>
               {f.label || <em>Paragraph text…</em>}
             </p>
           );
           if (f.type === 'checkbox') return (
             <label key={f.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
-              <div style={{ width: 15, height: 15, borderRadius: 3, border: '1px solid rgba(255,255,255,0.2)', marginTop: 2, flexShrink: 0 }} />
-              <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.55)', lineHeight: 1.5 }}>
-                {f.label || <em style={{ color: 'rgba(255,255,255,0.2)' }}>Checkbox label</em>}
-                {f.required && <span style={{ color: '#e86f6f', marginLeft: 3 }}>*</span>}
+              <div style={{ width: 15, height: 15, borderRadius: 3, border: '1px solid rgba(var(--ink-rgb), 0.2)', marginTop: 2, flexShrink: 0 }} />
+              <span style={{ fontSize: '0.75rem', color: 'rgba(var(--ink-rgb), 0.55)', lineHeight: 1.5 }}>
+                {f.label || <em style={{ color: 'rgba(var(--ink-rgb), 0.2)' }}>Checkbox label</em>}
+                {f.required && <span style={{ color: 'var(--color-danger)', marginLeft: 3 }}>*</span>}
               </span>
             </label>
           );
           if (f.type === 'photo_id') return (
             <div key={f.id} style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
               <span style={lbl}>{f.label || <em>Photo ID</em>}{f.required && ' *'}</span>
-              <span style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.35)', lineHeight: 1.5 }}>A clear photo of your driver’s licence, passport or other photo ID. Only the studio can see it.</span>
-              <div style={{ padding: '0.6rem', borderRadius: 8, border: '1px dashed rgba(255,255,255,0.25)', fontSize: '0.75rem', color: 'rgba(255,255,255,0.55)', textAlign: 'center' }}>Take or choose a photo of your ID</div>
+              <span style={{ fontSize: '0.68rem', color: 'rgba(var(--ink-rgb), 0.35)', lineHeight: 1.5 }}>A clear photo of your driver’s licence, passport or other photo ID. Only the studio can see it.</span>
+              <div style={{ padding: '0.6rem', borderRadius: 8, border: '1px dashed rgba(var(--ink-rgb), 0.25)', fontSize: '0.75rem', color: 'rgba(var(--ink-rgb), 0.55)', textAlign: 'center' }}>Take or choose a photo of your ID</div>
             </div>
           );
           if (f.type === 'yesno') return (
@@ -371,7 +383,7 @@ export function ConsentFormPreview({ name, fields, requiresSig, requiresGuardian
               <span style={lbl}>{f.label || <em>Question</em>}{f.required && ' *'}</span>
               <div style={{ display: 'flex', gap: 6 }}>
                 {['Yes', 'No'].map(opt => (
-                  <div key={opt} style={{ padding: '0.3rem 0.9rem', borderRadius: 6, background: opt === 'Yes' ? hexAlpha(accent, 0.14) : 'rgba(255,255,255,0.04)', border: `1px solid ${opt === 'Yes' ? hexAlpha(accent, 0.45) : 'rgba(255,255,255,0.1)'}`, fontSize: '0.75rem', color: opt === 'Yes' ? accent : 'rgba(255,255,255,0.4)' }}>{opt}</div>
+                  <div key={opt} style={{ padding: '0.3rem 0.9rem', borderRadius: 6, background: opt === 'Yes' ? hexAlpha(accent, 0.14) : 'rgba(var(--ink-rgb), 0.04)', border: `1px solid ${opt === 'Yes' ? hexAlpha(accent, 0.45) : 'rgba(var(--ink-rgb), 0.1)'}`, fontSize: '0.75rem', color: opt === 'Yes' ? accent : 'rgba(var(--ink-rgb), 0.4)' }}>{opt}</div>
                 ))}
               </div>
             </div>
@@ -392,15 +404,15 @@ export function ConsentFormPreview({ name, fields, requiresSig, requiresGuardian
 
         {/* Always-required agreement checkbox */}
         <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
-          <div style={{ width: 15, height: 15, borderRadius: 3, border: '1px solid rgba(255,255,255,0.2)', marginTop: 2, flexShrink: 0 }} />
-          <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.55)', lineHeight: 1.5 }}>
-            I have read and agreed to the above <span style={{ color: '#e86f6f' }}>*</span>
+          <div style={{ width: 15, height: 15, borderRadius: 3, border: '1px solid rgba(var(--ink-rgb), 0.2)', marginTop: 2, flexShrink: 0 }} />
+          <span style={{ fontSize: '0.75rem', color: 'rgba(var(--ink-rgb), 0.55)', lineHeight: 1.5 }}>
+            I have read and agreed to the above <span style={{ color: 'var(--color-danger)' }}>*</span>
           </span>
         </label>
 
         {requiresGuardian && (
-          <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 8, padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <span style={{ fontSize: '0.67rem', fontWeight: 600, color: 'rgba(255,255,255,0.25)', display: 'block', marginBottom: 4 }}>Guardian details (minors only)</span>
+          <div style={{ background: 'rgba(var(--ink-rgb), 0.03)', border: '1px solid rgba(var(--ink-rgb), 0.07)', borderRadius: 8, padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <span style={{ fontSize: '0.67rem', fontWeight: 600, color: 'rgba(var(--ink-rgb), 0.25)', display: 'block', marginBottom: 4 }}>Guardian details (minors only)</span>
             <div style={inp} />
             <div style={inp} />
           </div>
@@ -409,8 +421,8 @@ export function ConsentFormPreview({ name, fields, requiresSig, requiresGuardian
         {requiresSig && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
             <span style={lbl}>Signature *</span>
-            <div style={{ height: 64, background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.1)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <span style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.18)' }}>Sign here</span>
+            <div style={{ height: 64, background: 'rgba(var(--ink-rgb), 0.02)', border: '1px dashed rgba(var(--ink-rgb), 0.1)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <span style={{ fontSize: '0.7rem', color: 'rgba(var(--ink-rgb), 0.18)' }}>Sign here</span>
             </div>
           </div>
         )}

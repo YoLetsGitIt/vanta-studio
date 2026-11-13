@@ -28,7 +28,7 @@ const sameFields = (a, b) => FIELDS.every(({ key }) => {
   return !!x.enabled === !!y.enabled && !!x.required === !!y.required;
 });
 
-export default function WalkInFormSettings({ styles: s, url, studioName, logoUrl, consentTemplates, bg = '#111111', accent = '#d5d0c7' }) {
+export default function WalkInFormSettings({ styles: s, url, studioName, logoUrl, consentTemplates, bg, accent }) {
   const [saved, setSaved] = useState(null);   // what's saved
   const [fields, setFields] = useState(null); // what's being edited
   const [saving, setSaving] = useState(false);

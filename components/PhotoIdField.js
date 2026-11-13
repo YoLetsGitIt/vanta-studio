@@ -4,7 +4,7 @@
 // value is a File (before upload) or ''. Only the studio can see the photo.
 import { useEffect, useId, useRef, useState } from 'react';
 
-export default function PhotoIdField({ label, required, value, onChange, labelStyle, accent = '#d5d0c7' }) {
+export default function PhotoIdField({ label, required, value, onChange, labelStyle, accent = 'var(--accent)' }) {
   const inputRef = useRef(null);
   const id = useId();
   const [preview, setPreview] = useState('');
@@ -30,15 +30,15 @@ export default function PhotoIdField({ label, required, value, onChange, labelSt
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
       <span id={`${id}-label`} style={labelStyle}>
-        {label || 'Photo ID'}{required && <span style={{ color: 'var(--color-danger, #e86f6f)', marginLeft: 2 }}>*</span>}
+        {label || 'Photo ID'}{required && <span style={{ color: 'var(--color-danger, var(--color-danger))', marginLeft: 2 }}>*</span>}
       </span>
-      <span style={{ fontSize: '0.78rem', color: 'var(--text-muted, rgba(255,255,255,0.55))', lineHeight: 1.5 }}>
+      <span style={{ fontSize: '0.78rem', color: 'var(--text-muted, rgba(var(--ink-rgb), 0.55))', lineHeight: 1.5 }}>
         A clear photo of your driver’s licence, passport or other photo ID. Only the studio can see it.
       </span>
       <input ref={inputRef} type="file" accept="image/*" onChange={choose} aria-labelledby={`${id}-label`} style={{ display: 'none' }} />
       {preview ? (
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-          <img src={preview} alt="Your photo ID" style={{ width: 120, height: 80, objectFit: 'cover', borderRadius: 8, border: '1px solid rgba(255,255,255,0.15)' }} />
+          <img src={preview} alt="Your photo ID" style={{ width: 120, height: 80, objectFit: 'cover', borderRadius: 8, border: '1px solid rgba(var(--ink-rgb), 0.15)' }} />
           <div style={{ display: 'flex', gap: '0.25rem' }}>
             <button type="button" onClick={() => inputRef.current?.click()} style={linkBtn}>Replace</button>
             <button type="button" onClick={() => onChange('')} style={linkBtn}>Remove</button>
@@ -46,11 +46,11 @@ export default function PhotoIdField({ label, required, value, onChange, labelSt
         </div>
       ) : (
         <button type="button" onClick={() => inputRef.current?.click()}
-          style={{ minHeight: 48, padding: '0.6rem 1rem', borderRadius: 10, border: `1px dashed ${accent}`, background: 'rgba(255,255,255,0.04)', color: accent, fontSize: '0.88rem', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+          style={{ minHeight: 48, padding: '0.6rem 1rem', borderRadius: 10, border: `1px dashed ${accent}`, background: 'rgba(var(--ink-rgb), 0.04)', color: accent, fontSize: '0.88rem', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
           Take or choose a photo of your ID
         </button>
       )}
-      {error && <span role="alert" style={{ fontSize: '0.78rem', color: 'var(--color-danger, #e86f6f)' }}>{error}</span>}
+      {error && <span role="alert" style={{ fontSize: '0.78rem', color: 'var(--color-danger, var(--color-danger))' }}>{error}</span>}
     </div>
   );
 }

@@ -3,7 +3,7 @@
 import Dialog from '@/components/ui/Dialog';
 import Button from '@/components/ui/Button';
 import { WidgetPreview, ConsentFormPreview, CONSENT_DEFAULT_BG, CONSENT_DEFAULT_ACCENT } from '@/components/forms/FormPreviews';
-import { isLightHex as isLightColorHex } from '@/lib/formTheme';
+import { isLightHex as isLightColorHex, DEFAULT_LIGHT_ACCENT } from '@/lib/formTheme';
 import StudioLogoUpload from '@/components/StudioLogoUpload';
 import StickyPreview from '@/components/StickyPreview';
 // import SmartSchedulingSettings from '@/components/SmartSchedulingSettings'; // smart scheduling temporarily hidden
@@ -252,9 +252,9 @@ export default function SettingsPage() {
   const [email, setEmail] = useState('');
   const [aftercareInstructions, setAftercareInstructions] = useState('');
   const [piercingAftercareInstructions, setPiercingAftercareInstructions] = useState('');
-  const [widgetBgColor, setWidgetBgColor] = useState('#111111');
+  const [widgetBgColor, setWidgetBgColor] = useState('#ffffff');
   const [logoUrl, setLogoUrl] = useState('');
-  const [widgetAccentColor, setWidgetAccentColor] = useState('#d5d0c7');
+  const [widgetAccentColor, setWidgetAccentColor] = useState(DEFAULT_LIGHT_ACCENT);
   const [schedulingMode, setSchedulingMode] = useState('all');
   const [timezone, setTimezone] = useState('Australia/Sydney');
   const [walkinCut, setWalkinCut] = useState('0');
@@ -395,8 +395,8 @@ export default function SettingsPage() {
         if (account.studio?.longitude != null) setAddressLng(account.studio.longitude);
         setAftercareInstructions(account.studio?.aftercare_instructions ?? '');
         setPiercingAftercareInstructions(account.studio?.piercing_aftercare_instructions ?? '');
-        setWidgetBgColor(account.studio?.widget_bg_color || '#111111');
-        setWidgetAccentColor(account.studio?.widget_accent_color || '#d5d0c7');
+        setWidgetBgColor(account.studio?.widget_bg_color || '#ffffff');
+        setWidgetAccentColor(account.studio?.widget_accent_color || DEFAULT_LIGHT_ACCENT);
         setTimezone(account.studio?.timezone || 'Australia/Sydney');
         setSchedulingMode(account.studio?.scheduling_mode || 'all');
         setWalkinCut(String(account.studio?.walkin_cut_percent ?? account.studio?.studio_cut_percent ?? 0));
@@ -1061,10 +1061,10 @@ export default function SettingsPage() {
               ))}
             </div>
             {/* A small sample of how the forms look in these colours. */}
-            <div aria-hidden="true" style={{ ...s.colourSample, background: validHex(widgetBgColor) ? widgetBgColor : '#111111' }}>
-              <span style={{ fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: validHex(widgetAccentColor) ? widgetAccentColor : '#d5d0c7' }}>{name || 'Your studio'}</span>
+            <div aria-hidden="true" style={{ ...s.colourSample, background: validHex(widgetBgColor) ? widgetBgColor : '#ffffff' }}>
+              <span style={{ fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: validHex(widgetAccentColor) ? widgetAccentColor : DEFAULT_LIGHT_ACCENT }}>{name || 'Your studio'}</span>
               <span style={{ fontSize: '0.95rem', fontWeight: 700, color: '#fff' }}>Book an appointment</span>
-              <span style={{ ...s.colourSampleButton, background: validHex(widgetAccentColor) ? widgetAccentColor : '#d5d0c7', color: isLightColorHex(validHex(widgetAccentColor) ? widgetAccentColor : '#d5d0c7') ? '#11151b' : '#fff' }}>Request booking</span>
+              <span style={{ ...s.colourSampleButton, background: validHex(widgetAccentColor) ? widgetAccentColor : DEFAULT_LIGHT_ACCENT, color: isLightColorHex(validHex(widgetAccentColor) ? widgetAccentColor : DEFAULT_LIGHT_ACCENT) ? '#11151b' : '#fff' }}>Request booking</span>
             </div>
           </div>
         </section>
