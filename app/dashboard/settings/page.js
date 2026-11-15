@@ -269,7 +269,7 @@ export default function SettingsPage() {
   const [depositRefundable, setDepositRefundable] = useState(false);
   const [cancelWindow, setCancelWindow] = useState(48);
   // Notice needed to reschedule; 0 = the same as the cancellation notice.
-  const [rescheduleNotice, setRescheduleNotice] = useState(0);
+  const [rescheduleNotice, setRescheduleNotice] = useState(72);
   // Artist's share of a forfeited deposit, as typed; '' = their usual commission share.
   const [forfeitPct, setForfeitPct] = useState('');
   // The studio's form colours (booking form + website widget, walk-in form, consent
@@ -414,7 +414,7 @@ export default function SettingsPage() {
         setPayForfeitedDeposits(account.studio?.pay_artist_on_forfeited_deposits ?? false);
         setDepositRefundable(account.studio?.deposit_refundable ?? false);
         setCancelWindow(account.studio?.reschedule_window_hours ?? 48);
-        setRescheduleNotice(account.studio?.reschedule_notice_hours ?? 0);
+        setRescheduleNotice(account.studio?.reschedule_notice_hours || 72); // not set = the 72-hour default
         setForfeitPct(account.studio?.forfeited_deposit_artist_percent != null ? String(Number(account.studio.forfeited_deposit_artist_percent)) : '');
         setSendReminder7d(account.studio?.send_reminder_7d ?? true);
         setSendReminder3d(account.studio?.send_reminder_3d ?? false);
@@ -1276,7 +1276,9 @@ export default function SettingsPage() {
               <div style={s.paymentSettingCopy}>
                 <label htmlFor="reschedule-notice" style={s.paymentSettingTitle}>Reschedule notice</label>
                 <p style={s.paymentSettingDescription}>
-                  Clients can move a booking themselves once, up to {CANCEL_NOTICE_LABEL[rescheduleNotice || cancelWindow] ?? `${rescheduleNotice || cancelWindow} hours`} before it. Where the artist takes instant bookings they pick a new open time; otherwise they ask you. Changes apply to bookings made after you save.
+                  {rescheduleNotice < 0
+                    ? 'Clients can’t move bookings online. They contact you to change a time. Changes apply to bookings made after you save.'
+                    : <>Clients can move a booking themselves once, up to {CANCEL_NOTICE_LABEL[rescheduleNotice] ?? `${rescheduleNotice} hours`} before it. Where the artist takes instant bookings they pick a new open time; otherwise they ask you. Changes apply to bookings made after you save.</>}
                 </p>
               </div>
               <select
@@ -1285,7 +1287,7 @@ export default function SettingsPage() {
                 value={rescheduleNotice}
                 onChange={e => setRescheduleNotice(Number(e.target.value))}
               >
-                <option value={0}>{depositRefundable ? 'Same as deposit refund' : 'Default'} ({CANCEL_NOTICE_LABEL[cancelWindow] ?? `${cancelWindow} hours`})</option>
+                <option value={-1}>Never</option>
                 {[24, 48, 72, 168].map(h => <option key={h} value={h}>Up to {CANCEL_NOTICE_LABEL[h]} before</option>)}
               </select>
             </div>
