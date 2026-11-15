@@ -1255,7 +1255,7 @@ export default function SettingsPage() {
                   {depositRefundable
                     ? `Clients who cancel at least ${CANCEL_NOTICE_LABEL[cancelWindow] ?? `${cancelWindow} hours`} before their appointment get their deposit back. Later than that, you keep it.`
                     : 'You keep the deposit whenever the client cancels.'}
-                  {' '}If you cancel, the client always gets back everything they paid. Clients see this before they pay, and changes only apply to deposits paid after you save.
+                  {' '}If you cancel, the client always gets back everything they paid, and you cover the Vanta booking fee on that refund. Clients see this before they pay, and changes only apply to deposits paid after you save.
                 </p>
               </div>
               <select

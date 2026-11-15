@@ -31,7 +31,7 @@ async function routes(context, calls) {
   await context.route(/\/studio\/me\/bookings\/pref-1$/, r => r.fulfill({ json: preferred }));
   await context.route(/\/reschedule-request\/approve$/, r => { calls.push('approve'); return r.fulfill({ json: { status: 'confirmed' } }); });
   await context.route(/\/reschedule-request\/offer$/, r => { calls.push(['offer', JSON.parse(r.request().postData() || '{}')]); return r.fulfill({ json: { status: 'offered' } }); });
-  await context.route(/\/studio\/me\/bookings\/asked-1\/cancel-preview$/, r => r.fulfill({ json: { deposit: 'refund', refund_amount: 103.5, deposit_amount: 100, paid_through_vanta: true } }));
+  await context.route(/\/studio\/me\/bookings\/asked-1\/cancel-preview$/, r => r.fulfill({ json: { deposit: 'refund', refund_amount: 103.5, fee_covered: 3.5, deposit_amount: 100, paid_through_vanta: true } }));
   for (const [re, name] of [[/\/reschedule-request\/dismiss$/, 'dismiss'], [/\/refund-sent$/, 'refund-sent']]) {
     await context.route(re, r => { calls.push(name); return r.fulfill({ json: { ok: true } }); });
   }
@@ -111,6 +111,7 @@ async function routes(context, calls) {
           await global.getByRole('button', { name: 'Cancel', exact: true }).first().click();
           const dialog = page.getByRole('dialog', { name: 'Cancel booking' });
           await dialog.getByText(/refunded everything they paid \(\$103\.50, including the Vanta booking fee\)/).waitFor({ timeout: 10000 });
+          await dialog.getByText(/you cover the \$3\.50 booking fee/).waitFor({ timeout: 10000 });
           if (shots) await page.screenshot({ path: `${shots}/cancel-dialog.png` });
 
           // ── Settings: cancellation policy ──

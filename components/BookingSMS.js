@@ -13,16 +13,17 @@ const labels = {
   sending: 'Sending', sent: 'Sent — delivery not yet confirmed', delivered: 'Delivered',
   retry: 'Temporarily delayed — will retry', failed: 'SMS failed', undelivered: 'SMS could not be delivered',
   unknown: 'Delivery uncertain — needs review; no automatic resend', suppressed: 'Client has stopped SMS reminders',
+  push: 'Reminder sent to the client’s Vanta app instead of a text',
 };
 
 const TONES = {
-  delivered: 'success',
+  delivered: 'success', push: 'success',
   scheduled: 'info', submitting: 'info', accepted: 'info', queued: 'info', sending: 'info', sent: 'info',
   retry: 'warning', unknown: 'warning', short_notice: 'warning', too_late: 'warning', unavailable: 'warning', disabled: 'warning', not_confirmed: 'warning', invalid_phone: 'warning',
   failed: 'danger', undelivered: 'danger', suppressed: 'danger',
 };
 const SHORT = {
-  not_opted_in: 'Not opted in', delivered: 'Delivered', scheduled: 'Scheduled', sent: 'Sent', failed: 'Failed', suppressed: 'Opted out',
+  not_opted_in: 'Not opted in', delivered: 'Delivered', push: 'Sent to app', scheduled: 'Scheduled', sent: 'Sent', failed: 'Failed', suppressed: 'Opted out',
   undelivered: 'Undelivered', retry: 'Retrying', unknown: 'Needs review', short_notice: 'Skipped', too_late: 'Too late', disabled: 'Off', unavailable: 'Not active', not_confirmed: 'Waiting', invalid_phone: 'Bad number',
 };
 

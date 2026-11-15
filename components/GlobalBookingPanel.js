@@ -38,9 +38,12 @@ export default function GlobalBookingPanel() {
     let live = true;
     getCancelPreview(booking.id).then(p => {
       if (!live || p.deposit !== 'refund') return;
-      const amount = `$${Number(p.refund_amount).toFixed(2).replace(/\.00$/, '')}`;
+      const money = n => `$${Number(n).toFixed(2).replace(/\.00$/, '')}`;
+      const amount = money(p.refund_amount);
+      // The studio cancelling: the whole refund is the studio's to cover, booking fee included.
+      const covered = p.fee_covered > 0 ? ` It comes out of your Stripe balance, so you cover the ${money(p.fee_covered)} booking fee.` : '';
       setCancelNotice(p.paid_through_vanta
-        ? `The client will be refunded everything they paid (${amount}, including the Vanta booking fee) automatically.`
+        ? `The client will be refunded everything they paid (${amount}, including the Vanta booking fee) automatically.${covered}`
         : `The client paid their ${amount} deposit to you directly, so you’ll need to send it back. It will be listed under Refunds to send.`);
     }).catch(() => {});
     return () => { live = false; };
