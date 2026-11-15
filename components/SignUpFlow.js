@@ -50,8 +50,8 @@ export default function SignUpFlow({ onSwitchToSignIn }) {
         <h1 style={s.signupTitle}>Start your free trial</h1>
         <p style={s.signupSubtitle}>14 days to make Vanta your studio’s own.</p>
         <div style={s.planSummary}>
-          <p style={s.planSummaryPrice}>A$30/month after your trial</p>
-          <p style={s.trialNote}>Includes up to 6 artists. Additional artists A$5/month each. Card required.</p>
+          <p style={s.planSummaryPrice}>A$50/month after your trial</p>
+          <p style={s.trialNote}>Includes up to 6 artists. Additional artists A$8/month each. Card required.</p>
         </div>
       </header>
       <div style={s.switchRow}>
