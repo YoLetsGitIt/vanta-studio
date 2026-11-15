@@ -268,6 +268,8 @@ export default function SettingsPage() {
   // and how much notice "in time" means (also the notice needed to reschedule).
   const [depositRefundable, setDepositRefundable] = useState(false);
   const [cancelWindow, setCancelWindow] = useState(48);
+  // Notice needed to reschedule; 0 = the same as the cancellation notice.
+  const [rescheduleNotice, setRescheduleNotice] = useState(0);
   // Artist's share of a forfeited deposit, as typed; '' = their usual commission share.
   const [forfeitPct, setForfeitPct] = useState('');
   // The studio's form colours (booking form + website widget, walk-in form, consent
@@ -412,6 +414,7 @@ export default function SettingsPage() {
         setPayForfeitedDeposits(account.studio?.pay_artist_on_forfeited_deposits ?? false);
         setDepositRefundable(account.studio?.deposit_refundable ?? false);
         setCancelWindow(account.studio?.reschedule_window_hours ?? 48);
+        setRescheduleNotice(account.studio?.reschedule_notice_hours ?? 0);
         setForfeitPct(account.studio?.forfeited_deposit_artist_percent != null ? String(Number(account.studio.forfeited_deposit_artist_percent)) : '');
         setSendReminder7d(account.studio?.send_reminder_7d ?? true);
         setSendReminder3d(account.studio?.send_reminder_3d ?? false);
@@ -492,7 +495,7 @@ export default function SettingsPage() {
       const pc = parseFloat(personalCut);
       const fp = forfeitPct.trim() === '' ? null : parseFloat(forfeitPct);
       if (fp != null && !(fp >= 0 && fp <= 100)) { setProfileError('The artist’s share of forfeited deposits must be between 0 and 100%.'); setSaving(false); return; }
-      await updateStudioProfile(name.trim(), address.trim(), undefined, undefined, isNaN(wc) ? 0 : wc, isNaN(pc) ? 0 : pc, aftercareInstructions, timezone, addressLat, addressLng, paymentRecordingReq, cancelWindow, widgetConsentTemplateId || null, sendReminder7d, sendReminder24h, payForfeitedDeposits, schedulingMode, piercingAftercareInstructions, sendReminder3d, fp, depositRefundable);
+      await updateStudioProfile(name.trim(), address.trim(), undefined, undefined, isNaN(wc) ? 0 : wc, isNaN(pc) ? 0 : pc, aftercareInstructions, timezone, addressLat, addressLng, paymentRecordingReq, cancelWindow, widgetConsentTemplateId || null, sendReminder7d, sendReminder24h, payForfeitedDeposits, schedulingMode, piercingAftercareInstructions, sendReminder3d, fp, depositRefundable, rescheduleNotice);
       invalidate('studio-account');
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
@@ -1269,7 +1272,7 @@ export default function SettingsPage() {
               <div style={s.paymentSettingCopy}>
                 <label htmlFor="cancel-notice" style={s.paymentSettingTitle}>Notice needed</label>
                 <p style={s.paymentSettingDescription}>
-                  {depositRefundable ? 'How far ahead a client must cancel to get their deposit back. ' : ''}Clients can move a booking themselves once, up to this long before it.
+                  {depositRefundable ? 'How far ahead a client must cancel to get their deposit back.' : 'How far ahead a client must cancel for it to count as cancelling in time.'}
                 </p>
               </div>
               <select
@@ -1278,6 +1281,23 @@ export default function SettingsPage() {
                 value={cancelWindow}
                 onChange={e => setCancelWindow(Number(e.target.value))}
               >
+                {[24, 48, 72, 168].map(h => <option key={h} value={h}>{CANCEL_NOTICE_LABEL[h]}</option>)}
+              </select>
+            </div>
+            <div className="studio-payment-setting" style={{ ...s.paymentSetting, paddingTop: 0, borderTop: 'none' }}>
+              <div style={s.paymentSettingCopy}>
+                <label htmlFor="reschedule-notice" style={s.paymentSettingTitle}>Reschedule notice</label>
+                <p style={s.paymentSettingDescription}>
+                  Clients can move a booking themselves once, up to {CANCEL_NOTICE_LABEL[rescheduleNotice || cancelWindow] ?? `${rescheduleNotice || cancelWindow} hours`} before it. Where the artist takes instant bookings they pick a new open time; otherwise they ask you. Changes apply to bookings made after you save.
+                </p>
+              </div>
+              <select
+                id="reschedule-notice"
+                style={s.paymentSettingSelect}
+                value={rescheduleNotice}
+                onChange={e => setRescheduleNotice(Number(e.target.value))}
+              >
+                <option value={0}>Same as cancellation ({CANCEL_NOTICE_LABEL[cancelWindow] ?? `${cancelWindow} hours`})</option>
                 {[24, 48, 72, 168].map(h => <option key={h} value={h}>{CANCEL_NOTICE_LABEL[h]}</option>)}
               </select>
             </div>

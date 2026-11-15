@@ -11,7 +11,7 @@ import CompleteBookingModal from '@/components/CompleteBookingModal';
 import { useBookingManagement } from '@/lib/bookingManagement';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { setBookingQuote, setBookingAppointmentType, getStations, getStudioArtists, getClientConsents, getNotes, addNote, deleteNote, getBookingConsentSubmissions, getClientConsentSubmissions, getStudioClients, getStudioClient, generateConsentLink, getStudioBookingPayment, recordStudioBookingPayment, getDepositReceipt, getDepositStatus, getOfferedTimes, listConsentTemplates, requestAvailability, dismissRescheduleRequest, markRefundSent } from '@/lib/api';
+import { setBookingQuote, setBookingAppointmentType, getStations, getStudioArtists, getClientConsents, getNotes, addNote, deleteNote, getBookingConsentSubmissions, getClientConsentSubmissions, getStudioClients, getStudioClient, generateConsentLink, getStudioBookingPayment, recordStudioBookingPayment, getDepositReceipt, getDepositStatus, getOfferedTimes, listConsentTemplates, requestAvailability, dismissRescheduleRequest, approveRescheduleRequest, offerRescheduleTimes, markRefundSent } from '@/lib/api';
 import { useStationAvailability } from '@/lib/useStationAvailability';
 import { statusColors, statusLabel, capitalise as cap } from '@/lib/status';
 import { formatDob as fmtDob, hasArtist, ageFromDob } from '@/lib/format';
@@ -121,6 +121,9 @@ export default function BookingDetailPanel({
   const [editOpen, setEditOpen] = useState(false);
   const [resending, setResending] = useState(false);
   const [changeSaving, setChangeSaving] = useState(false); // closing a reschedule request / marking a refund sent
+  // Offering the client times to choose from (up to three), as local date + time.
+  const [moveOfferOpen, setMoveOfferOpen] = useState(false);
+  const [offerSlots, setOfferSlots] = useState([{ date: '', time: '' }, { date: '', time: '' }, { date: '', time: '' }]);
   const [offerOpen, setOfferOpen] = useState(false);
   const [offer, setOffer] = useState(null); // { booking, data } — times the studio offered the client
   const bookingManagement = useBookingManagement();
@@ -780,13 +783,69 @@ export default function BookingDetailPanel({
           {rescheduleRequest && (
             <div role="status" style={p.changeBox}>
               <span style={p.changeTitle}>{clientFirst} asked for a new time</span>
+              {rescheduleRequest.preferred_time && (
+                <span style={p.changeText}>
+                  Asked for <strong>{new Date(rescheduleRequest.preferred_time).toLocaleString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}</strong>
+                </span>
+              )}
               {rescheduleRequest.message && <span style={p.changeText}>“{rescheduleRequest.message}”</span>}
+              {rescheduleRequest.offered_times?.length > 0 && (
+                <span style={p.changeText}>
+                  You offered {rescheduleRequest.offered_times.map(at => new Date(at).toLocaleString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })).join(', ')}. Waiting for {clientFirst} to choose.
+                </span>
+              )}
               <span style={p.changeText}>
                 Asked {new Date(rescheduleRequest.created_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}. Moving it uses up {clientFirst}’s one free reschedule; the deposit moves with it.
               </span>
+              {moveOfferOpen && (
+                <div style={{ display: 'grid', gap: 8, width: '100%' }}>
+                  <span style={p.changeText}>Up to three times. {clientFirst} gets them by email and picks one.</span>
+                  {offerSlots.map((slot, i) => (
+                    <div key={i} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 3fr) minmax(0, 2fr)', gap: 8 }}>
+                      <input type="date" aria-label={`Time ${i + 1} date`} value={slot.date}
+                        onChange={e => setOfferSlots(s => s.map((x, j) => (j === i ? { ...x, date: e.target.value } : x)))}
+                        style={{ minWidth: 0, padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--page)', color: 'var(--text)', font: 'inherit' }} />
+                      <input type="time" step={900} aria-label={`Time ${i + 1}`} value={slot.time}
+                        onChange={e => setOfferSlots(s => s.map((x, j) => (j === i ? { ...x, time: e.target.value } : x)))}
+                        style={{ minWidth: 0, padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--page)', color: 'var(--text)', font: 'inherit' }} />
+                    </div>
+                  ))}
+                </div>
+              )}
               <div style={p.changeActions}>
-                <Button size="sm" variant="primary" onClick={() => setEditOpen(true)} disabled={changeSaving}>Move booking</Button>
-                <Button size="sm" variant="secondary" disabled={changeSaving} onClick={async () => {
+                {rescheduleRequest.preferred_time && !moveOfferOpen && (
+                  <Button size="sm" variant="primary" disabled={changeSaving} onClick={async () => {
+                    setChangeSaving(true);
+                    try {
+                      await approveRescheduleRequest(bookingId);
+                      showFeedback(`Moved. ${clientFirst} has been emailed the new time`, 'success');
+                      window.dispatchEvent(new Event('vanta:attention-changed'));
+                      forgetBookings();
+                      await onBooked?.(bookingId);
+                    } catch (e) { showError(e); } finally { setChangeSaving(false); }
+                  }}>Approve {new Date(rescheduleRequest.preferred_time).toLocaleString('en-AU', { weekday: 'short', hour: 'numeric', minute: '2-digit' })}</Button>
+                )}
+                {moveOfferOpen ? (
+                  <>
+                    <Button size="sm" variant="primary" disabled={changeSaving || !offerSlots.some(x => x.date && x.time)} onClick={async () => {
+                      const times = offerSlots.filter(x => x.date && x.time).map(x => new Date(`${x.date}T${x.time}:00`).toISOString());
+                      setChangeSaving(true);
+                      try {
+                        await offerRescheduleTimes(bookingId, times);
+                        showFeedback(`Sent ${times.length === 1 ? 'the time' : `${times.length} times`} to ${clientFirst}`, 'success');
+                        setMoveOfferOpen(false);
+                        setOfferSlots([{ date: '', time: '' }, { date: '', time: '' }, { date: '', time: '' }]);
+                        forgetBookings();
+                        await onBooked?.(bookingId);
+                      } catch (e) { showError(e); } finally { setChangeSaving(false); }
+                    }}>Send times</Button>
+                    <Button size="sm" variant="secondary" disabled={changeSaving} onClick={() => setMoveOfferOpen(false)}>Back</Button>
+                  </>
+                ) : (
+                  <Button size="sm" variant={rescheduleRequest.preferred_time ? 'secondary' : 'primary'} disabled={changeSaving} onClick={() => setMoveOfferOpen(true)}>Offer times</Button>
+                )}
+                {!moveOfferOpen && <Button size="sm" variant="secondary" onClick={() => setEditOpen(true)} disabled={changeSaving}>Move booking</Button>}
+                {!moveOfferOpen && <Button size="sm" variant="secondary" disabled={changeSaving} onClick={async () => {
                   setChangeSaving(true);
                   try {
                     await dismissRescheduleRequest(bookingId);
@@ -795,7 +854,7 @@ export default function BookingDetailPanel({
                     forgetBookings();
                     await onBooked?.(bookingId);
                   } catch (e) { showError(e); } finally { setChangeSaving(false); }
-                }}>Can’t move it</Button>
+                }}>Can’t move it</Button>}
               </div>
             </div>
           )}
