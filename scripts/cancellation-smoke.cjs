@@ -115,18 +115,27 @@ async function routes(context, calls) {
 
           // ── Settings: cancellation policy ──
           await page.goto(`${base}/dashboard/settings?tab=payments`, { waitUntil: 'domcontentloaded' });
-          const policy = page.getByLabel('Cancellation policy');
-          await policy.waitFor({ timeout: 15000 });
-          await policy.selectOption('refundable');
-          await page.getByLabel('Notice needed').selectOption('72');
-          await page.getByText('Clients get their deposit back if they cancel at least 3 days before.', { exact: false }).waitFor();
-          if (shots) await page.locator('#cancellation-policy').scrollIntoViewIfNeeded().then(() => page.screenshot({ path: `${shots}/settings.png` }));
-          await page.locator('form:has(#cancellation-policy) button[type="submit"]').click();
+          // One setting: when a client can cancel and still get their deposit back.
+          const refund = page.getByLabel('Deposit refund');
+          await refund.waitFor({ timeout: 15000 });
+          await refund.selectOption('72');
+          await page.getByText('Clients who cancel at least 3 days before their appointment get their deposit back.', { exact: false }).waitFor();
+          await page.getByLabel('Reschedule notice').selectOption('168');
+          if (shots) await page.locator('#deposit-refund').scrollIntoViewIfNeeded().then(() => page.screenshot({ path: `${shots}/settings.png` }));
+          await page.locator('form:has(#deposit-refund) button[type="submit"]').click();
           await new Promise(r => setTimeout(r, 500));
-          const saved = calls.filter(c => Array.isArray(c) && c[0] === 'profile').pop();
+          let saved = calls.filter(c => Array.isArray(c) && c[0] === 'profile').pop();
           assert.ok(saved, 'Settings saved');
           assert.equal(saved[1].deposit_refundable, true);
           assert.equal(saved[1].reschedule_window_hours, 72);
+          assert.equal(saved[1].reschedule_notice_hours, 168);
+          // Never: the deposit is kept, the notice stays as it was.
+          await refund.selectOption('never');
+          await page.getByText('You keep the deposit whenever the client cancels.', { exact: false }).waitFor();
+          await page.locator('form:has(#deposit-refund) button[type="submit"]').click();
+          await new Promise(r => setTimeout(r, 500));
+          saved = calls.filter(c => Array.isArray(c) && c[0] === 'profile').pop();
+          assert.equal(saved[1].deposit_refundable, false);
         }
         assert.deepEqual(errors, [], 'No page errors');
         console.log(`PASS cancellations at ${width}px`);

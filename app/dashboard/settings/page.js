@@ -1250,38 +1250,26 @@ export default function SettingsPage() {
             </div>
             <div className="studio-payment-setting" style={s.paymentSetting}>
               <div style={s.paymentSettingCopy}>
-                <label htmlFor="cancellation-policy" style={s.paymentSettingTitle}>Cancellation policy</label>
+                <label htmlFor="deposit-refund" style={s.paymentSettingTitle}>Deposit refund</label>
                 <p style={s.paymentSettingDescription}>
                   {depositRefundable
-                    ? `Clients get their deposit back if they cancel at least ${CANCEL_NOTICE_LABEL[cancelWindow] ?? `${cancelWindow} hours`} before. Later than that, you keep it.`
+                    ? `Clients who cancel at least ${CANCEL_NOTICE_LABEL[cancelWindow] ?? `${cancelWindow} hours`} before their appointment get their deposit back. Later than that, you keep it.`
                     : 'You keep the deposit whenever the client cancels.'}
                   {' '}If you cancel, the client always gets back everything they paid. Clients see this before they pay, and changes only apply to deposits paid after you save.
                 </p>
               </div>
               <select
-                id="cancellation-policy"
+                id="deposit-refund"
                 style={s.paymentSettingSelect}
-                value={depositRefundable ? 'refundable' : 'kept'}
-                onChange={e => setDepositRefundable(e.target.value === 'refundable')}
+                value={depositRefundable ? String(cancelWindow) : 'never'}
+                onChange={e => {
+                  if (e.target.value === 'never') { setDepositRefundable(false); return; }
+                  setDepositRefundable(true);
+                  setCancelWindow(Number(e.target.value));
+                }}
               >
-                <option value="refundable">Refundable with notice</option>
-                <option value="kept">Non-refundable</option>
-              </select>
-            </div>
-            <div className="studio-payment-setting" style={{ ...s.paymentSetting, paddingTop: 0, borderTop: 'none' }}>
-              <div style={s.paymentSettingCopy}>
-                <label htmlFor="cancel-notice" style={s.paymentSettingTitle}>Notice needed</label>
-                <p style={s.paymentSettingDescription}>
-                  {depositRefundable ? 'How far ahead a client must cancel to get their deposit back.' : 'How far ahead a client must cancel for it to count as cancelling in time.'}
-                </p>
-              </div>
-              <select
-                id="cancel-notice"
-                style={s.paymentSettingSelect}
-                value={cancelWindow}
-                onChange={e => setCancelWindow(Number(e.target.value))}
-              >
-                {[24, 48, 72, 168].map(h => <option key={h} value={h}>{CANCEL_NOTICE_LABEL[h]}</option>)}
+                <option value="never">Never</option>
+                {[24, 48, 72, 168].map(h => <option key={h} value={String(h)}>Up to {CANCEL_NOTICE_LABEL[h]} before</option>)}
               </select>
             </div>
             <div className="studio-payment-setting" style={{ ...s.paymentSetting, paddingTop: 0, borderTop: 'none' }}>
@@ -1297,8 +1285,8 @@ export default function SettingsPage() {
                 value={rescheduleNotice}
                 onChange={e => setRescheduleNotice(Number(e.target.value))}
               >
-                <option value={0}>Same as cancellation ({CANCEL_NOTICE_LABEL[cancelWindow] ?? `${cancelWindow} hours`})</option>
-                {[24, 48, 72, 168].map(h => <option key={h} value={h}>{CANCEL_NOTICE_LABEL[h]}</option>)}
+                <option value={0}>{depositRefundable ? 'Same as deposit refund' : 'Default'} ({CANCEL_NOTICE_LABEL[cancelWindow] ?? `${cancelWindow} hours`})</option>
+                {[24, 48, 72, 168].map(h => <option key={h} value={h}>Up to {CANCEL_NOTICE_LABEL[h]} before</option>)}
               </select>
             </div>
             <div className="studio-payment-setting" style={s.paymentSetting}>
