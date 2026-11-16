@@ -232,7 +232,8 @@ function IntakeInner({ mode, onStyle }) {
       const res = await fetch(`${backend}/bookings/${booking}/instant-status?t=${encodeURIComponent(token)}`, { cache: 'no-store' }).catch(() => null);
       const data = res?.ok ? await res.json().catch(() => null) : null;
       if (!live) return;
-      if (data?.state === 'booked' || data?.state === 'closed') { setPayment(p => ({ ...p, ...data })); return; }
+      // processing: paid from their bank; booked once the money arrives (an email says so).
+      if (data?.state === 'booked' || data?.state === 'closed' || data?.state === 'processing') { setPayment(p => ({ ...p, ...data })); return; }
       if (++tries >= 15) { setPayment(p => ({ ...p, ...(data || {}), state: 'waiting' })); return; }
       setTimeout(check, 2000);
     }
@@ -482,6 +483,11 @@ function IntakeInner({ mode, onStyle }) {
           <div style={s.successIcon}>✓</div>
           <h2 style={s.successTitle}>Payment received</h2>
           <p style={s.successSub}>We’re confirming your booking now. You’ll get an email as soon as it’s done.</p>
+        </>}
+        {payment.state === 'processing' && <>
+          <div style={s.successIcon}>✓</div>
+          <h2 style={s.successTitle}>Your bank payment is on its way</h2>
+          <p style={s.successSub}>{payment.chosen_time && zone ? `${formatWhen(payment.chosen_time, zone)} at ${studio.name} is held for you. ` : 'Your time is held for you. '}Bank payments can take a little while to arrive. You’ll get an email as soon as it has and you’re booked in.</p>
         </>}
         {payment.state === 'closed' && <>
           <h2 style={s.successTitle}>This time is no longer held</h2>
