@@ -103,7 +103,7 @@ export default function InstantTimePicker({ backend, artistId, info, typeId, onT
                 <span style={st.meta}>{formatLength(t.duration_minutes)}</span>
               </span>
               {Number(t.deposit) > 0
-                ? <span style={{ ...st.meta, marginTop: 0, flexShrink: 0, textAlign: 'right' }}>{money(depositCharge(t.deposit).total)} to book<span style={{ display: 'block', fontSize: '0.72rem' }}>{formatMoney(t.deposit)} deposit + {money(depositCharge(t.deposit).fee)} Vanta booking fee</span></span>
+                ? <span style={{ ...st.meta, marginTop: 0, flexShrink: 0, textAlign: 'right' }}>{money(depositCharge(t.deposit, { fee_absorbed: info?.fee_absorbed }).total)} to book<span style={{ display: 'block', fontSize: '0.72rem' }}>{info?.fee_absorbed ? 'deposit, no booking fee' : `${formatMoney(t.deposit)} deposit + ${money(depositCharge(t.deposit).fee)} Vanta booking fee`}</span></span>
                 : <span style={{ ...st.meta, marginTop: 0, flexShrink: 0, textAlign: 'right' }}>Free<span style={{ display: 'block', fontSize: '0.72rem' }}>no deposit</span></span>}
             </button>
           );

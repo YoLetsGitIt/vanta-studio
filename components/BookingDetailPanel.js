@@ -918,11 +918,13 @@ export default function BookingDetailPanel({
           const canEditQuote = ['confirmed', 'requires_confirmation', 'awaiting_payment'].includes(rawStatus) && !isCompleted && !showCompleted;
           // Left to pay at the appointment, once a deposit is in.
           const balance = !isCompleted && !ended && paid && quote != null && depositAmount != null && quote > depositAmount ? quote - depositAmount : null;
-          const fee = paid && paidByStripe && depositAmount != null ? (Math.round(depositAmount * 0.03 * 100) + 50) / 100 : 0;
+          // The client's booking fee, unless the studio paid it (then the client paid the deposit alone).
+          const feeAbsorbed = !!booking?.deposit_fee_absorbed;
+          const fee = paid && paidByStripe && depositAmount != null && !feeAbsorbed ? (Math.round(depositAmount * 0.03 * 100) + 50) / 100 : 0;
           const paidOn = paid ? new Date(depositPaidAt || depositConfirmedAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }) : null;
           const paidHow = depositPaidVia ? `by ${depositPaidVia}` : paidByStripe ? 'through Vanta' : null;
           const note = {
-            paid: [`Paid ${[paidHow, paidOn && `on ${paidOn}`].filter(Boolean).join(' ')}.`, fee ? `${firstNm} paid ${money(depositAmount + fee)}, including the ${money(fee)} Vanta booking fee.` : null, isNoShow ? `${firstNm} didn’t show.` : null, ended ? (refundedAt ? `The booking was cancelled and ${refundOwedAmount} was refunded.` : refundOwed ? 'The booking was cancelled; the deposit needs to be sent back.' : 'The booking was cancelled and the deposit was kept under the cancellation policy.') : null].filter(Boolean).join(' '),
+            paid: [`Paid ${[paidHow, paidOn && `on ${paidOn}`].filter(Boolean).join(' ')}.`, fee ? `${firstNm} paid ${money(depositAmount + fee)}, including the ${money(fee)} Vanta booking fee.` : (paid && paidByStripe && feeAbsorbed ? `${firstNm} paid the deposit only; the studio covered the Vanta booking fee.` : null), isNoShow ? `${firstNm} didn’t show.` : null, ended ? (refundedAt ? `The booking was cancelled and ${refundOwedAmount} was refunded.` : refundOwed ? 'The booking was cancelled; the deposit needs to be sent back.' : 'The booking was cancelled and the deposit was kept under the cancellation policy.') : null].filter(Boolean).join(' '),
             unconfirmed: `Paid ${[paidHow, paidOn && `on ${paidOn}`].filter(Boolean).join(' ')}. Check it’s arrived.`,
             link: `${firstNm} has been sent a link to pay${selectionTokenExpiresAt ? `. It expires ${new Date(selectionTokenExpiresAt).toLocaleString('en-AU', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}` : ''}.`,
             expired: `${firstNm} didn’t pay before the payment link expired.`,

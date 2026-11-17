@@ -11,8 +11,8 @@ import { getDepositMethods, updateDepositMethods } from '@/lib/api';
 import { showFeedback } from '@/lib/feedback';
 
 const DETAILS = ['payid', 'payid_name', 'bank_account_name', 'bank_bsb', 'bank_account_number'];
-const SWITCHES = ['payid_enabled', 'bank_enabled', 'card_enabled'];
-const EMPTY = { payid: '', payid_name: '', bank_account_name: '', bank_bsb: '', bank_account_number: '', payid_enabled: true, bank_enabled: true, card_enabled: true };
+const SWITCHES = ['payid_enabled', 'bank_enabled', 'card_enabled', 'booking_fee_payer'];
+const EMPTY = { payid: '', payid_name: '', bank_account_name: '', bank_bsb: '', bank_account_number: '', payid_enabled: true, bank_enabled: true, card_enabled: true, booking_fee_payer: 'client' };
 
 export default function DepositPaymentOptions({ styles: s, stripe }) {
   const [form, setForm] = useState(null);
@@ -89,20 +89,46 @@ export default function DepositPaymentOptions({ styles: s, stripe }) {
           <div style={o.methodHead}>
             <div style={o.methodText}>
               <span style={o.methodName}>Vanta payments</span>
-              <span style={o.methodHint}>Clients pay online through Vanta and the booking is confirmed automatically. You get the whole deposit.</span>
+              <span style={o.methodHint}>Clients pay online through Vanta and the booking is confirmed automatically.</span>
             </div>
             {stripeActive && (
               <Switch label="Vanta payments" checked={form.card_enabled} onChange={flip('card_enabled')} disabled={saving} s={s} />
             )}
           </div>
-          {/* The Vanta booking fee: the client pays it to Vanta, the studio keeps the full deposit. */}
-          <div style={o.feeBox} aria-label="What clients pay through Vanta">
-            <div style={o.feeRow}><span>Deposit you ask for</span><span style={o.feeNum}>$100.00</span></div>
-            <div style={o.feeRow}><span>Vanta booking fee, paid by the client (3% + 50c)</span><span style={o.feeNum}>+ $3.50</span></div>
-            <div style={{ ...o.feeRow, ...o.feeTotal }}><span>Client pays</span><span style={o.feeNum}>$103.50</span></div>
-            <div style={{ ...o.feeRow, ...o.feeYou }}><span>You receive in Stripe</span><span style={{ ...o.feeNum, color: "var(--color-success)" }}>$100.00</span></div>
-            <p style={o.feeNote}>Clients pay Vanta a booking fee for booking through Vanta. It’s the same however they pay, they see it with the total before paying, and nothing comes out of your deposit.</p>
+          {/* Who pays the Vanta booking fee (3% + 50c): the client on top of the deposit, or
+              the studio out of it. */}
+          <div style={o.payerBlock}>
+            <span style={o.payerLabel} id="fee-payer-label">Who pays the Vanta booking fee</span>
+            <div role="radiogroup" aria-labelledby="fee-payer-label" style={o.segment}>
+              {[['client', 'The client'], ['business', 'The studio']].map(([value, label]) => {
+                const active = form.booking_fee_payer === value;
+                return (
+                  <button key={value} type="button" role="radio" aria-checked={active} disabled={saving}
+                    onClick={() => setForm(f => ({ ...f, booking_fee_payer: value }))}
+                    style={{ ...o.segmentOption, ...(active ? o.segmentActive : {}) }}>
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
+          {form.booking_fee_payer === 'business' ? (
+            <div style={o.feeBox} aria-label="What clients pay through Vanta">
+              <div style={o.feeRow}><span>Deposit you ask for</span><span style={o.feeNum}>$100.00</span></div>
+              <div style={{ ...o.feeRow, ...o.feeTotal }}><span>Client pays</span><span style={o.feeNum}>$100.00</span></div>
+              <div style={o.feeRow}><span>Vanta booking fee, paid by you (3% + 50c)</span><span style={o.feeNum}>− $3.50</span></div>
+              <div style={{ ...o.feeRow, ...o.feeYou }}><span>You receive in Stripe</span><span style={{ ...o.feeNum, color: "var(--color-success)" }}>$96.50</span></div>
+              <p style={o.feeNote}>You cover the Vanta booking fee, so clients pay only the deposit. It comes out of each deposit paid through Vanta, the same however the client pays.</p>
+            </div>
+          ) : (
+            <div style={o.feeBox} aria-label="What clients pay through Vanta">
+              <div style={o.feeRow}><span>Deposit you ask for</span><span style={o.feeNum}>$100.00</span></div>
+              <div style={o.feeRow}><span>Vanta booking fee, paid by the client (3% + 50c)</span><span style={o.feeNum}>+ $3.50</span></div>
+              <div style={{ ...o.feeRow, ...o.feeTotal }}><span>Client pays</span><span style={o.feeNum}>$103.50</span></div>
+              <div style={{ ...o.feeRow, ...o.feeYou }}><span>You receive in Stripe</span><span style={{ ...o.feeNum, color: "var(--color-success)" }}>$100.00</span></div>
+              <p style={o.feeNote}>Clients pay Vanta a booking fee for booking through Vanta. It’s the same however they pay, they see it with the total before paying, and nothing comes out of your deposit.</p>
+            </div>
+          )}
           {stripe.status === null ? (
             <div style={s.loadingDot} />
           ) : !stripe.status?.connected ? (
@@ -197,6 +223,7 @@ function fromServer(data) {
     payid_enabled: d.payid_enabled !== false && !!d.payid,
     bank_enabled: d.bank_enabled !== false && !!(d.bank_account_name && d.bank_bsb && d.bank_account_number),
     card_enabled: d.card_enabled !== false,
+    booking_fee_payer: d.booking_fee_payer === 'business' ? 'business' : 'client',
   };
 }
 
@@ -234,4 +261,9 @@ const o = {
   feeYou: { fontWeight: 700, color: 'var(--color-success)' },
   feeNote: { margin: '0.2rem 0 0', fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: 1.4 },
   footer: { display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '0.25rem' },
+  payerBlock: { display: 'flex', flexDirection: 'column', gap: '0.4rem', maxWidth: 440 },
+  payerLabel: { fontSize: '0.85rem', fontWeight: 600, color: 'var(--text)' },
+  segment: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, padding: 4, borderRadius: 10, background: 'var(--bg-card)', border: '1px solid var(--border-faint)' },
+  segmentOption: { minHeight: 36, borderRadius: 7, border: '1px solid transparent', background: 'transparent', color: 'var(--text-muted)', fontSize: '0.88rem', fontWeight: 500, cursor: 'pointer' },
+  segmentActive: { background: 'var(--bg-base)', borderColor: 'var(--border-faint)', color: 'var(--text)', fontWeight: 600, boxShadow: '0 1px 2px rgba(0,0,0,0.06)' },
 };
