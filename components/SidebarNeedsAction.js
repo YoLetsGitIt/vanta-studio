@@ -52,6 +52,11 @@ export default function SidebarNeedsAction({ paymentRecording, onNavigate }) {
     // Clients who paid by PayID / bank say so on a separate record, so look those up
     // for each unpaid deposit.
     const load = () => getDashboardAttention().then(async d => {
+      // Newer backends send the claims with the list; ask per booking only on older ones.
+      if (d.deposit_claims) {
+        if (live) setData({ ...d, claims: d.deposit_claims });
+        return;
+      }
       const unpaid = (d.bookings ?? []).filter(needsDeposit);
       const found = await Promise.all(unpaid.map(b => getDepositStatus(b.id).then(r => [b.id, r.client_claim]).catch(() => [b.id, null])));
       if (live) setData({ ...d, claims: Object.fromEntries(found.filter(([, c]) => c)) });
