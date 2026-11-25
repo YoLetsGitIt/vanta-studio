@@ -1075,7 +1075,7 @@ export default function SettingsPage() {
             {/* A small sample of how the forms look in these colours. */}
             <div aria-hidden="true" style={{ ...s.colourSample, background: validHex(widgetBgColor) ? widgetBgColor : '#ffffff' }}>
               <span style={{ fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: validHex(widgetAccentColor) ? widgetAccentColor : DEFAULT_LIGHT_ACCENT }}>{name || 'Your studio'}</span>
-              <span style={{ fontSize: '0.95rem', fontWeight: 700, color: '#fff' }}>Book an appointment</span>
+              <span style={{ fontSize: '0.95rem', fontWeight: 700, color: isLightColorHex(validHex(widgetBgColor) ? widgetBgColor : '#ffffff') ? '#11151b' : '#ffffff' }}>Book an appointment</span>
               <span style={{ ...s.colourSampleButton, background: validHex(widgetAccentColor) ? widgetAccentColor : DEFAULT_LIGHT_ACCENT, color: isLightColorHex(validHex(widgetAccentColor) ? widgetAccentColor : DEFAULT_LIGHT_ACCENT) ? '#11151b' : '#fff' }}>Request booking</span>
             </div>
           </div>
