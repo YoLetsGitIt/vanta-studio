@@ -144,6 +144,7 @@ function IntakeInner({ mode, onStyle }) {
 
   const [submitting, setSubmitting] = useState(false);
   const formRef = useRef(null);
+  const missingTarget = useRef('');
   const [, setValidityTick] = useState(0);
   const [submitError, setSubmitError] = useState('');
   const [done, setDone]             = useState(false);
@@ -294,23 +295,30 @@ function IntakeInner({ mode, onStyle }) {
 
   // The first required thing still missing from the booking or consent forms, or ''.
   // Drives both the disabled submit button and the message on submit.
+  // The first thing still needed before the booking can be sent, or ''. missingTarget
+  // remembers where it is on the page (a CSS selector), so the button can take the client there.
   function missingRequirement(bookingEmail = guest ? guestEmail.trim() : session?.user?.email?.trim() || '') {
-    if (walkIn && !firstName.trim()) return 'Please provide your first name.';
-    if (walkIn && !lastName.trim()) return 'Please provide your last name.';
-    if (!clientName) return 'Please provide your full name.';
-    if (guest && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(bookingEmail)) return 'Please provide a valid email address.';
-    if (!phoneNum.trim()) return 'Please provide your phone number.';
-    if (!dob) return 'Please provide your date of birth.';
-    if (walkIn && !artistId) return 'Please choose your artist.';
-    if (instantMode && !instantChoice) return 'Please choose your appointment.';
-    if (instantMode && !instantStart) return 'Please choose a time.';
+    const miss = (message, target) => { missingTarget.current = target; return message; };
+    missingTarget.current = '';
+    if (walkIn && !firstName.trim()) return miss('Please provide your first name.', 'input[autocomplete="given-name"]');
+    if (walkIn && !lastName.trim()) return miss('Please provide your last name.', 'input[autocomplete="family-name"]');
+    if (!clientName) return miss('Please provide your full name.', 'input[autocomplete="name"]');
+    if (guest && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(bookingEmail)) return miss('Please provide a valid email address.', 'input[type="email"]');
+    if (!phoneNum.trim()) return miss('Please provide your phone number.', '#booking-phone');
+    if (!dob) return miss('Please provide your date of birth.', '[data-need="dob"]');
+    if (walkIn && !artistId) return miss('Please choose your artist.', '[data-need="artist"]');
+    if (instantMode && !instantChoice) return miss('Please choose your appointment.', '[data-need="time"]');
+    if (instantMode && !instantStart) return miss('Please choose a time.', '[data-need="time"]');
     if (formConfig?.address?.enabled && field('address').enabled) {
       const problem = addressProblem(address, field('address').required);
-      if (problem) return `Address: ${problem.charAt(0).toLowerCase()}${problem.slice(1)}`;
+      if (problem) return miss(`Address: ${problem.charAt(0).toLowerCase()}${problem.slice(1)}`, '[data-need="address"]');
     }
-    if (field('body_location').enabled && placements.length === 0) return 'Please select at least one placement.';
+    if (field('body_location').enabled && placements.length === 0) return miss('Please select at least one placement.', '[data-need="placement"]');
     if (field('availability_windows').enabled && field('availability_windows').required && availability.length === 0) {
-      return 'Please add at least one time you’re available.';
+      return miss('Please add at least one time you’re available.', '[data-need="availability"]');
+    }
+    if (field('image_paths').enabled && field('image_paths').required && photoPreviews.length === 0) {
+      return miss('Please add at least one reference photo.', '[data-need="photos"]');
     }
 
     // Validate consent form templates — only enforce required ones
@@ -321,27 +329,45 @@ function IntakeInner({ mode, onStyle }) {
       for (const f of (t.fields ?? [])) {
         if (f.required && ['text', 'textarea', 'yesno', 'photo_id'].includes(f.type)) {
           if (!ts.answers?.[f.id]) {
-            return `Please complete all required fields in "${t.name}".`;
+            return miss(`Please complete all required fields in "${t.name}".`, `[data-need="form-${t.id}"]`);
           }
         }
         if (f.required && f.type === 'checkbox' && !ts.answers?.[f.id]) {
-          return `Please check all required boxes in "${t.name}".`;
+          return miss(`Please check all required boxes in "${t.name}".`, `[data-need="form-${t.id}"]`);
         }
       }
       if (!ts.answers?.__agreed__) {
-        return `Please confirm you have read and agreed to "${t.name}".`;
+        return miss(`Please confirm you have read and agreed to "${t.name}".`, `[data-need="agree-${t.id}"]`);
       }
       if (t.requires_signature && !ts.sigBlob) {
-        return `Please sign "${t.name}".`;
+        return miss(`Please sign "${t.name}".`, `[data-need="sign-${t.id}"]`);
       }
       if (isMinor) {
-        if (!guardianName.trim()) return 'Please provide the guardian\'s name.';
-        if (!ts.guardianSigBlob) return `Guardian signature required for "${t.name}".`;
+        if (!guardianName.trim()) return miss('Please provide the guardian\'s name.', `#guardian-name-${t.id}`);
+        if (!ts.guardianSigBlob) return miss(`Guardian signature required for "${t.name}".`, `[data-need="guardian-sign-${t.id}"]`);
       }
     }
     const form = formRef.current;
-    if (form && !form.checkValidity()) return 'Please fill in everything marked *.';
+    if (form && !form.checkValidity()) return miss('Please fill in everything marked *.', ':invalid');
     return '';
+  }
+
+  // Scrolls to what's still needed, focuses it and briefly highlights it.
+  function showMissing() {
+    const form = formRef.current;
+    if (!form) return;
+    const selector = missingTarget.current;
+    let el = null;
+    try { el = selector ? form.querySelector(selector) : null; } catch { el = null; }
+    el = el || form.querySelector(':invalid');
+    if (!el) return;
+    el.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' });
+    const focusable = el.matches('input, select, textarea, button') ? el : el.querySelector('input, select, textarea, button');
+    focusable?.focus({ preventScroll: true });
+    el.classList.remove('bk-needs');
+    void el.offsetWidth; // restart the highlight if it's already showing
+    el.classList.add('bk-needs');
+    window.setTimeout(() => el.classList.remove('bk-needs'), 1800);
   }
 
   async function handleSubmit(e) {
@@ -358,7 +384,7 @@ function IntakeInner({ mode, onStyle }) {
       if (!bookingEmail) { setSubmitError('Please sign in with an account that has an email address.'); return; }
     }
     const missing = missingRequirement(bookingEmail);
-    if (missing) { setSubmitError(missing); return; }
+    if (missing) { showMissing(); return; }
 
     setSubmitError('');
     setSubmitting(true);
@@ -563,7 +589,7 @@ function IntakeInner({ mode, onStyle }) {
               </Field>
             )}
             <Field label="Date of birth" required>
-              <DateOfBirthInput style={s.input} value={dob} onChange={setDob} />
+              <div data-need="dob"><DateOfBirthInput style={s.input} value={dob} onChange={setDob} /></div>
             </Field>
             <Field label="Email">
               {guest
@@ -594,9 +620,9 @@ function IntakeInner({ mode, onStyle }) {
               </div>
             </Field>
             {formConfig?.address?.enabled && field('address').enabled && (
-              <AddressFields value={address} onChange={setAddress} required={field('address').required}
+              <div data-need="address"><AddressFields value={address} onChange={setAddress} required={field('address').required}
                 inputStyle={s.input} classes={{ field: 'studio-field', label: 'studio-field-label' }}
-                legendExtra={field('address').required ? null : <Optional />} />
+                legendExtra={field('address').required ? null : <Optional />} /></div>
             )}
           </Section>
 
@@ -609,7 +635,7 @@ function IntakeInner({ mode, onStyle }) {
               </select>
             </Field>}
             {walkIn && (
-              <ArtistChoice artists={studio.artists} value={artistId} onChange={setArtistId} />
+              <div data-need="artist"><ArtistChoice artists={studio.artists} value={artistId} onChange={setArtistId} /></div>
             )}
             {!walkIn && field('artist_id').enabled && (
               <Field label={<>{'Artist preference'}{field('artist_id').required ? null : <Optional />}</>}>
@@ -631,7 +657,7 @@ function IntakeInner({ mode, onStyle }) {
             )}
 
             {field('body_location').enabled && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+              <div data-need="placement" style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
                 <label style={s.label}>
                   Placement{field('body_location').required ? <Required /> : null}
                   <span style={{ color: 'var(--text-muted)', fontWeight: 400, marginLeft: 6 }}>
@@ -782,7 +808,7 @@ function IntakeInner({ mode, onStyle }) {
 
           {/* ── Instant booking: one of the artist's open times ── */}
           {instantMode && (
-            <Section title="Pick a time">
+            <Section title="Pick a time" need="time">
               <InstantTimePicker backend={process.env.NEXT_PUBLIC_BACKEND_URL} artistId={artistId} info={instantInfo}
                 typeId={instantType} onType={setInstantType} start={instantStart} onStart={setInstantStart} />
             </Section>
@@ -790,7 +816,7 @@ function IntakeInner({ mode, onStyle }) {
 
           {/* ── Weekly availability ── */}
           {field('availability_windows').enabled && (
-            <Section title="Your availability">
+            <Section title="Your availability" need="availability">
               <Field label={<>Earliest date you can come in<Optional /></>}>
                 <input
                   type="date" style={s.input} value={earliestDate}
@@ -808,7 +834,7 @@ function IntakeInner({ mode, onStyle }) {
 
           {/* ── Reference photos ── */}
           {field('image_paths').enabled && (
-            <Section title="Reference photos">
+            <Section title="Reference photos" need="photos">
               <p style={s.sectionHint}>{field('image_paths').required ? 'Required — up to 5 images' : 'Optional — up to 5 images'}</p>
               <input ref={photoInputRef} type="file" accept="image/*" multiple hidden onChange={handlePhotoChange} />
               <Button variant="secondary" onClick={() => photoInputRef.current?.click()}>+ Add photos</Button>
@@ -829,7 +855,7 @@ function IntakeInner({ mode, onStyle }) {
           {consentTemplates.map(t => {
                 const ts = templateState[t.id] ?? {};
                 return (
-                  <Section key={t.id} title={walkIn ? null : t.name}>
+                  <Section key={t.id} title={walkIn ? null : t.name} need={`form-${t.id}`}>
 
                     {(t.fields ?? []).map(field => (
                       <ConsentFormField
@@ -841,7 +867,7 @@ function IntakeInner({ mode, onStyle }) {
                     ))}
 
                     {/* Always-required agreement checkbox */}
-                    <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6rem', cursor: 'pointer' }}>
+                    <label data-need={`agree-${t.id}`} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6rem', cursor: 'pointer' }}>
                       <input
                         type="checkbox"
                         checked={!!ts.answers?.__agreed__}
@@ -885,7 +911,7 @@ function IntakeInner({ mode, onStyle }) {
                             <input id={`guardian-phone-${t.id}`} style={s.input} type="tel" value={guardianPhone}
                               onChange={e => setGuardianPhone(e.target.value)} placeholder="Phone number" />
                           </div>
-                          <div>
+                          <div data-need={`guardian-sign-${t.id}`}>
                             <label style={s.label}>Guardian signature <span style={{ color: 'var(--color-danger)' }}>*</span></label>
                             <SignaturePad label="Guardian signature" onCapture={blob => setTemplateGuardianSigBlob(t.id, blob)} />
                           </div>
@@ -894,7 +920,7 @@ function IntakeInner({ mode, onStyle }) {
                     )}
 
                     {t.requires_signature && (
-                      <div>
+                      <div data-need={`sign-${t.id}`}>
                         <label style={s.label}>{isMinor ? 'Client signature' : 'Signature'} <span style={{ color: 'var(--color-danger)' }}>*</span></label>
                         <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '0 0 0.4rem', lineHeight: 1.5 }}>By signing, I agree that my electronic signature is legally binding and I consent to sign this form electronically.</p>
                         <SignaturePad onCapture={blob => setTemplateSigBlob(t.id, blob)} />
@@ -911,11 +937,26 @@ function IntakeInner({ mode, onStyle }) {
               Send me one SMS reminder before this appointment. Optional; I can stop SMS reminders using the link in the message.
             </label>}
             {submitError && <p role="alert" style={s.error}>{submitError}</p>}
-            <Button type="submit" loading={submitting} loadingLabel="Submitting…" fullWidth disabled={!!blocker} aria-describedby={blocker ? 'booking-blocker' : undefined}>{walkIn ? 'Book me in' : instantMode ? (instantChoice && instantStart ? `Pay ${money(depositCharge(instantChoice.deposit).total)}` : 'Book and pay deposit') : 'Request booking'}</Button>
+            {/* What's still missing sits right above the button; tapping either goes to it. */}
+            {blocker && !submitError && (
+              <div id="booking-blocker" role="status" style={s.blocker}>
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" style={{ flex: 'none', marginTop: 1 }}>
+                  <circle cx="8" cy="8" r="6.5" stroke="currentColor" strokeWidth="1.5" />
+                  <path d="M8 4.75v3.75M8 11h.01" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+                </svg>
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  <strong style={{ display: 'block', fontWeight: 650 }}>Still needed</strong>
+                  {blocker}
+                </span>
+                <button type="button" onClick={showMissing} style={s.blockerGo}>Show me</button>
+              </div>
+            )}
+            <Button type="submit" loading={submitting} loadingLabel="Submitting…" fullWidth aria-describedby={blocker ? 'booking-blocker' : undefined}
+              onClick={blocker ? e => { e.preventDefault(); showMissing(); } : undefined}
+              style={blocker ? { opacity: 0.55 } : undefined}>{walkIn ? 'Book me in' : instantMode ? (instantChoice && instantStart ? `Pay ${money(depositCharge(instantChoice.deposit).total)}` : 'Book and pay deposit') : 'Request booking'}</Button>
             {instantMode && instantChoice && instantStart && <p style={{ ...s.sectionHint, marginTop: 10, textAlign: 'center' }}>{formatWhen(instantStart, instantInfo.timezone)}. Your time is held for 30 minutes while you pay. {instantInfo.fee_absorbed
               ? <>{formatMoney(instantChoice.deposit)} deposit in total. {BOOKING_FEE_COVERED_NOTE} {payWays(false)}</>
               : <>{formatMoney(instantChoice.deposit)} deposit + {money(depositCharge(instantChoice.deposit).fee)} Vanta booking fee = {money(depositCharge(instantChoice.deposit).total)} in total. {BOOKING_FEE_NOTE} {payWays(false)}</>}</p>}
-            {blocker && !submitError && <p id="booking-blocker" style={s.blocker}>{blocker}</p>}
           </div>
 
         </form>
@@ -1170,9 +1211,9 @@ function Optional() {
   return <span style={{ color: 'var(--text-muted)', fontWeight: 400, marginLeft: 4 }}>(optional)</span>;
 }
 
-function Section({ title, children, first = false }) {
+function Section({ title, children, first = false, need }) {
   return (
-    <div style={{
+    <div data-need={need} style={{
       display: 'flex', flexDirection: 'column', gap: '0.9rem',
       borderTop: first ? 'none' : '1px solid rgba(var(--ink-rgb), 0.06)',
       paddingTop: first ? 0 : '1.5rem',
@@ -1318,7 +1359,15 @@ const s = {
   thumbImg: { width: '100%', height: '100%', objectFit: 'cover' },
   thumbRemove: { position: 'absolute', top: 2, right: 2, width: 18, height: 18, borderRadius: '50%', background: 'rgba(0,0,0,0.65)', border: 'none', color: '#fff', fontSize: '0.65rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 },
   nameRow: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.9rem' },
-  blocker: { margin: '0.6rem 0 0', fontSize: '0.8rem', color: 'var(--text-muted)', textAlign: 'center' },
+  blocker: {
+    display: 'flex', alignItems: 'flex-start', gap: '0.6rem', padding: '0.75rem 0.85rem', borderRadius: 12,
+    background: 'var(--color-warning-surface)', border: '1px solid var(--color-warning-border)', color: 'var(--color-warning)',
+    fontSize: '0.85rem', lineHeight: 1.45,
+  },
+  blockerGo: {
+    flex: 'none', alignSelf: 'center', background: 'none', border: 'none', padding: '0.25rem 0', cursor: 'pointer', boxShadow: 'none',
+    font: 'inherit', fontWeight: 650, color: 'inherit', textDecoration: 'underline', textUnderlineOffset: 3,
+  },
   sigWrap: { display: 'flex', flexDirection: 'column', gap: '0.4rem' },
   sigCanvas: { width: '100%', height: 140, borderRadius: 8, background: 'rgba(var(--ink-rgb), 0.04)', border: '1px solid rgba(var(--ink-rgb), 0.12)', display: 'block', touchAction: 'none', cursor: 'crosshair' },
   sigFooter: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },

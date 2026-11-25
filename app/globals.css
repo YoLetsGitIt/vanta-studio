@@ -732,3 +732,16 @@ textarea {
 .bk-cal-loading { animation: bk-cal-pulse 1.2s ease-in-out infinite; }
 @keyframes bk-cal-pulse { 50% { opacity: 0.45; } }
 @media (prefers-reduced-motion: reduce) { .bk-spinner { animation-duration: 2.4s; } .bk-cal-loading { animation: none; } }
+
+/* Booking form: the field "Request booking" sends the client to, highlighted for a moment. */
+.bk-needs {
+  border-radius: 12px;
+  outline: 2px solid var(--color-warning);
+  outline-offset: 4px;
+  animation: bk-needs-fade 1.8s ease-out forwards;
+}
+@keyframes bk-needs-fade {
+  0%, 60% { outline-color: var(--color-warning); }
+  100% { outline-color: transparent; }
+}
+@media (prefers-reduced-motion: reduce) { .bk-needs { animation: none; } }
