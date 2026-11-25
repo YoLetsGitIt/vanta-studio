@@ -315,7 +315,7 @@ export default function OfferTimesModal({ booking, offer = null, artists: givenA
             )}
           </>
         ) : (
-          <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-ghost)' }}>To ask for a deposit, add Stripe, PayID or bank transfer in Settings → Payments.</p>
+          <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-ghost)' }}>To ask for a deposit, connect Stripe in Settings → Payments.</p>
         )}
       </fieldset>
       {blocker && <p role="status" style={{ margin: 'var(--space-3) 0 0', color: 'var(--color-warning, #e0a84f)', fontSize: '0.875rem' }}>{blocker}</p>}

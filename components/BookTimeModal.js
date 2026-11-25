@@ -123,7 +123,7 @@ export default function BookTimeModal({ booking, artists: givenArtists = NO_ARTI
             )}
           </>
         ) : (
-          <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-ghost)' }}>To ask for a deposit, add Stripe, PayID or bank transfer in Settings → Payments.</p>
+          <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-ghost)' }}>To ask for a deposit, connect Stripe in Settings → Payments.</p>
         )}
       </fieldset>
       {errorMessage && <p role="alert" style={{ margin: 'var(--space-3) 0 0', color: 'var(--color-danger)', fontSize: '0.875rem' }}>{errorMessage}</p>}

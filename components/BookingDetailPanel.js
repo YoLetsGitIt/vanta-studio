@@ -104,7 +104,7 @@ export default function BookingDetailPanel({
   onConfirm,    // optional fn() — for requires_confirmation bookings
   onReassign,   // optional fn() — for requires_confirmation bookings
   bookTimeArtists, // optional: studio artists — shows "Book a time" on requests
-  depositsReady = false, // the studio can collect deposits (Stripe, PayID or bank)
+  depositsReady = false, // the studio can collect deposits (Stripe connected)
   onBooked,     // optional fn(bookingId) — after "Book a time"
   embedded = false, // sits inside another surface: fills it, with no backdrop
   onLeave,      // optional fn() — when embedded, close the surface too before going to another page
