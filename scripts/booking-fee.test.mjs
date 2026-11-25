@@ -11,14 +11,14 @@ test('the fee matches the server for common deposits', () => {
 });
 
 test('a deposit through Vanta shows the fee and the total, from the server when sent', () => {
-  assert.deepEqual(depositCharge(100, { card: true }), { deposit: 100, fee: 3.5, total: 103.5, throughVanta: true, bank: false });
-  assert.deepEqual(depositCharge(100, { card: true, booking_fee: 4, total: 104, bank: true }), { deposit: 100, fee: 4, total: 104, throughVanta: true, bank: true });
+  assert.deepEqual(depositCharge(100, { card: true }), { deposit: 100, fee: 3.5, total: 103.5, throughVanta: true, bank: false, absorbed: false });
+  assert.deepEqual(depositCharge(100, { card: true, booking_fee: 4, total: 104, bank: true }), { deposit: 100, fee: 4, total: 104, throughVanta: true, bank: true, absorbed: false });
   // An artist's own booking (no studio options): paid through Vanta.
   assert.equal(depositCharge(100, undefined).total, 103.5);
 });
 
 test('a deposit paid straight to the studio has no fee', () => {
-  assert.deepEqual(depositCharge(100, { card: false, manual: { payid: 'pay@ink.example' } }), { deposit: 100, fee: 0, total: 100, throughVanta: false, bank: false });
+  assert.deepEqual(depositCharge(100, { card: false, manual: { payid: 'pay@ink.example' } }), { deposit: 100, fee: 0, total: 100, throughVanta: false, bank: false, absorbed: false });
 });
 
 test('the fee is never described as a card or payment fee', () => {
