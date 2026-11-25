@@ -932,7 +932,7 @@ function IntakeInner({ mode, onStyle }) {
 
           {/* ── Submit ── */}
           <div style={s.submitSection}>
-            {!walkIn && <label style={{ display: 'flex', gap: 10, fontSize: 13, lineHeight: 1.6, marginBottom: 24 }}>
+            {!walkIn && <label style={{ display: 'flex', gap: 10, fontSize: 13, lineHeight: 1.6, marginBottom: 24, color: 'var(--text)' }}>
               <input type="checkbox" checked={smsOptIn} onChange={e => setSMSOptIn(e.target.checked)} />
               Send me one SMS reminder before this appointment. Optional; I can stop SMS reminders using the link in the message.
             </label>}
