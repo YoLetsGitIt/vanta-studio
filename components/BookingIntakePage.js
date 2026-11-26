@@ -111,6 +111,8 @@ function IntakeInner({ mode, onStyle }) {
   const [phoneNum,  setPhoneNum]    = useState('');
   // Ticked unless the client unticks it, like the booking link.
   const [smsOptIn, setSMSOptIn] = useState(true);
+  // "Send me offers and updates": never pre-ticked (Australian spam rules need the client to opt in).
+  const [offersOptIn, setOffersOptIn] = useState(false);
   const [dob, setDob]               = useState('');
   const [skinTone, setSkinTone]     = useState('');
 
@@ -448,6 +450,7 @@ function IntakeInner({ mode, onStyle }) {
         email: bookingEmail,
         phone: bookingPhone,
         sms_reminder_opt_in: smsOptIn,
+        marketing_opt_in: offersOptIn,
         dob,
         skin_tone:            isPiercing ? '' : skinTone,
 
@@ -936,6 +939,10 @@ function IntakeInner({ mode, onStyle }) {
             {!walkIn && <label style={{ display: 'flex', gap: 10, fontSize: 13, lineHeight: 1.6, marginBottom: 24, color: 'var(--text)' }}>
               <input type="checkbox" checked={smsOptIn} onChange={e => setSMSOptIn(e.target.checked)} />
               Send me one SMS reminder before this appointment. Optional; I can stop SMS reminders using the link in the message.
+            </label>}
+            {!walkIn && <label style={{ display: 'flex', gap: 10, fontSize: 13, lineHeight: 1.6, marginTop: -12, marginBottom: 24, color: 'var(--text)' }}>
+              <input type="checkbox" checked={offersOptIn} onChange={e => setOffersOptIn(e.target.checked)} />
+              Send me offers and updates from {studio.name} by email and text. Optional; I can unsubscribe at any time.
             </label>}
             {submitError && <p role="alert" style={s.error}>{submitError}</p>}
             {/* What's still missing sits right above the button; tapping either goes to it. */}
