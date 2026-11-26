@@ -109,7 +109,8 @@ function IntakeInner({ mode, onStyle }) {
   const clientName = walkIn ? `${firstName.trim()} ${lastName.trim()}`.trim() : fullName.trim();
   const [phoneCode, setPhoneCode]   = useState(() => detectCountry());
   const [phoneNum,  setPhoneNum]    = useState('');
-  const [smsOptIn, setSMSOptIn] = useState(false);
+  // Ticked unless the client unticks it, like the booking link.
+  const [smsOptIn, setSMSOptIn] = useState(true);
   const [dob, setDob]               = useState('');
   const [skinTone, setSkinTone]     = useState('');
 
