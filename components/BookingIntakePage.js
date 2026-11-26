@@ -122,6 +122,8 @@ function IntakeInner({ mode, onStyle }) {
   const [size, setSize]             = useState('');
   const [sizeUnit, setSizeUnit]     = useState('cm');
   const [colorStyle, setColorStyle] = useState('');
+  // With Colour: which colours, sent as "Color (deep red, gold)" like the booking link.
+  const [colorDetails, setColorDetails] = useState('');
   const [appointmentType, setAppointmentType] = useState('tattoo');
   const isPiercing = appointmentType === 'piercing';
   const [retouch, setRetouch]       = useState(false);
@@ -458,7 +460,7 @@ function IntakeInner({ mode, onStyle }) {
         body_location:        placements.join(', '),
         design_details:       design,
         size:                 !isPiercing && size.trim() ? `${size.trim()}${sizeUnit}` : '',
-        color:                isPiercing ? '' : colorStyle,
+        color:                isPiercing ? '' : colorStyle === 'Color' && colorDetails.trim() ? `Color (${colorDetails.trim()})` : colorStyle,
         notes,
         allergies:            hasAllergies ? (allergyDetails.trim() || 'Yes') : '',
         ...(formConfig?.address?.enabled ? { address_parts: addressPayload(address) } : {}),
@@ -781,6 +783,10 @@ function IntakeInner({ mode, onStyle }) {
                   );
                 })}
               </div>
+              {colorStyle === 'Color' && (
+                <input style={{ ...s.input, marginTop: '0.3rem' }} type="text" aria-label="Which colours?" maxLength={200}
+                  value={colorDetails} onChange={e => setColorDetails(e.target.value)} placeholder="Which colours? e.g. deep red, gold highlights" />
+              )}
             </div>
 
             }
@@ -823,14 +829,14 @@ function IntakeInner({ mode, onStyle }) {
             <Section title="Your availability" need="availability">
               <Field label={<>Earliest date you can come in<Optional /></>}>
                 <input
-                  type="date" style={s.input} value={earliestDate}
+                  type="date" className="cf-date" style={s.input} value={earliestDate}
                   min={new Date().toLocaleDateString('en-CA')}
                   onChange={e => setEarliestDate(e.target.value)}
                 />
               </Field>
               <p style={s.sectionHint}>
-                {availabilityForArtist ? 'Required, so your artist can send you times' : field('availability_windows').required ? 'Required' : 'Optional'} — which hours usually suit you each week?
-                Press and drag down a day to mark the times that work, and tap a block to remove it.
+                Which hours usually suit you each week?{' '}
+                {availabilityForArtist ? 'Required, so your artist can send you times.' : field('availability_windows').required ? 'Required.' : 'Optional.'}
               </p>
               <WeeklyAvailabilityGrid value={availability} onChange={setAvailability} hours={studioHours} />
             </Section>
