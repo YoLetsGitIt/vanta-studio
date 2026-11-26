@@ -60,6 +60,17 @@ export default function WeeklyAvailabilityGrid({ value, onChange, hours, accent 
   for (let h = firstHour; h * 60 < range.end; h++) hourMarks.push(h);
 
   const [drag, setDrag] = useState(null); // { dow, start, current, moved }
+  // Until the client picks something, one open day shows a block being dragged down,
+  // so it's clear the grid is dragged rather than typed into.
+  const [touched, setTouched] = useState(false);
+  const order = [2, 3, 4, 1, 5, 6, 0];
+  const demoDow = value.length || touched ? null : order.find(d => {
+    const o = openSlots(d);
+    return o && o.hi - o.lo >= 6;
+  }) ?? null;
+  const demoOpen = demoDow == null ? null : openSlots(demoDow);
+  const demoTop = demoOpen ? demoOpen.lo + Math.min(2, Math.floor((demoOpen.hi - demoOpen.lo - 4) / 2)) : 0;
+  const demoSlots = demoOpen ? Math.min(4, demoOpen.hi - demoTop) : 0;
   const dragRef = useRef(null);
 
   const windowsFor = dow => value.filter(w => w.day_of_week === dow);
@@ -98,6 +109,7 @@ export default function WeeklyAvailabilityGrid({ value, onChange, hours, accent 
   function onPointerDown(e, dow) {
     if (e.button !== undefined && e.button !== 0) return;
     if (!openSlots(dow)) return; // closed day
+    setTouched(true);
     e.currentTarget.setPointerCapture?.(e.pointerId);
     const slot = slotAt(e, e.currentTarget);
     const d = { dow, start: slot, current: slot, startY: e.clientY, moved: false, onBlock: !!blockAt(dow, slot) };
@@ -142,6 +154,13 @@ export default function WeeklyAvailabilityGrid({ value, onChange, hours, accent 
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+      <p style={g.howTo}>
+        <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true" style={{ flex: 'none' }}>
+          <rect x="6" y="2.5" width="8" height="9" rx="2" fill="currentColor" opacity="0.25" />
+          <path d="M10 4v12m0 0-3.25-3.25M10 16l3.25-3.25" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+        <span><strong style={{ fontWeight: 650, color: 'var(--text)' }}>Drag down a day</strong> to pick your times</span>
+      </p>
       <div style={g.wrap}>
         {/* Day headers */}
         <div style={g.headRow}>
@@ -184,14 +203,19 @@ export default function WeeklyAvailabilityGrid({ value, onChange, hours, accent 
                   const s = timeToSlot(w.start_time), e = timeToSlot(w.end_time);
                   return <span key={`${w.start_time}-${w.end_time}`} style={{ ...g.block, background: accent, top: s * SLOT_H + 1, height: (e - s) * SLOT_H - 2 }} />;
                 })}
+                {dow === demoDow && demoSlots > 0 && (
+                  <span aria-hidden="true" className="wag-demo" style={{ ...g.demo, top: demoTop * SLOT_H + 1, '--wag-h': `${demoSlots * SLOT_H - 2}px` }}>
+                    <span className="wag-demo-block" style={{ ...g.block, left: 0, right: 0, top: 0, background: accent }} />
+                    <span className="wag-demo-dot" style={g.demoDot} />
+                  </span>
+                )}
                 {live && <span style={{ ...g.block, background: accent, opacity: 0.45, top: live[0] * SLOT_H + 1, height: (live[1] - live[0]) * SLOT_H - 2 }} />}
               </div>
             );
           })}
         </div>
       </div>
-      {/* How to drag is explained above the grid by the form. */}
-      {known && <p style={g.hint}>Shaded times are outside the studio’s opening hours.</p>}
+      <p style={g.hint}>Tap a block to remove it.{known && ' Shaded times are outside the studio’s opening hours.'}</p>
 
       {summary.length > 0 && (
         <ul aria-label="Your selected times" style={g.list}>
@@ -228,6 +252,12 @@ const g = {
   hourLine: { position: 'absolute', left: 0, right: 0, height: 1, background: 'rgba(var(--ink-rgb), 0.08)', pointerEvents: 'none' },
   block: { position: 'absolute', left: 2, right: 2, borderRadius: 4, pointerEvents: 'none' },
   hint: { fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 },
+  howTo: { display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0, fontSize: '0.8rem', lineHeight: 1.4, color: 'var(--text-muted)' },
+  demo: { position: 'absolute', left: 2, right: 2, height: 'var(--wag-h)', pointerEvents: 'none' },
+  demoDot: {
+    position: 'absolute', left: '50%', top: 0, width: 18, height: 18, marginLeft: -9, marginTop: -9, borderRadius: '50%',
+    background: 'var(--text)', opacity: 0.85, boxShadow: '0 0 0 4px rgba(var(--ink-rgb), 0.12)',
+  },
   list: { listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '0.25rem' },
   item: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', fontSize: '0.85rem', color: 'var(--text-dim)' },
   remove: { background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '0.8rem', width: 36, height: 36, cursor: 'pointer', flexShrink: 0, fontFamily: 'inherit' },

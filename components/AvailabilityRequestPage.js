@@ -97,11 +97,10 @@ function Inner() {
       <form onSubmit={send} style={s.form}>
         <label style={s.field}>
           <span style={s.fieldLabel}>Earliest date you can come in <span style={s.optional}>(optional)</span></span>
-          <input type="date" style={s.input} value={earliestDate} min={new Date().toLocaleDateString('en-CA')} onChange={e => setEarliestDate(e.target.value)} />
+          <input type="date" className="cf-date" style={s.input} value={earliestDate} min={new Date().toLocaleDateString('en-CA')} onChange={e => setEarliestDate(e.target.value)} />
         </label>
         <div style={s.field}>
           <span style={s.fieldLabel}>Times that usually suit you</span>
-          <p style={s.hint}>Press and drag down a day to mark the times that work, and tap a block to remove it.</p>
           <WeeklyAvailabilityGrid value={availability} onChange={v => { setAvailability(v); setError(''); }} hours={info.hours} />
         </div>
         {error && <p role="alert" style={s.error}>{error}</p>}
