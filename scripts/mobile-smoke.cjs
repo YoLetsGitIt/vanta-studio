@@ -83,7 +83,7 @@ async function contained(page, label) {
     ]) {
       const mobile = width <= 760 || (width <= 1100 && height <= 550 && width > height);
       await page.setViewportSize({ width, height });
-      for (const route of ['home', 'schedule', 'appointments', 'clients', 'artists', 'analytics', 'financial', 'settings', 'import']) {
+      for (const route of ['schedule', 'appointments', 'clients', 'artists', 'analytics', 'financial', 'marketing', 'settings', 'import']) { // (the dashboard home page is retired)
         await page.goto(`${base}/dashboard/${route}.html`, { waitUntil: 'networkidle' });
         await page.locator('.studio-dashboard-main').waitFor();
         await contained(page, `${route} at ${width}`);
@@ -116,10 +116,11 @@ async function contained(page, label) {
           const focusedCalendar = mobile && width > height;
           const toolbar = page.getByRole('toolbar', { name: 'Calendar controls' });
           if (focusedCalendar) {
-            assert.equal(await toolbar.getByLabel('Calendar view').inputValue(), 'day:artist');
+            assert.equal(await toolbar.getByLabel('Calendar view').inputValue(), 'week:artist'); // Schedule opens in Week view
+            await toolbar.getByLabel('Calendar view').selectOption('day:artist');
             await toolbar.getByRole('button', { name: 'Open studio navigation' }).click();
             const navigation = page.getByRole('dialog', { name: 'More', exact: true });
-            for (const name of ['Dashboard', 'Schedule', 'Bookings', 'Clients', 'Settings']) await navigation.getByRole('link', { name, exact: true }).waitFor();
+            for (const name of ['Schedule', 'Bookings', 'Clients', 'Settings']) await navigation.getByRole('link', { name, exact: true }).waitFor();
             await page.keyboard.press('Escape');
             await toolbar.getByRole('button', { name: 'New Appointment', exact: true }).click();
             await page.getByRole('dialog', { name: 'New Appointment', exact: true }).waitFor();
@@ -130,10 +131,8 @@ async function contained(page, label) {
             await toolbar.getByRole('button', { name: 'Today', exact: true }).click();
             assert.equal(await page.locator('.studio-calendar-toolbar-date').innerText(), currentDate);
             await toolbar.getByLabel('Calendar view').selectOption('day:artist:all');
-            await toolbar.getByLabel('Calendar view').selectOption('day:station');
-            await page.locator('.studio-calendar-column-heading').filter({ hasText: 'Station 1' }).waitFor();
             await toolbar.getByLabel('Calendar view').selectOption('day:artist');
-          } else assert.equal(await page.getByRole('button', { name: 'Day', exact: true }).getAttribute('aria-pressed'), mobile ? 'true' : 'false');
+          } else assert.equal(await page.getByRole('button', { name: 'Week', exact: true }).getAttribute('aria-pressed'), 'true'); // Week view on every screen
           if (mobile) {
             const calendar = page.locator('.studio-calendar-scroll');
             await calendar.waitFor();
@@ -150,9 +149,7 @@ async function contained(page, label) {
             }
           }
           if (height < width && mobile) await page.screenshot({ path: `/private/tmp/studio-landscape-schedule-${width}.png` });
-          if (focusedCalendar) await toolbar.getByLabel('Calendar view').selectOption('month:artist');
-          else await page.getByRole('button', { name: 'Month', exact: true }).click();
-          await contained(page, `month at ${width}`);
+          // (Month view is hidden for now.)
         }
         if (height < width && mobile && ['appointments', 'clients', 'home'].includes(route)) {
           await page.screenshot({ path: `/private/tmp/studio-landscape-${route}-${width}.png` });
@@ -162,6 +159,7 @@ async function contained(page, label) {
           await page.locator('.studio-booking-detail').waitFor();
           await page.locator('.studio-booking-detail').getByRole('status').filter({ hasText: /^Loading/ }).waitFor({ state: 'hidden' });
           await page.locator('.studio-booking-detail').waitFor();
+          await page.waitForTimeout(450); // let the panel finish sliding in
           const bounds = await page.locator('.studio-booking-detail').boundingBox();
           assert.ok(bounds.x >= 0 && bounds.x + bounds.width <= width + 1);
           if (mobile) assert.equal(bounds.width, width);
@@ -170,6 +168,7 @@ async function contained(page, label) {
         if (route === 'clients') {
           await page.locator('.studio-client-row').click();
           await page.locator('#client-detail').waitFor();
+          await page.waitForTimeout(450); // let the panel finish sliding in
           const bounds = await page.locator('#client-detail').boundingBox();
           assert.ok(bounds.x >= 0 && bounds.x + bounds.width <= width + 1);
           await page.getByRole('button', { name: 'Close client details' }).click();

@@ -96,7 +96,7 @@ const output = path.resolve(__dirname, '../../artifacts/schedule-scroll-controls
       const day = page.locator('.studio-calendar-scroll'); await day.waitFor();
       await wheel(day, 0, 200); await state(true);
       await wheel(day, 0, -100); await state(false);
-      await choose('month'); await state(false);
+      await choose('week'); await state(false); // (month view is hidden for now)
       assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), 'No page overflow');
       assert.deepEqual(errors, []);
       results.push({ width, height, touch, theme, reducedMotion, directionChanges: true, pinnedDates: true, horizontalIgnored: true, programmaticIgnored: true, bottomStable: true, keyboard: true, filters: true, dayAndWeek: true });

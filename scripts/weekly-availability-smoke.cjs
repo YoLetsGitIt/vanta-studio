@@ -118,7 +118,7 @@ async function openForm(page) {
       await page.getByText('Your availability', { exact: true }).waitFor();
 
       // Required: submit stays disabled with a clear message.
-      assert.ok(await page.getByRole('button', { name: 'Request booking', exact: true }).isDisabled());
+      assert.ok(await page.locator('#booking-blocker').isVisible(), 'Still needed shown instead of sending');
       await page.getByText('Please add at least one time you’re available.').waitFor();
       assert.equal(writes.filter(w => w.path.endsWith('/client-booking')).length, 0);
 

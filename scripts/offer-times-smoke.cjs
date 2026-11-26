@@ -19,7 +19,7 @@ const pending = { id: 'req-1', requester_name: 'Minseo Park', requester_email: '
       let sent; let offer = null; let current = { ...pending };
       await context.route(/\/studio\/me\/bookings(\?|$)/, r => r.fulfill({ json: { bookings: [current] } }));
       await context.route(/\/studio\/me\/bookings\/req-1$/, r => r.fulfill({ json: current }));
-      await context.route(/\/stripe\/status/, r => r.fulfill({ json: { charges_enabled: false, manual_deposits_ready: true } }));
+      await context.route(/\/stripe\/status/, r => r.fulfill({ json: { connected: true, charges_enabled: true, card_enabled: true, manual_deposits_ready: false } }));
       await context.route(/\/studio\/me\/booking-management$/, r => r.fulfill({ json: { mode: 'studio' } }));
       await context.route(/\/studio\/me\/bookings\/req-1\/offered-times$/, r => r.fulfill({ json: { offer } }));
       // The artist works Mon and Wed 9–6, has one booking coming up, and is busy at 2pm.

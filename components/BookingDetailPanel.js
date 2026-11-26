@@ -654,7 +654,7 @@ export default function BookingDetailPanel({
           {(email || phone || clientAge != null) && (
             <div style={p.contact}>
               {email && (
-                <button type="button" style={p.contactLink} title="Copy email"
+                <button type="button" style={p.contactLink} title="Copy email" aria-label={`Copy email: ${email}`}
                   onClick={() => navigator.clipboard.writeText(email).then(() => showFeedback('Email copied.', 'success')).catch(showError)}>
                   {email}
                 </button>

@@ -34,8 +34,8 @@ const session={access_token:'qa-only-access-token',refresh_token:'qa-only-refres
    const page=await context.newPage();page.setDefaultTimeout(15000);page.on('pageerror',e=>errors.push(e.message));
    await page.goto(`${base}/signup/`,{waitUntil:'networkidle'});
    await page.getByRole('heading',{name:'Start your free trial',exact:true}).waitFor();
-   await page.getByText('A$30/month after your trial', { exact: true }).waitFor();
-   await page.getByText('Includes up to 6 artists. Additional artists A$5/month each. Card required.', { exact: true }).waitFor();
+   await page.getByText('A$50/month after your trial', { exact: true }).waitFor();
+   await page.getByText('Includes up to 6 artists. Additional artists A$8/month each. Card required.', { exact: true }).waitFor();
    const email=page.locator('input[type=email]'),passwords=page.locator('input[type=password]');
    await email.fill('existing@example.test');await passwords.nth(0).fill('qa-only-password');await passwords.nth(1).fill('does-not-match');
    await page.getByRole('button',{name:'Continue',exact:true}).click();await page.getByRole('alert').filter({hasText:'Passwords do not match'}).waitFor();
@@ -74,7 +74,7 @@ const session={access_token:'qa-only-access-token',refresh_token:'qa-only-refres
    await page.locator('input[type=password]').fill('qa-only-password');
    await page.getByRole('button',{name:'Sign in',exact:true}).click();
    await page.locator('.studio-dashboard-main').waitFor();
-   assert.equal(new URL(page.url()).pathname,'/dashboard/home','Sign-in lands on the dashboard document');
+   assert.equal(new URL(page.url()).pathname,'/dashboard/schedule','Sign-in lands on the schedule');
    assert.deepEqual(errors,[]);
    console.log(`PASS ${width}px: validation, duplicate email, required address, checkout handoff, return completion, automatic sign-in, first dashboard and ordinary sign-in.`);
    await context.close();

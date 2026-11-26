@@ -26,20 +26,20 @@ const base = process.env.STUDIO_TEST_URL || 'http://127.0.0.1:3058';
       await page.goto(`${base}/dashboard/settings?tab=payments`, { waitUntil: 'networkidle' });
       const card = page.getByRole('region', { name: 'Artist commission' });
       await card.getByText('Jamie Lee').waitFor();
-      assert.match(await card.innerText(), /Studio & walk-in 25%/);
-      assert.match(await card.innerText(), /Personal Studio rate/);
+      assert.match(await card.innerText(), /25%\s+Artist keeps 75%/);
+      assert.match(await card.innerText(), /Personal & app[\s\S]*Studio rate/i);
 
       // Add Sam with only a personal rate.
-      await card.getByRole('button', { name: '+ Add artist rate' }).click();
-      await card.getByRole('combobox').selectOption('artist-0');
-      await card.getByLabel('Personal, app & imported studio share for this artist').fill('15');
+      await card.getByRole('button', { name: 'Add artist', exact: true }).first().click();
+      await card.getByLabel('Artist', { exact: true }).selectOption('artist-0');
+      await card.getByLabel('Personal & app: studio share for this artist').fill('15');
       await card.getByRole('button', { name: 'Save', exact: true }).click();
       await card.getByText('Sam Anderson').waitFor();
       assert.deepEqual(writes.at(-1), { method: 'PUT', id: 'artist-0', body: { studio_cut_percent: null, personal_cut_percent: 15 } });
 
       // Edit Jamie; out-of-range values are caught before saving.
       await card.getByRole('button', { name: 'Edit commission for Jamie Lee' }).click();
-      const studioRate = card.getByLabel('Studio & walk-in studio share for this artist');
+      const studioRate = card.getByLabel('Studio & walk-in: studio share for this artist');
       assert.equal(await studioRate.inputValue(), '25');
       await studioRate.fill('120');
       const before = writes.length;

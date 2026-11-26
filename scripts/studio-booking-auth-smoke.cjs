@@ -285,7 +285,7 @@ async function signIn(page) {
       await page.getByRole('button', { name: 'Forearm', exact: true }).click();
       await page.locator('textarea').first().fill('Fine line swallow');
       await email.fill('not-an-email');
-      assert.equal(await page.getByRole('button', { name: 'Request booking', exact: true }).isDisabled(), true, 'An invalid email keeps the button disabled');
+      assert.equal(await page.locator('#booking-blocker').isVisible(), true, 'An invalid email shows Still needed');
       assert.equal(calls.guestBookings.length, 0, 'An invalid email is not submitted');
       await email.fill('guest@example.test');
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);

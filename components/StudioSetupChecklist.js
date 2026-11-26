@@ -54,12 +54,11 @@ export default function StudioSetupChecklist() {
     setError('');
     try {
       let next = await getStudioOnboarding();
-      // The Settings shortcut (?setup=1) brings a dismissed checklist back.
-      const url = new URL(window.location.href);
-      if (url.searchParams.get('setup') === '1') {
-        url.searchParams.delete('setup');
-        window.history.replaceState(window.history.state, '', url);
-        if (next.dismissed) next = await updateStudioOnboarding({ dismissed: false });
+      // The Settings shortcut (?setup=1) brings a dismissed checklist back. The parameter
+      // stays in the address: the checklist page only shows while it's there, so removing
+      // it would send a refresh to the Schedule.
+      if (new URL(window.location.href).searchParams.get('setup') === '1' && next.dismissed) {
+        next = await updateStudioOnboarding({ dismissed: false });
       }
       setState(next);
     }
@@ -75,6 +74,11 @@ export default function StudioSetupChecklist() {
     setError('');
     try {
       const saved = await updateStudioOnboarding(change);
+      // Removed from the checklist page: nothing is left there, so go to the Schedule.
+      if (change.dismissed && saved.dismissed && window.location.pathname.replace(/\/$/, '') === '/dashboard/home') {
+        window.location.replace('/dashboard/schedule');
+        return;
+      }
       setState(saved);
       if (change.status === 'complete' && saved.steps?.[change.step] === 'complete') setAnimatedStep(change.step);
     }

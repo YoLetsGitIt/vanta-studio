@@ -20,12 +20,13 @@ function statusBadge(status, mt) {
 
 // The address the studio's emails go out from, in words, or null when not set up.
 export function senderSummary(settings, mt) {
+  if (!settings) return null;
   if (['gmail', 'outlook'].includes(settings.sender_provider)) return settings.mailbox_email || null;
   if (settings.domain_status === 'verified') return `${settings.from_local || 'hello'}@${settings.domain}`;
   return settings.reply_to ? mt('Vanta’s shared address, with replies going to {email}', { email: settings.reply_to }) : null;
 }
 
-export default function SenderSettings({ settings, available, domainAvailable = available, onSaved, onReload }) {
+export default function SenderSettings({ settings = {}, available, domainAvailable = available, onSaved, onReload }) {
   const { t: mt } = useLanguage();
   const [form, setForm] = useState(settings);
   const [saving, setSaving] = useState(false);

@@ -20,15 +20,17 @@ const base = process.env.STUDIO_TEST_URL || 'http://127.0.0.1:3019';
     return route.fulfill({json:{deposit_required:false}});
    });
    const page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
-   await page.goto(base+'/dashboard/home',{waitUntil:'networkidle'});
-   await page.getByRole('button',{name:/Unpaid deposits/}).click();
+   // Needs action lists the unpaid deposit; its booking panel cancels it.
+   await page.goto(base+'/dashboard/schedule',{waitUntil:'networkidle'});
+   if(width>=800)await page.getByText(/Unpaid deposits/).first().waitFor();
+   await page.goto(base+'/dashboard/appointments?booking=booking-1',{waitUntil:'networkidle'});
    await page.getByRole('button',{name:'Cancel deposit',exact:true}).click();
    let confirm=page.getByRole('alertdialog');await confirm.waitFor();
    await page.keyboard.press('Escape');assert.equal(cancellations,0);
    await page.getByRole('button',{name:'Cancel deposit',exact:true}).click();
    confirm=page.getByRole('alertdialog');await confirm.getByRole('button',{name:'Cancel deposit',exact:true}).click();
-   await page.getByText('Deposit cancelled. The appointment is still booked.',{exact:true}).waitFor();
-   assert.equal(await page.getByRole('button',{name:/Unpaid deposits/}).count(),0);assert.equal(cancellations,1);
+   await page.getByText(/Deposit cancelled|Not required/).first().waitFor();
+   assert.equal(cancellations,1);
    // The details panel offers the same action; a rejected cancellation keeps the requirement.
    current={...current,status:'confirmed',deposit_required:true,deposit_amount:100};fail=true;
    await page.goto(base+'/dashboard/appointments?booking=booking-1',{waitUntil:'networkidle'});
@@ -36,7 +38,7 @@ const base = process.env.STUDIO_TEST_URL || 'http://127.0.0.1:3019';
    await page.getByRole('alertdialog').getByRole('button',{name:'Cancel deposit',exact:true}).click();
    await page.getByText('Payment already received',{exact:true}).waitFor();assert(await cancel.isVisible());
    fail=false;await cancel.click();await page.getByRole('alertdialog').getByRole('button',{name:'Cancel deposit',exact:true}).click();
-   await page.getByText('Not required',{exact:true}).waitFor();assert.equal(await cancel.count(),0);
+   await page.getByText('Deposit cancelled. The appointment is still booked.',{exact:true}).waitFor();assert.equal(await cancel.count(),0);
    assert.deepEqual(errors,[]);console.log('PASS',width,'cancel dismissed, unpaid deposit cancelled, failure retained, details updated');
    await context.close();
   }

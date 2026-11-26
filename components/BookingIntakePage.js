@@ -1108,8 +1108,13 @@ function Required() {
 // Walk-ins pick their artist from a custom dropdown, not a native <select>: on some
 // iPhones the native picker didn't keep the choice. Tapping the field opens the list;
 // choosing an artist closes it.
-function ArtistChoice({ artists, value, onChange }) {
+function ArtistChoice({ artists: all, value, onChange }) {
   const [open, setOpen] = useState(false);
+  // Artists who aren't working here today stay listed (clients look for them by name)
+  // but can't be chosen, and sit below the ones who are in.
+  const away = a => a.workingToday === false;
+  const artists = [...all.filter(a => !away(a)), ...all.filter(away)];
+  const noneIn = artists.length > 0 && artists.every(away);
   const rootRef = useRef(null);
   const triggerRef = useRef(null);
   const listRef = useRef(null);
@@ -1163,24 +1168,27 @@ function ArtistChoice({ artists, value, onChange }) {
         }}>
           {artists.map(a => {
             const on = value === a.artistId;
+            const out = away(a);
             return (
               <button
                 key={a.artistId}
                 type="button"
                 role="option"
                 aria-selected={on}
+                aria-disabled={out || undefined}
+                disabled={out}
                 className="walkin-artist-option"
-                onClick={() => choose(a.artistId)}
+                onClick={() => { if (!out) choose(a.artistId); }}
                 style={{
                   display: 'flex', alignItems: 'center', gap: '0.6rem', minHeight: 48, padding: '0.45rem 0.6rem', borderRadius: 8,
-                  border: 0, cursor: 'pointer', textAlign: 'left', font: 'inherit', color: 'var(--text)',
-                  background: on ? 'var(--cf-accent-soft)' : 'transparent', WebkitTapHighlightColor: 'transparent',
+                  border: 0, cursor: out ? 'not-allowed' : 'pointer', textAlign: 'left', font: 'inherit', color: 'var(--text)',
+                  background: on ? 'var(--cf-accent-soft)' : 'transparent', WebkitTapHighlightColor: 'transparent', opacity: out ? 0.5 : 1,
                 }}
               >
                 <ArtistAvatar artist={a} size={32} />
                 <span style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
                   <span style={{ fontSize: '0.9rem', fontWeight: 600, overflowWrap: 'anywhere' }}>{a.name}</span>
-                  {a.studioType === 'guest' && <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Guest artist</span>}
+                  {(out || a.studioType === 'guest') && <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{[out && 'Not in today', a.studioType === 'guest' && 'Guest artist'].filter(Boolean).join(' · ')}</span>}
                 </span>
                 {on && (
                   <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" style={{ flexShrink: 0, color: 'var(--cf-accent)' }}>
@@ -1193,6 +1201,7 @@ function ArtistChoice({ artists, value, onChange }) {
         </div>
       )}
       {artists.length === 0 && <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)' }}>No artists are available right now. Please ask at the front desk.</p>}
+      {noneIn && <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)' }}>None of our artists are in today. Please ask at the front desk.</p>}
     </div>
   );
 }

@@ -25,28 +25,21 @@ const sub = { id: 'sub-1', template_id: 'tmpl-1', template_name: 'Tattoo consent
       await page.goto(base + '/dashboard/clients?client=client-1', { waitUntil: 'networkidle' });
       const panel = page.locator('#client-detail');
       await panel.waitFor();
-      await panel.getByText('Signed consent forms (1)').waitFor();
+      await panel.getByText('Tattoo consent', { exact: true }).waitFor();
       assert.equal(await panel.getByText('Not consented', { exact: true }).count(), 0, 'signed client is not shown as not consented');
       assert.ok(await panel.getByText('Consented', { exact: true }).count() >= 1);
       assert.equal(await panel.getByRole('button', { name: 'Send link' }).count(), 0, 'no send link for a consented client');
-      // The whole list starts closed, showing only how many forms are signed.
-      const listToggle = panel.getByRole('button', { name: /Signed consent forms \(1\)/ });
-      assert.equal(await listToggle.getAttribute('aria-expanded'), 'false');
-      assert.equal(await panel.getByRole('button', { name: /Tattoo consent/ }).count(), 0, 'forms hidden until the list is opened');
-      await listToggle.click();
-      assert.equal(await listToggle.getAttribute('aria-expanded'), 'true');
-      // Each form is collapsed at first: name and signing date only, expanded on tap.
-      const formToggle = panel.getByRole('button', { name: /Tattoo consent/ });
-      assert.equal(await formToggle.getAttribute('aria-expanded'), 'false');
-      assert.equal(await panel.getByText('Are you feeling well today?', { exact: true }).count(), 0, 'answers hidden until expanded');
-      await formToggle.click();
-      assert.equal(await formToggle.getAttribute('aria-expanded'), 'true');
+      // Each signed form is one row (name and signing date); answers show once opened.
+      await panel.getByText(/Signed 3 Nov 2026/).waitFor();
+      assert.equal(await panel.getByText('Are you feeling well today?', { exact: true }).count(), 0, 'answers hidden until opened');
+      await panel.getByRole('button', { name: /Tattoo consent/ }).first().click();
       // The completed form, with the form's own question labels.
-      await panel.getByText('Are you feeling well today?', { exact: true }).waitFor();
-      await panel.getByText('Medications', { exact: true }).waitFor();
-      assert.equal(await panel.getByText('f_well').count(), 0, 'field ids are not shown');
-      await panel.getByRole('img', { name: 'Client signature' }).waitFor();
-      await panel.getByRole('button', { name: 'Download PDF' }).waitFor();
+      const form = page.locator('body');
+      await form.getByText('Are you feeling well today?', { exact: true }).first().waitFor();
+      await form.getByText('Medications', { exact: true }).first().waitFor();
+      assert.equal(await form.getByText('f_well').count(), 0, 'field ids are not shown');
+      await form.getByRole('img', { name: 'Client signature' }).first().waitFor();
+      await form.getByRole('button', { name: 'Download PDF' }).first().waitFor();
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true, 'No sideways scroll');
       assert.deepEqual(errors, []);
       if (process.env.STUDIO_REVIEW_OUTPUT) await panel.getByText("Signed consent forms (1)").scrollIntoViewIfNeeded(), await page.screenshot({ path: `${process.env.STUDIO_REVIEW_OUTPUT}/client-consent-${width}.png` });

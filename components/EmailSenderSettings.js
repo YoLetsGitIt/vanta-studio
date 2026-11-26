@@ -40,7 +40,7 @@ export default function EmailSenderSettings() {
       {!data && !error && <p role="status" className={styles.hint}>{mt("Loading your email sender…")}</p>}
       {data && (
         <SenderSettings
-          settings={data.settings}
+          settings={data.settings ?? {}}
           available={data.available}
           domainAvailable={data.domain_available ?? data.available}
           onSaved={load}

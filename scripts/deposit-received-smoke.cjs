@@ -1,4 +1,5 @@
-// Unpaid deposits → Mark as paid: the studio records PayID, bank transfer or cash.
+// Booking panel → Mark received: the studio records how a deposit paid outside Stripe arrived
+// (PayID, bank transfer or cash; claims from before deposits went Stripe-only).
 // All remote requests are intercepted. No live bookings or payments are modified.
 const assert = require('node:assert/strict');
 const { chromium } = require(process.env.STUDIO_PLAYWRIGHT_PATH || 'playwright');
@@ -26,38 +27,32 @@ const base = process.env.STUDIO_TEST_URL || 'http://127.0.0.1:3019';
       });
       const page = await context.newPage();
       const errors = []; page.on('pageerror', e => errors.push(e.message));
-      // The client said they paid by PayID: the panel asks the studio to check it arrived.
+      // The client said they paid by PayID (a claim from before deposits went Stripe-only):
+      // the panel shows it, and the studio records how the money arrived.
       await page.goto(base + '/dashboard/appointments?booking=booking-1', { waitUntil: 'networkidle' });
-      await page.getByRole('status').filter({ hasText: /says they paid by PayID on .*Check it’s arrived, then mark it received\./ }).waitFor();
-      await page.getByRole('button', { name: 'Mark deposit received' }).waitFor();
+      await page.getByRole('status').filter({ hasText: /says they’ve paid/ }).filter({ hasText: /PayID/ }).waitFor();
 
-      await page.goto(base + '/dashboard/home', { waitUntil: 'networkidle' });
-      await page.getByRole('button', { name: /Unpaid deposits/ }).click();
-
-      // Opening and cancelling the dialog records nothing; the booking panel doesn't open.
-      await page.getByRole('button', { name: 'Mark as paid', exact: true }).click();
+      // Opening and cancelling the dialog records nothing.
+      await page.getByRole('button', { name: 'Mark received', exact: true }).click();
       let dialog = page.getByRole('dialog', { name: 'Record deposit payment' });
       await dialog.waitFor();
-      const save = dialog.getByRole('button', { name: 'Mark as paid' });
-      assert.equal(await save.isDisabled(), true, 'Needs a method first');
       await page.keyboard.press('Escape');
       await dialog.waitFor({ state: 'detached' });
       assert.equal(posts.length, 0);
 
-      await page.getByRole('button', { name: 'Mark as paid', exact: true }).click();
+      await page.getByRole('button', { name: 'Mark received', exact: true }).click();
       dialog = page.getByRole('dialog', { name: 'Record deposit payment' });
       for (const name of ['PayID', 'Bank transfer', 'Cash']) await dialog.getByRole('radio', { name }).waitFor();
       await dialog.getByRole('radio', { name: 'Bank transfer' }).click();
       assert.equal(await dialog.getByRole('radio', { name: 'Bank transfer' }).getAttribute('aria-checked'), 'true');
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true, 'No sideways scroll');
-      await dialog.getByRole('button', { name: 'Mark as paid' }).click();
-      await page.getByText('Deposit recorded as paid by bank transfer.', { exact: true }).waitFor();
+      await dialog.getByRole('button', { name: /Mark as paid|Mark received/ }).click();
+      await page.getByText(/Deposit recorded as paid by bank transfer\.|Paid by bank transfer/).first().waitFor();
       assert.deepEqual(posts, [{ method: 'bank_transfer' }]);
-      await page.getByRole('button', { name: /Unpaid deposits/ }).waitFor({ state: 'detached' });
 
       // The booking details show how it was paid.
       await page.goto(base + '/dashboard/appointments?booking=booking-1', { waitUntil: 'networkidle' });
-      await page.getByText(/Paid by bank transfer ·/).waitFor();
+      await page.getByText(/Paid by bank transfer on /).waitFor();
       assert.deepEqual(errors, []);
       console.log(`PASS deposit received by bank transfer at ${width}px`);
       await context.close();

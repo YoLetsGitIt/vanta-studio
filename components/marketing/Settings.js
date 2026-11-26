@@ -12,7 +12,7 @@ const SENDER_SETTINGS = '/dashboard/settings?tab=messages#email-sender';
 
 export default function MarketingSettings({ data, onReload, onTemplates, onHistory }) {
   const { t: mt } = useLanguage();
-  const { stats, settings, available, ready } = data;
+  const { stats, settings = {}, available, ready } = data;
   const steps = [
     { done: ready, title: mt("Set up your sending email"), hint: mt("So client replies reach you."), action: <Link href={SENDER_SETTINGS} className="studio-button studio-button--primary studio-button--sm">{mt("Add it")}</Link> },
     { done: stats.consented_clients > 0, title: mt("Choose who can be emailed"), hint: mt("Tick “agreed to marketing emails” on a client."), action: <Link href="/dashboard/clients" className="studio-button studio-button--secondary studio-button--sm">{mt("Go to clients")}</Link> },

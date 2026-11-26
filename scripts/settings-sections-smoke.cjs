@@ -7,10 +7,10 @@ const base = process.env.STUDIO_TEST_URL || 'http://127.0.0.1:3058';
 const expected = {
   studio: ['Profile', 'Hours', 'Stations'],
   requests: ['Who confirms booking times', 'Booking form'],
-  walkins: ['Walk-in form'],
+  walkins: ['Walk-in link'],
   consent: [],
   messages: ['Emails'],
-  payments: ['Deposit payment options'],
+  payments: ['Deposit payments'],
   account: ['New booking notifications'],
 };
 
@@ -45,7 +45,7 @@ const expected = {
     await p.goto(`${base}/dashboard/settings`, { waitUntil: 'networkidle' });
     const list = p.getByRole('navigation', { name: 'Settings sections' });
     await list.waitFor();
-    assert.equal(await list.getByRole('button').count(), 7);
+    assert.equal(await list.getByRole("button").count(), 8);
     assert.equal(await p.locator('.studio-settings-page section').count(), 0, 'Only the list shows until a section is chosen');
     await list.getByRole('button', { name: /^Client messages/ }).click();
     await p.getByRole('heading', { name: 'Client messages', level: 1 }).waitFor();

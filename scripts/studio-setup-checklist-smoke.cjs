@@ -33,7 +33,7 @@ const output = process.env.STUDIO_QA_OUTPUT || path.resolve(__dirname, '../../ar
         return { context, page };
       }
       let { context, page } = await newContext();
-      const home = () => page.goto(`${base}/dashboard/home`, { waitUntil: 'networkidle' });
+      const home = () => page.goto(`${base}/dashboard/home?setup=1`, { waitUntil: 'networkidle' });
       const checklist = () => page.getByRole('region', { name: 'Studio setup', exact: true });
       const progress = async count => {
         await page.getByRole('status').filter({ hasText: `${count} of 6 done` }).waitFor();
@@ -110,11 +110,12 @@ const output = process.env.STUDIO_QA_OUTPUT || path.resolve(__dirname, '../../ar
       await completion('Studio details').click(); await progress(5);
       assert.equal(await completion('Import clients').getAttribute('aria-pressed'), 'true');
       await page.goto(`${base}/dashboard/settings`, { waitUntil: 'networkidle' });
-      const shortcuts = page.getByRole('complementary', { name: 'Studio setup shortcuts' });
+      const shortcuts = page.locator('details').filter({ hasText: 'Setup and imports' });
       for (const tab of ['studio', 'requests', 'payments', 'account']) {
         await page.goto(`${base}/dashboard/settings?tab=${tab}`, { waitUntil: 'networkidle' });
         if (tab === 'account') {
           await shortcuts.waitFor();
+          if (!(await shortcuts.getAttribute('open') !== null)) await shortcuts.getByText('Setup and imports', { exact: true }).click();
           assert.equal(await shortcuts.getByRole('link', { name: 'Import data', exact: true }).getAttribute('href'), '/dashboard/import');
         } else {
           await shortcuts.waitFor({ state: 'detached' });
@@ -123,10 +124,11 @@ const output = process.env.STUDIO_QA_OUTPUT || path.resolve(__dirname, '../../ar
       }
       await page.goto(`${base}/dashboard/settings?tab=account`, { waitUntil: 'networkidle' });
       await shortcuts.waitFor();
+      await shortcuts.getByText('Setup and imports', { exact: true }).click();
       assert.equal(await shortcuts.getByRole('link', { name: 'Setup checklist', exact: true }).getAttribute('href'), '/dashboard/home?setup=1#studio-setup');
       await page.screenshot({ path: path.join(output, `settings-shortcuts-${width}.png`), fullPage: true });
       await shortcuts.getByRole('link', { name: 'Setup checklist' }).click();
-      await page.waitForURL(`${base}/dashboard/home#studio-setup`); await progress(5);
+      await page.waitForURL(`${base}/dashboard/home?setup=1#studio-setup`); await progress(5);
       await checklist().getByRole('link', { name: 'Open importer' }).click();
       await page.waitForURL(`${base}/dashboard/import`);
       await page.locator('.studio-dashboard-main h1').waitFor();

@@ -54,7 +54,7 @@ async function inspect(page, name, screenshot = false) {
           if (route==='clients') {
             await page.locator('.studio-client-row').first().click();
             await page.getByRole('button',{name:'Close client details',exact:true}).waitFor();
-            await page.getByRole('button',{name:/Allergies.*: Yes/}).click();
+            // (The client profile with allergies is hidden from the panel for now.)
             await inspect(page,`client-detail-${width}-${theme}`,true);
             await page.getByRole('button',{name:'Close client details',exact:true}).click();
           }
@@ -63,40 +63,19 @@ async function inspect(page, name, screenshot = false) {
             await page.getByRole('button',{name:'Close booking details',exact:true}).waitFor();
             await inspect(page,`booking-detail-${width}-${theme}`,true);
           }
-          if (route==='settings') for(const tab of ['bookings','payments','account']) {
-            await page.locator(`[data-tour-settings-tab="${tab}"]`).click();
+          if (route==='settings') for(const tab of ['messages','consent','payments','account']) {
+            await page.goto(`${base}/dashboard/settings?tab=${tab}`,{waitUntil:'networkidle'});
+            await page.locator('.studio-dashboard-main').waitFor();
             await inspect(page,`settings-${tab}-${width}-${theme}`,width===320&&theme==='dark');
-            if(tab==='bookings'){
+            if(tab==='messages'){
               const reminder=page.getByRole('switch',{name:'7-day reminder',exact:true});
               const before=await reminder.getAttribute('aria-checked');
               await reminder.click({position:{x:22,y:2}});
               assert.notEqual(await reminder.getAttribute('aria-checked'),before,'The expanded switch area responds to taps');
               const track=await reminder.locator('span[aria-hidden="true"]').boundingBox();
               assert.equal(Math.round(track.height),24,'Switch graphic stays compact');
-              await page.getByRole('button',{name:'Edit',exact:true}).first().click();
-              const dialog=page.getByRole('dialog',{name:'Edit form',exact:true});
-              await dialog.waitFor();
-              await dialog.getByRole('button',{name:'+ Text',exact:true}).click();
-              await dialog.getByRole('textbox',{name:'Field 1 label',exact:true}).fill('First field');
-              await dialog.getByRole('button',{name:'+ Text',exact:true}).click();
-              await dialog.getByRole('textbox',{name:'Field 2 label',exact:true}).fill('Second field');
-              await dialog.getByRole('button',{name:'Move field 2 up',exact:true}).click();
-              assert.equal(await dialog.getByRole('textbox',{name:'Field 1 label',exact:true}).inputValue(),'Second field');
-              await inspect(page,`consent-builder-${width}-${theme}`,true);
-              await page.setViewportSize({width,height:300});
-              await page.waitForFunction(()=>innerHeight===300);
-              await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
-              await dialog.getByRole('textbox',{name:'Form name'}).focus();
-              const save=dialog.getByRole('button',{name:'Save form',exact:true});
-              const bounds=await save.boundingBox();
-              if(bounds.y<0||bounds.y+bounds.height>301)await page.screenshot({path:`${output}/consent-short-failure-${width}-${theme}.png`});
-              assert.ok(bounds.y>=0&&bounds.y+bounds.height<=301,`Save stays visible with a short viewport: ${JSON.stringify(bounds)}`);
-              await dialog.getByRole('textbox',{name:'Field 2 label',exact:true}).scrollIntoViewIfNeeded();
-              const scrolled=await save.boundingBox();
-              assert.ok(scrolled.y>=0&&scrolled.y+scrolled.height<=301,'Scrolling fields keeps Save visible');
-              await page.setViewportSize({width,height});
-              await dialog.getByRole('button',{name:'Cancel',exact:true}).click();
             }
+            // (The consent form is edited inline now, not in an "Edit form" dialog.)
           }
           if(route==='marketing'){
             await page.getByRole('button',{name:'Settings',exact:true}).click();

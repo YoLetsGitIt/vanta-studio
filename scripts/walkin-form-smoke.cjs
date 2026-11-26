@@ -8,7 +8,7 @@ const { chromium } = require(process.env.STUDIO_PLAYWRIGHT_PATH || 'playwright')
 const base = process.env.STUDIO_TEST_URL || 'http://127.0.0.1:3056';
 const shots = process.env.STUDIO_REVIEW_OUTPUT;
 const artistId = '33333333-3333-4333-8333-333333333333';
-const studio = { id: '11111111-1111-4111-8111-111111111111', name: 'Test Tattoo Studio', artists: [{ artistId, name: 'Sam Rivers' }, { artistId: '44444444-4444-4444-8444-444444444444', name: 'Jo Lake' }] };
+const studio = { id: '11111111-1111-4111-8111-111111111111', name: 'Test Tattoo Studio', artists: [{ artistId: '55555555-5555-4555-8555-555555555555', name: 'Ari Day', workingToday: false }, { artistId, name: 'Sam Rivers', workingToday: true }, { artistId: '44444444-4444-4444-8444-444444444444', name: 'Jo Lake' }] };
 const template = { id: 'tmpl-1', name: 'Walk-in consent', requires_signature: false, fields: [{ id: 'healthy', type: 'yesno', label: 'Are you feeling well today?', required: true }] };
 
 (async () => {
@@ -46,13 +46,13 @@ const template = { id: 'tmpl-1', name: 'Walk-in consent', requires_signature: fa
       assert.equal(await page.getByText('Send me one SMS reminder', { exact: false }).count(), 0);
       // The consent form sits straight in the page: no "Consent forms" header or box, titled with its own name.
       assert.equal(await page.getByText('Consent forms', { exact: true }).count(), 0);
-      await page.getByText('Walk-in consent', { exact: true }).waitFor();
+      await page.getByText('Are you feeling well today?').first().waitFor(); // the consent form's questions (walk-ins don't show its name)
       const book = page.getByRole('button', { name: 'Book me in', exact: true });
-      assert.equal(await book.isDisabled(), true, 'Book me in is disabled on an empty form');
+      assert.equal(await page.locator('#booking-blocker').isVisible(), true, 'Still needed on an empty form');
       // Walk-ins give first and last name separately.
       assert.equal(await page.getByPlaceholder('Your name', { exact: true }).count(), 0);
       await page.getByPlaceholder('First name', { exact: true }).fill('Walk In');
-      assert.equal(await book.isDisabled(), true, 'disabled until the last name is given');
+      assert.equal(await page.locator('#booking-blocker').isVisible(), true, 'Still needed until the last name is given');
       await page.getByText('Please provide your last name.').waitFor();
       await page.getByPlaceholder('Last name', { exact: true }).fill('Client');
       await fillDob(page, '1994-05-06');
@@ -61,18 +61,24 @@ const template = { id: 'tmpl-1', name: 'Walk-in consent', requires_signature: fa
       await page.getByRole('button', { name: 'Forearm', exact: true }).click();
       await page.getByRole('button', { name: 'Yes', exact: true }).click();
       // The artist is required and comes before the consent form.
-      assert.equal(await book.isDisabled(), true, 'disabled until the artist is chosen');
+      assert.equal(await page.locator('#booking-blocker').isVisible(), true, 'Still needed until the artist is chosen');
       await page.getByText('Please choose your artist.').waitFor();
-      // Artists are tappable cards (radio buttons), not a dropdown.
-      const artists = page.getByRole('group', { name: /^Artist/ });
-      assert.equal(await artists.getByRole('radio').count(), 2);
-      assert.equal(await artists.getByRole('radio').first().evaluate(el => el.required), true);
-      await artists.getByText('Sam Rivers', { exact: true }).click();
-      assert.equal(await artists.getByRole('radio', { name: /Sam Rivers/ }).isChecked(), true);
-      assert.equal(await book.isDisabled(), true, 'still disabled before agreeing to the consent form');
+      // Artists are a dropdown list with their photos.
+      await page.getByRole('button', { name: /^Artist/ }).click();
+      const artists = page.getByRole('listbox', { name: /^Artist/ });
+      assert.equal(await artists.getByRole('option').count(), 3);
+      // Not working here today: still listed, last, marked and not choosable.
+      const away = artists.getByRole('option').last();
+      assert.match(await away.innerText(), /Ari Day[\s\S]*Not in today/);
+      assert.equal(await away.isDisabled(), true, 'an artist not in today cannot be chosen');
+      assert.equal(await artists.getByRole('option', { name: /Jo Lake/ }).isDisabled(), false, 'no workingToday flag (older backend) means choosable');
+      await artists.getByRole('option', { name: /Sam Rivers/ }).click();
+      await artists.waitFor({ state: 'detached' });
+      assert.match(await page.getByRole('button', { name: /^Artist/ }).innerText(), /Sam Rivers/);
+      assert.equal(await page.locator('#booking-blocker').isVisible(), true, 'Still needed before agreeing to the consent form');
       await page.getByText('Please confirm you have read and agreed to "Walk-in consent".').waitFor();
       await page.getByText('I have read and agreed', { exact: false }).first().click();
-      assert.equal(await book.isDisabled(), false, 'enabled once everything required is filled in');
+      assert.equal(await page.locator('#booking-blocker').isVisible(), false, 'Ready once everything required is filled in');
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
       if (shots) await page.screenshot({ path: `${shots}/walkin-${width}.png`, fullPage: true });
       await page.getByRole('button', { name: 'Book me in', exact: true }).click();

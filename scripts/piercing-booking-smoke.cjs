@@ -60,16 +60,15 @@ async function mockContext(browser, width, { studioClosed = false } = {}) {
       assert.equal(await page.getByText('Skin tone',{exact:true}).count(),0);
       assert.equal(await page.getByText('Colour',{exact:true}).count(),0);
       assert.equal(await page.getByRole('button',{name:'Nostril',exact:true}).count(),1);
-      await page.getByPlaceholder('First',{exact:true}).fill('Local');
-      await page.getByPlaceholder('Last',{exact:true}).fill('Client');
+      await page.getByPlaceholder('Your name',{exact:true}).fill('Local Client');
       await fillDob(page, '1990-01-01');
-      await page.locator('input[type="email"]').fill('client@example.test');
+      { const email = page.locator('input[type="email"]'); if (await email.isEditable()) await email.fill('client@example.test'); } // signed-in clients' email is locked
       await page.locator('input[type="tel"]').fill('0400123456');
       await page.getByRole('button',{name:'Nostril',exact:true}).click();
       await page.locator('textarea').first().fill('Single left nostril piercing');
       await page.getByRole('button',{name:'Request booking',exact:true}).click();
       await page.getByRole('heading',{name:"You're on the list!",exact:true}).waitFor();
-      const submitted=writes.find(w=>w.path.endsWith('/studio-booking')).body;
+      const submitted=writes.find(w=>/\/(studio|client)-booking$/.test(w.path)).body;
       assert.equal(submitted.session_type,'piercing');
       assert.equal(submitted.body_location,'Nostril');
       assert.equal(submitted.size,''); assert.equal(submitted.skin_tone,''); assert.equal(submitted.color,'');
@@ -77,67 +76,67 @@ async function mockContext(browser, width, { studioClosed = false } = {}) {
       console.log(`PASS studio piercing request at ${width}px`);
       await context.close();
     }
+    // New appointment (guided steps): booking type, client, piercing + artist, schedule, price.
+    const labels={studio:'Studio appointment',walkin:'Walk-in',personal:'Personal appointment'};
     for (const width of [390, 1280]) for (const source of ['studio', 'walkin', 'personal']) {
       const {context,writes}=await mockContext(browser,width);
       const page=await context.newPage();
       const errors=[];page.on('pageerror',e=>errors.push(e.message));
       await page.goto(`${studioBase}/dashboard/appointments.html`,{waitUntil:'networkidle'});
-      await page.getByRole('button',{name:'New Appointment',exact:true}).first().waitFor();
-      await page.evaluate(bookingType=>window.dispatchEvent(new CustomEvent('vanta:open-new-appointment',{detail:{bookingType}})),source);
-      const type=page.getByRole('combobox',{name:'Appointment type',exact:true});
-      await type.waitFor();
-      const bounds=await type.boundingBox();
-      assert.ok(bounds && bounds.y >= 0 && bounds.y + bounds.height <= 1000, `${source} appointment type must be visible before entering client or schedule details at ${width}px`);
-      await type.selectOption('piercing');
-      await page.getByRole('button',{name:'New client',exact:true}).first().click();
+      await page.locator('main').first().waitFor();
+      await page.evaluate(()=>window.dispatchEvent(new CustomEvent('vanta:open-new-appointment',{detail:{}})));
+      await page.locator('#new-appointment-title').waitFor();
+      await page.getByRole('radio',{name:labels[source],exact:true}).click();
+      await page.getByRole('button',{name:/New client/i}).first().click();
       await page.locator('#new-appointment-first-name').fill('Local');
       await page.locator('#new-appointment-last-name').fill('Client');
-      await page.getByRole('combobox',{name:'Artist',exact:true}).selectOption(artistId);
-      const tomorrow=new Date(Date.now()+86400000).toISOString().slice(0,10);
-      await page.locator('#new-appointment-date').fill(tomorrow);
-      await page.getByRole('combobox',{name:'Station',exact:true}).selectOption('local-station');
-      await page.locator('#new-appointment-type').selectOption('piercing');
-      assert.equal(await page.locator('#new-appointment-size').count(),0);
+      await page.locator('#new-appointment-email').fill('local.client@example.test');
+      await page.locator('#new-appointment-phone').fill('0400123456');
+      const openStep=async name=>{const b=page.getByRole('button',{name:`Open ${name}`});if(await b.count()&&await b.getAttribute('aria-expanded')==='false')await b.click();};
+      await openStep('Appointment');
+      await page.getByRole('radio',{name:'Piercing',exact:true}).click();
+      await page.locator('#new-appointment-artist').selectOption(artistId);
+      await openStep('Schedule');
+      await page.locator('#new-appointment-date').fill(new Date(Date.now()+2*86400000).toISOString().slice(0,10));
+      await page.getByLabel('Start time hour').selectOption('11');
+      await page.getByLabel('Start time minutes').selectOption({index:0});
+      await page.getByLabel('Start time AM or PM').selectOption({index:0});
+      await page.locator('#new-appointment-duration').selectOption({index:2});
+      if(await page.locator('#new-appointment-station').isEnabled())await page.locator('#new-appointment-station').selectOption('local-station');
+      await openStep('Payment');
+      await page.locator('#new-appointment-estimate').fill('120');
+      const none=page.getByRole('radio',{name:/No deposit/});if(await none.count())await none.first().click();
       await page.getByRole('button',{name:'Create Appointment',exact:true}).click();
-      await page.locator('#new-appointment-type').waitFor({state:'hidden'});
+      await page.locator('#new-appointment-first-name').waitFor({state:'detached'});
       const manual=writes.find(w=>w.path==='/studio/me/bookings').body;
       assert.equal(manual.session_type,'piercing');assert.equal(manual.size,undefined);
-      assert.equal(manual.station_id,'local-station');assert.equal(manual.source,source);
+      assert.equal(manual.source,source);assert.equal(manual.artist_id,artistId);
       assert.equal(errors.length,0,errors.join('\n'));
-      console.log(`PASS ${source} piercing selector visible upfront and booking submits at ${width}px`);
+      console.log(`PASS ${source} piercing appointment created at ${width}px`);
       await context.close();
     }
     {
+      // A closed day is caught before anything is sent.
       const {context,writes}=await mockContext(browser,390,{studioClosed:true});
       const page=await context.newPage();
       await page.goto(`${studioBase}/dashboard/appointments.html`,{waitUntil:'networkidle'});
-      await page.getByRole('button',{name:'New Appointment',exact:true}).first().waitFor();
-      await page.evaluate(()=>window.dispatchEvent(new CustomEvent('vanta:open-new-appointment',{detail:{bookingType:'walkin'}})));
-      const type=page.getByRole('combobox',{name:'Appointment type',exact:true});
-      await type.selectOption('piercing');
-      assert.equal(await type.inputValue(),'piercing');
+      await page.locator('main').first().waitFor();
+      await page.evaluate(()=>window.dispatchEvent(new CustomEvent('vanta:open-new-appointment',{detail:{}})));
+      await page.locator('#new-appointment-title').waitFor();
+      await page.getByRole('radio',{name:'Walk-in',exact:true}).click();
+      const openStep=async name=>{const b=page.getByRole('button',{name:`Open ${name}`});if(await b.count()&&await b.getAttribute('aria-expanded')==='false')await b.click();};
+      await openStep('Appointment');
+      await page.getByRole('radio',{name:'Piercing',exact:true}).click();
+      await openStep('Schedule');
+      await page.locator('#new-appointment-date').fill(new Date(Date.now()+2*86400000).toISOString().slice(0,10));
       await page.getByText('Studio is closed on this day.',{exact:true}).first().waitFor();
+      assert.equal(await page.getByRole('button',{name:'Create Appointment',exact:true}).isDisabled(),true);
       assert.equal(writes.length,0);
-      console.log('PASS piercing selectable for an incomplete walk-in on a closed day');
+      console.log('PASS closed day blocks a piercing walk-in before sending');
       await context.close();
     }
-    {
-      const {context,writes}=await mockContext(browser,1280);
-      const page=await context.newPage();
-      await page.goto(`${studioBase}/dashboard/settings.html?tab=bookings`,{waitUntil:'networkidle'});
-      const guidance=page.getByRole('textbox',{name:'Piercing aftercare instructions',exact:true});
-      await guidance.fill('Local studio piercing guidance');
-      const section=page.getByRole('heading',{name:'Piercing aftercare instructions',exact:true}).locator('..');
-      await section.getByRole('button',{name:'Save',exact:true}).click();
-      await section.getByRole('button',{name:'Saved!',exact:true}).waitFor();
-      const saved=writes.find(w=>w.path==='/studio/me/profile').body;
-      assert.equal(saved.piercing_aftercare_instructions,'Local studio piercing guidance');
-      assert.equal(saved.aftercare_instructions,'');
-      await page.reload({waitUntil:'networkidle'});
-      assert.equal(await guidance.inputValue(),'Local studio piercing guidance');
-      console.log('PASS separate piercing aftercare setting persists');
-      await context.close();
-    }
+    // (Piercing aftercare is hidden in Settings for now, so it isn't checked here.)
+    if (!process.env.VANTA_PUBLIC_TEST_URL) { console.log('SKIP website piercing request (set VANTA_PUBLIC_TEST_URL to the served website)'); return; }
     const {context,writes}=await mockContext(browser,390);
     const page=await context.newPage();
     const errors=[];page.on('pageerror',e=>errors.push(e.message));

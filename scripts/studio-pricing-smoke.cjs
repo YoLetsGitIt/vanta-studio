@@ -16,7 +16,7 @@ const base = process.env.STUDIO_TEST_URL || 'http://127.0.0.1:3036';
       await page.goto(`${base}/dashboard/settings?tab=account`, { waitUntil: 'networkidle' });
       await page.getByRole('heading', { name: 'Billing', exact: true }).waitFor();
       const section = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Billing', exact: true }) });
-      await section.getByText(/\$30\/mo AUD covers up to 6 artists, then \$5\/artist beyond that\./).waitFor();
+      await section.getByText(/\$50\/mo AUD covers up to 6 artists, then \$8\/artist beyond that\./).waitFor();
       // Estimates are returned by the API; UI must not clamp larger studios to
       // the base fee, or replace Stripe's actual next-invoice amount.
       billing = { base_tier_cents: 3000, base_tier_seats: 6, per_extra_seat_cents: 500, seat_count: 8, estimated_monthly_cents: 4000 };

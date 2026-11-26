@@ -21,23 +21,22 @@ const shots = process.env.STUDIO_QA_OUTPUT;
       const page = await context.newPage();
       const errors = []; page.on('pageerror', e => errors.push(e.message));
       const checklist = page.locator('#studio-setup');
-      await page.goto(`${base}/dashboard/home`, { waitUntil: 'networkidle' });
+      await page.goto(`${base}/dashboard/home?setup=1`, { waitUntil: 'networkidle' });
       await checklist.getByRole('heading', { name: 'Studio setup' }).waitFor();
       if (shots) await page.screenshot({ path: `${shots}/setup-${width}.png` });
       await checklist.getByRole('button', { name: 'Dismiss setup checklist' }).click();
-      await checklist.waitFor({ state: 'detached' });
+      // Nothing is left on the checklist page, so it goes to the Schedule.
+      await page.waitForURL(/\/dashboard\/schedule/);
       assert.deepEqual(writes.at(-1), { dismissed: true });
       assert.equal(state.steps.profile, 'complete', 'Progress is kept');
-      // Stays gone on the next visit.
-      await page.reload({ waitUntil: 'networkidle' });
-      await page.waitForTimeout(500);
       assert.equal(await checklist.count(), 0, 'Dismissed checklist stays hidden');
       // Settings → Account → Setup checklist reopens it.
       await page.goto(`${base}/dashboard/settings?tab=account`, { waitUntil: 'networkidle' });
+      await page.getByText('Setup and imports', { exact: true }).click(); // the shortcuts start folded
       await page.getByRole('link', { name: /Setup checklist/ }).click();
       await checklist.getByRole('heading', { name: 'Studio setup' }).waitFor();
       assert.deepEqual(writes.at(-1), { dismissed: false });
-      assert.equal(new URL(page.url()).searchParams.has('setup'), false, 'Reopen flag is removed from the address');
+      assert.equal(new URL(page.url()).searchParams.get('setup'), '1', 'The checklist address keeps ?setup=1 so a refresh stays here');
       assert.deepEqual(errors, []);
       console.log(`PASS dismiss and reopen setup checklist at ${width}px`);
       await context.close();
@@ -51,7 +50,7 @@ const shots = process.env.STUDIO_QA_OUTPUT;
         return route.fulfill({ json: doneState });
       });
       const donePage = await doneContext.newPage();
-      await donePage.goto(`${base}/dashboard/home`, { waitUntil: 'networkidle' });
+      await donePage.goto(`${base}/dashboard/home?setup=1`, { waitUntil: 'networkidle' });
       const doneList = donePage.locator('#studio-setup');
       await doneList.getByText(/Your studio is set up\./).waitFor();
       const remove = doneList.getByRole('button', { name: 'Dismiss setup checklist' });

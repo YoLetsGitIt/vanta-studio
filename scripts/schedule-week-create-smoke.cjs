@@ -22,7 +22,7 @@ const base = process.env.STUDIO_TEST_URL || 'http://127.0.0.1:3060';
    const page=await context.newPage();await page.clock.setFixedTime(new Date('2026-11-09T08:00:00+11:00'));
    const errors=[];page.on('pageerror',e=>errors.push(e.message));
    await page.goto(base+'/dashboard/schedule',{waitUntil:'networkidle'});
-   if(width===844)await page.getByLabel('Calendar view').selectOption('week:artist');else await page.getByRole('button',{name:'Week',exact:true}).click();
+   if(width===844)await page.getByRole('combobox',{name:'Calendar view'}).selectOption('week:artist');else await page.getByRole('button',{name:'Week',exact:true}).click();
    const week=page.getByRole('region',{name:'Weekly schedule'});
    await week.waitFor();
    const filter=page.getByLabel('Filter weekly schedule');

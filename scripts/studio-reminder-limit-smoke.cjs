@@ -13,7 +13,7 @@ const base=process.env.STUDIO_TEST_URL||'http://127.0.0.1:3036',out=process.env.
   await context.route('**/studio/me',route=>route.fulfill({json:{status:'approved',studio_id:'test-studio',studio}}));
   await context.route('**/studio/me/profile',route=>{assert.equal(route.request().method(),'PATCH');const b=route.request().postDataJSON();assert.ok(keys.filter(k=>b[k]).length<=2,'UI sent an invalid selection');writes.push(b);studio={...studio,...b};return route.fulfill({json:{studio}})});
   const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
-  await page.goto(`${base}/dashboard/settings?tab=bookings`,{waitUntil:'networkidle'});
+  await page.goto(`${base}/dashboard/settings?tab=messages`,{waitUntil:'networkidle'});
   const card=page.locator('section').filter({has:page.getByRole('heading',{name:'Emails',exact:true})});await card.waitFor();
   const switches=['7-day reminder','3-day reminder','24-hour reminder'].map(name=>card.getByRole('switch',{name,exact:true}));const [seven,three,day]=switches,save=card.getByRole('button',{name:'Save',exact:true});
   async function state(expected){

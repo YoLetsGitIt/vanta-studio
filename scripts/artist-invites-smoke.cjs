@@ -1,4 +1,4 @@
-// Artists → Invite artists: copy the link, invite by email, cancel.
+// Artists → Invite artists: the studio code (copy, copy message, get a new code), invite by email, cancel.
 // Serve out/ with clean URLs first. All services are intercepted.
 const assert = require('node:assert/strict');
 const { chromium } = require(process.env.STUDIO_PLAYWRIGHT_PATH || 'playwright');
@@ -12,12 +12,12 @@ const base = process.env.STUDIO_TEST_URL || 'http://127.0.0.1:3058';
       const context = await browser.newContext({ viewport: { width, height: 1000 }, isMobile: width < 800, hasTouch: width < 800 });
       await setup(context);
       await context.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: base });
-      let state = { link_url: 'https://www.vanta.tattoo/j/abcdefghjk', pending: [] };
+      let state = { code: 'K7P-M3Q', link_url: 'https://www.vanta.tattoo/j/k7pm3q', pending: [] };
       const writes = [];
       await context.route(/\/studio\/me\/artist-invites/, route => {
         const req = route.request(), url = new URL(req.url());
         if (req.method() === 'POST' && url.pathname.endsWith('/link/reset')) {
-          writes.push('reset'); state = { ...state, link_url: 'https://www.vanta.tattoo/j/newlink234' };
+          writes.push('reset'); state = { ...state, code: 'X2Q-9RT', link_url: 'https://www.vanta.tattoo/j/x2q9rt' };
         } else if (req.method() === 'POST') {
           const body = req.postDataJSON(); writes.push(body);
           state = { ...state, pending: [{ id: `inv-${writes.length}`, code: `pers${writes.length}code`, kind: 'personal', email: body.email, created_at: '2026-11-05T01:00:00Z', sent_via: 'email' }, ...state.pending] };
@@ -36,12 +36,13 @@ const base = process.env.STUDIO_TEST_URL || 'http://127.0.0.1:3058';
       if (await skip.isVisible().catch(() => false)) await skip.click();
       await page.getByRole('button', { name: 'Invite artists' }).click();
       const dialog = page.getByRole('dialog', { name: 'Invite artists' });
-      const linkInput = dialog.getByLabel('Invite link');
-      await page.waitForFunction(() => document.querySelector('input[aria-label="Invite link"]')?.value.startsWith('https://'));
-      assert.equal(await linkInput.inputValue(), 'https://www.vanta.tattoo/j/abcdefghjk');
-      await dialog.getByRole('button', { name: 'Copy', exact: true }).click();
+      const code = dialog.getByLabel('Studio code');
+      await code.getByText('K7P-M3Q', { exact: true }).waitFor();
+      await dialog.getByRole('button', { name: 'Copy code', exact: true }).click();
       await dialog.getByRole('button', { name: 'Copied' }).waitFor();
-      assert.equal(await page.evaluate(() => navigator.clipboard.readText()), 'https://www.vanta.tattoo/j/abcdefghjk');
+      assert.equal(await page.evaluate(() => navigator.clipboard.readText()), 'K7P-M3Q');
+      await dialog.getByRole('button', { name: 'Copy message', exact: true }).click();
+      assert.match(await page.evaluate(() => navigator.clipboard.readText()), /Join a studio code[\s\S]*K7P-M3Q|K7P-M3Q/);
 
       assert.equal(await dialog.getByText(/mobile/i).count(), 0, 'No phone invites');
       for (const email of ['dani@example.com', 'sam@example.com']) {
@@ -55,11 +56,10 @@ const base = process.env.STUDIO_TEST_URL || 'http://127.0.0.1:3058';
       await dialog.getByRole('button', { name: 'Cancel' }).first().click();
       await dialog.getByText('Waiting to join (1)').waitFor();
 
-      await dialog.getByRole('button', { name: 'Reset link' }).click();
-      await dialog.getByText('New invite link created. The old link no longer works.').waitFor();
-      assert.equal(await linkInput.inputValue(), 'https://www.vanta.tattoo/j/newlink234');
+      await dialog.getByRole('button', { name: 'Get a new code' }).click();
+      await dialog.getByText('New studio code created. The old code no longer works.').waitFor();
+      await code.getByText('X2Q-9RT', { exact: true }).waitFor();
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true, 'No sideways scroll');
-      await page.screenshot({ path: `/private/tmp/claude-501/-Users-matthewkwon-Documents-vanta/dfaf52eb-4ed3-4d2e-959d-1887c9e8d497/scratchpad/invite-dialog-${width}.png` });
       assert.deepEqual(errors, []);
       console.log(`PASS artist invites at ${width}px`);
       await context.close();

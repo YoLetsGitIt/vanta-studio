@@ -14,6 +14,8 @@ const results=[];
 (async()=>{
  const browser=await chromium.launch();
  async function run(name, action, {site='studio',lang='en',width=390,auth=true}={}) {
+  // Website pages (vanta.tattoo) only run when the website is served too.
+  if(!process.env.PUBLIC_TEST_URL&&!process.env.VANTA_PUBLIC_TEST_URL&&/\bweb\s*\+/.test(action.toString())){console.log('SKIP',name,'(website page: set PUBLIC_TEST_URL)');return;}
   const context=await browser.newContext({viewport:{width,height:844}});
   const errors=[],writes=[];
   if(site==='studio')await setup(context);
@@ -42,12 +44,12 @@ const results=[];
   await run('piercing-detail',async(p,c)=>{
    await c.route('**/studio/me/bookings/booking-1',r=>r.fulfill({json:{...booking,session_type:'piercing',body_location:'Nostril'}}));
    await p.goto(studio+'/dashboard/appointments.html?booking=booking-1',{waitUntil:'networkidle'});
-   await p.getByRole('heading',{name:'Piercing',exact:true}).waitFor();await p.getByRole('button',{name:'Copy email',exact:true}).waitFor();
+   await p.getByRole('heading',{name:'Piercing',exact:true}).waitFor();await p.getByRole('button',{name:/^Copy email: /}).waitFor();
   });
-  for(const [lang,title,newTemplate,settings] of [['en','Marketing','New email campaign','Settings'],['zh-Hans','营销','新邮件活动','设置'],['ko','마케팅','새 이메일 캠페인','설정']])await run('marketing-'+lang,async(p)=>{
-   await p.goto(studio+'/dashboard/marketing.html',{waitUntil:'networkidle'});await p.getByRole('heading',{name:title,exact:true}).waitFor();await p.getByRole('heading',{name:newTemplate,exact:true}).waitFor();
-   const picker=p.getByRole('button',{name:lang==='en'?'Choose a saved email campaign or example':lang==='ko'?'저장한 이메일 캠페인 또는 예시 선택':'选择已保存的邮件活动或示例',exact:true});await picker.click();assert.equal(await picker.getAttribute('aria-expanded'),'true');
-   await p.getByRole('tab',{name:settings,exact:true}).click();
+  for(const [lang,title,campaigns,newCampaign,settings] of [['en','Create and send','Your email campaigns','New email campaign','Settings'],['zh-Hans','创建并发送','你的邮件活动','新邮件活动','设置'],['ko','작성 및 발송','내 이메일 캠페인','새 이메일 캠페인','설정']])await run('marketing-'+lang,async(p)=>{
+   await p.goto(studio+'/dashboard/marketing.html',{waitUntil:'networkidle'});await p.getByRole('heading',{name:title,exact:true}).waitFor();await p.getByRole('heading',{name:campaigns,exact:true}).waitFor();
+   await p.getByRole('button',{name:newCampaign}).first().waitFor();
+   await p.getByRole('button',{name:settings,exact:true}).click();
   },{lang});
   await run('financial-data-table',async(p)=>{
    await p.goto(studio+'/dashboard/financial.html',{waitUntil:'networkidle'});await p.getByText('View chart data',{exact:true}).click();await p.getByRole('table').first().waitFor();assert((await p.locator('tbody tr').count())>0);
