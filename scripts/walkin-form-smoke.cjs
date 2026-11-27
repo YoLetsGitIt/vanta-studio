@@ -30,8 +30,8 @@ const template = { id: 'tmpl-1', name: 'Walk-in consent', requires_signature: fa
         if (url.pathname.endsWith('/hours')) return route.fulfill({ json: { hours: [] }, headers });
         if (url.pathname.endsWith('/walk-in') && req.method() === 'POST') {
           posts.push(req.postDataJSON());
-          if (busy) { busy = false; return route.fulfill({ status: 409, json: { error: 'That artist is with another client right now. Choose another artist or ask at the front desk.' }, headers }); }
-          return route.fulfill({ status: 201, json: { id: 'b', status: 'confirmed' }, headers });
+          // With another client right now: still booked in, and told to wait.
+          return route.fulfill({ status: 201, json: { id: 'b', status: 'confirmed', artist_busy: busy }, headers });
         }
         if (url.hostname.endsWith('supabase.co')) return route.fulfill({ status: 401, json: {}, headers });
         throw new Error(`Unexpected call: ${req.method()} ${url.pathname}`);
@@ -82,12 +82,13 @@ const template = { id: 'tmpl-1', name: 'Walk-in consent', requires_signature: fa
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
       if (shots) await page.screenshot({ path: `${shots}/walkin-${width}.png`, fullPage: true });
       await page.getByRole('button', { name: 'Book me in', exact: true }).click();
-      if (width === 390) {
-        await page.getByRole('alert').filter({ hasText: 'with another client right now' }).waitFor();
-        await page.getByRole('button', { name: 'Book me in', exact: true }).click();
-      }
       await page.getByRole('heading', { name: "You're booked in!" }).waitFor();
-      await page.getByText('Sam Rivers will be with you shortly.', { exact: false }).waitFor();
+      if (busy) {
+        await page.getByText('Sam Rivers is with another client right now and will see you when they’re done.', { exact: false }).waitFor();
+        assert.equal(posts.length, 1, 'A busy artist does not turn the walk-in away');
+      } else {
+        await page.getByText('Sam Rivers will be with you shortly.', { exact: false }).waitFor();
+      }
       const sent = posts.at(-1);
       assert.deepEqual([sent.artist_id, sent.name, sent.email, sent.dob, sent.phone.replaceAll(' ', ''), sent.body_location], [artistId, 'Walk In Client', 'walkin@example.test', '1994-05-06', '+61400111222', 'Forearm']);
       assert.equal(sent.consent_submissions[0].answers.healthy, 'Yes');

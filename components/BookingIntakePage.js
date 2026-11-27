@@ -40,6 +40,8 @@ function IntakeInner({ mode, onStyle }) {
   const studioId = params.get('s');
   const [studioHours, setStudioHours] = useState(null);
   const [bookedArtist, setBookedArtist] = useState('');
+  // Walk-in: the artist was with another client when they booked in (they wait).
+  const [artistBusy, setArtistBusy] = useState(false);
 
   const [studio, setStudio]   = useState(null);
   const [studioErr, setStudioErr] = useState('');
@@ -482,7 +484,10 @@ function IntakeInner({ mode, onStyle }) {
       }
       // Match consent: remember reviewed details for the next visit.
       if (!guest) getSupabase().auth.updateUser({ data: { full_name: clientName, name: clientName, dob, phone: bookingPhone } }).catch(() => {});
-      if (walkIn) setBookedArtist(studio.artists.find(a => a.artistId === artistId)?.name || '');
+      if (walkIn) {
+        setBookedArtist(studio.artists.find(a => a.artistId === artistId)?.name || '');
+        setArtistBusy(Boolean(created?.artist_busy));
+      }
       setDone(true);
     } catch (err) {
       if (instantMode && err.status === 409) setInstantStart('');
@@ -546,7 +551,12 @@ function IntakeInner({ mode, onStyle }) {
       <div style={s.card}>
         <div style={s.successIcon}>✓</div>
         <h2 style={s.successTitle}>You're booked in!</h2>
-        <p style={s.successSub}>{bookedArtist ? `${bookedArtist} will be with you shortly.` : 'Your artist will be with you shortly.'} Take a seat and let the front desk know you're here.</p>
+        <p style={s.successSub}>
+          {artistBusy
+            ? `${bookedArtist || 'Your artist'} is with another client right now and will see you when they’re done.`
+            : bookedArtist ? `${bookedArtist} will be with you shortly.` : 'Your artist will be with you shortly.'}
+          {' '}Take a seat and let the front desk know you're here.
+        </p>
         {/* Studios often leave this on a shared iPad: start fresh for the next client. */}
         <Button variant="secondary" onClick={() => window.location.reload()}>Start a new walk-in</Button>
       </div>
