@@ -4,6 +4,9 @@
 const assert = require('node:assert/strict');
 // Date of birth is three dropdowns (day, month, year).
 const fillDob = async (page, iso) => { const [y, m, d] = iso.split('-'); const g = page.getByRole('group', { name: 'Date of birth' }).first(); await g.getByLabel('Day of birth').selectOption(String(+d)); await g.getByLabel('Month of birth').selectOption(String(+m)); await g.getByLabel('Year of birth').selectOption(y); };
+// The booking form asks for first and last name separately.
+const fillName = async (page, full) => { const [first, ...rest] = full.split(' '); await page.getByPlaceholder('First name', { exact: true }).fill(first); await page.getByPlaceholder('Last name', { exact: true }).fill(rest.join(' ')); };
+const nameValue = async page => `${await page.getByPlaceholder('First name', { exact: true }).inputValue()} ${await page.getByPlaceholder('Last name', { exact: true }).inputValue()}`.trim();
 const { chromium } = require(process.env.STUDIO_PLAYWRIGHT_PATH || 'playwright');
 const base = process.env.STUDIO_TEST_URL || 'http://127.0.0.1:3056';
 const shots = process.env.STUDIO_REVIEW_OUTPUT;
@@ -33,7 +36,7 @@ const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
       const page = await context.newPage();
       const errors = []; page.on('pageerror', e => errors.push(e.message));
       await page.goto(`${base}/studio-booking?s=${studio.id}&guest=1`, { waitUntil: 'networkidle' });
-      await page.getByPlaceholder('Your name', { exact: true }).fill('Guest Client');
+      await fillName(page, 'Guest Client');
       await fillDob(page, '1992-03-04');
       await page.getByPlaceholder('you@example.com').fill('guest@example.test');
       await page.getByPlaceholder('555 0100').fill('400999888');

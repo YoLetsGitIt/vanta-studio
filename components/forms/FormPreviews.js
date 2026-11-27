@@ -223,7 +223,7 @@ export function WidgetPreview({ bg: bgIn, accent: accentIn, studioName, logoUrl,
         )}
 
         {/* Button */}
-        <div style={{ padding: '0.75rem', background: accent, borderRadius: 9, fontSize: '0.85rem', fontWeight: 700, color: light ? '#0e0e0e' : 'var(--text)', textAlign: 'center' }}>
+        <div style={{ padding: '0.75rem', background: accent, borderRadius: 9, fontSize: '0.85rem', fontWeight: 700, color: light ? '#11151b' : '#ffffff', textAlign: 'center' }}>
           Request booking
         </div>
 
@@ -321,7 +321,7 @@ export function WalkInPreview({ bg: bgIn, accent: accentIn, studioName, logoUrl,
           ? consentTemplates.map(t => <ConsentBlock key={t.id} template={t} inp={inp} lbl={lbl} fld={fld} showName={false} />)
           : <p style={{ margin: 0, fontSize: '0.72rem', color: 'rgba(var(--ink-rgb), 0.4)' }}>No consent forms yet. Any you create in Consent forms appear here.</p>}
 
-        <div style={{ padding: '0.75rem', background: accent, borderRadius: 9, fontSize: '0.85rem', fontWeight: 700, color: light ? '#0e0e0e' : 'var(--text)', textAlign: 'center' }}>Book me in</div>
+        <div style={{ padding: '0.75rem', background: accent, borderRadius: 9, fontSize: '0.85rem', fontWeight: 700, color: light ? '#11151b' : '#ffffff', textAlign: 'center' }}>Book me in</div>
       </div>
     </div>
   );
@@ -331,9 +331,10 @@ export function WalkInPreview({ bg: bgIn, accent: accentIn, studioName, logoUrl,
 // match the client page's standard look.
 export const CONSENT_DEFAULT_BG = '#ffffff';
 export const CONSENT_DEFAULT_ACCENT = DEFAULT_LIGHT_ACCENT;
-export function ConsentFormPreview({ name, fields, requiresSig, requiresGuardian, bg: bgIn = CONSENT_DEFAULT_BG, accent: accentIn = CONSENT_DEFAULT_ACCENT, studioName }) {
+export function ConsentFormPreview({ name, fields, requiresSig, requiresGuardian, askAddress = '', bg: bgIn = CONSENT_DEFAULT_BG, accent: accentIn = CONSENT_DEFAULT_ACCENT, studioName }) {
   const { bg, accent, mode } = previewColours(bgIn, accentIn);
-  const accentText = isLightColor(accent) ? '#11151b' : 'var(--text)';
+  // Same as the real form (lib/formTheme.js): dark text on a light highlight, white on a dark one.
+  const accentText = isLightColor(accent) ? '#11151b' : '#ffffff';
   const inp = { height: 36, background: 'rgba(var(--ink-rgb), 0.05)', border: '1px solid rgba(var(--ink-rgb), 0.1)', borderRadius: 8 };
   const lbl = { fontSize: '0.7rem', fontWeight: 600, color: 'rgba(var(--ink-rgb), 0.4)', marginBottom: 3, display: 'block' };
   return (
@@ -345,6 +346,15 @@ export function ConsentFormPreview({ name, fields, requiresSig, requiresGuardian
           <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text)', margin: 0 }}>{name}</h3>
         ) : (
           <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'rgba(var(--ink-rgb), 0.2)', margin: 0, fontStyle: 'italic' }}>Form name</h3>
+        )}
+
+        {/* Asked once with the client's details, before the form's own fields. */}
+        {askAddress && (
+          <div style={{ display: 'grid', gap: 6 }}>
+            <span style={{ ...lbl, marginBottom: 0 }}>Address{askAddress === 'required' ? <span style={{ color: 'var(--color-danger)', marginLeft: 3 }}>*</span> : <span style={{ fontWeight: 500, marginLeft: 4 }}>(optional)</span>}</span>
+            <div style={inp} aria-hidden="true" />
+            <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 0.8fr 0.8fr', gap: 6 }} aria-hidden="true"><div style={inp} /><div style={inp} /><div style={inp} /></div>
+          </div>
         )}
 
         {fields.length === 0 && (

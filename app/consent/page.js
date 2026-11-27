@@ -11,6 +11,7 @@ import DateOfBirthInput from '@/components/ui/DateOfBirthInput';
 import ClientAccountActions from '@/components/ClientAccountActions';
 import ClientAuthGate from '@/components/ClientAuthGate';
 import PhotoIdField from '@/components/PhotoIdField';
+import AddressFields, { EMPTY_ADDRESS, addressEmpty, addressPayload, addressProblem } from '@/components/forms/AddressFields';
 import { uploadPhotoIdAnswers, signStudioPhotoId } from '@/lib/photoId';
 
 // The studio's reusable consent QR code lands here (/consent?s=<studioId>). Unlike the
@@ -60,6 +61,8 @@ function ConsentForm({ onStyle }) {
   const [dob, setDob]             = useState('');
   const [signerName, setSignerName] = useState('');
   const [phone, setPhone]         = useState('');
+  // Asked when any of the studio's consent forms asks for the address (ask_address).
+  const [address, setAddress]     = useState(EMPTY_ADDRESS);
   const [info, setInfo]           = useState(null);
   const [loadErr, setLoadErr]     = useState('');
   const [templateState, setTemplateState] = useState({});
@@ -155,6 +158,10 @@ function ConsentForm({ onStyle }) {
     if (!signerName.trim()) { setSubmitErr('Please enter your full name.'); return; }
     if (!dob) { setSubmitErr('Please enter your date of birth.'); return; }
     if (phone.replace(/\D/g, '').length < 7) { setSubmitErr('Please enter a valid phone number.'); return; }
+    if (templates.some(t => t.ask_address)) {
+      const problem = addressProblem(address, templates.some(t => t.ask_address === 'required'));
+      if (problem) { setSubmitErr(`Address: ${problem.charAt(0).toLowerCase()}${problem.slice(1)}`); return; }
+    }
 
     for (const t of templates) {
       const ts = templateState[t.id] ?? {};
@@ -196,9 +203,11 @@ function ConsentForm({ onStyle }) {
         const needsGuardian = isMinor && t.requires_minor_guardian;
         if (t.requires_signature && ts.sigBlob) clientSigPath = await uploadSig(ts.sigBlob);
         if (needsGuardian && guardianSigBlobs[t.id]) guardianSigPath = await uploadSig(guardianSigBlobs[t.id]);
+        const answers = await uploadPhotoIdAnswers(ts.answers ?? {}, file => signStudioPhotoId(BACKEND, info.studio_id, file));
+        if (t.ask_address && !addressEmpty(address)) answers.__address_parts__ = JSON.stringify(addressPayload(address));
         submissions.push({
           template_id:            t.id,
-          answers:                await uploadPhotoIdAnswers(ts.answers ?? {}, file => signStudioPhotoId(BACKEND, info.studio_id, file)),
+          answers,
           is_minor:               isMinor,
           client_signature_path:  clientSigPath,
           guardian_name:          needsGuardian ? guardianName : '',
@@ -281,6 +290,13 @@ function ConsentForm({ onStyle }) {
               <label htmlFor="consent-phone" style={{ ...s.label, marginBottom: '0.3rem' }}>Phone number <span style={{ color: 'var(--color-danger)' }}>*</span></label>
               <input id="consent-phone" style={s.input} type="tel" required autoComplete="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="Your phone number" />
             </div>
+            {templates.some(t => t.ask_address) && (() => {
+              const required = templates.some(t => t.ask_address === 'required');
+              return (
+                <AddressFields value={address} onChange={setAddress} required={required} inputStyle={s.input}
+                  labelStyle={{ ...s.label, marginBottom: 0 }} legendExtra={required ? null : <span style={{ fontWeight: 400, opacity: 0.7 }}> (optional)</span>} />
+              );
+            })()}
           </div>
         </div>
 

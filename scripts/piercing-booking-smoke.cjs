@@ -3,6 +3,9 @@
 const assert = require('node:assert/strict');
 // Date of birth is three dropdowns (day, month, year).
 const fillDob = async (page, iso) => { const [y, m, d] = iso.split('-'); const g = page.getByRole('group', { name: 'Date of birth' }).first(); await g.getByLabel('Day of birth').selectOption(String(+d)); await g.getByLabel('Month of birth').selectOption(String(+m)); await g.getByLabel('Year of birth').selectOption(y); };
+// The booking form asks for first and last name separately.
+const fillName = async (page, full) => { const [first, ...rest] = full.split(' '); await page.getByPlaceholder('First name', { exact: true }).fill(first); await page.getByPlaceholder('Last name', { exact: true }).fill(rest.join(' ')); };
+const nameValue = async page => `${await page.getByPlaceholder('First name', { exact: true }).inputValue()} ${await page.getByPlaceholder('Last name', { exact: true }).inputValue()}`.trim();
 const { chromium } = require(process.env.VANTA_PLAYWRIGHT_PATH || 'playwright');
 const studioBase = process.env.VANTA_STUDIO_TEST_URL || 'http://127.0.0.1:3029';
 const publicBase = process.env.VANTA_PUBLIC_TEST_URL || 'http://127.0.0.1:3030';
@@ -60,7 +63,7 @@ async function mockContext(browser, width, { studioClosed = false } = {}) {
       assert.equal(await page.getByText('Skin tone',{exact:true}).count(),0);
       assert.equal(await page.getByText('Colour',{exact:true}).count(),0);
       assert.equal(await page.getByRole('button',{name:'Nostril',exact:true}).count(),1);
-      await page.getByPlaceholder('Your name',{exact:true}).fill('Local Client');
+      await fillName(page, 'Local Client');
       await fillDob(page, '1990-01-01');
       { const email = page.locator('input[type="email"]'); if (await email.isEditable()) await email.fill('client@example.test'); } // signed-in clients' email is locked
       await page.locator('input[type="tel"]').fill('0400123456');

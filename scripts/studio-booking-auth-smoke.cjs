@@ -2,6 +2,9 @@
 const assert = require('node:assert/strict');
 // Date of birth is three dropdowns (day, month, year).
 const fillDob = async (page, iso) => { const [y, m, d] = iso.split('-'); const g = page.getByRole('group', { name: 'Date of birth' }).first(); await g.getByLabel('Day of birth').selectOption(String(+d)); await g.getByLabel('Month of birth').selectOption(String(+m)); await g.getByLabel('Year of birth').selectOption(y); };
+// The booking form asks for first and last name separately.
+const fillName = async (page, full) => { const [first, ...rest] = full.split(' '); await page.getByPlaceholder('First name', { exact: true }).fill(first); await page.getByPlaceholder('Last name', { exact: true }).fill(rest.join(' ')); };
+const nameValue = async page => `${await page.getByPlaceholder('First name', { exact: true }).inputValue()} ${await page.getByPlaceholder('Last name', { exact: true }).inputValue()}`.trim();
 const fs = require('node:fs');
 const { chromium } = require(process.env.STUDIO_PLAYWRIGHT_PATH || 'playwright');
 const base = process.env.STUDIO_TEST_URL || 'http://127.0.0.1:3056';
@@ -130,12 +133,12 @@ async function signIn(page) {
       await page.screenshot({ path: `${output}/signup-${width}.png`, fullPage: true });
       await signIn(page);
       assert(await page.getByText('Your details', { exact: true }).isVisible());
-      assert.equal(await page.getByPlaceholder('Your name', { exact: true }).inputValue(), 'Jamie Client');
+      assert.equal(await nameValue(page), 'Jamie Client');
       assert.deepEqual(await page.locator('select[autocomplete^="bday-"]').evaluateAll(s => s.map(x => x.value)), ['1', '1', '1990']);
       assert.equal(await page.getByPlaceholder('you@example.com').inputValue(), user.email);
       assert(await page.getByPlaceholder('you@example.com').evaluate(input => input.readOnly));
       assert.equal(await page.locator('input[type="tel"]').inputValue(), '400123456');
-      assert.equal(await page.locator('select[autocomplete="bday-day"]').evaluate(input => input.offsetHeight === document.querySelector('input[autocomplete="name"]').offsetHeight), true, 'Prefilled date and name fields have matching heights');
+      assert.equal(await page.locator('select[autocomplete="bday-day"]').evaluate(input => input.offsetHeight === document.querySelector('input[autocomplete="given-name"]').offsetHeight), true, 'Prefilled date and name fields have matching heights');
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
       await page.screenshot({ path: `${output}/booking-${width}.png`, fullPage: true });
       await page.getByRole('button', { name: 'Forearm', exact: true }).click();
@@ -147,7 +150,8 @@ async function signIn(page) {
       assert.equal(calls.bookings[0].name, 'Jamie Client');
       assert.equal(calls.bookings[0].dob, '1990-01-01');
       assert.equal(calls.bookings[0].phone.replaceAll(' ', ''), '+61400123456');
-      assert.equal(calls.bookings[0].sms_reminder_opt_in, false, 'Booking does not silently opt in to messages');
+      assert.equal(calls.bookings[0].sms_reminder_opt_in, true, 'The SMS reminder box starts ticked (e9e11d23)');
+      assert.equal(calls.bookings[0].marketing_opt_in, false, 'Offers and updates are never pre-ticked');
       assert.deepEqual(errors, []);
       results.push(`Anonymous gate, login, visible prefilled details and authenticated booking: ${width}px`);
       await context.close();
@@ -155,17 +159,17 @@ async function signIn(page) {
     {
       const { context, page, calls } = await open(browser, { signedIn: true, logoutFailure: true });
       const before = page.url();
-      await page.getByPlaceholder('Your name', { exact: true }).fill('Draft Client');
+      await fillName(page, 'Draft Client');
       await page.getByRole('button', { name: 'Log out', exact: true }).click();
       await page.getByRole('alert').filter({ hasText: 'Could not log out' }).waitFor();
-      assert.equal(await page.getByPlaceholder('Your name', { exact: true }).inputValue(), 'Draft Client');
+      assert.equal(await nameValue(page), 'Draft Client');
       await page.getByRole('button', { name: 'Log out', exact: true }).click();
       await page.getByRole('heading', { name: `Book with ${studio.name}`, exact: true }).waitFor();
       assert.equal(page.url(), before, 'Logging out retains the studio QR link');
       assert.equal(await page.getByRole('button', { name: 'Log out', exact: true }).count(), 0);
       assert.equal(calls.bookings.length, 0);
       await signIn(page);
-      assert.equal(await page.getByPlaceholder('Your name', { exact: true }).inputValue(), 'Jamie Client', 'Explicit logout clears the prior client draft');
+      assert.equal(await nameValue(page), 'Jamie Client', 'Explicit logout clears the prior client draft');
       results.push('Logout error recovery, browser-only sign-out, studio URL retained and client draft cleared');
       await context.close();
     }
@@ -187,7 +191,7 @@ async function signIn(page) {
       assert.equal(calls.signups[0].body.email, user.email);
       assert.equal(calls.profileUpdates.at(-1).data.dob, '1990-01-01');
       assert(calls.profiles.length >= 1, 'New accounts receive a Vanta profile');
-      assert.equal(await page.getByPlaceholder('Your name', { exact: true }).inputValue(), 'Jamie Client', 'Signup details remain visible and prefilled');
+      assert.equal(await nameValue(page), 'Jamie Client', 'Signup details remain visible and prefilled');
       assert.deepEqual(await page.locator('select[autocomplete^="bday-"]').evaluateAll(s => s.map(x => x.value)), ['1', '1', '1990']);
       assert.equal(await page.locator('input[type="tel"]').inputValue(), '400123456');
       assert.equal(calls.bookings.length, 0, 'Account creation does not submit a booking');
@@ -202,7 +206,7 @@ async function signIn(page) {
       await page.getByRole('button', { name: 'Try again', exact: true }).click();
       await page.getByRole('button', { name: 'Request booking', exact: true }).waitFor();
       assert.equal(calls.bookings.length, 0);
-      await page.getByPlaceholder('Your name', { exact: true }).fill('Edited Jamie');
+      await fillName(page, 'Edited Jamie');
       await page.locator('textarea').first().fill('Keep my botanical design draft');
       await page.evaluate(storageKey => {
         localStorage.removeItem(storageKey);
@@ -213,7 +217,7 @@ async function signIn(page) {
       await page.getByRole('heading', { name: `Book with ${studio.name}` }).waitFor();
       assert.equal(await page.getByRole('button', { name: 'Request booking', exact: true }).count(), 0);
       await signIn(page);
-      assert.equal(await page.getByPlaceholder('Your name', { exact: true }).inputValue(), 'Edited Jamie', 'Same-account reauthentication preserves reviewed details');
+      assert.equal(await nameValue(page), 'Edited Jamie', 'Same-account reauthentication preserves reviewed details');
       assert.equal(await page.locator('textarea').first().inputValue(), 'Keep my botanical design draft', 'Same-account reauthentication preserves form edits');
       results.push('Returning session, profile retry, sign-out and reauthentication');
       await context.close();
@@ -224,18 +228,19 @@ async function signIn(page) {
       { label: 'Only missing name', metadata: { dob: '1990-01-01' }, profile: { name: 'User', phone: '+61400123456' }, missing: ['Full name'], name: 'Jamie Client', phone: '+61400123456' },
       { label: 'Only missing phone', metadata: { dob: '1990-01-01' }, profile: { name: 'Jamie Client' }, missing: ['Phone'], name: 'Jamie Client', phone: '+61 400123456' },
       { label: 'Metadata fallback', metadata: user.user_metadata, profile: { name: 'User', phone: '' }, missing: [], name: 'Jamie Client', phone: '+61400123456' },
-      { label: 'Single-word name and saved international phone', metadata: user.user_metadata, profile: { name: 'Prince', phone: '+93701234567' }, missing: [], name: 'Prince', phone: '+93701234567' },
+      // A one-word account name fills the first name; every booking needs a last name too.
+      { label: 'Single-word name and saved international phone', metadata: user.user_metadata, profile: { name: 'Prince', phone: '+93701234567' }, missing: [], lastNeeded: 'Nelson', name: 'Prince', phone: '+93701234567' },
     ]) {
       const { context, page, calls, errors } = await open(browser, { signedIn: true, ...details });
       await page.getByRole('button', { name: 'Request booking', exact: true }).waitFor();
-      for (const label of ['Full name', 'Date of birth', 'Phone']) {
+      for (const label of ['First name', 'Last name', 'Date of birth', 'Phone']) {
         assert(await page.getByLabel(label, { exact: false }).first().isVisible(), `${details.label}: ${label} is visible`);
       }
-      assert.equal(await page.getByPlaceholder('Your name', { exact: true }).inputValue(), details.missing.includes('Full name') ? '' : details.name);
+      assert.equal(await nameValue(page), details.missing.includes('Full name') ? '' : details.name);
       assert.equal(await (await page.locator('select[autocomplete^="bday-"]').evaluateAll(s => s.map(x => x.value)).then(([d, m, y]) => d && m && y ? `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}` : '')), details.missing.includes('Date of birth') ? '' : '1990-01-01');
       assert.equal(await page.locator('input[type="tel"]').inputValue(), details.missing.includes('Phone') ? '' : details.phone.startsWith('+61') ? '400123456' : details.phone);
       assert.equal(await page.locator('input[type="email"]').inputValue(), user.email);
-      if (details.missing.includes('Full name')) await page.getByPlaceholder('Your name', { exact: true }).fill(details.name);
+      if (details.missing.includes('Full name')) await fillName(page, details.name);
       if (details.missing.includes('Date of birth')) await fillDob(page, '1990-01-01');
       if (details.missing.includes('Phone')) {
         await page.getByRole('combobox', { name: 'Phone country code' }).selectOption('AU');
@@ -247,11 +252,17 @@ async function signIn(page) {
       }
       await page.getByRole('button', { name: 'Forearm', exact: true }).click();
       await page.locator('textarea').first().fill('Botanical piece');
+      if (details.lastNeeded) {
+        await page.getByRole('button', { name: 'Request booking', exact: true }).click();
+        await page.getByText('Please provide your last name.').first().waitFor();
+        assert.equal(calls.bookings.length, 0, 'Not sent without a last name');
+        await page.getByPlaceholder('Last name', { exact: true }).fill(details.lastNeeded);
+      }
       await page.getByRole('button', { name: 'Request booking', exact: true }).click();
       await page.getByRole('heading', { name: "You're on the list!" }).waitFor();
       await page.waitForLoadState('networkidle');
       assert.equal(calls.bookings.length, 1);
-      assert.equal(calls.bookings[0].name, details.name);
+      assert.equal(calls.bookings[0].name, details.lastNeeded ? `${details.name} ${details.lastNeeded}` : details.name);
       assert.equal(calls.bookings[0].phone.replaceAll(' ', ''), details.phone.replaceAll(' ', ''));
       assert.equal(calls.bookings[0].dob, '1990-01-01');
       assert.equal(calls.bookings[0].email, user.email);
@@ -259,7 +270,7 @@ async function signIn(page) {
         assert.equal(calls.profileUpdates.at(-1).data.dob, '1990-01-01', 'New details are remembered on the account');
         await page.reload({ waitUntil: 'networkidle' });
         await page.getByRole('button', { name: 'Request booking', exact: true }).waitFor();
-        assert.equal(await page.getByPlaceholder('Your name', { exact: true }).inputValue(), details.name, 'A later visit prefills the saved name');
+        assert.equal(await nameValue(page), details.name, 'A later visit prefills the saved name');
         assert.equal(await (await page.locator('select[autocomplete^="bday-"]').evaluateAll(s => s.map(x => x.value)).then(([d, m, y]) => d && m && y ? `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}` : '')), '1990-01-01', 'A later visit prefills the saved date of birth');
         assert.equal(await page.locator('input[type="tel"]').inputValue(), '400123456', 'A later visit prefills the saved phone');
       }
@@ -278,7 +289,7 @@ async function signIn(page) {
       await page.getByText('booking as a guest', { exact: false }).waitFor();
       const email = page.getByPlaceholder('you@example.com');
       assert.equal(await email.evaluate(input => input.readOnly), false, 'Guests type their email');
-      await page.getByPlaceholder('Your name', { exact: true }).fill('Guest Client');
+      await fillName(page, 'Guest Client');
       await fillDob(page, '1992-03-04');
       await page.getByRole('combobox', { name: 'Phone country code' }).selectOption('AU');
       await page.getByPlaceholder('555 0100').fill('400999888');

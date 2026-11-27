@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Field from '@/components/ui/Field';
-import AddressFields, { EMPTY_ADDRESS, addressPayload, addressProblem } from '@/components/forms/AddressFields';
+import AddressFields, { EMPTY_ADDRESS, addressEmpty, addressPayload, addressProblem } from '@/components/forms/AddressFields';
 import Button from '@/components/ui/Button';
 import BrandLoader from '@/components/BrandLoader';
 import ClientAuthGate from '@/components/ClientAuthGate';
@@ -263,6 +263,13 @@ function IntakeInner({ mode, onStyle }) {
   }
 
   // True if DOB indicates the client is under 18
+  // The address: asked by the booking form, or by a consent form (ask_address). It's
+  // asked once, with the client's details, and given to every consent form that asks.
+  const formAsksAddress = Boolean(formConfig?.address?.enabled && field('address').enabled);
+  const consentAsksAddress = consentTemplates.some(t => t.ask_address);
+  const showAddress = formAsksAddress || consentAsksAddress;
+  const addressRequired = (formAsksAddress && field('address').required) || consentTemplates.some(t => t.ask_address === 'required');
+
   const isMinor = (() => {
     if (!dob) return false;
     const birth = new Date(dob + 'T12:00:00');
@@ -317,8 +324,8 @@ function IntakeInner({ mode, onStyle }) {
     if (walkIn && !artistId) return miss('Please choose your artist.', '[data-need="artist"]');
     if (instantMode && !instantChoice) return miss('Please choose your appointment.', '[data-need="time"]');
     if (instantMode && !instantStart) return miss('Please choose a time.', '[data-need="time"]');
-    if (formConfig?.address?.enabled && field('address').enabled) {
-      const problem = addressProblem(address, field('address').required);
+    if (showAddress) {
+      const problem = addressProblem(address, addressRequired);
       if (problem) return miss(`Address: ${problem.charAt(0).toLowerCase()}${problem.slice(1)}`, '[data-need="address"]');
     }
     if (field('body_location').enabled && placements.length === 0) return miss('Please select at least one placement.', '[data-need="placement"]');
@@ -435,9 +442,11 @@ function IntakeInner({ mode, onStyle }) {
           guardianSigPath = await uploadSignature(ts.guardianSigBlob, `Guardian signature for "${t.name}"`);
         }
 
+        const answers = await uploadPhotoIdAnswers(ts.answers ?? {}, file => signStudioPhotoId(process.env.NEXT_PUBLIC_BACKEND_URL, studioId, file));
+        if (t.ask_address && !addressEmpty(address)) answers.__address_parts__ = JSON.stringify(addressPayload(address));
         consentSubmissions.push({
           template_id:            t.id,
-          answers:                await uploadPhotoIdAnswers(ts.answers ?? {}, file => signStudioPhotoId(process.env.NEXT_PUBLIC_BACKEND_URL, studioId, file)),
+          answers,
           is_minor:               isMinor,
           signer_name:            clientName,
           client_signature_path:  clientSigPath,
@@ -633,10 +642,10 @@ function IntakeInner({ mode, onStyle }) {
                 />
               </div>
             </Field>
-            {formConfig?.address?.enabled && field('address').enabled && (
-              <div data-need="address"><AddressFields value={address} onChange={setAddress} required={field('address').required}
+            {showAddress && (
+              <div data-need="address"><AddressFields value={address} onChange={setAddress} required={addressRequired}
                 inputStyle={s.input} classes={{ field: 'studio-field', label: 'studio-field-label' }}
-                legendExtra={field('address').required ? null : <Optional />} /></div>
+                legendExtra={addressRequired ? null : <Optional />} /></div>
             )}
           </Section>
 

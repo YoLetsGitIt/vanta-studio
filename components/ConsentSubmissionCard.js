@@ -44,8 +44,9 @@ export function ConsentFlagNotice({ submissions = [] }) {
 // compact: one row per form, for the booking and client panels.
 export default function ConsentSubmissionCard({ sub, templates = [], compact = false }) {
   const fields = templates.find(t => t.id === sub.template_id)?.fields ?? [];
-  const labelFor = id => fields.find(f => f.id === id)?.label || id;
-  const answers = Object.entries(sub.answers ?? {}).filter(([k, v]) => k !== '__agreed__' && v !== '' && v != null);
+  // The address (when the form asked for it) is shown as one line; its parts stay stored.
+  const labelFor = id => (id === '__address__' ? 'Address' : fields.find(f => f.id === id)?.label || id);
+  const answers = Object.entries(sub.answers ?? {}).filter(([k, v]) => k !== '__agreed__' && k !== '__address_parts__' && v !== '' && v != null);
   const flagFor = id => (sub.flags ?? []).find(f => f.field_id === id);
   const flagged = (sub.flags ?? []).length;
   const [open, setOpen] = useState(false);
