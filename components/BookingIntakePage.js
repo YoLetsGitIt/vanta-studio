@@ -89,7 +89,10 @@ function IntakeInner({ mode, onStyle }) {
           dob: metadata.dob?.trim() || '',
           phone: profile.phone?.trim() || metadata.phone?.trim() || '',
         };
-        setFullName(details.name);
+        // Account names are one string: first word is the first name, the rest the last name.
+        const [first = '', ...rest] = details.name.split(/\s+/).filter(Boolean);
+        setFirstName(first);
+        setLastName(rest.join(' '));
         setDob(details.dob);
         const country = [...COUNTRIES].sort((a, b) => b.dial.length - a.dial.length).find(country => details.phone.startsWith(country.dial));
         setPhoneCode(country?.id || detectCountry());
@@ -102,11 +105,10 @@ function IntakeInner({ mode, onStyle }) {
   }, [session, accountRetry]);
 
   // Form state
-  const [fullName, setFullName]     = useState('');
-  // Walk-ins give first and last name separately; everything else uses one name field.
+  // Every booking asks for first and last name separately; they're joined into one name when sent.
   const [firstName, setFirstName]   = useState('');
   const [lastName, setLastName]     = useState('');
-  const clientName = walkIn ? `${firstName.trim()} ${lastName.trim()}`.trim() : fullName.trim();
+  const clientName = `${firstName.trim()} ${lastName.trim()}`.trim();
   const [phoneCode, setPhoneCode]   = useState(() => detectCountry());
   const [phoneNum,  setPhoneNum]    = useState('');
   // Ticked unless the client unticks it, like the booking link.
@@ -305,9 +307,8 @@ function IntakeInner({ mode, onStyle }) {
   function missingRequirement(bookingEmail = guest ? guestEmail.trim() : session?.user?.email?.trim() || '') {
     const miss = (message, target) => { missingTarget.current = target; return message; };
     missingTarget.current = '';
-    if (walkIn && !firstName.trim()) return miss('Please provide your first name.', 'input[autocomplete="given-name"]');
-    if (walkIn && !lastName.trim()) return miss('Please provide your last name.', 'input[autocomplete="family-name"]');
-    if (!clientName) return miss('Please provide your full name.', 'input[autocomplete="name"]');
+    if (!firstName.trim()) return miss('Please provide your first name.', 'input[autocomplete="given-name"]');
+    if (!lastName.trim()) return miss('Please provide your last name.', 'input[autocomplete="family-name"]');
     if (guest && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(bookingEmail)) return miss('Please provide a valid email address.', 'input[type="email"]');
     if (!phoneNum.trim()) return miss('Please provide your phone number.', '#booking-phone');
     if (!dob) return miss('Please provide your date of birth.', '[data-need="dob"]');
@@ -475,12 +476,12 @@ function IntakeInner({ mode, onStyle }) {
       });
       if (instantMode && created?.instant?.checkout_url) {
         // The time is held: pay the deposit to lock it in.
-        if (!guest) getSupabase().auth.updateUser({ data: { full_name: fullName.trim(), name: fullName.trim(), dob, phone: bookingPhone } }).catch(() => {});
+        if (!guest) getSupabase().auth.updateUser({ data: { full_name: clientName, name: clientName, dob, phone: bookingPhone } }).catch(() => {});
         window.location.assign(created.instant.checkout_url);
         return;
       }
       // Match consent: remember reviewed details for the next visit.
-      if (!guest) getSupabase().auth.updateUser({ data: { full_name: fullName.trim(), name: fullName.trim(), dob, phone: bookingPhone } }).catch(() => {});
+      if (!guest) getSupabase().auth.updateUser({ data: { full_name: clientName, name: clientName, dob, phone: bookingPhone } }).catch(() => {});
       if (walkIn) setBookedArtist(studio.artists.find(a => a.artistId === artistId)?.name || '');
       setDone(true);
     } catch (err) {
@@ -580,20 +581,14 @@ function IntakeInner({ mode, onStyle }) {
 
           <Section title="Your details" first>
             <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: 13 }}>{walkIn ? `${studio.name} uses these details to contact you about your appointment.` : guest ? `You’re booking as a guest, no account needed. ${studio.name} uses these details to contact you about your booking.` : 'Review your details and update anything that has changed.'}</p>
-            {walkIn ? (
-              <div style={s.nameRow}>
-                <Field label="First name">
-                  <input style={s.input} type="text" value={firstName} required autoComplete="given-name" onChange={e => setFirstName(e.target.value)} placeholder="First name" />
-                </Field>
-                <Field label="Last name">
-                  <input style={s.input} type="text" value={lastName} required autoComplete="family-name" onChange={e => setLastName(e.target.value)} placeholder="Last name" />
-                </Field>
-              </div>
-            ) : (
-              <Field label="Full name">
-                <input style={s.input} type="text" value={fullName} required autoComplete="name" onChange={e => setFullName(e.target.value)} placeholder="Your name" />
+            <div style={s.nameRow}>
+              <Field label="First name">
+                <input style={s.input} type="text" value={firstName} required autoComplete="given-name" onChange={e => setFirstName(e.target.value)} placeholder="First name" />
               </Field>
-            )}
+              <Field label="Last name">
+                <input style={s.input} type="text" value={lastName} required autoComplete="family-name" onChange={e => setLastName(e.target.value)} placeholder="Last name" />
+              </Field>
+            </div>
             <Field label="Date of birth" required>
               <div data-need="dob"><DateOfBirthInput style={s.input} value={dob} onChange={setDob} /></div>
             </Field>
