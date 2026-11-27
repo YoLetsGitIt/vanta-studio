@@ -954,7 +954,7 @@ const s = {
   schedTimeInput: {
     background: 'var(--surface-2)', border: '1px solid var(--border)',
     borderRadius: 6, color: 'var(--text)', fontSize: '0.78rem',
-    padding: '0.2rem 0.4rem', colorScheme: 'dark', fontFamily: 'inherit',
+    padding: '0.2rem 0.4rem', colorScheme: 'inherit', fontFamily: 'inherit',
   },
   schedSaveBtn: {
     background: 'var(--accent)', border: 'none', borderRadius: 7,

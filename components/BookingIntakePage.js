@@ -1339,7 +1339,7 @@ const s = {
   // Dropdowns drop Safari's native look (on iPhone it ignores the field's height and
   // colours and draws a small grey control) and use the same box plus a chevron.
   select: {
-    WebkitAppearance: 'none', appearance: 'none', colorScheme: 'dark',
+    WebkitAppearance: 'none', appearance: 'none', colorScheme: 'inherit',
     paddingRight: '2rem', cursor: 'pointer',
     backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23999' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E\")",
     backgroundRepeat: 'no-repeat', backgroundPosition: 'right 0.85rem center',

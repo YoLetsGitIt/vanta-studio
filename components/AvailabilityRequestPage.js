@@ -139,7 +139,7 @@ const s = {
   fieldLabel: { fontSize: '0.8rem', fontWeight: 600, color: 'rgba(var(--ink-rgb), 0.8)' },
   optional: { fontWeight: 400, color: 'var(--text-muted)' },
   hint: { margin: 0, fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.5 },
-  input: { background: 'rgba(var(--ink-rgb), 0.05)', border: '1px solid rgba(var(--ink-rgb), 0.1)', borderRadius: 8, color: 'var(--text)', fontSize: '16px', minHeight: 44, padding: '0.65rem 0.85rem', width: '100%', boxSizing: 'border-box', fontFamily: 'inherit', colorScheme: 'dark' },
+  input: { background: 'rgba(var(--ink-rgb), 0.05)', border: '1px solid rgba(var(--ink-rgb), 0.1)', borderRadius: 8, color: 'var(--text)', fontSize: '16px', minHeight: 44, padding: '0.65rem 0.85rem', width: '100%', boxSizing: 'border-box', fontFamily: 'inherit', colorScheme: 'inherit' },
   error: { margin: 0, fontSize: '0.85rem', color: 'var(--color-danger)' },
   msg: { color: 'var(--text-muted)', fontSize: '0.875rem', padding: '2rem' },
   successIcon: { width: 48, height: 48, borderRadius: '50%', background: 'rgba(76,201,138,0.15)', color: 'var(--color-success)', fontSize: '1.4rem', display: 'flex', alignItems: 'center', justifyContent: 'center' },
