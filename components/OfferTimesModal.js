@@ -6,14 +6,14 @@
 import { useEffect, useState } from 'react';
 import { bookingActions } from '@/lib/bookingActions';
 import { hasArtist } from '@/lib/format';
-import { getStudioArtists, checkOfferTimes, getArtistWorkSchedule, getStudioScheduleRange } from '@/lib/api';
+import { getStudioArtists, checkOfferTimes, getArtistWorkSchedule, getStudioScheduleRange, getArtistBusy } from '@/lib/api';
 import { describeAvailability, formatTime } from '@/lib/availability';
 import { showError } from '@/lib/feedback';
 import Dialog from '@/components/ui/Dialog';
 import Button from '@/components/ui/Button';
 import Field, { Input, Select } from '@/components/ui/Field';
 import OfferWeekView, { mondayOf } from '@/components/OfferWeekView';
-import { artistHoursOn } from '@/lib/artist-days.mjs';
+import { artistHoursOn, overlapSpans } from '@/lib/artist-days.mjs';
 import { TypeChips, lengthLabel, useTypePricing, withLength } from '@/components/TypePricing';
 
 const pad = n => String(n).padStart(2, '0');
@@ -112,21 +112,44 @@ export default function OfferTimesModal({ booking, offer = null, artists: givenA
     const dow = new Date(`${date}T00:00:00`).getDay();
     return artistHoursOn(artistWeek.schedule, artistWeek.overrides, studioId, date).map(h => ({ day_of_week: dow, ...h }));
   };
+  // When the artist is busy that week: bookings here ("Booked"), and bookings at other
+  // studios or Google Calendar events ("Busy", time only). [{ start, end, here, kind, id }]
   useEffect(() => {
     if (!artistId) { setArtistBookings(null); return undefined; }
     let active = true;
     setArtistBookings(null);
-    const to = new Date(weekStart); to.setDate(to.getDate() + 6);
-    getStudioScheduleRange(toDate(weekStart), toDate(to))
+    const to = new Date(weekStart); to.setDate(to.getDate() + 7);
+    const sorted = list => list.sort((a, b) => new Date(a.start) - new Date(b.start));
+    getArtistBusy(artistId, weekStart.toISOString(), to.toISOString(), booking?.id)
       .then(d => {
         if (!active) return;
-        setArtistBookings((d.entries ?? [])
-          .filter(e => String(e.artistId) === String(artistId) && e.chosenTime && e.bookingId !== booking?.id && e.status !== 'cancelled')
-          .sort((a, b) => new Date(a.chosenTime) - new Date(b.chosenTime)));
+        setArtistBookings(sorted((d.busy ?? []).map((b, i) => ({ start: b.start, end: b.end, here: !!b.here, kind: b.kind || 'booking', id: b.booking_id || `busy-${i}` }))));
+      })
+      // An older server without the busy times: this studio's bookings only.
+      .catch(() => {
+        const last = new Date(weekStart); last.setDate(last.getDate() + 6);
+        return getStudioScheduleRange(toDate(weekStart), toDate(last)).then(d => {
+          if (!active) return;
+          setArtistBookings(sorted((d.entries ?? [])
+            .filter(e => String(e.artistId) === String(artistId) && e.chosenTime && e.bookingId !== booking?.id && e.status !== 'cancelled')
+            .map(e => ({ start: e.chosenTime, end: new Date(new Date(e.chosenTime).getTime() + (e.durationMins ?? 60) * 60000).toISOString(), here: true, kind: 'booking', id: e.bookingId }))));
+        });
       })
       .catch(() => { if (active) setArtistBookings([]); });
     return () => { active = false; };
   }, [artistId, booking?.id, weekStart.getTime()]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // The first date from today when the artist (here) and the client are both free, for
+  // jumping to it when the week shown has none. Looks six months ahead.
+  const findShared = from => {
+    if (!windows.length || !(artistWeek.schedule.length || artistWeek.overrides.length)) return null;
+    const day = new Date(Math.max(from.getTime(), Date.now())); day.setHours(0, 0, 0, 0);
+    for (let i = 0; i < 183; i++, day.setDate(day.getDate() + 1)) {
+      const date = toDate(day);
+      if (overlapSpans(artistHoursFor(date), windows.filter(w => w.day_of_week === day.getDay())).some(span => span.end - span.start >= duration)) return date;
+    }
+    return null;
+  };
   const artistHoursList = describeAvailability(artistHours ?? []);
   const clientDays = new Set(windows.map(w => w.day_of_week));
   const bothFree = new Set((artistHours ?? []).filter(h => clientDays.has(h.day_of_week)).map(h => h.day_of_week));
@@ -224,6 +247,12 @@ export default function OfferTimesModal({ booking, offer = null, artists: givenA
   }
 
   const clientName = booking?.requester_name || 'the client';
+  // Google Calendar events aren't checked by the server (they only warn): an option in one.
+  const calendarBusy = row => {
+    if (!row.date || !row.time) return false;
+    const start = new Date(`${row.date}T${row.time}:00`).getTime(), end = start + duration * 60000;
+    return (artistBookings ?? []).some(b => b.kind === 'calendar' && new Date(b.start).getTime() < end && new Date(b.end).getTime() > start);
+  };
   const artistName = artists.find(a => String(a.artistId ?? a.artist_id ?? a.id) === String(artistId))?.name;
   return (
     <Dialog
@@ -242,15 +271,23 @@ export default function OfferTimesModal({ booking, offer = null, artists: givenA
       )}
     >
       <fieldset disabled={saving} style={{ display: 'grid', gap: 'var(--space-4)', margin: 0, padding: 0, border: 0, minWidth: 0 }}>
-        <Field label="Artist" required>
-          <Select value={artistId} onChange={e => setArtistId(e.target.value)} aria-label="Artist">
-            <option value="">Choose an artist</option>
-            {artists.map(artist => {
-              const id = artist.artistId ?? artist.artist_id ?? artist.id;
-              return <option key={id} value={id}>{artist.name}</option>;
-            })}
-          </Select>
-        </Field>
+        {/* The length sets how big each option is on the calendar, so it sits up here. */}
+        <div style={o.pair}>
+          <Field label="Artist" required>
+            <Select value={artistId} onChange={e => setArtistId(e.target.value)} aria-label="Artist">
+              <option value="">Choose an artist</option>
+              {artists.map(artist => {
+                const id = artist.artistId ?? artist.artist_id ?? artist.id;
+                return <option key={id} value={id}>{artist.name}</option>;
+              })}
+            </Select>
+          </Field>
+          <Field label="Duration">
+            <Select value={duration} onChange={e => setDuration(Number(e.target.value))} aria-label="Duration">
+              {withLength(DURATIONS, duration).map(m => <option key={m} value={m}>{lengthLabel(m)}</option>)}
+            </Select>
+          </Field>
+        </div>
         <TypeChips pricing={pricing} />
         {artistId ? (
           <OfferWeekView
@@ -259,7 +296,10 @@ export default function OfferTimesModal({ booking, offer = null, artists: givenA
             clientWindows={windows}
             artistHours={artistHours ?? []}
             artistHoursFor={artistHoursFor}
-            bookings={artistBookings ?? []}
+            busy={artistBookings ?? []}
+            findShared={findShared}
+            artistName={artistName}
+            clientName={clientName === 'the client' ? 'the client' : clientName.split(' ')[0]}
             options={rows}
             duration={duration}
             onPick={pickFromWeek}
@@ -281,18 +321,12 @@ export default function OfferTimesModal({ booking, offer = null, artists: givenA
             <section aria-label="Artist's availability">
               {artistHoursList.map(a => <p key={a.day}>{a.day}: {a.times}{bothFree.has(DAY_NAMES.indexOf(a.day)) ? ', both free' : ''}</p>)}
               {(artistBookings ?? []).map(e => {
-                const start = new Date(e.chosenTime), end = new Date(start.getTime() + (e.durationMins ?? 60) * 60000);
-                return <p key={e.bookingId}>Booked {start.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' })}, {formatTime(toTime(start))} – {formatTime(toTime(end))}</p>;
+                const start = new Date(e.start), end = new Date(e.end);
+                return <p key={e.id}>{e.here ? 'Booked' : 'Busy'} {start.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' })}, {formatTime(toTime(start))} – {formatTime(toTime(end))}</p>;
               })}
             </section>
           )}
         </div>
-        <Field label="Duration">
-          <Select value={duration} onChange={e => setDuration(Number(e.target.value))} aria-label="Duration">
-            {withLength(DURATIONS, duration).map(m => <option key={m} value={m}>{lengthLabel(m)}</option>)}
-          </Select>
-        </Field>
-
         <div style={{ display: 'grid', gap: 'var(--space-3)' }}>
           {rows.map((row, i) => {
             const outside = !withinAvailability(windows, row.date, row.time, duration);
@@ -306,18 +340,21 @@ export default function OfferTimesModal({ booking, offer = null, artists: givenA
             const danger = duplicate(i) || past(i) || live?.state === 'taken';
             return (
               <div key={i} style={o.option}>
-                <div style={o.optionHead}>
-                  <span style={o.optionLabel}>Option {i + 1}</span>
-                  {rows.length > 1 && (
-                    <button type="button" style={o.remove} onClick={() => removeRow(i)} aria-label={`Remove option ${i + 1}`}>Remove</button>
-                  )}
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.3fr) minmax(0, 1fr)', gap: 'var(--space-3)' }}>
+                <div style={o.optionRow}>
+                  {/* The same number as the option on the calendar. */}
+                  <span style={o.badge} aria-hidden="true">{i + 1}</span>
+                  <span className="sr-only">Option {i + 1}</span>
                   <Input type="date" value={row.date} onChange={e => setRow(i, { date: e.target.value })} aria-label={`Option ${i + 1} date`} />
                   <Input type="time" step="900" value={row.time} onChange={e => setRow(i, { time: e.target.value })} aria-label={`Option ${i + 1} start time`} />
+                  {rows.length > 1 ? (
+                    <button type="button" className="offer-remove" style={o.remove} onClick={() => removeRow(i)} aria-label={`Remove option ${i + 1}`} title="Remove">
+                      <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="m3.5 3.5 7 7m0-7-7 7" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>
+                    </button>
+                  ) : <span aria-hidden="true" />}
                 </div>
                 {note && <span role={danger ? 'alert' : undefined} style={{ ...o.note, color: danger ? 'var(--color-danger)' : 'var(--color-warning, #e0a84f)' }}>{note}</span>}
-                {!note && live?.state === 'free' && <span style={{ ...o.note, color: 'var(--color-success)' }}>✓ Artist is free</span>}
+                {!note && calendarBusy(row) && <span style={{ ...o.note, color: 'var(--color-warning, #e0a84f)' }}>Their calendar shows them busy then.</span>}
+                {!note && !calendarBusy(row) && live?.state === 'free' && <span style={{ ...o.note, color: 'var(--color-success)' }}>✓ Artist is free</span>}
                 {!note && live?.state === 'checking' && <span style={{ ...o.note, color: 'var(--text-muted)' }}>Checking the artist’s schedule…</span>}
               </div>
             );
@@ -357,9 +394,10 @@ const o = {
   availability: { display: 'grid', gap: 2, alignContent: 'start', padding: '10px 12px', borderRadius: 10, background: 'var(--bg-input)', border: '1px solid var(--border)', fontSize: '0.875rem', color: 'var(--text-muted)' },
   availabilityTitle: { fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: 2 },
   availabilityRow: { lineHeight: 1.5 },
+  pair: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--space-3)' },
   option: { display: 'grid', gap: 6 },
-  optionHead: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', minHeight: 24 },
-  optionLabel: { fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-secondary)' },
-  remove: { background: 'none', border: 0, padding: '4px 0', color: 'var(--text-muted)', fontSize: '0.8125rem', cursor: 'pointer', fontFamily: 'inherit' },
-  note: { fontSize: '0.8125rem' },
+  optionRow: { display: 'grid', gridTemplateColumns: '26px minmax(0, 1.3fr) minmax(0, 1fr) 36px', alignItems: 'center', gap: 'var(--space-2, 8px)' },
+  badge: { width: 26, height: 26, borderRadius: 6, display: 'grid', placeItems: 'center', background: 'var(--accent)', color: 'var(--accent-contrast)', fontSize: '0.8rem', fontWeight: 800 },
+  remove: { width: 36, height: 36, display: 'grid', placeItems: 'center', background: 'none', border: 0, borderRadius: 8, padding: 0, color: 'var(--text-muted)', cursor: 'pointer', fontFamily: 'inherit' },
+  note: { fontSize: '0.8125rem', paddingLeft: 34 },
 };

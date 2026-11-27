@@ -32,6 +32,15 @@ const pending = { id: 'req-1', requester_name: 'Minseo Park', requester_email: '
       const soon = new Date(Date.now() + 3 * 86400000); soon.setHours(11, 0, 0, 0);
       let chosenArtist = '';
       await context.route(/\/studio\/me\/schedule\?.*start=/, r => r.fulfill({ json: { entries: [{ bookingId: 'other', artistId: chosenArtist, chosenTime: soon.toISOString(), durationMins: 120, status: 'confirmed' }] } }));
+      // Busy: this studio's booking (as in the schedule), plus the artist's calendar at
+      // 12–1 on the extra Thursday.
+      await context.route(/\/studio\/me\/artists\/[^/]+\/busy\?/, r => {
+        const thuNoon = new Date(`${extraDay}T12:00:00`);
+        return r.fulfill({ json: { calendar_connected: true, busy: [
+          { start: soon.toISOString(), end: new Date(soon.getTime() + 120 * 60000).toISOString(), here: true, booking_id: 'other', kind: 'booking' },
+          { start: thuNoon.toISOString(), end: new Date(thuNoon.getTime() + 60 * 60000).toISOString(), here: false, kind: 'calendar' },
+        ] } });
+      });
       const checks = [];
       await context.route(/\/studio\/me\/bookings\/req-1\/offer-times\/check/, r => {
         const times = new URL(r.request().url()).searchParams.getAll('time');
@@ -94,6 +103,11 @@ const pending = { id: 'req-1', requester_name: 'Minseo Park', requester_email: '
       assert.equal(await shadeCount(3, 'Artist free'), 1, 'Thursday: the date override adds hours');
       assert.equal(await shadeCount(3, 'Both free'), 0, 'Thursday: the client is not free');
       await week.getByText('Both free', { exact: true }).waitFor();
+      // The artist's calendar shows them busy at noon on Thursday: drawn, and a tap there is refused.
+      await columns.nth(3).locator('span[title^="Busy 12pm"]').waitFor();
+      await columns.nth(3).click({ position: { x: 8, y: 6 * 14 + 4 } }); // 12pm on a 9am grid
+      await week.getByRole('status').filter({ hasText: /is busy then/ }).waitFor();
+      assert.equal(await dialog.getByLabel('Option 2 date').count(), 0, 'A busy time is not added');
       await week.locator('div[aria-hidden="true"]').nth(firstDay).click({ position: { x: 8, y: 4 * 2 * 14 + 4 } }); // 1pm on a 9am grid
       assert.equal(await dialog.getByLabel('Option 2 date').inputValue(), firstDate, 'Tapped day becomes option 2');
       assert.equal(await dialog.getByLabel('Option 2 start time').inputValue(), '13:00', 'Tapped time becomes option 2');
