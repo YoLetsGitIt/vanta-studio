@@ -1010,6 +1010,8 @@ export default function BookingDetailPanel({
                     const earlier = Math.max(0, (consentMore?.total ?? sorted.length) - 1);
                     const loading = consentLoading || submissionsLoading;
                     const needsForm = email && !loading && (consentStatus === 'none' || consentStatus === 'outdated');
+                    // The link can always be sent again, even after the client has signed.
+                    const canSend = Boolean(email) && !loading;
                     return <>
                       {needsForm && (
                         <p style={p.consentNeed}>
@@ -1023,12 +1025,12 @@ export default function BookingDetailPanel({
                         : consent && !consentLoading && (
                           <span style={p.hint}>Signed {new Date(consent.agreed_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
                         )}
-                      {(needsForm || earlier > 0) && (
+                      {(canSend || earlier > 0) && (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-                          {needsForm && (
+                          {canSend && (
                             <Button variant="secondary" size="sm" onClick={() => handleSendConsentLink('__inline__')}
                               loading={linkGeneratingId === '__inline__'} loadingLabel="Sending…" disabled={linkSentId === '__inline__'}>
-                              {linkSentId === '__inline__' ? 'Link sent ✓' : 'Send consent link'}
+                              {linkSentId === '__inline__' ? 'Link sent ✓' : needsForm ? 'Send consent link' : 'Send consent link again'}
                             </Button>
                           )}
                           {earlier > 0 && (
