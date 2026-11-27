@@ -576,7 +576,10 @@ function IntakeInner({ mode, onStyle }) {
         <h1 style={s.studioName}>{studio.name}</h1>
       </div>
 
-      <form ref={formRef} onSubmit={handleSubmit} onInput={() => setValidityTick(n => n + 1)} onChange={() => setValidityTick(n => n + 1)} style={s.form}>
+      {/* Re-check what's still needed on React's onChange only (a select's 'change', a text
+          field's typing). Not onInput: on iPhone the picker wheel fires 'input' before
+          'change', and that re-render put every dropdown back to its old value. */}
+      <form ref={formRef} onSubmit={handleSubmit} onChange={() => setValidityTick(n => n + 1)} style={s.form}>
           {!guest && <ClientAccountActions email={session.user.email} />}
 
           <Section title="Your details" first>
