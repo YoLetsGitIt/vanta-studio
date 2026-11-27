@@ -13,6 +13,7 @@ import Dialog from '@/components/ui/Dialog';
 import Button from '@/components/ui/Button';
 import Field, { Input, Select } from '@/components/ui/Field';
 import OfferWeekView, { mondayOf } from '@/components/OfferWeekView';
+import { artistHoursOn } from '@/lib/artist-days.mjs';
 import { TypeChips, lengthLabel, useTypePricing, withLength } from '@/components/TypePricing';
 
 const pad = n => String(n).padStart(2, '0');
@@ -85,19 +86,36 @@ export default function OfferTimesModal({ booking, offer = null, artists: givenA
   // The chosen artist's weekly hours at this studio and their bookings over the next
   // four weeks, shown beside the client's availability. null = loading.
   const [artistHours, setArtistHours] = useState(null);
+  // The full weekly schedule (every studio) and date overrides (days off, changed hours,
+  // a day at another studio) for the next six months: the calendar shows the artist's
+  // hours here on each actual date.
+  const [artistWeek, setArtistWeek] = useState({ schedule: [], overrides: [] });
   const [artistBookings, setArtistBookings] = useState(null);
+  const studioId = booking?.studio_id ?? '';
   useEffect(() => {
-    if (!artistId) { setArtistHours(null); setArtistBookings(null); return undefined; }
+    if (!artistId) { setArtistHours(null); setArtistWeek({ schedule: [], overrides: [] }); return undefined; }
     let active = true;
-    setArtistBookings(null);
-    const studioId = booking?.studio_id;
-    getArtistWorkSchedule(artistId)
+    const from = new Date(), to = new Date(); to.setDate(to.getDate() + 183);
+    getArtistWorkSchedule(artistId, toDate(from), toDate(to))
       .then(d => {
         if (!active) return;
         const rows = (d.schedule ?? []).filter(r => !studioId || !r.studio_id || r.studio_id === studioId);
         setArtistHours(rows.map(r => ({ day_of_week: r.day_of_week, start_time: String(r.start_time).slice(0, 5), end_time: String(r.end_time).slice(0, 5) })));
+        setArtistWeek({ schedule: d.schedule ?? [], overrides: d.overrides ?? [] });
       })
-      .catch(() => { if (active) setArtistHours([]); });
+      .catch(() => { if (active) { setArtistHours([]); setArtistWeek({ schedule: [], overrides: [] }); } });
+    return () => { active = false; };
+  }, [artistId, studioId]);
+  // The artist's hours at this studio on a date, as windows for that day.
+  const artistHoursFor = date => {
+    if (!date) return [];
+    const dow = new Date(`${date}T00:00:00`).getDay();
+    return artistHoursOn(artistWeek.schedule, artistWeek.overrides, studioId, date).map(h => ({ day_of_week: dow, ...h }));
+  };
+  useEffect(() => {
+    if (!artistId) { setArtistBookings(null); return undefined; }
+    let active = true;
+    setArtistBookings(null);
     const to = new Date(weekStart); to.setDate(to.getDate() + 6);
     getStudioScheduleRange(toDate(weekStart), toDate(to))
       .then(d => {
@@ -108,7 +126,7 @@ export default function OfferTimesModal({ booking, offer = null, artists: givenA
       })
       .catch(() => { if (active) setArtistBookings([]); });
     return () => { active = false; };
-  }, [artistId, booking?.id, booking?.studio_id, weekStart.getTime()]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [artistId, booking?.id, weekStart.getTime()]); // eslint-disable-line react-hooks/exhaustive-deps
   const artistHoursList = describeAvailability(artistHours ?? []);
   const clientDays = new Set(windows.map(w => w.day_of_week));
   const bothFree = new Set((artistHours ?? []).filter(h => clientDays.has(h.day_of_week)).map(h => h.day_of_week));
@@ -126,6 +144,11 @@ export default function OfferTimesModal({ booking, offer = null, artists: givenA
       const next = suggestTimes(windows, 10).find(s => !taken.has(s.date));
       return [...list, next ?? { date: '', time: list.at(-1)?.time || '11:00' }];
     });
+  }
+
+  // Removing the last option leaves an empty one to fill in (there's always at least one).
+  function removeRow(i) {
+    setRows(list => (list.length > 1 ? list.filter((_, j) => j !== i) : [{ date: '', time: list[0]?.time || '11:00' }]));
   }
 
   // Tapping the calendar fills the first option without a date, or adds one (up to three).
@@ -235,11 +258,13 @@ export default function OfferTimesModal({ booking, offer = null, artists: givenA
             onWeekChange={setWeekStart}
             clientWindows={windows}
             artistHours={artistHours ?? []}
+            artistHoursFor={artistHoursFor}
             bookings={artistBookings ?? []}
             options={rows}
             duration={duration}
             onPick={pickFromWeek}
             onMove={(i, date, time) => setRow(i, { date, time })}
+            onRemove={removeRow}
             canPick={rows.some(r => !r.date) || rows.length < MAX_TIMES}
           />
         ) : (
@@ -272,7 +297,10 @@ export default function OfferTimesModal({ booking, offer = null, artists: givenA
           {rows.map((row, i) => {
             const outside = !withinAvailability(windows, row.date, row.time, duration);
             const live = artistFree[keys[i]];
-            const offHours = artistHours?.length > 0 && !withinAvailability(artistHours, row.date, row.time, duration);
+            // Hours on that date: a day off or a day at another studio counts as outside them.
+            const dayHours = artistHoursFor(row.date);
+            const offHours = (artistWeek.schedule.length > 0 || artistWeek.overrides.length > 0) && !!row.date && !!row.time
+              && (dayHours.length === 0 || !withinAvailability(dayHours, row.date, row.time, duration));
             const note = duplicate(i) ? 'Same as another option.' : past(i) ? 'This time has passed.' : live?.state === 'taken' ? live.message
               : outside && offHours ? 'Outside their availability and the artist’s hours.' : outside ? 'Outside their availability.' : offHours ? 'Outside the artist’s hours.' : null;
             const danger = duplicate(i) || past(i) || live?.state === 'taken';
@@ -281,7 +309,7 @@ export default function OfferTimesModal({ booking, offer = null, artists: givenA
                 <div style={o.optionHead}>
                   <span style={o.optionLabel}>Option {i + 1}</span>
                   {rows.length > 1 && (
-                    <button type="button" style={o.remove} onClick={() => setRows(list => list.filter((_, j) => j !== i))} aria-label={`Remove option ${i + 1}`}>Remove</button>
+                    <button type="button" style={o.remove} onClick={() => removeRow(i)} aria-label={`Remove option ${i + 1}`}>Remove</button>
                   )}
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.3fr) minmax(0, 1fr)', gap: 'var(--space-3)' }}>

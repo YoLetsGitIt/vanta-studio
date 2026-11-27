@@ -22,8 +22,13 @@ const pending = { id: 'req-1', requester_name: 'Minseo Park', requester_email: '
       await context.route(/\/stripe\/status/, r => r.fulfill({ json: { connected: true, charges_enabled: true, card_enabled: true, manual_deposits_ready: false } }));
       await context.route(/\/studio\/me\/booking-management$/, r => r.fulfill({ json: { mode: 'studio' } }));
       await context.route(/\/studio\/me\/bookings\/req-1\/offered-times$/, r => r.fulfill({ json: { offer } }));
-      // The artist works Mon and Wed 9–6, has one booking coming up, and is busy at 2pm.
-      await context.route(/\/artists\/[^/]+\/work-schedule$/, r => r.fulfill({ json: { schedule: [1, 3].map(d => ({ day_of_week: d, start_time: '09:00:00', end_time: '18:00:00' })) } }));
+      // The artist works Mon and Wed 9–6, plus 10–2 on the Thursday of the first option's
+      // week (a date override), has one booking coming up, and is busy at 2pm.
+      let extraDay = '';
+      await context.route(/\/artists\/[^/]+\/work-schedule(\?|$)/, r => r.fulfill({ json: {
+        schedule: [1, 3].map(d => ({ day_of_week: d, start_time: '09:00:00', end_time: '18:00:00' })),
+        overrides: extraDay ? [{ date: `${extraDay}T00:00:00Z`, is_blocked: false, start_time: '10:00', end_time: '14:00' }] : [],
+      } }));
       const soon = new Date(Date.now() + 3 * 86400000); soon.setHours(11, 0, 0, 0);
       let chosenArtist = '';
       await context.route(/\/studio\/me\/schedule\?.*start=/, r => r.fulfill({ json: { entries: [{ bookingId: 'other', artistId: chosenArtist, chosenTime: soon.toISOString(), durationMins: 120, status: 'confirmed' }] } }));
@@ -63,6 +68,8 @@ const pending = { id: 'req-1', requester_name: 'Minseo Park', requester_email: '
       // The calendar appears once an artist is chosen.
       assert.equal(await dialog.getByRole('region', { name: 'Week view' }).count(), 0, 'No calendar before an artist is chosen');
       await dialog.getByText(/Choose an artist to see their availability/).waitFor();
+      { const thu = new Date(`${firstDate}T00:00:00`); thu.setDate(thu.getDate() - ((thu.getDay() + 6) % 7) + 3);
+        extraDay = `${thu.getFullYear()}-${String(thu.getMonth() + 1).padStart(2, '0')}-${String(thu.getDate()).padStart(2, '0')}`; }
       chosenArtist = await dialog.getByLabel('Artist').locator('option').nth(1).getAttribute('value');
       await dialog.getByLabel('Artist').selectOption({ index: 1 });
       await dialog.getByLabel('Duration').selectOption('120');
@@ -76,14 +83,28 @@ const pending = { id: 'req-1', requester_name: 'Minseo Park', requester_email: '
       const week = dialog.getByRole('region', { name: 'Week view' });
       await week.waitFor();
       const firstDay = (new Date(`${firstDate}T00:00:00`).getDay() + 6) % 7; // Mon = 0
+      // The artist's hours are shaded per date, like the app: Mon and Wed, and the extra
+      // Thursday from the override. Tuesday is dimmed. Mon and Wed are "both free".
+      const columns = week.locator('div[aria-hidden="true"]');
+      const shadeCount = async (day, kind) => columns.nth(day).locator(`span[title^="${kind}"]`).count();
+      assert.equal(await shadeCount(0, 'Artist free'), 1, 'Monday: artist free');
+      assert.equal(await shadeCount(0, 'Both free'), 1, 'Monday: both free');
+      assert.equal(await shadeCount(1, 'Artist free'), 0, 'Tuesday: not working');
+      assert.equal(await week.locator('span[title="Artist isn’t working here this day"]').count() >= 4, true, 'Days off are dimmed');
+      assert.equal(await shadeCount(3, 'Artist free'), 1, 'Thursday: the date override adds hours');
+      assert.equal(await shadeCount(3, 'Both free'), 0, 'Thursday: the client is not free');
+      await week.getByText('Both free', { exact: true }).waitFor();
       await week.locator('div[aria-hidden="true"]').nth(firstDay).click({ position: { x: 8, y: 4 * 2 * 14 + 4 } }); // 1pm on a 9am grid
       assert.equal(await dialog.getByLabel('Option 2 date').inputValue(), firstDate, 'Tapped day becomes option 2');
       assert.equal(await dialog.getByLabel('Option 2 start time').inputValue(), '13:00', 'Tapped time becomes option 2');
       if (shots) await week.screenshot({ path: `${shots}/offer-week-${width}.png` });
-      await dialog.getByRole('button', { name: 'Remove option 2' }).click();
+      // Tapping an option in the calendar removes it.
+      await week.locator('button[title^="Option 2"]').click();
+      assert.equal(await dialog.getByLabel('Option 2 date').count(), 0, 'Tapping an option removes it');
+      assert.equal(await dialog.getByLabel('Option 1 date').inputValue(), firstDate, 'Option 1 stays');
       if (width >= 800) {
         // With a mouse, drag option 1 to Wednesday at 3pm (the grid starts at 9am, 14px per half hour).
-        const block = week.locator('span[title^="Option 1"]');
+        const block = week.locator('button[title^="Option 1"]');
         await block.evaluate(el => el.scrollIntoView({ block: 'center' }));
         const from = await block.boundingBox();
         const wed = await week.locator('div[aria-hidden="true"]').nth(2).boundingBox();

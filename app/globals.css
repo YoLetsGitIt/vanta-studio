@@ -609,6 +609,12 @@ textarea {
 
 /* Offer times week view: dragging options is mouse-only, so only mention it there. */
 @media not (pointer: fine) { .offer-week-drag-hint { display: none; } }
+/* Offer times calendar: with a mouse, hovering an option shows the × that removing it means. */
+.offer-week-option-x { display: none; font-size: 0.9rem; line-height: 1; }
+@media (hover: hover) and (pointer: fine) {
+  .offer-week-option:not([data-dragging]):hover .offer-week-option-n { display: none; }
+  .offer-week-option:not([data-dragging]):hover .offer-week-option-x { display: inline; }
+}
 
 /* Booking panel opened over any page (sidebar Needs action): only the panel and its backdrop take clicks. */
 .studio-global-panel-inner > * { pointer-events: auto; }
