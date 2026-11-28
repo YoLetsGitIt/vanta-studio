@@ -6,8 +6,15 @@ import styles from './ScheduleScrollFrame.module.css';
 const ControlsCollapsed = createContext(false);
 const THRESHOLD = 12;
 
-export function ScheduleControls({ children }) {
+// Whether the calendar has been scrolled down (its controls make room).
+export function useControlsCollapsed() {
+  return useContext(ControlsCollapsed);
+}
+
+// fold: the controls slide away with the calendar (see foldHeader) instead of hiding.
+export function ScheduleControls({ children, fold = false }) {
   const collapsed = useContext(ControlsCollapsed);
+  if (fold) return <div className={styles.foldControls} data-fold-header>{children}</div>;
   return (
     <div className={styles.controls} data-collapsed={collapsed || undefined} inert={collapsed || undefined}>
       <div className={styles.controlsInner}>{children}</div>
@@ -15,11 +22,99 @@ export function ScheduleControls({ children }) {
   );
 }
 
-export default function ScheduleScrollFrame({ children, resetKey, style }) {
+// foldHeader (a phone): the header doesn't hide and come back on a timer. The part above
+// its [data-fold-keep] (the dates) moves up with the calendar as it's scrolled, exactly as
+// far, and comes back only as the calendar nears its top, again in step with it. The
+// calendar lies under the header and never changes size, so nothing jumps; its sticky
+// headings sit under what's left of the header (--fold-left).
+export default function ScheduleScrollFrame({ children, resetKey, style, foldHeader = false }) {
   const [collapsed, setCollapsed] = useState(false);
   const root = useRef(null);
 
   useEffect(() => {
+    if (!foldHeader) return undefined;
+    const container = root.current;
+    let fold = 0, shift = 0, intent = null;
+    const last = new WeakMap();
+    const header = () => container.querySelector(':scope > [data-fold-header]');
+    const isScroller = el => el instanceof Element && el.classList.contains('studio-calendar-scroll');
+    function paint(scroller) {
+      const head = header();
+      if (head) head.style.transform = shift ? `translate3d(0, ${-shift}px, 0)` : '';
+      if (scroller) scroller.style.setProperty('--fold-left', `${fold - shift}px`);
+      setCollapsed(fold > 0 && shift >= fold);
+    }
+    function measure() {
+      const head = header(), keep = head?.querySelector('[data-fold-keep]');
+      fold = head && keep ? Math.max(0, Math.round(keep.getBoundingClientRect().top - head.getBoundingClientRect().top)) : 0;
+      container.style.setProperty('--fold-h', `${fold}px`);
+      shift = Math.min(shift, fold);
+      for (const el of container.querySelectorAll('.studio-calendar-scroll')) el.style.setProperty('--fold-left', `${fold - shift}px`);
+      paint();
+    }
+    // Only scrolling the person does moves the header (not the calendar opening at 7am).
+    // A wheel event can arrive just after the scroll it caused: it claims that scroll.
+    let unclaimed = null;
+    function arm(event) {
+      if (event.type === 'wheel' && Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
+      const scroller = event.target instanceof Element && !event.target.closest('[role="dialog"]') ? event.target.closest('.studio-calendar-scroll') : null;
+      if (!scroller) return;
+      intent = { scroller, until: performance.now() + 1500 };
+      const late = event.type === 'wheel' && unclaimed?.scroller === scroller && performance.now() - unclaimed.at < 250;
+      // Scroll events keep `last` current; the scroller may already have moved for this
+      // wheel (passive events are handed over after scrolling starts).
+      if (late) last.set(scroller, unclaimed.from);
+      else if (!last.has(scroller)) last.set(scroller, Math.max(0, scroller.scrollTop));
+      unclaimed = null;
+      if (late) move(scroller);
+    }
+    const topOf = scroller => Math.max(0, Math.min(scroller.scrollTop, scroller.scrollHeight - scroller.clientHeight));
+    function move(scroller) {
+      const top = topOf(scroller);
+      const previous = last.has(scroller) ? last.get(scroller) : top;
+      last.set(scroller, top);
+      // Down: away by as far as it scrolled. Up: back only within the header's height of
+      // the top, so it is fully back exactly as the calendar reaches its top.
+      const next = top > previous ? Math.min(fold, shift + top - previous) : Math.min(shift, top);
+      if (next === shift) return;
+      shift = next;
+      paint(scroller);
+    }
+    function scroll(event) {
+      const scroller = event.target;
+      if (!isScroller(scroller)) return;
+      if (intent?.scroller !== scroller || performance.now() > intent.until) {
+        if (unclaimed?.scroller !== scroller || performance.now() - unclaimed.at > 250) unclaimed = { scroller, from: last.has(scroller) ? last.get(scroller) : 0, at: performance.now() };
+        last.set(scroller, topOf(scroller));
+        return;
+      }
+      intent.until = performance.now() + 1500; // momentum after the finger lifts
+      move(scroller);
+    }
+    measure();
+    const resize = new ResizeObserver(measure);
+    const head = header();
+    if (head) resize.observe(head);
+    // Note where a calendar is before it's scrolled (a pointer coming over it comes first).
+    function seen(event) {
+      const scroller = event.target instanceof Element ? event.target.closest('.studio-calendar-scroll') : null;
+      if (scroller && !last.has(scroller)) last.set(scroller, topOf(scroller));
+    }
+    const listeners = { pointerover: seen, focusin: seen, wheel: arm, pointerdown: arm, touchstart: arm, keydown: arm, scroll };
+    for (const [name, handler] of Object.entries(listeners)) container.addEventListener(name, handler, { capture: true, passive: true });
+    return () => {
+      resize.disconnect();
+      for (const [name, handler] of Object.entries(listeners)) container.removeEventListener(name, handler, true);
+      shift = 0;
+      const h = header();
+      if (h) h.style.transform = '';
+      for (const el of container.querySelectorAll('.studio-calendar-scroll')) el.style.removeProperty('--fold-left');
+      setCollapsed(false);
+    };
+  }, [resetKey, foldHeader]);
+
+  useEffect(() => {
+    if (foldHeader) return undefined;
     setCollapsed(false);
     let intent = null;
     let touch = null;
@@ -85,20 +180,19 @@ export default function ScheduleScrollFrame({ children, resetKey, style }) {
       const direction = Math.sign(delta);
       intent.distance = intent.direction === direction ? intent.distance + Math.abs(delta) : Math.abs(delta);
       intent.direction = direction;
-      if (top <= 4 || intent.distance >= THRESHOLD) {
-        setCollapsed(top > 4 && direction > 0);
-      }
+      if (top <= 4) setCollapsed(false);
+      else if (intent.distance >= THRESHOLD) setCollapsed(direction > 0);
     }
     const listeners = { wheel, pointerdown: pointer, touchstart: touchStart, touchmove: touchMove, keydown: key, scroll };
     for (const [name, handler] of Object.entries(listeners)) container.addEventListener(name, handler, { capture: true, passive: true });
     return () => {
       for (const [name, handler] of Object.entries(listeners)) container.removeEventListener(name, handler, true);
     };
-  }, [resetKey]);
+  }, [resetKey, foldHeader]);
 
   return (
     <ControlsCollapsed.Provider value={collapsed}>
-      <div ref={root} className="studio-feature-page studio-schedule-page" style={style} data-controls-collapsed={collapsed}>
+      <div ref={root} className="studio-feature-page studio-schedule-page" style={style} data-controls-collapsed={collapsed} data-fold={foldHeader || undefined}>
         {children}
       </div>
     </ControlsCollapsed.Provider>

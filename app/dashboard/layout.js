@@ -18,6 +18,7 @@ import SidebarCalendar from '@/components/SidebarCalendar';
 import SidebarNeedsAction from '@/components/SidebarNeedsAction';
 import GlobalBookingPanel from '@/components/GlobalBookingPanel';
 import SpaceAccent from '@/components/SpaceAccent';
+import { ScheduleBootSkeleton } from '@/components/ScheduleSkeleton';
 
 const NAV = [
   { href: '/dashboard/schedule',     tKey: 'nav_schedule',  icon: GridCalIcon },
@@ -262,9 +263,26 @@ function DashboardShell({ children }) {
   }
 
   if (!ready) {
+    // A phone gets the app's own top bar and tabs straight away (and on the schedule, its
+    // shape) rather than an empty screen; a computer keeps the quiet dot.
+    const onSchedule = pathname.startsWith('/dashboard/schedule');
     return (
-      <div style={s.loadingWrap}>
-        <div style={s.loadingDot} />
+      <div className="studio-dashboard-shell studio-boot" style={s.shell} aria-busy="true">
+        <header className="studio-mobile-header">
+          <span style={s.logo} className="studio-brand"><SpaceAccent /><span style={s.logoMark}>vanta</span><span style={s.logoSub}>studio</span></span>
+          <span className="skeleton studio-boot-new" aria-hidden="true" />
+        </header>
+        <div className="studio-boot-body">
+          {onSchedule && <div className="studio-boot-phone"><ScheduleBootSkeleton /></div>}
+          <div className={`studio-boot-dot${onSchedule ? ' studio-boot-desktop' : ''}`} style={s.loadingWrap}><div style={s.loadingDot} /></div>
+        </div>
+        <nav className="studio-mobile-nav" aria-hidden="true">
+          {MOBILE_NAV.map(({ href, tKey, icon: Icon }) => (
+            <span key={href} className="studio-boot-tab" data-current={pathname.startsWith(href) || undefined}><Icon size={20} /><span suppressHydrationWarning>{t(tKey)}</span></span>
+          ))}
+          {/* The page is built in English; the labels may be in the studio's language here. */}
+          <span className="studio-boot-tab"><span aria-hidden="true" className="studio-more-icon">•••</span><span suppressHydrationWarning>{t('nav_more')}</span></span>
+        </nav>
       </div>
     );
   }
@@ -293,8 +311,8 @@ function DashboardShell({ children }) {
           <SpaceAccent />
           <span style={s.logoMark}>vanta</span><span style={s.logoSub}>studio</span>
         </Link>
-        <button type="button" className="studio-button studio-button--sm" onClick={() => { setAppointmentType('walkin'); setAppointmentSlot(null); setAppointmentPanelOpen(true); }}>
-          <PlusIcon />{t('new_appointment')}
+        <button type="button" className="studio-button studio-button--sm studio-mobile-new" aria-label={t('new_appointment')} onClick={() => { setAppointmentType('walkin'); setAppointmentSlot(null); setAppointmentPanelOpen(true); }}>
+          <PlusIcon />{t('new_short')}
         </button>
       </header>
       <style>{TOUR_HIGHLIGHT_CSS}</style>
@@ -586,7 +604,8 @@ function ImportIcon({ size = 16 }) {
 
 const s = {
   loadingWrap: {
-    height: '100vh',
+    flex: 1,
+    minHeight: 0,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',

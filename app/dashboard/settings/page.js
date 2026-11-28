@@ -319,14 +319,16 @@ export default function SettingsPage() {
   const bookingManagement = useBookingManagement();
   // One-line summaries for the phone settings list.
   function settingsSummary(id) {
+    // By id, not position: the list's order changes as sections are added.
+    const hint = SETTINGS_TABS.find(tb => tb.id === id)?.hint ?? '';
     switch (id) {
-      case 'studio': return name ? `${name} · profile, hours and stations` : SETTINGS_TABS[0].hint;
+      case 'studio': return name ? `${name} · profile, hours and stations` : hint;
       case 'requests': return bookingManagement === 'studio' ? 'The studio confirms times · form, link and widget'
-        : bookingManagement === 'artist' ? 'Artists confirm times · form, link and widget' : SETTINGS_TABS[1].hint;
+        : bookingManagement === 'artist' ? 'Artists confirm times · form, link and widget' : hint;
       case 'consent': return consentTemplates.length ? 'Set up' : 'Not set up yet';
-      case 'payments': return stripeStatus?.charges_enabled ? 'Stripe connected · commission and deposits' : SETTINGS_TABS[5].hint;
-      case 'account': return email ? `${email} · billing and notifications` : SETTINGS_TABS[6].hint;
-      default: return SETTINGS_TABS.find(tb => tb.id === id)?.hint ?? '';
+      case 'payments': return stripeStatus?.charges_enabled ? 'Stripe connected · commission and deposits' : hint;
+      case 'account': return email ? `${email} · billing and notifications` : hint;
+      default: return hint;
     }
   }
 

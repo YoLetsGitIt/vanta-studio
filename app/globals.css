@@ -304,6 +304,23 @@ html[data-theme="nature"] #account-preferences-heading::after {
   padding: 0;
 }
 
+/* Phones: no grey flash over tapped controls (each control has its own pressed state),
+   no text inflation when rotated. */
+html {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* The dashboard is an app shell with its own scrolling areas: pulling past the top
+   shouldn't reload it or rubber-band the whole page. Public forms keep normal paging. */
+html:has(.studio-dashboard-shell),
+html:has(.studio-dashboard-shell) body { overscroll-behavior: none; }
+
+/* Taps act at once (no double-tap-to-zoom wait), and holding a control doesn't select
+   its label. Text content stays selectable. */
+button, a, [role="button"], [role="tab"], summary, label:has(> input[type="checkbox"]), label:has(> input[type="radio"]) { touch-action: manipulation; }
+button, [role="button"], [role="tab"], summary { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+
 html,
 body {
   height: 100%;
@@ -346,9 +363,11 @@ select {
   transition: border-color var(--duration-fast) ease, background-color var(--duration-fast) ease;
 }
 
-input:hover:not(:disabled):not([aria-invalid="true"]),
-textarea:hover:not(:disabled):not([aria-invalid="true"]),
-select:hover:not(:disabled):not([aria-invalid="true"]) { border-color: var(--border-strong); }
+@media (hover: hover) and (pointer: fine) {
+  input:hover:not(:disabled):not([aria-invalid="true"]),
+  textarea:hover:not(:disabled):not([aria-invalid="true"]),
+  select:hover:not(:disabled):not([aria-invalid="true"]) { border-color: var(--border-strong); }
+}
 
 input:focus,
 textarea:focus,
@@ -426,8 +445,8 @@ option { color: var(--text); background: var(--bg-modal); }
   }
 }
 
-.studio-attention-item[role="button"]:hover {
-  background: var(--bg-row-active);
+@media (hover: hover) and (pointer: fine) {
+  .studio-attention-item[role="button"]:hover { background: var(--bg-row-active); }
 }
 
 .studio-attention-item[role="button"]:focus-visible {

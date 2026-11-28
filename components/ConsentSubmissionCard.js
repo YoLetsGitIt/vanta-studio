@@ -61,12 +61,12 @@ export default function ConsentSubmissionCard({ sub, templates = [], compact = f
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="M14 3v5h5" /><path d="M9 13h6M9 17h4" /></svg>
       </span>
       <span style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem', minWidth: 0, flex: 1 }}>
-        <span style={{ ...d.itemTitle, display: 'flex', alignItems: 'center', gap: '0.4rem', minWidth: 0 }}>
-          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sub.template_name || 'Consent form'}</span>
+        <span className="studio-consent-row-head" style={{ ...d.itemTitle, display: 'flex', alignItems: 'center', gap: '0.4rem', minWidth: 0 }}>
+          <span className="studio-consent-row-name" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sub.template_name || 'Consent form'}</span>
           {sub.is_minor && <Pill tone="warning">Minor</Pill>}
-          {flagged > 0 && <Pill tone="warning">⚠ Check {flagged === 1 ? '1 answer' : `${flagged} answers`}</Pill>}
+          {flagged > 0 && <span className="studio-consent-row-flag"><Pill tone="warning">⚠ Check {flagged === 1 ? '1 answer' : `${flagged} answers`}</Pill></span>}
         </span>
-        <span style={{ ...d.hint, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        <span className="studio-consent-row-meta" style={{ ...d.hint, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           Signed {signedOn}{sub.signer_name ? ` · ${sub.signer_name}` : ''}
         </span>
       </span>

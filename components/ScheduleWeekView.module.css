@@ -12,7 +12,7 @@
 .day { min-width: 0; border-right: 1px solid var(--border-faint); background: var(--bg-base); }
 .day:last-child { border-right: 0; }
 .dayHeading { position: sticky; top: 0; z-index: 5; width: 100%; height: var(--heading-h); display: grid; grid-template-columns: 1fr auto; align-content: center; gap: 4px; padding: 0 12px; text-align: left; background: var(--bg-sidebar); color: var(--text); border: 0; border-bottom: 1px solid var(--border); cursor: pointer; }
-.dayHeading:hover { background: var(--bg-row-hover); }
+@media (hover: hover) and (pointer: fine) { .dayHeading:hover { background: var(--bg-row-hover); } }
 .dayName { grid-column: 1 / -1; display: flex; align-items: baseline; justify-content: space-between; gap: 6px; font-size: 12px; font-weight: 600; color: var(--text-muted); }
 /* "Day view →": shows on hover and focus, and always on days too busy to read here. */
 .openDay { font-size: 11px; font-weight: 650; color: var(--accent); white-space: nowrap; opacity: 0; transform: translateX(-3px); transition: opacity 150ms ease, transform 150ms ease; }
@@ -30,7 +30,7 @@
 .nowLine { position: absolute; left: 0; right: 0; z-index: 1; border-top: 2px solid var(--color-danger, #e5484d); pointer-events: none; }
 .nowLine::before { content: ''; position: absolute; left: -4px; top: -5px; width: 8px; height: 8px; border-radius: 50%; background: var(--color-danger, #e5484d); }
 .booking { position: absolute; z-index: 1; min-height: 22px; min-width: 0; display: flex; flex-direction: column; gap: 2px; padding: 5px 7px; overflow: hidden; border: 1px solid var(--border); border-left: 3px solid var(--booking-color); border-radius: 7px; background: color-mix(in srgb, var(--booking-color) 13%, var(--bg-card)); color: var(--text); text-align: left; font-family: inherit; cursor: pointer; transition: background 150ms, border-color 150ms; }
-.booking:hover { z-index: 3; background: color-mix(in srgb, var(--booking-color) 22%, var(--bg-card)); border-top-color: var(--border-strong); border-right-color: var(--border-strong); border-bottom-color: var(--border-strong); }
+@media (hover: hover) and (pointer: fine) { .booking:hover { z-index: 3; background: color-mix(in srgb, var(--booking-color) 22%, var(--bg-card)); border-top-color: var(--border-strong); border-right-color: var(--border-strong); border-bottom-color: var(--border-strong); } }
 .booking:focus-visible, .dayHeading:focus-visible, .scroll:focus-visible, .filter select:focus-visible, .retry:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
 .selected { z-index: 3; box-shadow: 0 0 0 2px var(--accent); }
 .pending { border-style: dashed; background: var(--bg-base); }
@@ -63,8 +63,14 @@
 @media (max-width: 760px) {
   .summary { padding: 10px 16px; flex-wrap: wrap; font-size: 12px; }
   .filter select { max-width: 210px; min-height: 40px; font-size: 14px; }
-  .days { grid-template-columns: 44px repeat(7, minmax(150px, 1fr)); min-width: 1094px; --heading-h: 64px; }
-  .dayHeading { padding: 0 10px; }
+  /* Three days fill the screen and swiping moves a day at a time; the hours stay put. */
+  .days { grid-template-columns: 44px repeat(7, calc((100vw - 44px) / 3)); min-width: max-content; --heading-h: 64px; }
+  .scroll { scroll-snap-type: x mandatory; scroll-padding-left: 44px; }
+  .day { scroll-snap-align: start; }
+  .dayHeading { padding: 0 8px; }
+  .dayName { font-size: 11px; }
+  .openDay { display: none; }
+  .dayCount[data-empty] { display: none; }
 }
 @media (max-height: 550px) and (orientation: landscape) and (any-pointer: coarse) {
   .summary { padding: 4px 12px; }
@@ -143,3 +149,5 @@
 .moreClient { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .moreMeta { font-size: 11px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .moreDay { display: block; width: 100%; margin-top: 6px; padding: 8px 6px 2px; border: 0; border-top: 1px solid var(--border); background: transparent; color: var(--accent); font: inherit; font-size: 12px; font-weight: 600; text-align: left; cursor: pointer; }
+/* Under a phone's sliding header: the headings stick below what's left of it. */
+:global(.studio-schedule-page[data-fold]) .corner, :global(.studio-schedule-page[data-fold]) .dayHeading { top: var(--fold-left, var(--fold-h, 0px)); }

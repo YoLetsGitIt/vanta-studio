@@ -36,12 +36,12 @@
     padding: 4px env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
     border-top: 1px solid var(--border); background: var(--bg-sidebar);
   }
-  .studio-mobile-nav > a, .studio-mobile-nav > button {
+  .studio-mobile-nav > a, .studio-mobile-nav > button, .studio-mobile-nav > .studio-boot-tab {
     display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 4px;
     min-width: 0; min-height: 60px; padding: 6px 2px; border: 0; border-radius: 8px;
     background: transparent; color: var(--text-muted); font-size: 10px; line-height: 1.25; text-align: center;
   }
-  .studio-mobile-nav [aria-current="page"], .studio-mobile-nav .is-active {
+  .studio-mobile-nav [aria-current="page"], .studio-mobile-nav .is-active, .studio-mobile-nav > .studio-boot-tab[data-current] {
     color: var(--accent); background: var(--nav-active-bg); font-weight: 600;
   }
   .studio-more-icon { height: 20px; font-size: 18px; line-height: 20px; letter-spacing: 2px; }
@@ -63,7 +63,7 @@
   }
   .studio-scroll-tabs > button { flex-shrink: 0; white-space: nowrap; }
   .studio-booking-subfilters { padding: 8px 16px !important; }
-  .studio-booking-row { display: grid !important; grid-template-columns: 44px minmax(0, 1fr); gap: 8px 12px !important; padding: 12px !important; flex-shrink: 0; }
+  .studio-booking-row:not([data-phone-row]) { display: grid !important; grid-template-columns: 44px minmax(0, 1fr); gap: 8px 12px !important; padding: 12px !important; flex-shrink: 0; }
   .studio-booking-main { overflow-wrap: anywhere; }
   .studio-booking-status { grid-column: 2; flex-direction: row !important; align-items: center !important; flex-wrap: wrap; gap: 8px !important; }
   .studio-client-row { display: grid !important; grid-template-columns: 36px minmax(0, 1fr); gap: 8px 12px !important; padding: 12px !important; }
@@ -77,7 +77,9 @@
     padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
   }
   .studio-booking-detail > div, .studio-client-detail > div { min-height: 0; }
-  .studio-booking-detail, .studio-client-detail { overflow-wrap: anywhere; }
+  /* Long unbroken text (an email, a link) breaks rather than overflowing, but words and
+     prices never split while a row can still wrap: "anywhere" would break "$450". */
+  .studio-booking-detail, .studio-client-detail { overflow-wrap: break-word; }
   .studio-appointment-panel {
     width: 100% !important; height: 100dvh; border: 0 !important;
     padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
@@ -401,3 +403,206 @@
 .settings-column { display: flex; flex-direction: column; gap: 16px; align-self: start; min-width: 0; }
 .settings-column > * { margin: 0 !important; }
 @media (max-width: 720px) { .settings-column { gap: 12px; } }
+
+/* ── Phone first: schedule ──────────────────────────────────────────────────
+   Portrait phones get a two-row toolbar (view switch and date on one row, the artist
+   filter and Today on the next) and calendars that fit the screen: two artists or
+   three days at a time, swiping a column at a time, with the hours pinned. */
+.studio-schedule-date-short { display: none; }
+@media (max-width: 760px) and (orientation: portrait) {
+  .studio-schedule-page .studio-feature-header {
+    display: grid !important; grid-template-columns: auto 44px minmax(0, 1fr) minmax(44px, auto);
+    align-items: center; gap: 8px !important; padding: 8px 12px !important; min-height: 0 !important;
+  }
+  .studio-schedule-page .studio-schedule-toggles {
+    grid-row: 1; grid-column: 1; width: auto !important; align-self: center !important; flex-wrap: nowrap !important;
+    gap: 2px !important; padding: 2px; border-radius: 10px; background: var(--bg-chip);
+  }
+  .studio-schedule-page .studio-schedule-toggles > button {
+    min-height: 44px !important; min-width: 0 !important; padding: 0 14px !important; margin: 0 !important;
+    border: 0 !important; border-radius: 8px; font-size: 14px !important; color: var(--text-muted) !important;
+  }
+  .studio-schedule-page .studio-schedule-toggles > button[aria-pressed="true"] {
+    background: var(--accent) !important; color: var(--accent-contrast) !important; font-weight: 650 !important;
+  }
+  .studio-schedule-page .studio-schedule-date-nav { display: contents !important; }
+  .studio-schedule-date-nav > button[aria-label^="Previous"] { grid-row: 1; grid-column: 2; justify-self: end; }
+  .studio-schedule-page .studio-schedule-date-label { grid-row: 1; grid-column: 3; font-size: 15px !important; text-align: center; overflow: hidden; text-overflow: ellipsis; }
+  .studio-schedule-date-nav > button[aria-label^="Next"] { grid-row: 1; grid-column: 4; justify-self: start; }
+  .studio-schedule-date-nav .studio-schedule-filter-select { grid-row: 2; grid-column: 1 / 4; width: 100%; }
+  .studio-schedule-date-nav > button:not([aria-label]) { grid-row: 2; grid-column: 4; margin: 0 !important; min-height: 44px; padding-inline: 12px !important; }
+  .studio-schedule-date-long { display: none; }
+  .studio-schedule-date-short { display: inline; }
+
+  /* Day view: artists as columns, two to a screen. */
+  .studio-day-grid { grid-template-columns: 44px repeat(var(--cols), minmax(max(140px, calc((100vw - 44px) / 2)), 1fr)) !important; }
+  .studio-calendar-scroll:has(> .studio-day-grid) { scroll-snap-type: x mandatory; scroll-padding-left: 44px; }
+  .studio-day-grid > .studio-day-artist { scroll-snap-align: start; padding-inline: 8px !important; }
+  .studio-day-grid > .studio-day-corner, .studio-day-grid > .studio-day-gutter { position: sticky !important; left: 0; z-index: 3; background: var(--bg-base); }
+  /* The artists stay in view while the day scrolls, like the Week view's day headings. */
+  .studio-day-grid > .studio-day-artist { position: sticky; top: 0; z-index: 2; background: var(--bg-sidebar); }
+  .studio-day-grid > .studio-day-corner { top: 0; z-index: 4; background: var(--bg-sidebar); }
+}
+
+/* ── Phone first: shared pieces ─────────────────────────────────────────── */
+@media (max-width: 760px) {
+  /* Top bar: "+ New" (its label reads New Appointment to screen readers). */
+  .studio-mobile-new { padding-inline: 14px !important; }
+
+  /* Booking details: email, phone and age as their own items, no dangling dots. */
+  .studio-bdp-contact { flex-wrap: wrap; row-gap: 0 !important; column-gap: 14px !important; }
+  .studio-bdp-sep { display: none; }
+
+  /* Client details: a fact's value under its label, so a long email gets the full width. */
+  .studio-client-detail .studio-fact:not(.studio-fact--block) { flex-direction: column; align-items: flex-start !important; gap: 2px !important; }
+  .studio-client-detail .studio-fact:not(.studio-fact--block) > span:last-child { text-align: left !important; overflow-wrap: anywhere; }
+
+  /* Rows that open something respond the moment they're pressed. */
+  .studio-booking-row:not([data-phone-row]), .studio-client-row, .studio-consent-row, .studio-attention-item[role="button"] { transition: background-color 100ms ease; }
+  .studio-booking-row:not([data-phone-row]):active, .studio-client-row:active, .studio-consent-row:active, .studio-attention-item[role="button"]:active { background: var(--bg-row-active) !important; }
+}
+
+/* ── Phone first: lists ─────────────────────────────────────────────────── */
+@media (max-width: 760px) and (orientation: portrait) {
+  /* Clients: the sort fills the row under the search. */
+  .studio-clients-page > .studio-feature-header select { width: 100% !important; max-width: none !important; }
+}
+
+/* Keyboard shortcut hints mean nothing without a keyboard. */
+@media (hover: none) and (pointer: coarse) { .studio-keyboard-hint { display: none; } }
+@media (max-width: 380px) and (orientation: portrait) {
+  .studio-schedule-page .studio-feature-header { column-gap: 4px !important; padding-inline: 10px !important; }
+  .studio-schedule-page .studio-schedule-toggles > button { padding: 0 10px !important; font-size: 13px !important; }
+  .studio-schedule-page .studio-schedule-date-label { font-size: 13px !important; }
+}
+
+/* ── Phone first: booking details ───────────────────────────────────────────
+   Two short lines of contact under the name, tighter cards, signed forms that show
+   their name and date, and an action bar whose buttons each stay on one line. */
+@media (max-width: 760px) {
+  /* A short header: the name (which opens the client), one or two lines of contact in
+     small type, then the pills. */
+  .studio-booking-detail .studio-bdp-header { padding: 10px 6px 10px 16px !important; gap: 4px !important; align-items: flex-start !important; }
+  .studio-booking-detail .studio-bdp-headtext { gap: 8px !important; }
+  .studio-booking-detail .studio-bdp-headtext > :first-child { font-size: 1.15rem !important; line-height: 1.25; min-height: 0 !important; }
+  .studio-booking-detail .studio-bdp-name-chevron { display: inline !important; color: var(--text-muted); font-weight: 500; }
+  .studio-booking-detail .studio-bdp-view-client, .studio-booking-detail .studio-bdp-dob { display: none !important; }
+  .studio-booking-detail .studio-bdp-contact { column-gap: 12px !important; row-gap: 0 !important; font-size: 0.8125rem; }
+  .studio-booking-detail .studio-bdp-contact > * { font-size: 0.8125rem !important; color: var(--text-muted) !important; }
+  /* Full 44px tap targets; the rows overlap so the lines sit close together. */
+  .studio-booking-detail .studio-bdp-contact { margin-block: 0 !important; line-height: 1.35; }
+  .studio-booking-detail .studio-bdp-contact > :not(.studio-bdp-sep) { min-height: 44px !important; margin-block: -12px; display: inline-flex; align-items: center; }
+  /* Email, phone and age flow together and wrap as the text grows; a long email is cut
+     with "…" rather than broken mid-word. View client sits at the end of the pills. */
+  .studio-booking-detail .studio-bdp-email { max-width: 100%; min-width: 0; display: block !important; line-height: 44px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; overflow-wrap: normal !important; }
+  .studio-booking-detail .studio-bdp-contact > span:not(.studio-bdp-sep), .studio-booking-detail .studio-bdp-contact > a { white-space: nowrap; }
+
+  .studio-booking-detail .studio-bdp-body { padding: 12px !important; gap: 12px !important; }
+  .studio-booking-detail .studio-bdp-hero,
+  .studio-booking-detail .studio-detail-section { padding: 14px !important; gap: 10px !important; border-radius: 12px !important; }
+
+  /* A signed form: its name (and any flag) wraps instead of cutting to "Conse…". */
+  .studio-consent-row-head { flex-wrap: wrap; row-gap: 4px !important; }
+  .studio-consent-row-name { white-space: normal !important; overflow: visible !important; }
+  .studio-consent-row-meta { white-space: normal !important; }
+
+  /* One row when the buttons fit; when they don't (a narrow phone, or large text) the
+     main step drops to its own full-width row instead of being cut off. */
+  .studio-booking-detail .studio-bdp-actions { padding: 10px 12px !important; gap: 8px !important; flex-wrap: wrap !important; }
+  .studio-booking-detail .studio-bdp-action { white-space: nowrap; padding-inline: 12px !important; font-size: 0.9375rem; min-width: max-content !important; }
+  .studio-booking-detail .studio-bdp-action--main { flex: 1 1 auto !important; }
+  .studio-booking-detail .studio-bdp-action--danger { padding-inline: 6px !important; }
+
+  /* The warning above the signed forms already names the answer to check. */
+  .studio-booking-detail .studio-consent-row-flag { display: none; }
+
+  /* Price, deposit and other facts: the value drops under its label when text is large;
+     a card's title and its status pill wrap the same way. */
+  .studio-booking-detail .studio-fact { flex-wrap: wrap; row-gap: 2px; }
+  .studio-booking-detail .studio-fact > span { overflow-wrap: break-word !important; }
+  .studio-booking-detail .studio-detail-section > :first-child { flex-wrap: wrap; row-gap: 6px; }
+}
+@media (max-width: 400px) {
+  /* Room for "Mark complete" beside "No show": the tick goes. */
+  .studio-booking-detail .studio-bdp-action--main > svg { display: none; }
+}
+
+/* Bottom bar: its tabs share the width, however many there are. */
+@media (max-width: 760px), (max-width: 1100px) and (max-height: 550px) and (orientation: landscape) and (any-pointer: coarse) {
+  .studio-mobile-nav { grid-template-columns: none !important; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
+}
+
+/* Day view on a phone: blocks read at a glance (name, type, time). */
+@media (max-width: 760px) and (orientation: portrait) {
+  .studio-day-block { padding: 6px 8px !important; border-radius: 8px !important; gap: 2px; }
+  .studio-day-block > span:first-child { font-size: 0.85rem !important; }
+  .studio-day-block > span { flex-shrink: 0; font-size: 0.74rem !important; line-height: 1.3 !important; }
+  .studio-day-now::before { content: ''; position: absolute; left: -4px; top: -5px; width: 8px; height: 8px; border-radius: 50%; background: var(--color-danger, #e5484d); }
+}
+
+/* The chevron after a client's name in the booking header shows only on phones. */
+.studio-bdp-name-chevron { display: none; }
+
+
+/* ── Phone first: booking details, grouped lists ─────────────────────────────
+   Same look as the phone Bookings and Schedule lists: the client's name, status and
+   contact as the page's header; the appointment in one card; then each section as a
+   rounded card with its name above it and hairlines between rows. */
+@media (max-width: 760px) {
+  .studio-booking-detail .studio-bdp-header { border-bottom: 0 !important; padding-bottom: 4px !important; }
+  .studio-booking-detail .studio-bdp-body { padding: 8px 16px 28px !important; gap: 0 !important; }
+  .studio-booking-detail .studio-bdp-body > *, .studio-booking-detail .studio-bdp-cards > *, .studio-booking-detail [class*="column"] > * { margin-top: 0; }
+  .studio-booking-detail [class*="split"], .studio-booking-detail [class*="column"], .studio-booking-detail .studio-bdp-cards,
+  .studio-booking-detail [class*="glance"] { gap: 0 !important; }
+
+  /* The appointment: date, the time in large type, the artist; Edit as a text button. */
+  .studio-booking-detail .studio-bdp-hero { margin-top: 8px; padding: 16px !important; gap: 12px !important; border-radius: 16px !important; }
+  .studio-booking-detail .studio-bdp-hero-time { font-size: 1.6rem !important; letter-spacing: -0.02em; }
+  .studio-booking-detail .studio-bdp-hero .studio-button--secondary {
+    border-color: transparent !important; background: transparent !important; color: var(--color-info) !important;
+    font-weight: 650; padding-inline: 8px !important; margin-right: -8px;
+  }
+
+  /* Sections: the name above a rounded card. */
+  .studio-booking-detail .studio-detail-section {
+    position: relative; margin-top: 34px !important; padding: 4px 16px !important; gap: 0 !important;
+    border-radius: 14px !important; border: 1px solid var(--border-faint) !important; box-shadow: none !important;
+  }
+  .studio-booking-detail .studio-detail-section > :first-child {
+    position: absolute; left: 4px; right: 2px; bottom: calc(100% + 6px); min-height: 0 !important; margin: 0 !important;
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  }
+  .studio-booking-detail .studio-detail-section > :first-child h3 { font-size: 0.8125rem !important; font-weight: 650 !important; color: var(--text-muted) !important; letter-spacing: 0.01em; }
+  .studio-booking-detail .studio-detail-section > :first-child > span { font-size: 0.75rem !important; padding-block: 0.1rem !important; }
+  .studio-booking-detail .studio-detail-section > :first-child > button { min-height: 32px !important; }
+  /* Collapsible sections (open on tap) keep their header inside, as a row. */
+  .studio-booking-detail .studio-detail-section > button:first-child { position: static; min-height: 48px !important; }
+  .studio-booking-detail .studio-detail-section > button:first-child h3 { font-size: 1rem !important; color: var(--text) !important; }
+
+  /* Rows: label left, value right, a hairline between. Other content keeps its space. */
+  .studio-booking-detail .studio-detail-section > :not(:first-child) { padding-block: 12px; }
+  .studio-booking-detail .studio-detail-section > :not(:first-child) + :not(:first-child) { border-top: 1px solid var(--border-faint); }
+  .studio-booking-detail .studio-pay-rows { gap: 0 !important; padding-block: 0 !important; }
+  .studio-booking-detail .studio-pay-rows > * { padding-block: 12px; min-height: 48px; }
+  .studio-booking-detail .studio-pay-rows > * + * { border-top: 1px solid var(--border-faint); }
+  .studio-booking-detail .studio-detail-section .studio-fact { min-height: 24px; }
+}
+
+/* A phone's schedule header slides up with the calendar (ScheduleScrollFrame foldHeader).
+   The calendar starts under it: pulled up by the part that slides, with that much room above
+   its content, and its sticky headings kept below what's left of the header. */
+.studio-schedule-page[data-fold] > [data-fold-header] + *:has(.studio-calendar-scroll) { margin-top: calc(-1 * var(--fold-h, 0px)); }
+/* A margin, not padding: sticky headings measure from inside a scroller's padding. */
+.studio-schedule-page[data-fold] .studio-calendar-scroll > :first-child { margin-top: var(--fold-h, 0px); }
+.studio-schedule-page[data-fold] .studio-day-grid > .studio-day-artist,
+.studio-schedule-page[data-fold] .studio-day-grid > .studio-day-corner { top: var(--fold-left, var(--fold-h, 0px)); }
+
+/* While the studio loads (dashboard layout, not ready yet): the top bar and tabs, and on an
+   upright phone the schedule's shape; otherwise a dot in the middle. */
+.studio-boot-body { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+.studio-boot-new { display: block; width: 76px; height: 44px; border-radius: 10px; background: var(--bg-chip); }
+.studio-boot-phone { display: none; }
+@media (max-width: 760px) and (orientation: portrait) {
+  .studio-boot-phone { display: block; padding-top: var(--mobile-header-h, 61px); }
+  .studio-boot-desktop { display: none !important; }
+}

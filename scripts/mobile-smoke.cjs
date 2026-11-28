@@ -132,7 +132,21 @@ async function contained(page, label) {
             assert.equal(await page.locator('.studio-calendar-toolbar-date').innerText(), currentDate);
             await toolbar.getByLabel('Calendar view').selectOption('day:artist:all');
             await toolbar.getByLabel('Calendar view').selectOption('day:artist');
-          } else assert.equal(await page.getByRole('button', { name: 'Week', exact: true }).getAttribute('aria-pressed'), 'true'); // Week view on every screen
+          } else {
+            // Upright phones open on the List of today's bookings (List / Day / Week in the
+            // header); wider screens on the week.
+            const pressed = (selector, name) => page.waitForFunction(([sel, label]) => [...document.querySelectorAll(sel)].find(b => b.textContent.trim() === label)?.getAttribute('aria-pressed') === 'true', [selector, name]);
+            if (width <= 760 && height > width) {
+              await pressed('[aria-label="Calendar view"] button', 'List');
+              await page.getByRole('heading', { level: 1 }).filter({ hasText: /Today/ }).waitFor();
+              await contained(page, `schedule list at ${width}`);
+              // The calendar is one tap away.
+              await page.getByRole('button', { name: 'Day', exact: true }).click();
+              await pressed('[aria-label="Calendar view"] button', 'Day');
+            } else {
+              await pressed('.studio-schedule-toggles button', 'Week');
+            }
+          }
           if (mobile) {
             const calendar = page.locator('.studio-calendar-scroll');
             await calendar.waitFor();

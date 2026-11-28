@@ -857,7 +857,7 @@ function ClientDetail({ client, marketing, onMarketingChange, clientKey, panelDe
             style={detailStyles.noteInput}
           />
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
-            <span style={detailStyles.hint}>{noteErr ? <span style={{ color: 'var(--color-danger)' }}>{noteErr}</span> : t('clients_cmd_to_save')}</span>
+            <span style={detailStyles.hint}>{noteErr ? <span style={{ color: 'var(--color-danger)' }}>{noteErr}</span> : <span className="studio-keyboard-hint">{t('clients_cmd_to_save')}</span>}</span>
             <Button size="sm" variant="secondary" onClick={handleAddNote} disabled={noteAdding || !noteInput.trim()}>
               {t(noteAdding ? 'saving' : 'clients_add_note_btn')}
             </Button>

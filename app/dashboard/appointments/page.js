@@ -17,6 +17,7 @@ import { showError } from '@/lib/feedback';
 import { bookingActions } from '@/lib/bookingActions';
 import StatePanel from '@/components/ui/StatePanel';
 import { canCollectDeposits } from '@/lib/deposits';
+import BookingsPhoneList, { usePhoneLayout } from '@/components/BookingsPhoneList';
 
 const STATUS_FILTERS = [
   { value: 'pending',                              tKey: 'status_pending',            tone: 'warning' },
@@ -87,6 +88,8 @@ function AppointmentsInner() {
   const [studioArtists, setStudioArtists] = useState([]);
   const [stripeConnected, setStripeConnected] = useState(false);
   const requestedBookingId = searchParams.get('booking');
+  // Phones held upright get their own layout (components/BookingsPhoneList).
+  const phone = usePhoneLayout();
   const deepLinkTabSet = useRef(null); // the deep-linked booking whose tab was already chosen
 
   const activeSub = activeFilter === COMPLETED_TAB
@@ -374,6 +377,31 @@ function AppointmentsInner() {
         </div>
       )}
 
+      {phone ? (
+        <BookingsPhoneList
+          t={t}
+          title={t('nav_bookings')}
+          filters={STATUS_FILTERS}
+          activeFilter={activeFilter}
+          onFilter={selectFilter}
+          subFilters={activeFilter === CONFIRMED_TAB ? CONFIRMED_SUB_FILTERS : activeFilter === COMPLETED_TAB ? COMPLETED_SUB_FILTERS : null}
+          activeSub={activeFilter === CONFIRMED_TAB ? confirmedSubFilter : completedSubFilter}
+          onSub={value => { if (activeFilter === CONFIRMED_TAB) setConfirmedSubFilter(value); else setCompletedSubFilter(value); setSelected(null); }}
+          sortDir={sortDir}
+          onSort={toggleSort}
+          search={search}
+          onSearch={setSearch}
+          loading={loading}
+          error={error}
+          bookings={filteredBookings}
+          selectedId={selected}
+          onSelect={id => setSelected(prev => prev === id ? null : id)}
+          labelFor={b => (b.status === 'confirmed' && b.chosen_time && new Date(b.chosen_time) < new Date() ? 'Record payment' : undefined)}
+          nextCursor={nextCursor}
+          onLoadMore={loadMore}
+          loadingMore={loadingMore}
+        />
+      ) : (<>
       <div className="studio-feature-header" style={s.header}>
         <h1 style={s.title}>{t('nav_bookings')}</h1>
         <input
@@ -457,6 +485,7 @@ function AppointmentsInner() {
           </button>
         )}
       </div>
+      </>)}
 
       {selected && (
         <BookingDetailPanel
@@ -557,7 +586,7 @@ function BookingRow({ booking: b, selected, onSelect, labelOverride }) {
       }}
     >
       {/* Date block */}
-      <div style={s.dateBlock}>
+      <div className="studio-booking-date" style={s.dateBlock}>
         {d ? (
           <>
             <span style={s.dateMonth}>{month}</span>
@@ -580,14 +609,14 @@ function BookingRow({ booking: b, selected, onSelect, labelOverride }) {
 
       {/* Main content */}
       <div className="studio-booking-main" style={s.rowMain}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+        <div className="studio-booking-name" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
           <span style={s.clientName}>{b.requester_name}</span>
           {b.parent_booking_id && <span style={s.followUpTag}>{t('appt_followup')}</span>}
         </div>
         {sessionParts.length > 0 && (
-          <span style={s.rowMeta}>{sessionParts.join(' · ')}</span>
+          <span className="studio-booking-meta" style={s.rowMeta}>{sessionParts.join(' · ')}</span>
         )}
-        <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', marginTop: '0.1rem' }}>
+        <div className="studio-booking-tags" style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', marginTop: '0.1rem' }}>
           <span style={{ ...s.sourceTag, background: 'var(--bg-chip)', color: 'var(--text-muted)', borderColor: 'var(--border)' }}>
             {bookingStyle.tag}
           </span>

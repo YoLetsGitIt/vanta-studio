@@ -48,7 +48,7 @@ export function Pill({ tone, colors, children }) {
 
 export function Section({ title, aside, children }) {
   return (
-    <section style={d.section}>
+    <section className="studio-detail-section" style={d.section}>
       <div style={d.sectionHead}>
         <h3 style={d.sectionTitle}>{title}</h3>
         {aside}
@@ -63,7 +63,7 @@ export function CollapsibleSection({ title, defaultOpen = false, children }) {
   const [open, setOpen] = useState(defaultOpen);
   const bodyId = useId();
   return (
-    <section style={d.section}>
+    <section className="studio-detail-section" style={d.section}>
       <button type="button" aria-expanded={open} aria-controls={bodyId} onClick={() => setOpen(v => !v)}
         style={{ ...d.sectionHead, width: '100%', minHeight: 44, padding: 0, border: 0, background: 'none', color: 'inherit', font: 'inherit', textAlign: 'left', cursor: 'pointer' }}>
         <h3 style={d.sectionTitle}>{title}</h3>
@@ -79,7 +79,7 @@ export function Fact({ label, children, value, block = false, strong = false, co
   const content = children ?? value;
   if (!content && content !== 0) return null;
   return (
-    <div style={block ? d.factBlock : { ...d.fact, ...(control ? d.factControl : {}) }}>
+    <div className={block ? 'studio-fact studio-fact--block' : 'studio-fact'} style={block ? d.factBlock : { ...d.fact, ...(control ? d.factControl : {}) }}>
       <span style={d.factLabel}>{label}</span>
       <span style={{ ...(block ? d.factValueBlock : d.factValue), ...(strong ? d.factStrong : {}), ...(control ? d.factValueControl : {}) }}>{content}</span>
     </div>

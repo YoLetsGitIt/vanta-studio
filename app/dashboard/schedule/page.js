@@ -10,8 +10,12 @@ import BookingDetailPanel from '@/components/BookingDetailPanel';
 import ScheduleWeekView, { useScheduleFilterSlot } from '@/components/ScheduleWeekView';
 import { createPortal } from 'react-dom';
 import weekStyles from '@/components/ScheduleWeekView.module.css';
-import ScheduleScrollFrame, { ScheduleControls } from '@/components/ScheduleScrollFrame';
-import { weekRangeLabel, localDateKey } from '@/lib/scheduleWeek.mjs';
+import ScheduleScrollFrame, { ScheduleControls, useControlsCollapsed } from '@/components/ScheduleScrollFrame';
+import { ScheduleCalendarSkeleton, ScheduleListSkeleton } from '@/components/ScheduleSkeleton';
+import { weekRangeLabel, localDateKey, weekStartFor, calendarDayAfter } from '@/lib/scheduleWeek.mjs';
+import { usePhoneLayout } from '@/lib/usePhoneLayout';
+import { useSideScroll } from '@/lib/useSideScroll';
+import ps from './PhoneSchedule.module.css';
 
 // A day's bookings from a week or month the schedule already loaded, so switching to
 // day view doesn't fetch again. Null when no loaded range covers the day.
@@ -33,21 +37,25 @@ import { useLanguage } from '@/lib/i18n';
 import { showError } from '@/lib/feedback';
 import { bookingActions } from '@/lib/bookingActions';
 import { canCollectDeposits } from '@/lib/deposits';
+import { statusColors } from '@/lib/status';
 
 const HOUR_PX   = 64;
 const DAY_START = 8;
 const DAY_END   = 20;
 const HOURS     = Array.from({ length: DAY_END - DAY_START }, (_, i) => DAY_START + i);
 
-// Short landscape phones get a tighter hour so more of the working day fits on screen.
+// Short landscape phones get a tighter hour so more of the working day fits on screen;
+// upright phones a taller one, so an hour's booking has room for its name, type and time.
 function useHourPx() {
   const [px, setPx] = useState(HOUR_PX);
   useEffect(() => {
-    const mq = window.matchMedia('(max-height: 550px) and (orientation: landscape) and (any-pointer: coarse)');
-    const update = () => setPx(mq.matches ? 48 : HOUR_PX);
+    const short = window.matchMedia('(max-height: 550px) and (orientation: landscape) and (any-pointer: coarse)');
+    const upright = window.matchMedia('(max-width: 760px) and (orientation: portrait)');
+    const update = () => setPx(short.matches ? 48 : upright.matches ? 80 : HOUR_PX);
     update();
-    mq.addEventListener('change', update);
-    return () => mq.removeEventListener('change', update);
+    short.addEventListener('change', update);
+    upright.addEventListener('change', update);
+    return () => { short.removeEventListener('change', update); upright.removeEventListener('change', update); };
   }, []);
   return px;
 }
@@ -597,7 +605,14 @@ function DayView({ date, showAll, setShowAll }) {
   const { byId: typesById } = useAppointmentTypes();
   const { t } = useLanguage();
   const hourPx = useHourPx();
+  const phone = usePhoneLayout();
   const gridH  = (DAY_END - DAY_START) * hourPx;
+  // The current-time line on today's schedule, moved each minute.
+  const [nowTick, setNowTick] = useState(() => Date.now());
+  useEffect(() => { const id = setInterval(() => setNowTick(Date.now()), 60000); return () => clearInterval(id); }, []);
+  const nowAt = new Date(nowTick);
+  const nowMin = nowAt.getHours() * 60 + nowAt.getMinutes();
+  const nowTop = toISO(date) === toISO(nowAt) && nowMin >= DAY_START * 60 && nowMin <= DAY_END * 60 ? (nowMin - DAY_START * 60) * (hourPx / 60) : null;
   const filterSlot = useScheduleFilterSlot();
   const [artists,        setArtists]        = useState([]);
   const [entries,        setEntries]        = useState([]);
@@ -666,6 +681,13 @@ function DayView({ date, showAll, setShowAll }) {
   }
   const slotTime = minutes => { const at = new Date(date); at.setHours(Math.floor(minutes / 60), minutes % 60, 0, 0); return at.toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' }); };
 
+  // A phone: the calendar's shape (and the filter, unusable yet) while it loads.
+  if (loading && phone) return (
+    <>
+      {filterSlot && createPortal(<select className="studio-schedule-filter-select" aria-label="Artists shown" disabled><option>{t('sched_all_artists')}</option></select>, filterSlot)}
+      <ScheduleCalendarSkeleton kind="day" columns={Math.min(2, Math.max(1, getCached('artists:approved')?.length ?? 2))} />
+    </>
+  );
   if (loading) return <p style={s.msg}>{t('loading')}</p>;
   if (error)   return <p style={{ ...s.msg, color: '#e86f6f' }}>{error}</p>;
   if (!sorted.length) return <p style={s.msg}>{t('sched_no_artists_yet')}</p>;
@@ -685,11 +707,11 @@ function DayView({ date, showAll, setShowAll }) {
         <p style={s.msg}>{t('sched_no_artists_working')}</p>
       ) : (
       <div className="studio-calendar-scroll" style={s.calWrap}>
-      <div style={{ ...s.grid, gridTemplateColumns: `52px repeat(${cols.length}, minmax(160px, 1fr))` }}>
-        <div className="studio-calendar-column-heading" style={s.cornerCell} />
+      <div className="studio-day-grid" style={{ ...s.grid, gridTemplateColumns: `52px repeat(${cols.length}, minmax(160px, 1fr))`, '--cols': cols.length }}>
+        <div className="studio-calendar-column-heading studio-day-corner" style={s.cornerCell} />
 
         {cols.map(artist => (
-          <div key={artist.id} className="studio-calendar-column-heading" style={s.artistHeader}>
+          <div key={artist.id} className="studio-calendar-column-heading studio-day-artist" style={s.artistHeader}>
             {artist.profileImage
               ? <img src={artist.profileImage} alt={artist.name} style={s.artistAvatar} />
               : <div style={{ ...s.artistAvatar, ...s.artistAvatarFallback }}>{initials(artist.name)}</div>
@@ -698,8 +720,9 @@ function DayView({ date, showAll, setShowAll }) {
           </div>
         ))}
 
-        <div style={{ ...s.gutterCol, height: gridH }}>
-          {HOURS.map(h => (
+        <div className="studio-day-gutter" style={{ ...s.gutterCol, height: gridH }}>
+          {/* The first hour is the top edge: its label would sit half under the heading. */}
+          {HOURS.filter(h => h !== DAY_START).map(h => (
             <div key={h} style={{ ...s.hourLabel, top: (h - DAY_START) * hourPx }}>
               {h === 12 ? '12pm' : h < 12 ? `${h}am` : `${h-12}pm`}
             </div>
@@ -710,6 +733,8 @@ function DayView({ date, showAll, setShowAll }) {
           const bookings = byArtist[artist.artistId] ?? [];
           return (
             <div key={artist.id} style={{ ...s.dayCol, height: gridH }}>
+              {/* Now, on today's schedule. */}
+              {nowTop != null && <div className="studio-day-now" aria-hidden="true" style={{ position: 'absolute', left: 0, right: 0, top: nowTop, zIndex: 2, borderTop: '2px solid var(--color-danger, #e5484d)', pointerEvents: 'none' }} />}
               {Array.from({ length: (DAY_END - DAY_START) * 2 }, (_, i) => {
                 const minutes = DAY_START * 60 + i * 30;
                 const label = `${t('new_appointment')} · ${artist.name} · ${slotTime(minutes)}`;
@@ -737,14 +762,18 @@ function DayView({ date, showAll, setShowAll }) {
                 const blockBorder = unconfirmed ? 'rgba(255,255,255,0.18)' : ss.border;
                 const blockBg     = unconfirmed ? 'var(--bg-base)' : ss.bg;
                 const nameColor   = unconfirmed ? 'rgba(255,255,255,0.4)'  : 'var(--text-dim)';
+                const endMin = startMin + durMin;
+                const timeRange = `${slotTime(startMin)} – ${slotTime(endMin)}`;
                 return (
                   <div
                     key={b.bookingId}
+                    className="studio-day-block"
                     data-booking-id={b.bookingId}
                     onClick={() => actions.openDetail(b)}
                     style={{
                       ...s.block, top, height, left: 4, right: 4, width: undefined, zIndex: 1,
-                      background: blockBg,
+                      // The tint over the column's own colour, so hour lines don't show through.
+                      background: `linear-gradient(${blockBg}, ${blockBg}), var(--bg-card)`,
                       border: `1px ${unconfirmed ? 'dashed' : 'solid'} ${blockBorder}55`,
                       borderLeft: `3px ${unconfirmed ? 'dashed' : 'solid'} ${blockBorder}`,
                       cursor: 'pointer',
@@ -755,8 +784,8 @@ function DayView({ date, showAll, setShowAll }) {
                     {height >= 28 && ss.tag && !unconfirmed && (
                       <span style={{ fontSize: '0.6rem', fontWeight: 700, color: ss.tagColor, lineHeight: 1, letterSpacing: '0.03em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ss.tag}</span>
                     )}
-                    {height >= 44 && b.sessionType && <span style={s.blockMeta}>{b.sessionType}</span>}
-                    {height >= 56 && durMin && <span style={s.blockMeta}>{fmtDuration(durMin)}</span>}
+                    {height >= 44 && <span className="studio-day-block-time" style={s.blockMeta}>{timeRange} · {fmtDuration(durMin)}</span>}
+                    {height >= 96 && b.sessionType && <span style={s.blockMeta}>{b.sessionType.charAt(0).toUpperCase()}{b.sessionType.slice(1).replace(/_/g, ' ')}</span>}
                   </div>
                 );
               })}
@@ -1011,6 +1040,7 @@ function StationView({ date }) {
   const { byId: typesById } = useAppointmentTypes();
   const { t } = useLanguage();
   const hourPx = useHourPx();
+  const phone = usePhoneLayout();
   const gridH  = (DAY_END - DAY_START) * hourPx;
   const dateStr = toISO(date);
   const [entries,     setEntries]     = useState([]);
@@ -1134,6 +1164,303 @@ function StationView({ date }) {
   );
 }
 
+
+// ── Phone: List view ─────────────────────────────────────────────────────────
+// A phone held upright opens the schedule as a list of the day's bookings: the date,
+// the week (a dot under days with bookings), artists to filter by, then a card per
+// booking in time order. Day and Week are the calendars, one tap away.
+
+function PhoneViewSwitch({ view, onView }) {
+  const { t } = useLanguage();
+  return (
+    <div className={ps.views} role="group" aria-label="Calendar view">
+      {['list', 'day', 'week'].map(v => (
+        <button key={v} type="button" aria-pressed={view === v} onClick={() => onView(v)}>{t(`sched_${v}`)}</button>
+      ))}
+    </div>
+  );
+}
+
+// The week's bookings and the studio's artists, from the same range and cache as the
+// Week view (so moving between List, Day and Week doesn't fetch again).
+function useWeekEntries(date, refreshKey, enabled = true) {
+  const start = weekStartFor(date), startKey = localDateKey(start);
+  const weekKey = `schedule:week:${startKey}`;
+  const [entries, setEntries] = useState(() => getCached(weekKey));
+  const [artists, setArtists] = useState(() => getCached('artists:approved') ?? []);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    if (!enabled) return undefined;
+    let cancelled = false;
+    const cached = getCached(weekKey), cachedArtists = getCached('artists:approved');
+    if (cached) setEntries(cached); else setEntries(null);
+    setError('');
+    // Same range and cache as the Week view (including the UTC edge days).
+    Promise.all([
+      cached ? { entries: cached } : getStudioScheduleRange(localDateKey(calendarDayAfter(start, -1)), localDateKey(calendarDayAfter(start, 7))),
+      cachedArtists ? { artists: cachedArtists } : getStudioArtists('approved'),
+    ]).then(([sd, ad]) => {
+      const e = sd.entries ?? [], a = ad.artists ?? [];
+      setCached(weekKey, e); setCached('artists:approved', a);
+      if (!cancelled) { setEntries(e); setArtists(a); }
+    }).catch(err => { if (!cancelled) setError(err.message); });
+    return () => { cancelled = true; };
+  }, [weekKey, refreshKey, enabled]); // eslint-disable-line react-hooks/exhaustive-deps
+  return { entries, artists, error };
+}
+
+const dayKeyOf = e => localDateKey(new Date(e.chosenTime));
+
+// The top of the schedule on a phone, in every view: the date (or week), the List / Day /
+// Week switch, and the week with a dot under days that have bookings. children: the
+// filter row (artist chips in List; the Day and Week calendars' own filter).
+function PhoneScheduleHeader({ date, setDate, view, onView, locale, weekEntries, children }) {
+  const { t } = useLanguage();
+  // List passes the week it loaded; Day and Week load it here for the dots.
+  const own = useWeekEntries(date, 0, weekEntries === undefined);
+  const entries = weekEntries === undefined ? own.entries : weekEntries;
+  const start = weekStartFor(date);
+  const todayKey = localDateKey(new Date());
+  const selectedKey = localDateKey(date);
+  const days = Array.from({ length: 7 }, (_, i) => calendarDayAfter(start, i));
+  const busyDays = new Set((entries ?? []).filter(e => e.chosenTime && e.status !== 'cancelled').map(dayKeyOf));
+  const week = view === 'week';
+  const showingToday = week ? days.some(d => localDateKey(d) === todayKey) : selectedKey === todayKey;
+  // Day and Week: everything above the dates slides away with the calendar as it scrolls
+  // (ScheduleScrollFrame foldHeader), leaving the dates. List keeps its header.
+  const calendar = view !== 'list';
+  const compact = useControlsCollapsed() && calendar;
+  const headRow = (
+    <div className={ps.headRow}>
+      <h1 className={ps.heading}>
+        <span className={ps.weekday}>{week ? t('sched_week') : selectedKey === todayKey ? t('today') : date.toLocaleDateString(locale, { weekday: 'long' })}</span>
+        <span className={ps.date}>{week ? weekRangeLabel(date, locale) : date.toLocaleDateString(locale, { day: 'numeric', month: 'long' })}</span>
+      </h1>
+      <div className={ps.headActions}>
+        {!showingToday && <button type="button" className={ps.todayBtn} onClick={() => setDate(new Date())}>{t('today')}</button>}
+      </div>
+    </div>
+  );
+  const strip = <PhoneDateStrip date={date} setDate={setDate} week={week} onView={onView} locale={locale} busyDays={busyDays} />;
+  if (!calendar) return <div className={ps.top}>{headRow}{strip}{children}</div>;
+  return (
+    <div className={ps.top} data-calendar data-compact={compact || undefined}>
+      <div className={ps.fold} inert={compact || undefined}>
+        {headRow}
+        {children}
+        {/* The count and the view switch, under the filter. */}
+        <div className={ps.calendarBar}>
+          <PhoneViewBar view={view} onView={onView} count={entries == null ? null : entries.filter(e => e.chosenTime && e.status !== 'cancelled'
+            && (week ? weekStartFor(new Date(e.chosenTime)).getTime() === start.getTime() : dayKeyOf(e) === selectedKey)).length} />
+        </div>
+      </div>
+      <div data-fold-keep className={ps.keep}>{strip}</div>
+    </div>
+  );
+}
+
+// The dates on a phone: a strip of days that scrolls sideways through eight weeks either
+// side of the shown day and settles on a week (swipe, mouse wheel or drag). Tap a day to
+// show it. A dot marks days with bookings; the 1st of a month shows the month under it.
+// The arrow buttons (shown when focused) are for keyboards and screen readers.
+const STRIP_WEEKS = 8;
+function PhoneDateStrip({ date, setDate, week, onView, locale, busyDays }) {
+  const selectedKey = localDateKey(date);
+  const todayKey = localDateKey(new Date());
+  const shownWeek = weekStartFor(date);
+  const first = calendarDayAfter(shownWeek, -STRIP_WEEKS * 7);
+  const firstKey = localDateKey(first);
+  const days = Array.from({ length: (STRIP_WEEKS * 2 + 1) * 7 }, (_, i) => calendarDayAfter(first, i));
+  const sideScroll = useSideScroll();
+  const scroller = useRef(null);
+  const setScroller = el => { scroller.current = el; sideScroll(el); };
+
+  // Days with bookings across the whole strip (the shown week also comes from the page).
+  const stripKey = `schedule:strip:${firstKey}`;
+  const [stripBusy, setStripBusy] = useState(() => getCached(stripKey) ?? []);
+  useEffect(() => {
+    let cancelled = false;
+    const cached = getCached(stripKey);
+    if (cached) { setStripBusy(cached); return undefined; }
+    getStudioScheduleRange(localDateKey(calendarDayAfter(first, -1)), localDateKey(calendarDayAfter(first, days.length)))
+      .then(d => {
+        const keys = [...new Set((d.entries ?? []).filter(e => e.chosenTime && e.status !== 'cancelled').map(dayKeyOf))];
+        setCached(stripKey, keys);
+        if (!cancelled) setStripBusy(keys);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [stripKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  const busy = new Set([...stripBusy, ...busyDays]);
+
+  // Start on the shown week (it's in the middle of the strip).
+  useEffect(() => {
+    const el = scroller.current;
+    if (!el) return;
+    el.scrollLeft = (STRIP_WEEKS * 7) * (el.clientWidth / 7);
+  }, [firstKey]);
+
+  // The month (and year) of the days in view, as the strip scrolls.
+  const [inView, setInView] = useState(shownWeek);
+  useEffect(() => { setInView(shownWeek); }, [firstKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  // In Week view the calendar follows the strip: once it settles on another week, show it.
+  const settled = useRef(null);
+  function onScroll() {
+    const el = scroller.current;
+    if (!el) return;
+    const index = Math.round(el.scrollLeft / (el.clientWidth / 7));
+    const middle = days[Math.min(days.length - 1, index + 3)];
+    if (middle && (middle.getMonth() !== inView.getMonth() || middle.getFullYear() !== inView.getFullYear())) setInView(middle);
+    if (!week) return;
+    clearTimeout(settled.current);
+    settled.current = setTimeout(() => {
+      const weekIndex = Math.round(el.scrollLeft / el.clientWidth);
+      if (weekIndex !== STRIP_WEEKS) setDate(calendarDayAfter(date, (weekIndex - STRIP_WEEKS) * 7));
+    }, 220);
+  }
+  useEffect(() => () => clearTimeout(settled.current), []);
+
+  return (
+    <div className={ps.stripWrap}>
+      <p className={ps.month} aria-live="polite">{inView.toLocaleDateString(locale, { month: 'long', year: 'numeric' })}</p>
+      <button type="button" className={ps.weekNav} aria-label="Previous week" onClick={() => setDate(calendarDayAfter(date, -7))}><ChevronIcon dir="left" /></button>
+      <div ref={setScroller} className={ps.strip} role="group" aria-label="Dates" onScroll={onScroll}>
+        {days.map(d => {
+          const key = localDateKey(d);
+          const has = busy.has(key);
+          return (
+            <button key={key} type="button" className={ps.day} aria-pressed={!week && key === selectedKey} data-today={key === todayKey || undefined}
+              data-busy={has || undefined} data-monday={d.getDay() === 1 || undefined}
+              aria-label={`${d.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' })}${has ? ', has bookings' : ''}`}
+              data-in-week={(week && localDateKey(weekStartFor(d)) === localDateKey(shownWeek)) || undefined}
+              onClick={() => setDate(d)}>
+              <span className={ps.dayName} aria-hidden="true">{d.toLocaleDateString(locale, { weekday: 'narrow' })}</span>
+              <span className={ps.dayNum} aria-hidden="true">{d.getDate()}</span>
+              {d.getDate() === 1
+                ? <span className={ps.dayMonth} aria-hidden="true">{d.toLocaleDateString(locale, { month: 'short' })}</span>
+                : <span className={ps.dayDot} aria-hidden="true" />}
+            </button>
+          );
+        })}
+      </div>
+      <button type="button" className={ps.weekNav} aria-label="Next week" onClick={() => setDate(calendarDayAfter(date, 7))}><ChevronIcon dir="right" /></button>
+    </div>
+  );
+}
+
+// The row above the bookings: how many there are, and the List / Day / Week switch.
+function PhoneViewBar({ count, view, onView }) {
+  return (
+    <div className={ps.viewBar}>
+      {count == null
+        ? <span className={`skeleton ${ps.summarySkeleton}`} aria-hidden="true" />
+        : <span className={ps.summary}>{count === 1 ? '1 booking' : `${count} bookings`}</span>}
+      <PhoneViewSwitch view={view} onView={onView} />
+    </div>
+  );
+}
+
+function PhoneAgenda({ date, setDate, onView, locale }) {
+  const { t } = useLanguage();
+  const { byId: typesById } = useAppointmentTypes();
+  const [artistFilter, setArtistFilter] = useState('all');
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [nowTick, setNowTick] = useState(() => Date.now());
+  const actions = useBookingActions(() => { invalidatePrefix('schedule:'); setRefreshKey(k => k + 1); });
+  const { entries, artists, error } = useWeekEntries(date, refreshKey);
+  const artistRow = useSideScroll();
+
+  useEffect(() => { const id = setInterval(() => setNowTick(Date.now()), 60000); return () => clearInterval(id); }, []);
+  useEffect(() => {
+    const handler = () => { invalidatePrefix('schedule:'); setRefreshKey(k => k + 1); };
+    window.addEventListener('booking-created', handler);
+    return () => window.removeEventListener('booking-created', handler);
+  }, []);
+
+  const todayKey = localDateKey(new Date(nowTick));
+  const selectedKey = localDateKey(date);
+  const dayEntries = (entries ?? [])
+    .filter(e => e.chosenTime && dayKeyOf(e) === selectedKey)
+    .filter(e => artistFilter === 'all' || e.artistId === artistFilter)
+    .sort((a, b) => new Date(a.chosenTime) - new Date(b.chosenTime));
+  // Artists with bookings this day first, then the rest.
+  const bookedIds = new Set((entries ?? []).filter(e => e.chosenTime && dayKeyOf(e) === selectedKey).map(e => e.artistId));
+  const artistChips = [...artists].sort((a, b) => (bookedIds.has(b.artistId) - bookedIds.has(a.artistId)) || a.name.localeCompare(b.name));
+  const time = at => at.toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' }).toLowerCase();
+  const addBooking = () => window.dispatchEvent(new CustomEvent('vanta:open-new-appointment', { detail: { bookingType: 'studio', slot: { date: selectedKey, time: '10:00', artistId: artistFilter === 'all' ? undefined : artistFilter } } }));
+
+  return (
+    <div className={ps.page}>
+      <PhoneScheduleHeader date={date} setDate={setDate} view="list" onView={onView} locale={locale} weekEntries={entries}>
+        {artists.length > 1 && (
+          <div ref={artistRow} className={ps.artists} role="group" aria-label="Artists shown">
+            <button type="button" className={ps.artist} data-all aria-pressed={artistFilter === 'all'} onClick={() => setArtistFilter('all')}>{t('sched_all_artists')}</button>
+            {artistChips.map(a => (
+              <button key={a.artistId} type="button" className={ps.artist} aria-pressed={artistFilter === a.artistId} onClick={() => setArtistFilter(a.artistId)}>
+                {a.profileImage ? <img src={a.profileImage} alt="" className={ps.avatar} /> : <span className={ps.avatar} aria-hidden="true">{initials(a.name)}</span>}
+                {a.name.split(' ')[0]}
+              </button>
+            ))}
+          </div>
+        )}
+      </PhoneScheduleHeader>
+
+      <div className={ps.body}>
+        <PhoneViewBar count={entries === null ? null : dayEntries.length} view="list" onView={onView} />
+        {error && <p className={ps.message} role="alert">{error}</p>}
+        {!error && entries === null && <ScheduleListSkeleton />}
+        {!error && entries !== null && dayEntries.length === 0 && (
+          <div className={ps.empty}>
+            <p>{artistFilter === 'all' ? 'No bookings this day.' : 'No bookings for this artist this day.'}</p>
+            <button type="button" className={ps.addBtn} onClick={addBooking}>{t('new_appointment')}</button>
+          </div>
+        )}
+        {dayEntries.map(e => {
+          const at = new Date(e.chosenTime);
+          const end = new Date(at.getTime() + (e.durationMins ?? 60) * 60000);
+          const ss = entryStyle(e, typesById);
+          const unconfirmed = e.status === 'requires_confirmation' || e.status === 'awaiting_payment';
+          const now = nowTick >= at.getTime() && nowTick < end.getTime() && e.status !== 'cancelled';
+          const past = !now && end.getTime() <= nowTick;
+          const statusKey = { awaiting_payment: 'status_awaiting_payment', requires_confirmation: 'status_needs_confirmation', completed: 'status_completed', cancelled: 'status_cancelled' }[e.status];
+          const what = [e.sessionType ? `${e.sessionType.charAt(0).toUpperCase()}${e.sessionType.slice(1).replace(/_/g, ' ')}` : null, e.stationName].filter(Boolean).join(' · ');
+          const artist = artists.find(a => a.artistId === e.artistId);
+          const avatar = e.profileImage || artist?.profileImage;
+          return (
+            <button key={e.bookingId} type="button" className={ps.card} data-booking-id={e.bookingId} data-selected={actions.selectedEntry?.bookingId === e.bookingId || undefined}
+              data-now={now || undefined} data-past={past || undefined} onClick={() => actions.openDetail(e)}>
+              <span className={ps.times}>
+                <span className={ps.start}>{time(at)}</span>
+                <span className={ps.end}>{time(end)}</span>
+              </span>
+              <span className={ps.bar} style={{ '--bar': ss.border }} data-dashed={unconfirmed || undefined} aria-hidden="true" />
+              <span className={ps.info}>
+                <span className={ps.client}>{e.clientName}</span>
+                <span className={ps.what}>
+                  {ss.tag && <strong style={{ color: ss.typed ? ss.border : undefined }}>{ss.tag}</strong>}
+                  {ss.tag && what ? ' · ' : ''}{what}
+                </span>
+                <span className={ps.who}>
+                  {e.artistName && (
+                    <span className={ps.whoName}>
+                      {avatar ? <img src={avatar} alt="" className={ps.avatar} /> : <span className={ps.avatar} aria-hidden="true">{initials(e.artistName)}</span>}
+                      {e.artistName}
+                    </span>
+                  )}
+                  {now && <span className={`${ps.tag} ${ps.nowTag}`}>Now</span>}
+                  {statusKey && <span className={ps.tag} style={{ color: statusColors(e.status).text, background: statusColors(e.status).bg }}>{t(statusKey)}</span>}
+                </span>
+              </span>
+              <svg className={ps.chev} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
+            </button>
+          );
+        })}
+      </div>
+      <BookingOverlays actions={actions} />
+    </div>
+  );
+}
+
 // ── Page shell ────────────────────────────────────────────────────────────────
 
 const LANG_LOCALE = { en: 'en-AU', 'zh-Hans': 'zh-CN', ko: 'ko-KR' };
@@ -1142,6 +1469,14 @@ export default function SchedulePage() {
   const { t, lang } = useLanguage();
   const locale = LANG_LOCALE[lang] ?? 'en-AU';
   const [view,      setView]      = useState('week');  // 'week' | 'day' (month view hidden for now)
+  // A phone held upright opens on the List view of today (components below); Day and
+  // Week are its calendars. Turned sideways, the whole week fits, so it opens on Week.
+  const phone = usePhoneLayout();
+  useEffect(() => {
+    if (window.matchMedia('(max-width: 760px) and (orientation: portrait)').matches && !new URLSearchParams(window.location.search).get('view')) setView('list');
+  }, []);
+  // Rotated to landscape (or a wider window), List isn't offered: show the day.
+  useEffect(() => { if (!phone) setView(current => (current === 'list' ? 'day' : current)); }, [phone]);
   const [showAll, setShowAll] = useState(false);
   // The schedule always groups by artist. Station views (StationView, StationMonthView) are kept but not shown.
   const lens = 'artist';
@@ -1204,9 +1539,13 @@ export default function SchedulePage() {
   }, [view, monthStart, dayDate]);
 
 
+  if (phone && view === 'list') {
+    return <PhoneAgenda date={dayDate} setDate={setDayDate} onView={changeView} locale={locale} />;
+  }
+
   return (
-    <ScheduleScrollFrame style={s.page} resetKey={`${view}:${lens}:${toISO(view === 'month' ? monthStart : dayDate)}`}>
-      <ScheduleControls>
+    <ScheduleScrollFrame style={s.page} resetKey={`${view}:${lens}:${toISO(view === 'month' ? monthStart : dayDate)}`} foldHeader={phone}>
+      <ScheduleControls fold={phone}>
       <div className="studio-calendar-toolbar" role="toolbar" aria-label="Calendar controls">
         <button type="button" aria-label="Open studio navigation" onClick={() => window.dispatchEvent(new Event('vanta:open-navigation'))}>☰</button>
         <select aria-label="Calendar view" value={`${view}:${lens}${view === 'day' && lens === 'artist' && showAll ? ':all' : ''}`} onChange={event => {
@@ -1224,11 +1563,18 @@ export default function SchedulePage() {
         <button type="button" onClick={goToday}>{t('today')}</button>
         <button type="button" className="studio-calendar-add" aria-label={t('new_appointment')} title={t('new_appointment')} onClick={() => window.dispatchEvent(new CustomEvent('vanta:open-new-appointment', { detail: { bookingType: 'walkin' } }))}>＋</button>
       </div>
+      {phone ? (
+        <>
+          <PhoneScheduleHeader date={dayDate} setDate={setDayDate} view={view} onView={changeView} locale={locale}>
+            <div className={`studio-schedule-filter-slot ${ps.filterRow}`} />
+          </PhoneScheduleHeader>
+        </>
+      ) : (
       <div className="studio-feature-header" style={s.header}>
         <h1 className="sr-only">{t('nav_schedule')}</h1>
         <div className="studio-schedule-toggles" style={s.tabs} role="group" aria-label="Calendar view">
           {/* Month view is hidden for now; the sidebar calendar covers the month. */}
-          {['week', 'day'].map(v => (
+          {(phone ? ['list', 'day', 'week'] : ['week', 'day']).map(v => (
             <button key={v} aria-pressed={view === v} onClick={() => changeView(v)} style={{ ...s.tab, ...(view === v ? s.tabActive : {}) }}>
               {t(`sched_${v}`)}
             </button>
@@ -1239,10 +1585,14 @@ export default function SchedulePage() {
           <div className="studio-schedule-filter-slot" style={{ display: 'contents' }} />
           <button onClick={goToday} disabled={showingToday} style={{ ...s.todayBtn, ...(showingToday ? s.todayBtnOff : {}) }} title={showingToday ? 'Showing today' : 'Go to today'}>{t('today')}</button>
           <button aria-label={`Previous ${period}`} title={`Previous ${period}`} onClick={() => navigate(-1)} style={s.navBtn}><ChevronIcon dir="left" /></button>
-          <span className="studio-schedule-date-label" style={s.navLabel} aria-live="polite">{headerLabel}</span>
+          <span className="studio-schedule-date-label" style={s.navLabel} aria-live="polite">
+            <span className="studio-schedule-date-long">{headerLabel}</span>
+            <span className="studio-schedule-date-short" aria-hidden="true">{view === 'day' ? dayDate.toLocaleDateString(locale, { weekday: 'short', day: 'numeric', month: 'short' }) : weekLabel}</span>
+          </span>
           <button aria-label={`Next ${period}`} title={`Next ${period}`} onClick={() => navigate(1)} style={s.navBtn}><ChevronIcon dir="right" /></button>
         </div>
       </div>
+      )}
 
       </ScheduleControls>
       {view === 'month' && lens === 'artist'  && <MonthView        monthStart={monthStart} onDayClick={goToDayView} />}

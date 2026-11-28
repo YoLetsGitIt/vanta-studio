@@ -10,3 +10,6 @@
 @media (prefers-reduced-motion: reduce) {
   .controls { transition: none; }
 }
+/* A phone: the header moves up with the calendar (transform only, set as it scrolls) and
+   lies over it, so it has its own background and stacks above. */
+.foldControls { position: relative; z-index: 8; /* over the calendar (up to 7), under panels (30) */  flex-shrink: 0; min-width: 0; background: var(--bg-base); will-change: transform; }

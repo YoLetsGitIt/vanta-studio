@@ -622,21 +622,27 @@ export default function BookingDetailPanel({
   // Older bookings have no confirmed_at: the deposit, or the client's claim (which confirms them), dates it.
   const confirmedAt = booking?.confirmed_at ?? depositConfirmedAt ?? (wasConfirmed ? clientSaysPaid?.recorded_at : null) ?? null;
   const toMinute = at => Math.floor(new Date(at).getTime() / 60000);
+  // A walk-in has no request, confirmation or upcoming appointment: it starts when the
+  // client filled in the walk-in form (or when the studio added them).
+  const walkIn = normalizeBookingSource(source) === 'walkin';
+  const walkInFormAt = booking?.walkin_form_at ?? null;
   const timeline = [
-    createdAt && { at: createdAt, label: t('bdp_requested_at'), first: true },
+    walkIn
+      ? (walkInFormAt || createdAt) && { at: walkInFormAt || createdAt, label: walkInFormAt ? 'Filled in the walk-in form' : 'Added as a walk-in', first: true }
+      : createdAt && { at: createdAt, label: t('bdp_requested_at'), first: true },
     currentOffer?.email_sent_at && { at: currentOffer.email_sent_at, label: 'Times offered' },
     status === 'awaiting_payment' && updatedAt && { at: updatedAt, label: t('bdp_link_sent') },
     clientSaysPaid?.recorded_at && { at: clientSaysPaid.recorded_at, label: `${firstName} says they paid the deposit` },
     depositPaidAt && { at: depositPaidAt, label: `Deposit paid${depositPaidVia ? ` by ${depositPaidVia}` : ''}` },
-    confirmedAt && { at: confirmedAt, label: 'Booking confirmed' },
-    chosenTime && !ended && { at: chosenTime, label: 'Appointment' },
+    !walkIn && confirmedAt && { at: confirmedAt, label: 'Booking confirmed' },
+    !walkIn && chosenTime && !ended && { at: chosenTime, label: 'Appointment' },
     booking?.artist_outcome_recorded_at && { at: booking.artist_outcome_recorded_at, label: 'Artist recorded the session' },
     outcomeAt && { at: outcomeAt, label: isNoShow ? 'Marked as no show' : 'Marked complete' },
     ended && updatedAt && { at: updatedAt, label: statusLabel(rawStatus) },
   ].filter(item => item && Number.isFinite(new Date(item.at).getTime()))
     // Same minute keeps the order above (they said they paid, then it was confirmed).
     .sort((a, b) => (a.first ? -1 : b.first ? 1 : toMinute(a.at) - toMinute(b.at)));
-  if (wasConfirmed && !confirmedAt) {
+  if (wasConfirmed && !confirmedAt && !walkIn) {
     // Undated: goes just before the appointment, or at the end.
     const at = timeline.findIndex(item => item.label === 'Appointment');
     timeline.splice(at < 0 ? timeline.length : at, 0, { at: null, label: 'Booking confirmed' });
@@ -644,31 +650,41 @@ export default function BookingDetailPanel({
   const now = Date.now();
   const hasTimeline = timeline.length > 0 || (status === 'awaiting_payment' && selectionTokenExpiresAt) || (holdExpiresAt && canConfirm);
 
+  const canViewClient = Boolean(email || (clientName && clientName !== '—'));
+  function openClient() {
+    const key = email || clientName;
+    (onLeave ?? onClose)?.();
+    router.push(`/dashboard/clients?client=${encodeURIComponent(key)}`);
+  }
+
   return (
     <>
     {!embedded && <PanelBackdrop onClose={onClose} />}
     <aside className={`studio-booking-detail ${panelLayout.panel}`} aria-label={`${clientName} booking details`} style={panelStyle}>
       <div className="studio-bdp-header" style={p.header}>
         <div className="studio-bdp-headtext" style={p.headerText}>
-          <span style={p.title}>{clientName}</span>
+          {/* On a phone the name is the way to the client's page (no separate View client row). */}
+          {canViewClient ? (
+            <button type="button" className="studio-bdp-name" onClick={openClient} aria-label={`${clientName}, view client`}
+              style={{ ...p.title, background: 'none', border: 0, padding: 0, textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit', alignSelf: 'flex-start' }}>
+              {clientName}<span className="studio-bdp-name-chevron" aria-hidden="true"> ›</span>
+            </button>
+          ) : <span style={p.title}>{clientName}</span>}
           {(email || phone || clientAge != null) && (
-            <div style={p.contact}>
+            <div className="studio-bdp-contact" style={p.contact}>
               {email && (
-                <button type="button" style={p.contactLink} title="Copy email" aria-label={`Copy email: ${email}`}
+                <button type="button" className="studio-bdp-email" style={p.contactLink} title="Copy email" aria-label={`Copy email: ${email}`}
                   onClick={() => navigator.clipboard.writeText(email).then(() => showFeedback('Email copied.', 'success')).catch(showError)}>
                   {email}
                 </button>
               )}
-              {email && phone && <span aria-hidden="true" style={{ color: 'var(--text-ghost)' }}>·</span>}
+              {email && phone && <span className="studio-bdp-sep" aria-hidden="true" style={{ color: 'var(--text-ghost)' }}>·</span>}
               {phone && <a href={`sms:${phone}`} style={p.contactLink} title="Send a text">{phone}</a>}
-              {clientAge != null && (email || phone) && <span aria-hidden="true" style={{ color: 'var(--text-ghost)' }}>·</span>}
-              {clientAge != null && <span style={{ ...p.contactLink, cursor: 'default' }}>{fmtDob(String(clientDob).slice(0, 10))} ({clientAge} yrs)</span>}
-              {(email || (clientName && clientName !== '—')) && (
-                <button type="button" style={{ ...p.textLink, marginLeft: '0.35rem' }} onClick={() => {
-                  const key = email || clientName;
-                  (onLeave ?? onClose)?.();
-                  router.push(`/dashboard/clients?client=${encodeURIComponent(key)}`);
-                }}>{t('bdp_view_client')}</button>
+              {clientAge != null && (email || phone) && <span className="studio-bdp-sep" aria-hidden="true" style={{ color: 'var(--text-ghost)' }}>·</span>}
+              {clientAge != null && (
+                <span className="studio-bdp-age" style={{ ...p.contactLink, cursor: 'default' }} title={fmtDob(String(clientDob).slice(0, 10))}>
+                  <span className="studio-bdp-dob">{fmtDob(String(clientDob).slice(0, 10))} (</span>{clientAge} yrs<span className="studio-bdp-dob">)</span>
+                </span>
               )}
             </div>
           )}
@@ -697,6 +713,9 @@ export default function BookingDetailPanel({
               </span>
             )}
             {clientAge != null && clientAge < 18 && <Pill tone="warning">{t('bdp_minor')}</Pill>}
+            {canViewClient && (
+              <button type="button" className="studio-bdp-view-client" style={{ ...p.textLink, marginLeft: '0.2rem' }} onClick={openClient}>{t('bdp_view_client')}</button>
+            )}
           </div>
         </div>
         <IconButton onClick={onClose} aria-label="Close booking details">✕</IconButton>
@@ -725,7 +744,7 @@ export default function BookingDetailPanel({
                     {start.toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long', year: start.getFullYear() === new Date().getFullYear() ? undefined : 'numeric' })}
                     {!ended && <span style={p.heroRelative}>{relativeDay(start)}</span>}
                   </span>
-                  <span style={p.heroTime}>{clock(start)}{end ? ` – ${clock(end)}` : ''}</span>
+                  <span className="studio-bdp-hero-time" style={p.heroTime}>{clock(start)}{end ? ` – ${clock(end)}` : ''}</span>
                 </div>
                 {/* Edits what this card shows: the time, length, artist and station. */}
                 {canEdit && (
@@ -937,12 +956,12 @@ export default function BookingDetailPanel({
           const consentTone = consentStatus === 'current' ? 'success' : consentStatus === 'outdated' ? 'warning' : 'danger';
           return (
             <div className={panelLayout.glance} style={{ ...p.glance, '--tiles': showConsent ? 2 : 1 }}>
-              <section style={p.summaryCard} aria-labelledby="bdp-payment-title">
-                <div style={p.summaryRow}>
+              <section className="studio-detail-section" style={p.summaryCard} aria-labelledby="bdp-payment-title">
+                <div className="studio-summary-row" style={p.summaryRow}>
                   <h3 id="bdp-payment-title" style={p.sectionTitle}>Payment</h3>
                   {pill && <Pill tone={pill.tone}>{pill.text}</Pill>}
                 </div>
-                <div style={p.payRows}>
+                <div className="studio-pay-rows" style={p.payRows}>
                   {canEditQuote ? (
                     <EditableQuote key={bookingId} label={priceLabel} value={quote} money={money} disabled={actionLoading}
                       onSave={async value => {
@@ -952,18 +971,18 @@ export default function BookingDetailPanel({
                         forgetBookings();
                       }} />
                   ) : (
-                    <div style={p.summaryRow}>
+                    <div className="studio-summary-row" style={p.summaryRow}>
                       <span style={p.factLabel}>{priceLabel}</span>
                       <span style={price != null ? { ...p.factValue, ...p.factStrong } : p.summaryMuted}>{price != null ? money(price) : 'Not set'}</span>
                     </div>
                   )}
                   {showCompleted && finalPrice != null && quote != null && quote !== finalPrice && (
-                    <div style={p.summaryRow}>
+                    <div className="studio-summary-row" style={p.summaryRow}>
                       <span style={p.factLabel}>{t('bdp_quoted')}</span>
                       <span style={p.summaryMuted}>{money(quote)}</span>
                     </div>
                   )}
-                  <div style={p.summaryRow}>
+                  <div className="studio-summary-row" style={p.summaryRow}>
                     <span style={p.factLabel}>{t('bdp_deposit')}</span>
                     {hasDeposit
                       ? <span style={{ ...p.factValue, fontWeight: 600, ...(paid ? {} : { color: 'var(--text-dim)' }) }}>{depositAmount != null ? money(depositAmount) : '—'}</span>
@@ -997,8 +1016,8 @@ export default function BookingDetailPanel({
               </section>
 
               {showConsent && (
-                <section style={p.summaryCard} aria-labelledby="bdp-consent-title">
-                  <div style={p.summaryRow}>
+                <section className="studio-detail-section" style={p.summaryCard} aria-labelledby="bdp-consent-title">
+                  <div className="studio-summary-row" style={p.summaryRow}>
                     <h3 id="bdp-consent-title" style={p.sectionTitle}>{t('bdp_consent')}</h3>
                     {consentLoading || submissionsLoading ? <Pill>{t('loading')}</Pill> : <Pill tone={consentTone}>{consentLabel}</Pill>}
                   </div>
@@ -1428,10 +1447,10 @@ function EditableQuote({ label, value, money, disabled, onSave }) {
   };
   if (draft === null) {
     return (
-      <div style={p.summaryRow}>
+      <div className="studio-summary-row" style={p.summaryRow}>
         <span style={p.factLabel}>{label}</span>
         <span style={p.quoteAmount}>
-          <span style={value != null ? { ...p.factValue, ...p.factStrong } : p.summaryMuted}>{value != null ? money(value) : 'Not set'}</span>
+          <span style={value != null ? { ...p.factValue, ...p.factStrong, whiteSpace: 'nowrap', overflowWrap: 'normal' } : p.summaryMuted}>{value != null ? money(value) : 'Not set'}</span>
           <button type="button" className="studio-quote-edit" style={p.quoteEdit} disabled={disabled} aria-label={value != null ? `Edit ${label.toLowerCase()}` : `Add ${label.toLowerCase()}`}
             onClick={() => setDraft(value != null ? String(value) : '')}>{value != null ? 'Edit' : 'Add'}</button>
         </span>
@@ -1440,7 +1459,7 @@ function EditableQuote({ label, value, money, disabled, onSave }) {
   }
   return (
     <form style={p.quoteForm} onSubmit={save} onKeyDown={event => { if (event.key === 'Escape') { event.stopPropagation(); cancel(); } }}>
-      <div style={p.summaryRow}>
+      <div className="studio-summary-row" style={p.summaryRow}>
         <label htmlFor="bdp-quote" style={p.factLabel}>{label}</label>
         <span style={p.quoteFields}>
           <span className="studio-quote-money" style={p.quoteMoney}>
@@ -1577,7 +1596,8 @@ const p = {
   contactLink: { background: 'none', border: 'none', padding: 0, color: 'var(--text-dim)', fontSize: '0.875rem', fontFamily: 'inherit', cursor: 'pointer', textDecoration: 'none', overflowWrap: 'anywhere', textAlign: 'left' },
   glance: { display: 'grid', gap: '0.5rem', alignItems: 'stretch' },
   summaryCard: { display: 'flex', flexDirection: 'column', gap: '0.7rem', minWidth: 0, padding: '1rem 1.1rem', borderRadius: 14, background: 'var(--bg-card)', border: '1px solid var(--border)' },
-  summaryRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', minHeight: 26 },
+  // Wraps (value under its label) when large text leaves no room side by side.
+  summaryRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.15rem 0.75rem', minHeight: 26 },
   summaryMuted: { fontSize: '0.9rem', fontWeight: 500, color: 'var(--text-muted)' },
   summaryDivider: { borderTop: '1px solid var(--border)' },
   heroNote: { marginTop: '0.4rem', fontSize: '0.9rem', color: 'var(--color-danger)', fontWeight: 600 },

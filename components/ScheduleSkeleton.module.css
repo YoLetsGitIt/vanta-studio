@@ -1,0 +1,54 @@
+/* Placeholders for the schedule on a phone (ScheduleSkeleton.js). Shapes and sizes follow
+   PhoneSchedule.module.css and the calendars, in rem where those are. */
+.bone { display: block; border-radius: 6px; background: var(--bg-chip); }
+
+/* List view cards */
+.list { display: flex; flex-direction: column; gap: 10px; }
+.card {
+  display: grid; grid-template-columns: 4.25rem 4px minmax(0, 1fr); column-gap: 12px; align-items: stretch;
+  padding: 14px 12px 14px 14px; border-radius: 14px; border: 1px solid var(--border-faint); background: var(--bg-card);
+}
+.times { display: flex; flex-direction: column; gap: 6px; padding-top: 2px; }
+.time { width: 3.25rem; height: 0.9375rem; }
+.timeEnd { width: 2.5rem; height: 0.75rem; }
+.bar { border-radius: 4px; min-height: 3.5rem; }
+.info { display: flex; flex-direction: column; gap: 7px; min-width: 0; padding-top: 2px; }
+.name { height: 1rem; }
+.what { height: 0.8125rem; }
+.who { display: flex; align-items: center; gap: 8px; margin-top: 2px; }
+.face { width: 1.5rem; height: 1.5rem; border-radius: 50%; flex-shrink: 0; }
+.whoName { width: 4.5rem; height: 0.8125rem; }
+
+/* Day / Week calendar */
+.calendar { --hour: 80px; flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+.heads { display: grid; grid-template-columns: 44px repeat(var(--cols), minmax(0, 1fr)); height: 64px; flex-shrink: 0; background: var(--bg-sidebar); border-bottom: 1px solid var(--border); }
+.corner { border-right: 1px solid var(--border); }
+.head { display: flex; align-items: center; gap: 8px; padding: 0 8px; min-width: 0; border-right: 1px solid var(--border-faint); }
+.head:last-child { border-right: 0; }
+.headName { width: 4.5rem; height: 0.875rem; }
+.headDay { display: flex; flex-direction: column; gap: 6px; }
+.headSmall { width: 1.75rem; height: 0.6875rem; }
+.headDate { width: 3.25rem; height: 1.25rem; }
+.hours {
+  position: relative; flex: 1; display: grid; grid-template-columns: 44px repeat(var(--cols), minmax(0, 1fr));
+  background-image: linear-gradient(var(--border-faint) 1px, transparent 1px); background-size: 100% var(--hour);
+}
+.gutter { position: relative; border-right: 1px solid var(--border); background: var(--bg-base); }
+.hourLabel { position: absolute; right: 8px; width: 24px; height: 0.625rem; transform: translateY(-50%); }
+.col { border-right: 1px solid var(--border-faint); }
+.col:last-child { border-right: 0; }
+.block { position: absolute; border-radius: 8px; opacity: 0.7; }
+
+/* The whole page, before the studio loads */
+.boot { display: flex; flex-direction: column; min-width: 0; }
+.bootHead { padding: 10px 16px 10px; }
+.bootTitle { display: flex; flex-direction: column; gap: 8px; }
+.weekday { width: 4.5rem; height: 0.8125rem; }
+.date { width: 10rem; height: 1.625rem; }
+.strip { display: grid; grid-template-columns: repeat(7, 1fr); padding: 14px 8px 4px; }
+.stripDay { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 6px 0 10px; }
+.stripLetter { width: 0.625rem; height: 0.6875rem; }
+.stripNum { width: 2.1rem; height: 2.1rem; border-radius: 50%; }
+.chips { display: flex; gap: 8px; overflow: hidden; padding: 10px 16px 12px; border-bottom: 1px solid var(--border); }
+.chip { height: 40px; border-radius: 999px; flex-shrink: 0; }
+.bootBody { padding: 14px 16px 28px; }

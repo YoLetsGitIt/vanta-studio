@@ -9,6 +9,8 @@ import { hasArtist } from '@/lib/format';
 import { useLanguage } from '@/lib/i18n';
 import { calendarDayAfter, capDayLanes, layoutDayLanes, localDateKey, weekHourRange, weekStartFor, weekSchedule } from '@/lib/scheduleWeek.mjs';
 import styles from './ScheduleWeekView.module.css';
+import { ScheduleCalendarSkeleton } from './ScheduleSkeleton';
+import { usePhoneLayout } from '@/lib/usePhoneLayout';
 
 // Where the schedule's filter goes: the header next to "Today", or on a rotated phone the
 // one-row toolbar.
@@ -44,6 +46,7 @@ export default function ScheduleWeekView({ date, lens, refreshKey, selectedBooki
   const [focusedSlot, setFocusedSlot] = useState(null);
   const scrollRef = useRef(null);
   const toolbarSlot = useScheduleFilterSlot();
+  const phone = usePhoneLayout();
 
   useEffect(() => { setFilter('all'); }, [lens]);
   useEffect(() => { setOpenMore(null); }, [startKey, lens, filter]);
@@ -96,6 +99,10 @@ export default function ScheduleWeekView({ date, lens, refreshKey, selectedBooki
     if (!scroller || !column) return;
     // A little short of the hour line, so its label isn't cut off under the headings.
     scroller.scrollTop = Math.max(0, (scrollHour - startHour) * (column.offsetHeight / (endHour - startHour)) - 12);
+    // On a phone only a few days fit: start on today when it's in this week.
+    const todayColumn = scroller.querySelector('section[data-today]');
+    const gutter = scroller.querySelector('[data-gutter]');
+    if (todayColumn && scroller.scrollWidth > scroller.clientWidth) scroller.scrollLeft = todayColumn.offsetLeft - (gutter?.offsetWidth ?? 0);
   }, [loading, startKey, lens, scrollHour, startHour, endHour]);
 
   function addBooking(day, minutes) {
@@ -127,6 +134,13 @@ export default function ScheduleWeekView({ date, lens, refreshKey, selectedBooki
     scrollRef.current?.querySelector(`[data-booking-slot="${days[nextDay].key}-${nextMinutes}"]`)?.focus();
   }
 
+  // A phone: the calendar's shape (and the filter, unusable yet) while it loads.
+  if (loading && phone) return (
+    <div className={styles.view}>
+      {toolbarSlot && createPortal(<select className="studio-schedule-filter-select" aria-label={t('sched_week_filter')} disabled><option>{t(lens === 'artist' ? 'sched_all_artists' : 'sched_all_stations')}</option></select>, toolbarSlot)}
+      <ScheduleCalendarSkeleton kind="week" columns={3} />
+    </div>
+  );
   if (loading) return <p className={styles.message} role="status">{t('loading')}</p>;
   if (error) return <div className={styles.message} role="alert"><p>{error}</p><button type="button" className={styles.retry} onClick={() => { invalidatePrefix('schedule:'); setRetry(value => value + 1); }}>{t('sched_retry')}</button></div>;
 
@@ -142,7 +156,7 @@ export default function ScheduleWeekView({ date, lens, refreshKey, selectedBooki
       {toolbarSlot && createPortal(filterSelect, toolbarSlot)}
       <div ref={scrollRef} className={`studio-calendar-scroll ${styles.scroll}`} tabIndex={0} role="region" aria-label={t('sched_week_schedule')}>
         <div className={styles.days} style={{ '--hours': hours.length }}>
-          <div className={styles.gutter} aria-hidden="true">
+          <div className={styles.gutter} data-gutter aria-hidden="true">
             <div className={styles.corner} />
             <div className={styles.gutterHours}>
               {hours.map(hour => <span key={hour} className={styles.hourLabel} style={{ top: `${(hour - startHour) / hours.length * 100}%` }}>{hour === startHour ? '' : hourLabel(hour)}</span>)}
@@ -153,7 +167,7 @@ export default function ScheduleWeekView({ date, lens, refreshKey, selectedBooki
             // Too many at once to show here: the heading points to Day view (a column per artist).
             const busy = laid.overflow.length > 0;
             return (
-            <section key={day.key} className={`${styles.day} ${day.key === today ? styles.today : ''}`} aria-label={day.date.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' })}>
+            <section key={day.key} data-today={day.key === today || undefined} className={`${styles.day} ${day.key === today ? styles.today : ''}`} aria-label={day.date.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' })}>
               <button type="button" className={styles.dayHeading} data-busy={busy || undefined} onClick={() => onDayClick(day.date)} aria-current={day.key === today ? 'date' : undefined}
                 aria-label={`${day.date.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' })}, ${day.bookings.length} bookings. Open in Day view`} title="Open in Day view, one column per artist">
                 <span className={styles.dayName}>
