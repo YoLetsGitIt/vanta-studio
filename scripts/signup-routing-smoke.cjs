@@ -36,7 +36,7 @@ const base = process.env.STUDIO_TEST_URL || 'http://127.0.0.1:4173';
 
       assert.equal((await page.goto(base + '/')).status(), 200);
       await page.getByRole('heading', { name: 'Welcome back' }).waitFor();
-      const backToStudio = page.getByRole('link', { name: 'Back to studio', exact: true });
+      const backToStudio = page.getByRole('link', { name: 'vanta.tattoo', exact: true }); // back to the studio page on the website
       assert.equal(new URL(await backToStudio.getAttribute('href')).pathname, '/studio');
       await page.goto(base + '/signup/');
       await page.getByRole('heading', { name: 'Start your free trial', exact: true }).waitFor();

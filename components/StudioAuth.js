@@ -7,6 +7,7 @@ import SignUpFlow from '@/components/SignUpFlow';
 import Button from '@/components/ui/Button';
 import Field from '@/components/ui/Field';
 import StatePanel from '@/components/ui/StatePanel';
+import SpaceAccent from '@/components/SpaceAccent';
 import styles from './StudioAuth.module.css';
 const marketing = (process.env.NEXT_PUBLIC_MARKETING_URL || 'https://vanta.tattoo').replace(/\/$/, '');
 
@@ -119,26 +120,22 @@ export default function StudioAuth({ initialTab = 'signin', mode = initialTab })
   if (checking) return <StatePanel title="Loading your studio…" busy />;
 
   return (
-    <div data-theme="dark" className={styles.page}>
-      <div className={styles.scene} aria-hidden="true">
-        <picture>
-          <source media="(max-width: 700px)" srcSet="/studio/walkthrough/portrait/0183.webp" />
-          <img src="/studio/walkthrough/landscape/0183.webp" alt="" fetchPriority="high" />
-        </picture>
-      </div>
+    <div className={styles.page}>
+      {/* The same wordmark and colours as the dashboard (light or dark, as chosen there). */}
       <header className={styles.header}>
         <a className={styles.brand} href={marketing} aria-label="Vanta home">
-          vanta<span>.</span><small>STUDIO</small>
+          <SpaceAccent />
+          <span className={styles.brandMark}>vanta</span><span className={styles.brandSub}>studio</span>
         </a>
         <a className={styles.returnLink} href={`${marketing}/studio`}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path d="m10 5-7 7 7 7M3 12h18" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="m10 5-7 7 7 7M3 12h18" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
-          Back to studio
+          vanta.tattoo
         </a>
       </header>
       <main className={styles.main}>
-      <section className={styles.card} aria-label={tab === 'signup' ? 'Create your Vanta account' : 'Sign in to Vanta'}>
+      <section className={styles.card} data-tab={tab} aria-label={tab === 'signup' ? 'Create your Vanta account' : 'Sign in to Vanta'}>
         {tab === 'forgot' ? (
           <>
             <h1 style={s.authHeading}>Reset your password</h1>
@@ -258,16 +255,17 @@ function LockIcon({ size = 16 }) {
 
 const s = {
   authHeading: {
-    fontSize: 'clamp(1.65rem, 3vw, 2rem)',
-    fontWeight: 500,
+    fontSize: '1.625rem',
+    fontWeight: 700,
     color: 'var(--text)',
-    margin: '0 0 0.5rem',
-    letterSpacing: '-0.01em',
+    margin: '0 0 0.375rem',
+    letterSpacing: '-0.02em',
+    lineHeight: 1.2,
   },
   authSubheading: {
-    fontSize: '0.85rem',
+    fontSize: '0.9375rem',
     color: 'var(--text-muted)',
-    margin: '0 0 1.5rem',
+    margin: '0 0 1.75rem',
     lineHeight: 1.5,
   },
   inputIcon: {
@@ -285,40 +283,42 @@ const s = {
     background: 'none',
     border: 'none',
     color: 'var(--text-muted)',
-    fontSize: '0.8rem',
+    fontSize: '0.875rem',
+    fontWeight: 500,
     cursor: 'pointer',
     padding: '0.25rem 0',
-    textDecoration: 'underline',
-    textUnderlineOffset: 3,
+    minHeight: 32,
   },
   switchLine: {
-    fontSize: '0.85rem',
+    fontSize: '0.875rem',
     color: 'var(--text-muted)',
     textAlign: 'center',
-    marginTop: '1.5rem',
+    margin: '1.5rem 0 0',
   },
   switchLink: {
     background: 'none',
     border: 'none',
-    color: 'var(--accent)',
-    fontWeight: 600,
+    color: 'var(--text)',
+    fontWeight: 650,
     fontSize: 'inherit',
     cursor: 'pointer',
     padding: 0,
     textDecoration: 'underline',
     textUnderlineOffset: 3,
+    textDecorationColor: 'var(--border-strong)',
   },
   form: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '1.1rem',
+    gap: '1rem',
   },
   input: {
     background: 'var(--bg-input)',
     border: '1px solid var(--border)',
     borderRadius: 8,
+    minHeight: 44,
     padding: '0.65rem 0.85rem',
-    fontSize: '0.9rem',
+    fontSize: '0.9375rem',
     color: 'var(--text)',
     outline: 'none',
     width: '100%',
