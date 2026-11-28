@@ -112,11 +112,8 @@ const template = { id: 'tmpl-1', name: 'Walk-in consent', requires_signature: fa
       assert.equal(answers.home, '8 Lygon St, Carlton 3053, Australia', 'The one-line address is the answer to the field');
       const parts = JSON.parse(answers.__address_parts__);
       assert.deepEqual([parts.line1, parts.suburb, parts.postcode], ['8 Lygon St', 'Carlton', '3053'], 'The address goes with the signed form');
-      // Shared iPad: start fresh for the next client.
-      await page.getByRole('button', { name: 'Start a new walk-in' }).click();
-      await page.getByPlaceholder('First name', { exact: true }).waitFor();
-      assert.equal(await page.getByPlaceholder('First name', { exact: true }).inputValue(), '');
-      assert.equal(await page.getByPlaceholder('Last name', { exact: true }).inputValue(), '');
+      // The client is done: no way to start another walk-in from their confirmation.
+      assert.equal(await page.getByRole('button', { name: /new walk-in/i }).count(), 0);
       assert.deepEqual(errors, []);
       console.log(`PASS walk-in form at ${width}px`);
       await context.close();

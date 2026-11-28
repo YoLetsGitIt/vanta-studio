@@ -571,8 +571,6 @@ function IntakeInner({ mode, onStyle }) {
             : bookedArtist ? `${bookedArtist} will be with you shortly.` : 'Your artist will be with you shortly.'}
           {' '}Take a seat and let the front desk know you're here.
         </p>
-        {/* Studios often leave this on a shared iPad: start fresh for the next client. */}
-        <Button variant="secondary" onClick={() => window.location.reload()}>Start a new walk-in</Button>
       </div>
     );
   }
