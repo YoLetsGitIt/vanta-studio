@@ -805,11 +805,6 @@ export default function SettingsPage() {
   }
 
   async function handleSignOut() {
-    const { data: { session } } = await getSupabase().auth.getSession();
-    if (session?.user?.id) {
-      sessionStorage.removeItem(`vanta-studio-tour-session:${session.user.id}`);
-      sessionStorage.removeItem(`vanta-studio-tour-start:${session.user.id}`);
-    }
     await getSupabase().auth.signOut();
     window.location.replace('/'); // full load; see dashboard/layout.js
   }

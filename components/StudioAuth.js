@@ -70,20 +70,16 @@ export default function StudioAuth({ initialTab = 'signin', mode = initialTab })
     setError('');
     setLoading(true);
     const supabase = getSupabase();
-    const { data: signInData, error: authError } = await supabase.auth.signInWithPassword({ email, password });
+    const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
     if (authError) {
       setError(authError.message);
       setLoading(false);
       return;
     }
-    if (email.trim().toLowerCase() === 'studio@test.com' && signInData.user?.id) {
-      sessionStorage.removeItem(`vanta-studio-tour-session:${signInData.user.id}`);
-      sessionStorage.setItem(`vanta-studio-tour-start:${signInData.user.id}`, 'true');
-    }
     // Verify this is a studio account
     try {
       await getMyStudioAccount();
-      window.location.replace(email.trim().toLowerCase() === 'studio@test.com' ? '/dashboard/schedule?tour=1' : '/dashboard/schedule');
+      window.location.replace('/dashboard/schedule');
     } catch {
       // No studio account — sign them out and block access
       await supabase.auth.signOut();

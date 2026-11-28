@@ -14,7 +14,8 @@ const stations = artists.map((_, i) => ({ id: `station-${i}`, name: `Station ${i
 async function setup(context) {
   await context.addInitScript(() => {
     if (window !== window.top) return;
-    const user = { id: '22222222-2222-4222-8222-222222222222', email: 'studio@example.test' };
+    // A returning studio: the one-time guides are already seen (on the account; lib/guides).
+    const user = { id: '22222222-2222-4222-8222-222222222222', email: 'studio@example.test', user_metadata: { studio_tour_seen: '2026-01-01T00:00:00Z', studio_artist_guide_seen: '2026-01-01T00:00:00Z' } };
     localStorage.setItem('sb-aznxvdnpvbcofaqxgmtu-auth-token', JSON.stringify({ access_token: 'test-access-token', refresh_token: 'test-refresh-token', expires_at: 2000000000, user }));
     localStorage.setItem(`vanta-studio-tour:${user.id}`, 'complete');
     localStorage.setItem(`vanta-studio-artist-guide:${user.id}`, 'complete');

@@ -7,7 +7,7 @@ const fillDob = async (page, iso) => { const [y, m, d] = iso.split('-'); const g
 const { chromium } = require(process.env.VANTA_PLAYWRIGHT_PATH || 'playwright');
 const studioBase = process.env.VANTA_STUDIO_TEST_URL || 'http://127.0.0.1:3029';
 const shots = process.env.VANTA_SCREENSHOT_DIR;
-const user = { id: '22222222-2222-4222-8222-222222222222', email: 'client@example.test', role: 'authenticated', aud: 'authenticated', user_metadata: { full_name: 'Local Client' } };
+const user = { id: '22222222-2222-4222-8222-222222222222', email: 'client@example.test', role: 'authenticated', aud: 'authenticated', user_metadata: { full_name: 'Local Client', studio_tour_seen: '2026-01-01T00:00:00Z', studio_artist_guide_seen: '2026-01-01T00:00:00Z' } };
 const auth = { access_token: 'local-test-token', refresh_token: 'local-refresh-token', expires_at: 2000000000, expires_in: 3600, token_type: 'bearer', user };
 const studio = { id: 'test-studio', name: 'Local Studio', timezone: 'Australia/Melbourne', subscription_status: 'active', artists: [] };
 const savedWindows = [

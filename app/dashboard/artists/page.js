@@ -14,6 +14,7 @@ import { APPROVAL_STATUS_COLORS } from '@/lib/status';
 import { initials } from '@/lib/format';
 import { useLanguage } from '@/lib/i18n';
 import { getSupabase } from '@/lib/supabase';
+import { guideSeen, markGuideSeen } from '@/lib/guides';
 import { showError } from '@/lib/feedback';
 
 const APP_STORE_URL = 'https://apps.apple.com/au/app/vanta-find-your-next-tattoo/id6760996738';
@@ -105,13 +106,13 @@ function ArtistsInner() {
       const supabase = getSupabase();
       const { data: { session } } = await supabase.auth.getSession();
       if (!active || !session?.user) return;
-      const userId = session.user.id;
-      const tourFinished = localStorage.getItem(`vanta-studio-tour:${userId}`) === 'complete';
-      const guideKey = `vanta-studio-artist-guide:${userId}`;
-      const forceOpen = onboardingRequested;
-      const alwaysShowGuide = session.user.email?.trim().toLowerCase() === 'studio@test.com';
+      // Once ever, after the dashboard tour (lib/guides), or when asked for.
       const mainTourActive = document.body.dataset.vantaTourActive === 'true';
-      if (!mainTourActive && ((tourFinished && (!localStorage.getItem(guideKey) || alwaysShowGuide)) || forceOpen)) setArtistGuideOpen(true);
+      const firstTime = guideSeen(session.user, 'tour') && !guideSeen(session.user, 'artist-guide');
+      if (!mainTourActive && (firstTime || onboardingRequested)) {
+        setArtistGuideOpen(true);
+        markGuideSeen(session.user, 'artist-guide');
+      }
       getMyStudioAccount().then(data => {
         if (active) setStudioName(data.studio?.name || 'Your studio');
       }).catch(() => {});
@@ -121,9 +122,7 @@ function ArtistsInner() {
   }, [onboardingRequested]);
 
   function dismissArtistGuide() {
-    getSupabase().auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) localStorage.setItem(`vanta-studio-artist-guide:${session.user.id}`, 'complete');
-    });
+    getSupabase().auth.getSession().then(({ data: { session } }) => markGuideSeen(session?.user, 'artist-guide'));
     setArtistGuideOpen(false);
     if (onboardingRequested) router.replace('/dashboard/artists');
   }

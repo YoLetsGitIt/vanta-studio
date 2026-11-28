@@ -5,7 +5,7 @@ const { chromium, webkit } = require(process.env.VANTA_PLAYWRIGHT_PATH || 'playw
 const which = process.env.VANTA_MARKETING_CASE || 'all';
 const cases = name => which === 'all' || which.split(',').includes(name);
 const base = process.env.VANTA_STUDIO_TEST_URL || 'http://127.0.0.1:3029';
-const user = { id: '22222222-2222-4222-8222-222222222222', email: 'local@example.test', role: 'authenticated', aud: 'authenticated', user_metadata: { full_name: 'Local Studio' } };
+const user = { id: '22222222-2222-4222-8222-222222222222', email: 'local@example.test', role: 'authenticated', aud: 'authenticated', user_metadata: { full_name: 'Local Studio', studio_tour_seen: '2026-01-01T00:00:00Z', studio_artist_guide_seen: '2026-01-01T00:00:00Z' } };
 const session = { access_token: 'local-test-token', refresh_token: 'local-refresh-token', expires_at: 2000000000, expires_in: 3600, token_type: 'bearer', user };
 
 async function setup(browser, width, { ready = true, available = true, saveFailures = 0, deleteFailures = 0, sendFailures = 0, recipientFailures = 0, initialTemplates = [], lang = 'en', theme = 'dark', reducedMotion = 'no-preference' } = {}) {

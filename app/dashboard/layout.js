@@ -19,6 +19,7 @@ import SidebarNeedsAction from '@/components/SidebarNeedsAction';
 import GlobalBookingPanel from '@/components/GlobalBookingPanel';
 import SpaceAccent from '@/components/SpaceAccent';
 import { ScheduleBootSkeleton } from '@/components/ScheduleSkeleton';
+import { guideSeen, markGuideSeen } from '@/lib/guides';
 
 const NAV = [
   { href: '/dashboard/schedule',     tKey: 'nav_schedule',  icon: GridCalIcon },
@@ -235,29 +236,18 @@ function DashboardShell({ children }) {
       setSubscriptionStatus(studioAccount.studio?.subscription_status ?? '');
 
       setBillingBlocked(subscriptionInactive(studioAccount.studio));
-      const tourKey = `vanta-studio-tour:${session.user.id}`;
-      const sessionTourKey = `vanta-studio-tour-session:${session.user.id}`;
-      const requestedTourKey = `vanta-studio-tour-start:${session.user.id}`;
-      const alwaysShowTour = session.user.email?.trim().toLowerCase() === 'studio@test.com';
-      // The test account starts the tour on each new login, not on every dashboard
-      // route transition or component remount within the same signed-in session.
+      // The tour shows once ever (lib/guides), or when asked for with ?tour=1.
       const requestedByRoute = new URLSearchParams(window.location.search).get('tour') === '1';
-      const explicitlyRequested = sessionStorage.getItem(requestedTourKey) === 'true' || requestedByRoute;
-      const showTestTourThisSession = alwaysShowTour && (explicitlyRequested || !sessionStorage.getItem(sessionTourKey));
-      if (showTestTourThisSession) sessionStorage.setItem(sessionTourKey, 'shown');
-      sessionStorage.removeItem(requestedTourKey);
       if (requestedByRoute) window.history.replaceState({}, '', '/dashboard/schedule');
-      if (showTestTourThisSession || !localStorage.getItem(tourKey)) setTourStep(0);
+      const seen = guideSeen(session.user, 'tour');
+      if (requestedByRoute || !seen) setTourStep(0);
+      markGuideSeen(session.user, 'tour');
       setReady(true);
     }
     init();
   }, [router]);
 
   async function handleSignOut() {
-    if (user?.id) {
-      sessionStorage.removeItem(`vanta-studio-tour-session:${user.id}`);
-      sessionStorage.removeItem(`vanta-studio-tour-start:${user.id}`);
-    }
     await getSupabase().auth.signOut();
     window.location.replace('/signin');
   }
@@ -294,7 +284,7 @@ function DashboardShell({ children }) {
   const displayName = studioName || 'Studio';
 
   function finishTour() {
-    if (user?.id) localStorage.setItem(`vanta-studio-tour:${user.id}`, 'complete');
+    if (user) markGuideSeen(user, 'tour');
     setTourStep(null);
   }
 
