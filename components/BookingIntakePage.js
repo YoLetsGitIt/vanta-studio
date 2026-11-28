@@ -975,10 +975,13 @@ function IntakeInner({ mode, onStyle }) {
               <input type="checkbox" checked={smsOptIn} onChange={e => setSMSOptIn(e.target.checked)} />
               Send me one SMS reminder before this appointment. Optional; I can stop SMS reminders using the link in the message.
             </label>}
-            {!walkIn && <label style={{ display: 'flex', gap: 10, fontSize: 13, lineHeight: 1.6, marginTop: -12, marginBottom: 24, color: 'var(--text)' }}>
+            {/* Never pre-ticked (Australian spam rules). Walk-ins are asked about email only. */}
+            <label style={{ display: 'flex', gap: 10, fontSize: 13, lineHeight: 1.6, marginTop: walkIn ? 0 : -12, marginBottom: 24, color: 'var(--text)' }}>
               <input type="checkbox" checked={offersOptIn} onChange={e => setOffersOptIn(e.target.checked)} />
-              Send me offers and updates from {studio.name} by email and text. Optional; I can unsubscribe at any time.
-            </label>}
+              {walkIn
+                ? `Send me marketing emails from ${studio.name}, like offers and news. Optional; I can unsubscribe at any time.`
+                : `Send me offers and updates from ${studio.name} by email and text. Optional; I can unsubscribe at any time.`}
+            </label>
             {submitError && <p role="alert" style={s.error}>{submitError}</p>}
             {/* What's still missing sits right above the button; tapping either goes to it. */}
             {blocker && !submitError && (
