@@ -440,8 +440,8 @@
   .studio-day-grid > .studio-day-artist { scroll-snap-align: start; padding-inline: 8px !important; }
   .studio-day-grid > .studio-day-corner, .studio-day-grid > .studio-day-gutter { position: sticky !important; left: 0; z-index: 3; background: var(--bg-base); }
   /* The artists stay in view while the day scrolls, like the Week view's day headings. */
-  .studio-day-grid > .studio-day-artist { position: sticky; top: 0; z-index: 2; background: var(--bg-sidebar); }
-  .studio-day-grid > .studio-day-corner { top: 0; z-index: 4; background: var(--bg-sidebar); }
+  .studio-day-grid > .studio-day-artist { position: sticky; top: var(--strip-h, 0px); z-index: 2; background: var(--bg-sidebar); }
+  .studio-day-grid > .studio-day-corner { top: var(--strip-h, 0px); z-index: 4; background: var(--bg-sidebar); }
 }
 
 /* ── Phone first: shared pieces ─────────────────────────────────────────── */
@@ -588,14 +588,17 @@
   .studio-booking-detail .studio-detail-section .studio-fact { min-height: 24px; }
 }
 
-/* A phone's schedule header slides up with the calendar (ScheduleScrollFrame foldHeader).
-   The calendar starts under it: pulled up by the part that slides, with that much room above
-   its content, and its sticky headings kept below what's left of the header. */
-.studio-schedule-page[data-fold] > [data-fold-header] + *:has(.studio-calendar-scroll) { margin-top: calc(-1 * var(--fold-h, 0px)); }
-/* A margin, not padding: sticky headings measure from inside a scroller's padding. */
-.studio-schedule-page[data-fold] .studio-calendar-scroll > :first-child { margin-top: var(--fold-h, 0px); }
-.studio-schedule-page[data-fold] .studio-day-grid > .studio-day-artist,
-.studio-schedule-page[data-fold] .studio-day-grid > .studio-day-corner { top: var(--fold-left, var(--fold-h, 0px)); }
+/* A phone's Day and Week header lives inside the calendar's own scrolling (CalendarHead in
+   ScheduleScrollFrame), so the phone itself scrolls it: the heading, filter and view switch
+   go up with the calendar at the speed of the finger, the dates pin to the top, and the
+   calendar's headings pin under them (--strip-h, set once from the dates' height). Both are
+   a screen wide and pinned left, so swiping sideways through the days leaves them put. */
+.studio-calendar-scroll > .studio-calendar-fold,
+.studio-calendar-scroll > .studio-calendar-keep { position: sticky; left: 0; width: 100vw; background: var(--bg-base); }
+.studio-calendar-scroll > .studio-calendar-keep { top: 0; z-index: 9; /* over the calendar (up to 7), under panels (30) */ }
+/* Loading, an error, or nobody to show: the header above it, scrolling with it. */
+.studio-calendar-static { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow-y: auto; overscroll-behavior: contain; }
+.studio-calendar-static > .studio-calendar-keep { position: sticky; top: 0; z-index: 9; background: var(--bg-base); }
 
 /* While the studio loads (dashboard layout, not ready yet): the top bar and tabs, and on an
    upright phone the schedule's shape; otherwise a dot in the middle. */

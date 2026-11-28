@@ -11,6 +11,7 @@ import { calendarDayAfter, capDayLanes, layoutDayLanes, localDateKey, weekHourRa
 import styles from './ScheduleWeekView.module.css';
 import { ScheduleCalendarSkeleton } from './ScheduleSkeleton';
 import { usePhoneLayout } from '@/lib/usePhoneLayout';
+import { useCalendarHead } from './ScheduleScrollFrame';
 
 // Where the schedule's filter goes: the header next to "Today", or on a rotated phone the
 // one-row toolbar.
@@ -47,6 +48,7 @@ export default function ScheduleWeekView({ date, lens, refreshKey, selectedBooki
   const scrollRef = useRef(null);
   const toolbarSlot = useScheduleFilterSlot();
   const phone = usePhoneLayout();
+  const head = useCalendarHead();
 
   useEffect(() => { setFilter('all'); }, [lens]);
   useEffect(() => { setOpenMore(null); }, [startKey, lens, filter]);
@@ -84,15 +86,21 @@ export default function ScheduleWeekView({ date, lens, refreshKey, selectedBooki
   const time = value => new Intl.DateTimeFormat(locale, { hour: 'numeric', minute: '2-digit' }).format(value);
   const hourLabel = hour => new Intl.DateTimeFormat(locale, { hour: 'numeric' }).format(new Date(2000, 0, 1, hour));
   const today = localDateKey(new Date());
-  const { startHour, endHour } = weekHourRange();
+  const range = weekHourRange();
+  // Open at the working day (or the week's earliest start, if earlier), not midnight.
+  const firstStart = Math.min(8, ...days.flatMap(day => day.bookings.filter(b => !b.continuesFrom).map(b => b.displayStart.getHours())));
+  const scrollHour = Math.max(range.startHour, firstStart - 1);
+  // A phone (its header scrolls with the calendar): the hours start there instead of the
+  // calendar opening scrolled down to them, so it opens at its top with the header showing.
+  // Anything earlier in the week (carried over from the night before) still fits.
+  const earliest = Math.min(24, ...allDays.flatMap(day => day.bookings.map(b => b.displayStart.getHours())));
+  const startHour = head ? Math.min(scrollHour, earliest) : range.startHour;
+  const { endHour } = range;
   const hours = Array.from({ length: endHour - startHour }, (_, index) => startHour + index);
   const span = (endHour - startHour) * 60;
   // Percent of the column from the top of the visible range.
   const offset = (day, at) => ((at.getTime() - day.date.getTime()) / 60000 - startHour * 60) / span * 100;
   const now = new Date();
-  // Open scrolled to the working day (or the week's earliest start, if earlier), not midnight.
-  const firstStart = Math.min(8, ...days.flatMap(day => day.bookings.filter(b => !b.continuesFrom).map(b => b.displayStart.getHours())));
-  const scrollHour = Math.max(startHour, firstStart - 1);
 
   useEffect(() => {
     const scroller = scrollRef.current, column = scroller?.querySelector('section > div');
@@ -134,15 +142,13 @@ export default function ScheduleWeekView({ date, lens, refreshKey, selectedBooki
     scrollRef.current?.querySelector(`[data-booking-slot="${days[nextDay].key}-${nextMinutes}"]`)?.focus();
   }
 
-  // A phone: the calendar's shape (and the filter, unusable yet) while it loads.
-  if (loading && phone) return (
-    <div className={styles.view}>
-      {toolbarSlot && createPortal(<select className="studio-schedule-filter-select" aria-label={t('sched_week_filter')} disabled><option>{t(lens === 'artist' ? 'sched_all_artists' : 'sched_all_stations')}</option></select>, toolbarSlot)}
-      <ScheduleCalendarSkeleton kind="week" columns={3} />
-    </div>
-  );
+  // A phone: the header is part of this view (CalendarHead); while loading or after an error
+  // it sits above, so the dates still work.
+  const loadingFilter = <select className="studio-schedule-filter-select" aria-label={t('sched_week_filter')} disabled><option>{t(lens === 'artist' ? 'sched_all_artists' : 'sched_all_stations')}</option></select>;
+  const withHead = (node, filter = null) => head ? <div className="studio-calendar-static">{head(filter)}{node}</div> : node;
+  if (loading && phone) return withHead(<ScheduleCalendarSkeleton kind="week" columns={3} />, loadingFilter);
   if (loading) return <p className={styles.message} role="status">{t('loading')}</p>;
-  if (error) return <div className={styles.message} role="alert"><p>{error}</p><button type="button" className={styles.retry} onClick={() => { invalidatePrefix('schedule:'); setRetry(value => value + 1); }}>{t('sched_retry')}</button></div>;
+  if (error) return withHead(<div className={styles.message} role="alert"><p>{error}</p><button type="button" className={styles.retry} onClick={() => { invalidatePrefix('schedule:'); setRetry(value => value + 1); }}>{t('sched_retry')}</button></div>);
 
   const filterSelect = (
     <select className="studio-schedule-filter-select" aria-label={t('sched_week_filter')} value={activeFilter} onChange={event => setFilter(event.target.value)}>
@@ -153,8 +159,9 @@ export default function ScheduleWeekView({ date, lens, refreshKey, selectedBooki
 
   return (
     <div className={styles.view}>
-      {toolbarSlot && createPortal(filterSelect, toolbarSlot)}
+      {!head && toolbarSlot && createPortal(filterSelect, toolbarSlot)}
       <div ref={scrollRef} className={`studio-calendar-scroll ${styles.scroll}`} tabIndex={0} role="region" aria-label={t('sched_week_schedule')}>
+        {head?.(filterSelect)}
         <div className={styles.days} style={{ '--hours': hours.length }}>
           <div className={styles.gutter} data-gutter aria-hidden="true">
             <div className={styles.corner} />

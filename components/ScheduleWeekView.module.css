@@ -6,12 +6,12 @@
 .scroll { flex: 1; overflow: auto; }
 .days { --hour-px: 56px; --heading-h: 76px; display: grid; grid-template-columns: 52px repeat(7, minmax(130px, 1fr)); min-width: 980px; align-items: start; }
 .gutter { position: sticky; left: 0; z-index: 4; background: var(--bg-base); border-right: 1px solid var(--border); }
-.corner { position: sticky; top: 0; z-index: 6; height: var(--heading-h); background: var(--bg-sidebar); border-bottom: 1px solid var(--border); }
+.corner { position: sticky; top: var(--strip-h, 0px); z-index: 6; height: var(--heading-h); background: var(--bg-sidebar); border-bottom: 1px solid var(--border); }
 .gutterHours { position: relative; height: calc(var(--hours) * var(--hour-px)); }
 .hourLabel { position: absolute; right: 8px; transform: translateY(-50%); font-size: 10px; font-weight: 600; color: var(--text-faint); white-space: nowrap; }
 .day { min-width: 0; border-right: 1px solid var(--border-faint); background: var(--bg-base); }
 .day:last-child { border-right: 0; }
-.dayHeading { position: sticky; top: 0; z-index: 5; width: 100%; height: var(--heading-h); display: grid; grid-template-columns: 1fr auto; align-content: center; gap: 4px; padding: 0 12px; text-align: left; background: var(--bg-sidebar); color: var(--text); border: 0; border-bottom: 1px solid var(--border); cursor: pointer; }
+.dayHeading { position: sticky; top: var(--strip-h, 0px); z-index: 5; width: 100%; height: var(--heading-h); display: grid; grid-template-columns: 1fr auto; align-content: center; gap: 4px; padding: 0 12px; text-align: left; background: var(--bg-sidebar); color: var(--text); border: 0; border-bottom: 1px solid var(--border); cursor: pointer; }
 @media (hover: hover) and (pointer: fine) { .dayHeading:hover { background: var(--bg-row-hover); } }
 .dayName { grid-column: 1 / -1; display: flex; align-items: baseline; justify-content: space-between; gap: 6px; font-size: 12px; font-weight: 600; color: var(--text-muted); }
 /* "Day view →": shows on hover and focus, and always on days too busy to read here. */
@@ -149,5 +149,3 @@
 .moreClient { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .moreMeta { font-size: 11px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .moreDay { display: block; width: 100%; margin-top: 6px; padding: 8px 6px 2px; border: 0; border-top: 1px solid var(--border); background: transparent; color: var(--accent); font: inherit; font-size: 12px; font-weight: 600; text-align: left; cursor: pointer; }
-/* Under a phone's sliding header: the headings stick below what's left of it. */
-:global(.studio-schedule-page[data-fold]) .corner, :global(.studio-schedule-page[data-fold]) .dayHeading { top: var(--fold-left, var(--fold-h, 0px)); }

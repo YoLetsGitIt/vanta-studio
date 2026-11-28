@@ -10,7 +10,7 @@ import BookingDetailPanel from '@/components/BookingDetailPanel';
 import ScheduleWeekView, { useScheduleFilterSlot } from '@/components/ScheduleWeekView';
 import { createPortal } from 'react-dom';
 import weekStyles from '@/components/ScheduleWeekView.module.css';
-import ScheduleScrollFrame, { ScheduleControls, useControlsCollapsed } from '@/components/ScheduleScrollFrame';
+import ScheduleScrollFrame, { ScheduleControls, CalendarHead, useCalendarHead } from '@/components/ScheduleScrollFrame';
 import { ScheduleCalendarSkeleton, ScheduleListSkeleton } from '@/components/ScheduleSkeleton';
 import { weekRangeLabel, localDateKey, weekStartFor, calendarDayAfter } from '@/lib/scheduleWeek.mjs';
 import { usePhoneLayout } from '@/lib/usePhoneLayout';
@@ -606,6 +606,7 @@ function DayView({ date, showAll, setShowAll }) {
   const { t } = useLanguage();
   const hourPx = useHourPx();
   const phone = usePhoneLayout();
+  const head = useCalendarHead();
   const gridH  = (DAY_END - DAY_START) * hourPx;
   // The current-time line on today's schedule, moved each minute.
   const [nowTick, setNowTick] = useState(() => Date.now());
@@ -681,32 +682,32 @@ function DayView({ date, showAll, setShowAll }) {
   }
   const slotTime = minutes => { const at = new Date(date); at.setHours(Math.floor(minutes / 60), minutes % 60, 0, 0); return at.toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' }); };
 
-  // A phone: the calendar's shape (and the filter, unusable yet) while it loads.
-  if (loading && phone) return (
-    <>
-      {filterSlot && createPortal(<select className="studio-schedule-filter-select" aria-label="Artists shown" disabled><option>{t('sched_all_artists')}</option></select>, filterSlot)}
-      <ScheduleCalendarSkeleton kind="day" columns={Math.min(2, Math.max(1, getCached('artists:approved')?.length ?? 2))} />
-    </>
-  );
+  // A phone: the header is part of this view (CalendarHead); without a calendar to scroll
+  // (loading, an error, nobody to show) it sits above the message, so the dates still work.
+  const withHead = (node, filter = null) => head ? <div className="studio-calendar-static">{head(filter)}{node}</div> : node;
+  const loadingFilter = <select className="studio-schedule-filter-select" aria-label="Artists shown" disabled><option>{t('sched_all_artists')}</option></select>;
+  if (loading && phone) return withHead(<ScheduleCalendarSkeleton kind="day" columns={Math.min(2, Math.max(1, getCached('artists:approved')?.length ?? 2))} />, loadingFilter);
   if (loading) return <p style={s.msg}>{t('loading')}</p>;
-  if (error)   return <p style={{ ...s.msg, color: '#e86f6f' }}>{error}</p>;
-  if (!sorted.length) return <p style={s.msg}>{t('sched_no_artists_yet')}</p>;
+  if (error)   return withHead(<p style={{ ...s.msg, color: '#e86f6f' }}>{error}</p>);
+  if (!sorted.length) return withHead(<p style={s.msg}>{t('sched_no_artists_yet')}</p>);
+
+  const filterSelect = (
+    <select className="studio-schedule-filter-select" aria-label="Artists shown" value={showAll || !working.length ? 'all' : 'working'} onChange={e => setShowAll(e.target.value === 'all')}>
+      {working.length > 0 && <option value="working">{t('sched_working_today_only')} ({working.length})</option>}
+      <option value="all">{t('sched_all_artists')} ({sorted.length})</option>
+    </select>
+  );
 
   return (
     <div style={{ display: 'flex', flex: 1, overflow: 'hidden', position: 'relative' }}>
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
-      {filterSlot && createPortal(
-        <select className="studio-schedule-filter-select" aria-label="Artists shown" value={showAll || !working.length ? 'all' : 'working'} onChange={e => setShowAll(e.target.value === 'all')}>
-          {working.length > 0 && <option value="working">{t('sched_working_today_only')} ({working.length})</option>}
-          <option value="all">{t('sched_all_artists')} ({sorted.length})</option>
-        </select>,
-        filterSlot,
-      )}
+      {!head && filterSlot && createPortal(filterSelect, filterSlot)}
 
       {cols.length === 0 ? (
-        <p style={s.msg}>{t('sched_no_artists_working')}</p>
+        withHead(<p style={s.msg}>{t('sched_no_artists_working')}</p>, filterSelect)
       ) : (
       <div className="studio-calendar-scroll" style={s.calWrap}>
+      {head?.(filterSelect)}
       <div className="studio-day-grid" style={{ ...s.grid, gridTemplateColumns: `52px repeat(${cols.length}, minmax(160px, 1fr))`, '--cols': cols.length }}>
         <div className="studio-calendar-column-heading studio-day-corner" style={s.cornerCell} />
 
@@ -1226,10 +1227,20 @@ function PhoneScheduleHeader({ date, setDate, view, onView, locale, weekEntries,
   const busyDays = new Set((entries ?? []).filter(e => e.chosenTime && e.status !== 'cancelled').map(dayKeyOf));
   const week = view === 'week';
   const showingToday = week ? days.some(d => localDateKey(d) === todayKey) : selectedKey === todayKey;
-  // Day and Week: everything above the dates slides away with the calendar as it scrolls
-  // (ScheduleScrollFrame foldHeader), leaving the dates. List keeps its header.
+  // Day and Week: two parts that go inside the calendar's own scrolling (see CalendarHead):
+  // the heading, filter and view switch scroll away with it; the dates stay pinned on top,
+  // and the calendar's headings pin under them (--strip-h). List keeps a plain header.
   const calendar = view !== 'list';
-  const compact = useControlsCollapsed() && calendar;
+  const keepRef = useRef(null);
+  useEffect(() => {
+    const keep = keepRef.current, scroller = keep?.parentElement;
+    if (!keep || !scroller?.classList.contains('studio-calendar-scroll')) return undefined;
+    const measure = () => scroller.style.setProperty('--strip-h', `${keep.offsetHeight}px`);
+    const resize = new ResizeObserver(measure);
+    resize.observe(keep);
+    measure();
+    return () => { resize.disconnect(); scroller.style.removeProperty('--strip-h'); };
+  }, [calendar]);
   const headRow = (
     <div className={ps.headRow}>
       <h1 className={ps.heading}>
@@ -1244,8 +1255,8 @@ function PhoneScheduleHeader({ date, setDate, view, onView, locale, weekEntries,
   const strip = <PhoneDateStrip date={date} setDate={setDate} week={week} onView={onView} locale={locale} busyDays={busyDays} />;
   if (!calendar) return <div className={ps.top}>{headRow}{strip}{children}</div>;
   return (
-    <div className={ps.top} data-calendar data-compact={compact || undefined}>
-      <div className={ps.fold} inert={compact || undefined}>
+    <>
+      <div className={`studio-calendar-fold ${ps.top} ${ps.fold}`}>
         {headRow}
         {children}
         {/* The count and the view switch, under the filter. */}
@@ -1254,8 +1265,8 @@ function PhoneScheduleHeader({ date, setDate, view, onView, locale, weekEntries,
             && (week ? weekStartFor(new Date(e.chosenTime)).getTime() === start.getTime() : dayKeyOf(e) === selectedKey)).length} />
         </div>
       </div>
-      <div data-fold-keep className={ps.keep}>{strip}</div>
-    </div>
+      <div ref={keepRef} className={`studio-calendar-keep ${ps.keep}`}>{strip}</div>
+    </>
   );
 }
 
@@ -1543,9 +1554,17 @@ export default function SchedulePage() {
     return <PhoneAgenda date={dayDate} setDate={setDayDate} onView={changeView} locale={locale} />;
   }
 
+  // A phone: the Day and Week views put this header inside their scrolling (CalendarHead).
+  const calendarHead = phone ? filter => (
+    <PhoneScheduleHeader date={dayDate} setDate={setDayDate} view={view} onView={changeView} locale={locale}>
+      {filter && <div className={ps.filterRow}>{filter}</div>}
+    </PhoneScheduleHeader>
+  ) : null;
+
   return (
-    <ScheduleScrollFrame style={s.page} resetKey={`${view}:${lens}:${toISO(view === 'month' ? monthStart : dayDate)}`} foldHeader={phone}>
-      <ScheduleControls fold={phone}>
+    <CalendarHead.Provider value={calendarHead}>
+    <ScheduleScrollFrame style={s.page} resetKey={`${view}:${lens}:${toISO(view === 'month' ? monthStart : dayDate)}`} still={phone}>
+      <ScheduleControls>
       <div className="studio-calendar-toolbar" role="toolbar" aria-label="Calendar controls">
         <button type="button" aria-label="Open studio navigation" onClick={() => window.dispatchEvent(new Event('vanta:open-navigation'))}>☰</button>
         <select aria-label="Calendar view" value={`${view}:${lens}${view === 'day' && lens === 'artist' && showAll ? ':all' : ''}`} onChange={event => {
@@ -1563,13 +1582,7 @@ export default function SchedulePage() {
         <button type="button" onClick={goToday}>{t('today')}</button>
         <button type="button" className="studio-calendar-add" aria-label={t('new_appointment')} title={t('new_appointment')} onClick={() => window.dispatchEvent(new CustomEvent('vanta:open-new-appointment', { detail: { bookingType: 'walkin' } }))}>＋</button>
       </div>
-      {phone ? (
-        <>
-          <PhoneScheduleHeader date={dayDate} setDate={setDayDate} view={view} onView={changeView} locale={locale}>
-            <div className={`studio-schedule-filter-slot ${ps.filterRow}`} />
-          </PhoneScheduleHeader>
-        </>
-      ) : (
+      {phone ? null : (
       <div className="studio-feature-header" style={s.header}>
         <h1 className="sr-only">{t('nav_schedule')}</h1>
         <div className="studio-schedule-toggles" style={s.tabs} role="group" aria-label="Calendar view">
@@ -1599,6 +1612,7 @@ export default function SchedulePage() {
       {view === 'week' && <WeekView date={dayDate} lens={lens} onDayClick={goToDayView} />}
       {view === 'day'   && lens === 'artist'  && <DayView          date={dayDate} showAll={showAll} setShowAll={setShowAll} />}
     </ScheduleScrollFrame>
+    </CalendarHead.Provider>
   );
 }
 

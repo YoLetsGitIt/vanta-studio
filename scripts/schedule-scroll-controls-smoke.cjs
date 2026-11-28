@@ -68,18 +68,38 @@ const output = path.resolve(__dirname, '../../artifacts/schedule-scroll-controls
       await week.evaluate(el => { el.scrollLeft = 0; });
       await page.screenshot({ path: path.join(output, `expanded-${width}-${theme}.png`) });
       if (upright) {
-        // A phone: the header slides up exactly as far as the calendar scrolls, the calendar
-        // itself never moves or resizes, and the headings stay right under the dates.
-        const title = await page.locator('[data-fold-header] h1').boundingBox();
-        await wheel(week, 0, 60); await page.waitForTimeout(200);
-        const moved = await page.locator('[data-fold-header] h1').boundingBox();
-        assert.ok(Math.abs(title.y - moved.y - 60) <= 2, `Header must move with the calendar (moved ${title.y - moved.y})`);
-        await wheel(week, 0, 600); await state(true);
-        const after = await week.boundingBox();
-        assert.ok(Math.abs(after.y - expanded.y) <= 1 && Math.abs(after.height - expanded.height) <= 1, 'The calendar must not move or resize');
-        const dates = await page.locator('[data-fold-keep]').boundingBox();
-        const heading = await week.locator('section').first().getByRole('button').first().boundingBox();
-        assert.ok(Math.abs(heading.y - (dates.y + dates.height)) <= 2, 'Day/date headings must sit under the dates');
+        // A phone: the header is part of the calendar's own scrolling, so the phone moves it
+        // (no script): it goes up exactly as far as the calendar scrolls, the dates pin to the
+        // top with the headings right under them, swiping sideways leaves it put, and it all
+        // comes back at the top. The same in Day view.
+        for (const [name, scroller] of [['week', week], ['day', null]]) {
+          if (name === 'day') { await choose('day'); await page.locator('.studio-calendar-scroll .studio-day-grid').waitFor(); }
+          const cal = scroller ?? page.locator('.studio-calendar-scroll');
+          const box = await cal.boundingBox();
+          const title = page.locator('.studio-calendar-fold h1');
+          const at = async () => (await title.boundingBox()).y;
+          const start = await at();
+          await wheel(cal, 0, 60); await page.waitForTimeout(200);
+          assert.ok(Math.abs(start - await at() - 60) <= 2, `${name}: header must move with the calendar (moved ${start - await at()})`);
+          await wheel(cal, 0, 600); await page.waitForTimeout(200);
+          const dates = await page.locator('.studio-calendar-keep').boundingBox();
+          assert.ok(Math.abs(dates.y - box.y) <= 2, `${name}: the dates must pin to the top`);
+          const heading = await cal.locator(name === 'week' ? 'section button' : '.studio-day-artist').first().boundingBox();
+          assert.ok(Math.abs(heading.y - (dates.y + dates.height)) <= 2, `${name}: headings must sit under the dates`);
+          assert.ok(await page.getByRole('group', { name: 'Dates' }).isVisible(), `${name}: the dates stay`);
+          const x = dates.x;
+          await cal.evaluate(el => { el.scrollLeft += 200; }); await page.waitForTimeout(400);
+          assert.ok(Math.abs((await page.locator('.studio-calendar-keep').boundingBox()).x - x) <= 1, `${name}: swiping sideways leaves the dates put`);
+          await wheel(cal, 0, -10000); await page.waitForTimeout(200);
+          assert.ok(Math.abs(await at() - start) <= 2, `${name}: back at the top, the header is back`);
+          await page.screenshot({ path: path.join(output, `phone-${name}-${width}-${theme}.png`) });
+        }
+        assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), 'No page overflow');
+        assert.deepEqual(errors, []);
+        results.push({ width, height, touch, theme, reducedMotion, nativeHeader: true, pinnedDates: true, dayAndWeek: true });
+        console.log(`PASS schedule scrolling ${width}x${height} ${theme} ${reducedMotion} (phone)`);
+        await context.close();
+        continue;
       } else {
         await wheel(week, 0, 180); await state(true);
         const collapsed = await week.boundingBox();
@@ -92,12 +112,7 @@ const output = path.resolve(__dirname, '../../artifacts/schedule-scroll-controls
       await page.screenshot({ path: path.join(output, `collapsed-${width}-${theme}.png`) });
       await wheel(week, 180, 0); await page.waitForTimeout(150);
       assert.equal(await frame.getAttribute('data-controls-collapsed'), 'true');
-      // Scrolling back up reopens the controls; on an upright phone only near the top, in step.
-      if (upright) {
-        await wheel(week, 0, -80); await page.waitForTimeout(300);
-        assert.equal(await frame.getAttribute('data-controls-collapsed'), 'true', 'Phone controls stay shrunk until the top');
-        assert.ok(await page.getByRole('group', { name: 'Dates' }).isVisible(), 'The dates stay while shrunk');
-      }
+      // Scrolling back up reopens the controls.
       await wheel(week, 0, upright ? -10000 : -80); await state(false);
       await page.getByRole('combobox', { name: 'Filter weekly schedule' }).selectOption('artist-1');
       await page.getByRole('combobox', { name: 'Filter weekly schedule' }).selectOption('all');
