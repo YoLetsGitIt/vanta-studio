@@ -3,7 +3,8 @@
 import { useState, useEffect, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Field from '@/components/ui/Field';
-import AddressFields, { EMPTY_ADDRESS, addressEmpty, addressPayload, addressProblem } from '@/components/forms/AddressFields';
+import AddressFields, { EMPTY_ADDRESS, addressPayload, addressProblem } from '@/components/forms/AddressFields';
+import { addressAnswers, addressFieldOf, withAddressField } from '@/lib/consent-address';
 import Button from '@/components/ui/Button';
 import BrandLoader from '@/components/BrandLoader';
 import ClientAuthGate from '@/components/ClientAuthGate';
@@ -207,7 +208,7 @@ function IntakeInner({ mode, onStyle }) {
       if (!walkIn && preset && studioData?.artists?.some(a => a.artistId === preset)) setArtistId(preset);
       onStyle?.(studioData?.form_style ?? null);
       setFormConfig(configData.fields ?? {});
-      setConsentTemplates(consentData.templates ?? []);
+      setConsentTemplates((consentData.templates ?? []).map(withAddressField));
     }).catch(e => setStudioErr(e.message));
   }, [studioId]);
 
@@ -263,12 +264,16 @@ function IntakeInner({ mode, onStyle }) {
   }
 
   // True if DOB indicates the client is under 18
-  // The address: asked by the booking form, or by a consent form (ask_address). It's
-  // asked once, with the client's details, and given to every consent form that asks.
+  // The address: asked by the booking form (with the client's details) or by an address
+  // field in a consent form (where it sits in that form). It's asked once: when the
+  // booking form asks, consent forms that ask too are given that address; otherwise it's
+  // asked at the first consent form's address field and given to the others.
   const formAsksAddress = Boolean(formConfig?.address?.enabled && field('address').enabled);
-  const consentAsksAddress = consentTemplates.some(t => t.ask_address);
-  const showAddress = formAsksAddress || consentAsksAddress;
-  const addressRequired = (formAsksAddress && field('address').required) || consentTemplates.some(t => t.ask_address === 'required');
+  const consentAddressFields = consentTemplates.map(t => ({ t, f: addressFieldOf(t) })).filter(x => x.f);
+  const consentAddressRequired = consentAddressFields.some(x => x.f.required && (x.t.is_required ?? true));
+  const addressRequired = (formAsksAddress && field('address').required) || consentAddressRequired;
+  // Where the address fields are: 'details', a consent form's field id, or nowhere.
+  const addressAt = formAsksAddress ? 'details' : consentAddressFields[0] ? `${consentAddressFields[0].t.id}:${consentAddressFields[0].f.id}` : null;
 
   const isMinor = (() => {
     if (!dob) return false;
@@ -324,7 +329,7 @@ function IntakeInner({ mode, onStyle }) {
     if (walkIn && !artistId) return miss('Please choose your artist.', '[data-need="artist"]');
     if (instantMode && !instantChoice) return miss('Please choose your appointment.', '[data-need="time"]');
     if (instantMode && !instantStart) return miss('Please choose a time.', '[data-need="time"]');
-    if (showAddress) {
+    if (addressAt) {
       const problem = addressProblem(address, addressRequired);
       if (problem) return miss(`Address: ${problem.charAt(0).toLowerCase()}${problem.slice(1)}`, '[data-need="address"]');
     }
@@ -443,7 +448,7 @@ function IntakeInner({ mode, onStyle }) {
         }
 
         const answers = await uploadPhotoIdAnswers(ts.answers ?? {}, file => signStudioPhotoId(process.env.NEXT_PUBLIC_BACKEND_URL, studioId, file));
-        if (t.ask_address && !addressEmpty(address)) answers.__address_parts__ = JSON.stringify(addressPayload(address));
+        Object.assign(answers, addressAnswers(addressFieldOf(t), address));
         consentSubmissions.push({
           template_id:            t.id,
           answers,
@@ -642,7 +647,7 @@ function IntakeInner({ mode, onStyle }) {
                 />
               </div>
             </Field>
-            {showAddress && (
+            {addressAt === 'details' && (
               <div data-need="address"><AddressFields value={address} onChange={setAddress} required={addressRequired}
                 inputStyle={s.input} classes={{ field: 'studio-field', label: 'studio-field-label' }}
                 legendExtra={addressRequired ? null : <Optional />} /></div>
@@ -884,7 +889,14 @@ function IntakeInner({ mode, onStyle }) {
                 return (
                   <Section key={t.id} title={walkIn ? null : t.name} need={`form-${t.id}`}>
 
-                    {(t.fields ?? []).map(field => (
+                    {(t.fields ?? []).map(field => field.type === 'address' ? (
+                      // The address is asked once (see addressAt); a later form that asks is given it.
+                      addressAt === `${t.id}:${field.id}` ? (
+                        <div key={field.id} data-need="address"><AddressFields value={address} onChange={setAddress} required={addressRequired}
+                          inputStyle={s.input} classes={{ field: 'studio-field', label: 'studio-field-label' }}
+                          legend={field.label || 'Address'} legendExtra={addressRequired ? null : <Optional />} /></div>
+                      ) : null
+                    ) : (
                       <ConsentFormField
                         key={field.id}
                         field={field}

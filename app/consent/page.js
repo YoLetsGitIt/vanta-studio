@@ -11,7 +11,8 @@ import DateOfBirthInput from '@/components/ui/DateOfBirthInput';
 import ClientAccountActions from '@/components/ClientAccountActions';
 import ClientAuthGate from '@/components/ClientAuthGate';
 import PhotoIdField from '@/components/PhotoIdField';
-import AddressFields, { EMPTY_ADDRESS, addressEmpty, addressPayload, addressProblem } from '@/components/forms/AddressFields';
+import AddressFields, { EMPTY_ADDRESS, addressProblem } from '@/components/forms/AddressFields';
+import { addressAnswers, addressFieldOf, withAddressField } from '@/lib/consent-address';
 import { uploadPhotoIdAnswers, signStudioPhotoId } from '@/lib/photoId';
 
 // The studio's reusable consent QR code lands here (/consent?s=<studioId>). Unlike the
@@ -61,7 +62,7 @@ function ConsentForm({ onStyle }) {
   const [dob, setDob]             = useState('');
   const [signerName, setSignerName] = useState('');
   const [phone, setPhone]         = useState('');
-  // Asked when any of the studio's consent forms asks for the address (ask_address).
+  // Asked at the first consent form's address field; given to every form that asks.
   const [address, setAddress]     = useState(EMPTY_ADDRESS);
   const [info, setInfo]           = useState(null);
   const [loadErr, setLoadErr]     = useState('');
@@ -124,7 +125,7 @@ function ConsentForm({ onStyle }) {
     Promise.all([getStudioPublic(studioId), getStudioConsentTemplates(studioId, true)])
       .then(([studio, tpl]) => {
         onStyle?.(studio.form_style ?? studio.consent_style ?? null);
-        setInfo({ studio_id: studioId, studio_name: studio.name, logo_url: studio.logo_url ?? '', templates: tpl.templates ?? [] });
+        setInfo({ studio_id: studioId, studio_name: studio.name, logo_url: studio.logo_url ?? '', templates: (tpl.templates ?? []).map(withAddressField) });
       })
       .catch(() => setLoadErr('This consent link is invalid.'));
   }, [studioId]);
@@ -158,15 +159,15 @@ function ConsentForm({ onStyle }) {
     if (!signerName.trim()) { setSubmitErr('Please enter your full name.'); return; }
     if (!dob) { setSubmitErr('Please enter your date of birth.'); return; }
     if (phone.replace(/\D/g, '').length < 7) { setSubmitErr('Please enter a valid phone number.'); return; }
-    if (templates.some(t => t.ask_address)) {
-      const problem = addressProblem(address, templates.some(t => t.ask_address === 'required'));
+    if (templates.some(t => addressFieldOf(t))) {
+      const problem = addressProblem(address, templates.some(t => addressFieldOf(t)?.required));
       if (problem) { setSubmitErr(`Address: ${problem.charAt(0).toLowerCase()}${problem.slice(1)}`); return; }
     }
 
     for (const t of templates) {
       const ts = templateState[t.id] ?? {};
       for (const field of (t.fields ?? [])) {
-        if (field.required && !ts.answers?.[field.id]) {
+        if (field.required && field.type !== 'address' && !ts.answers?.[field.id]) {
           setSubmitErr(`Please fill in: ${field.label}`);
           return;
         }
@@ -204,7 +205,7 @@ function ConsentForm({ onStyle }) {
         if (t.requires_signature && ts.sigBlob) clientSigPath = await uploadSig(ts.sigBlob);
         if (needsGuardian && guardianSigBlobs[t.id]) guardianSigPath = await uploadSig(guardianSigBlobs[t.id]);
         const answers = await uploadPhotoIdAnswers(ts.answers ?? {}, file => signStudioPhotoId(BACKEND, info.studio_id, file));
-        if (t.ask_address && !addressEmpty(address)) answers.__address_parts__ = JSON.stringify(addressPayload(address));
+        Object.assign(answers, addressAnswers(addressFieldOf(t), address));
         submissions.push({
           template_id:            t.id,
           answers,
@@ -290,13 +291,6 @@ function ConsentForm({ onStyle }) {
               <label htmlFor="consent-phone" style={{ ...s.label, marginBottom: '0.3rem' }}>Phone number <span style={{ color: 'var(--color-danger)' }}>*</span></label>
               <input id="consent-phone" style={s.input} type="tel" required autoComplete="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="Your phone number" />
             </div>
-            {templates.some(t => t.ask_address) && (() => {
-              const required = templates.some(t => t.ask_address === 'required');
-              return (
-                <AddressFields value={address} onChange={setAddress} required={required} inputStyle={s.input}
-                  labelStyle={{ ...s.label, marginBottom: 0 }} legendExtra={required ? null : <span style={{ fontWeight: 400, opacity: 0.7 }}> (optional)</span>} />
-              );
-            })()}
           </div>
         </div>
 
@@ -318,7 +312,16 @@ function ConsentForm({ onStyle }) {
               </div>
 
               <div style={s.fieldStack}>
-                {(t.fields ?? []).map(field => (
+                {(t.fields ?? []).map(field => field.type === 'address' ? (
+                  // Asked once, in the first form that asks; later forms are given it.
+                  templates.find(x => addressFieldOf(x)) === t && field === addressFieldOf(t) ? (() => {
+                    const required = templates.some(x => addressFieldOf(x)?.required);
+                    return (
+                      <AddressFields key={field.id} value={address} onChange={setAddress} required={required} inputStyle={s.input} legend={field.label || 'Address'}
+                        labelStyle={{ ...s.label, marginBottom: 0 }} legendExtra={required ? null : <span style={{ fontWeight: 400, opacity: 0.7 }}> (optional)</span>} />
+                    );
+                  })() : null
+                ) : (
                   <ConsentFormField
                     key={field.id}
                     field={field}

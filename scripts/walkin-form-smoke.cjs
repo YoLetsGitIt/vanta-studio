@@ -9,8 +9,11 @@ const base = process.env.STUDIO_TEST_URL || 'http://127.0.0.1:3056';
 const shots = process.env.STUDIO_REVIEW_OUTPUT;
 const artistId = '33333333-3333-4333-8333-333333333333';
 const studio = { id: '11111111-1111-4111-8111-111111111111', name: 'Test Tattoo Studio', artists: [{ artistId: '55555555-5555-4555-8555-555555555555', name: 'Ari Day', workingToday: false }, { artistId, name: 'Sam Rivers', workingToday: true }, { artistId: '44444444-4444-4444-8444-444444444444', name: 'Jo Lake' }] };
-// The consent form asks for the client's address (required).
-const template = { id: 'tmpl-1', name: 'Walk-in consent', requires_signature: false, ask_address: 'required', fields: [{ id: 'healthy', type: 'yesno', label: 'Are you feeling well today?', required: true }] };
+// The consent form asks for the client's address with a required address field, after its question.
+const template = { id: 'tmpl-1', name: 'Walk-in consent', requires_signature: false, fields: [
+  { id: 'healthy', type: 'yesno', label: 'Are you feeling well today?', required: true },
+  { id: 'home', type: 'address', label: 'Home address', required: true },
+] };
 
 (async () => {
   const browser = await chromium.launch();
@@ -76,9 +79,15 @@ const template = { id: 'tmpl-1', name: 'Walk-in consent', requires_signature: fa
       await artists.getByRole('option', { name: /Sam Rivers/ }).click();
       await artists.waitFor({ state: 'detached' });
       assert.match(await page.getByRole('button', { name: /^Artist/ }).innerText(), /Sam Rivers/);
-      // The consent form asks for the address, once, with the client's details.
+      // The consent form asks for the address once, where the field sits: after its question, under its label.
       await page.getByText('Address: add the street address, suburb and postcode.').first().waitFor();
       assert.equal(await page.getByLabel('Street address', { exact: false }).count(), 1, 'Asked once');
+      const order = await page.evaluate(() => {
+        const q = [...document.querySelectorAll('span')].find(el => el.textContent.startsWith('Are you feeling well today?'));
+        const legend = [...document.querySelectorAll('legend')].find(el => el.textContent.startsWith('Home address'));
+        return q && legend ? Boolean(q.compareDocumentPosition(legend) & Node.DOCUMENT_POSITION_FOLLOWING) : null;
+      });
+      assert.equal(order, true, 'The address sits after the question, under the field label');
       await page.getByLabel('Street address', { exact: false }).fill('8 Lygon St');
       await page.getByLabel('Suburb or city', { exact: false }).fill('Carlton');
       await page.getByLabel('Postcode', { exact: false }).fill('3053');
@@ -99,7 +108,9 @@ const template = { id: 'tmpl-1', name: 'Walk-in consent', requires_signature: fa
       const sent = posts.at(-1);
       assert.deepEqual([sent.artist_id, sent.name, sent.email, sent.dob, sent.phone.replaceAll(' ', ''), sent.body_location], [artistId, 'Walk In Client', 'walkin@example.test', '1994-05-06', '+61400111222', 'Forearm']);
       assert.equal(sent.consent_submissions[0].answers.healthy, 'Yes');
-      const parts = JSON.parse(sent.consent_submissions[0].answers.__address_parts__);
+      const answers = sent.consent_submissions[0].answers;
+      assert.equal(answers.home, '8 Lygon St, Carlton 3053, Australia', 'The one-line address is the answer to the field');
+      const parts = JSON.parse(answers.__address_parts__);
       assert.deepEqual([parts.line1, parts.suburb, parts.postcode], ['8 Lygon St', 'Carlton', '3053'], 'The address goes with the signed form');
       // Shared iPad: start fresh for the next client.
       await page.getByRole('button', { name: 'Start a new walk-in' }).click();

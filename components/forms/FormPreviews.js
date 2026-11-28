@@ -61,6 +61,11 @@ function ConsentBlock({ template, inp, lbl, fld, showName = true }) {
             </div>
           </div>
         );
+        if (f.type === 'address') return (
+          <div key={i} style={{ ...fld }}><span style={lbl}>{f.label || 'Address'}</span>
+            <div style={{ display: 'grid', gap: 5 }} aria-hidden="true"><div style={inp} /><div style={{ display: 'grid', gridTemplateColumns: '1.4fr 0.8fr 0.8fr', gap: 5 }}><div style={inp} /><div style={inp} /><div style={inp} /></div></div>
+          </div>
+        );
         return <div key={i} style={{ ...fld }}><span style={lbl}>{f.label}</span><div style={{ ...inp, height: 52 }} /></div>;
       })}
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
@@ -331,7 +336,7 @@ export function WalkInPreview({ bg: bgIn, accent: accentIn, studioName, logoUrl,
 // match the client page's standard look.
 export const CONSENT_DEFAULT_BG = '#ffffff';
 export const CONSENT_DEFAULT_ACCENT = DEFAULT_LIGHT_ACCENT;
-export function ConsentFormPreview({ name, fields, requiresSig, requiresGuardian, askAddress = '', bg: bgIn = CONSENT_DEFAULT_BG, accent: accentIn = CONSENT_DEFAULT_ACCENT, studioName }) {
+export function ConsentFormPreview({ name, fields, requiresSig, requiresGuardian, bg: bgIn = CONSENT_DEFAULT_BG, accent: accentIn = CONSENT_DEFAULT_ACCENT, studioName }) {
   const { bg, accent, mode } = previewColours(bgIn, accentIn);
   // Same as the real form (lib/formTheme.js): dark text on a light highlight, white on a dark one.
   const accentText = isLightColor(accent) ? '#11151b' : '#ffffff';
@@ -346,15 +351,6 @@ export function ConsentFormPreview({ name, fields, requiresSig, requiresGuardian
           <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text)', margin: 0 }}>{name}</h3>
         ) : (
           <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'rgba(var(--ink-rgb), 0.2)', margin: 0, fontStyle: 'italic' }}>Form name</h3>
-        )}
-
-        {/* Asked once with the client's details, before the form's own fields. */}
-        {askAddress && (
-          <div style={{ display: 'grid', gap: 6 }}>
-            <span style={{ ...lbl, marginBottom: 0 }}>Address{askAddress === 'required' ? <span style={{ color: 'var(--color-danger)', marginLeft: 3 }}>*</span> : <span style={{ fontWeight: 500, marginLeft: 4 }}>(optional)</span>}</span>
-            <div style={inp} aria-hidden="true" />
-            <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 0.8fr 0.8fr', gap: 6 }} aria-hidden="true"><div style={inp} /><div style={inp} /><div style={inp} /></div>
-          </div>
         )}
 
         {fields.length === 0 && (
@@ -386,6 +382,13 @@ export function ConsentFormPreview({ name, fields, requiresSig, requiresGuardian
               <span style={lbl}>{f.label || <em>Photo ID</em>}{f.required && ' *'}</span>
               <span style={{ fontSize: '0.68rem', color: 'rgba(var(--ink-rgb), 0.35)', lineHeight: 1.5 }}>A clear photo of your driver’s licence, passport or other photo ID. Only the studio can see it.</span>
               <div style={{ padding: '0.6rem', borderRadius: 8, border: '1px dashed rgba(var(--ink-rgb), 0.25)', fontSize: '0.75rem', color: 'rgba(var(--ink-rgb), 0.55)', textAlign: 'center' }}>Take or choose a photo of your ID</div>
+            </div>
+          );
+          if (f.type === 'address') return (
+            <div key={f.id} style={{ display: 'grid', gap: 6 }}>
+              <span style={{ ...lbl, marginBottom: 0 }}>{f.label || <em>Address</em>}{f.required ? ' *' : <span style={{ fontWeight: 500, marginLeft: 4 }}>(optional)</span>}</span>
+              <div style={inp} aria-hidden="true" />
+              <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 0.8fr 0.8fr', gap: 6 }} aria-hidden="true"><div style={inp} /><div style={inp} /><div style={inp} /></div>
             </div>
           );
           if (f.type === 'yesno') return (

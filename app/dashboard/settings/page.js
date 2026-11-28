@@ -40,6 +40,7 @@ import PushNotificationSettings from '@/components/PushNotificationSettings';
 import ArtistCommissionOverrides from '@/components/ArtistCommissionOverrides';
 import { useBookingManagement } from '@/lib/bookingManagement';
 import { MOBILE_MEDIA } from '@/lib/responsive';
+import { consentFieldsOf } from '@/lib/consent-address';
 
 const DAY_KEYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 
@@ -353,7 +354,6 @@ export default function SettingsPage() {
   const [templateName, setTemplateName] = useState('');
   const [templateRequiresSig, setTemplateRequiresSig] = useState(true);
   // Ask for the client's address on the consent form: '', 'optional' or 'required'.
-  const [templateAskAddress, setTemplateAskAddress] = useState('');
   const [templateRequiresGuardian, setTemplateRequiresGuardian] = useState(false);
   const [templateFields, setTemplateFields] = useState([]);
   const [templateSaving, setTemplateSaving] = useState(false);
@@ -623,10 +623,10 @@ export default function SettingsPage() {
   // Studios have one consent form for now (the API allows more). It's the form used on
   // the booking link, or else the first one; with none yet, saving creates it.
   const consentForm = consentTemplates.find(x => x.id === widgetConsentTemplateId) ?? consentTemplates[0] ?? null;
-  const consentDraft = { name: templateName, requiresSig: templateRequiresSig, askAddress: templateAskAddress, fields: templateFields };
+  const consentDraft = { name: templateName, requiresSig: templateRequiresSig, fields: templateFields };
   const consentSaved = consentForm
-    ? { name: consentForm.name, requiresSig: consentForm.requires_signature, askAddress: consentForm.ask_address ?? '', fields: consentForm.fields ?? [] }
-    : { name: 'Consent form', requiresSig: true, askAddress: '', fields: [] };
+    ? { name: consentForm.name, requiresSig: consentForm.requires_signature, fields: consentFieldsOf(consentForm) }
+    : { name: 'Consent form', requiresSig: true, fields: [] };
   const consentDirty = JSON.stringify(consentDraft) !== JSON.stringify(consentSaved);
   const consentLoadedFor = useRef(undefined);
   useEffect(() => {
@@ -637,7 +637,6 @@ export default function SettingsPage() {
     setEditingTemplate(consentForm);
     setTemplateName(consentSaved.name);
     setTemplateRequiresSig(consentSaved.requiresSig);
-    setTemplateAskAddress(consentSaved.askAddress);
     setTemplateRequiresGuardian(consentForm?.requires_minor_guardian ?? false);
     setTemplateFields(consentSaved.fields);
     setTemplateError('');
@@ -646,14 +645,16 @@ export default function SettingsPage() {
   function resetConsentForm() {
     setTemplateName(consentSaved.name);
     setTemplateRequiresSig(consentSaved.requiresSig);
-    setTemplateAskAddress(consentSaved.askAddress);
     setTemplateFields(consentSaved.fields);
     setTemplateError('');
   }
 
   function addField(type) {
-    // A photo ID field starts labelled and required; studios can change both.
-    setTemplateFields(prev => [...prev, { id: `f_${Date.now()}`, type, label: type === 'photo_id' ? 'Photo ID' : '', required: type === 'photo_id' }]);
+    // Photo ID and Address start labelled (Photo ID also required); studios can change both.
+    // A form asks for the address once.
+    if (type === 'address' && templateFields.some(f => f.type === 'address')) return;
+    const label = { photo_id: 'Photo ID', address: 'Address' }[type] ?? '';
+    setTemplateFields(prev => [...prev, { id: `f_${Date.now()}`, type, label, required: type === 'photo_id' }]);
   }
 
   function updateField(id, changes) {
@@ -685,7 +686,8 @@ export default function SettingsPage() {
         name: templateName.trim(),
         requires_signature: templateRequiresSig,
         requires_minor_guardian: templateRequiresGuardian,
-        ask_address: templateAskAddress,
+        // The address is a field now; this clears the older setting.
+        ask_address: '',
         fields: templateFields,
       };
       if (consentForm) {
@@ -1588,14 +1590,6 @@ export default function SettingsPage() {
                         style={{ accentColor: 'var(--accent)' }} />
                       <span style={{ fontSize: '0.83rem', color: 'var(--text-secondary)' }}>Require client signature</span>
                     </label>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
-                      <label htmlFor="consent-ask-address" style={{ fontSize: '0.83rem', color: 'var(--text-secondary)' }}>Client’s address</label>
-                      <select id="consent-ask-address" value={templateAskAddress} onChange={e => setTemplateAskAddress(e.target.value)} style={{ ...s.input, width: 'auto', minWidth: 160, padding: '0.45rem 2rem 0.45rem 0.7rem' }}>
-                        <option value="">Don’t ask</option>
-                        <option value="optional">Ask (optional)</option>
-                        <option value="required">Ask (required)</option>
-                      </select>
-                    </div>
                     <p style={{ fontSize: '0.85rem', color: 'var(--text-ghost)', margin: 0, lineHeight: 1.5 }}>
                       Guardian consent fields appear automatically when the client's date of birth indicates they are under 18.
                     </p>
@@ -1605,9 +1599,13 @@ export default function SettingsPage() {
                     <div className="studio-consent-field-toolbar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
                       <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Fields ({templateFields.length})</span>
                       <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-                        {[['heading','Heading'],['paragraph','Paragraph'],['checkbox','Checkbox'],['text','Text'],['textarea','Textarea'],['yesno','Yes/No'],['photo_id','Photo ID']].map(([type, label]) => (
-                          <button key={type} style={s.addFieldBtn} onClick={() => addField(type)}>+ {label}</button>
-                        ))}
+                        {[['heading','Heading'],['paragraph','Paragraph'],['checkbox','Checkbox'],['text','Text'],['textarea','Textarea'],['yesno','Yes/No'],['photo_id','Photo ID'],['address','Address']].map(([type, label]) => {
+                          const added = type === 'address' && templateFields.some(f => f.type === 'address');
+                          return (
+                            <button key={type} type="button" style={{ ...s.addFieldBtn, ...(added ? { opacity: 0.45, cursor: 'default' } : {}) }} onClick={() => addField(type)} disabled={added}
+                              title={added ? 'This form already asks for the address' : undefined}>+ {label}</button>
+                          );
+                        })}
                       </div>
                     </div>
 
@@ -1637,6 +1635,9 @@ export default function SettingsPage() {
                           <input aria-label={`Field ${idx + 1} label`} style={{ ...s.input, fontSize: '0.82rem' }} type="text" value={f.label}
                             onChange={e => updateField(f.id, { label: e.target.value })}
                             placeholder="Field label…" />
+                        )}
+                        {f.type === 'address' && (
+                          <p style={{ fontSize: '0.78rem', color: 'var(--text-ghost)', margin: '0.3rem 0 0', lineHeight: 1.45 }}>Clients fill in their street, suburb, state, postcode and country. It’s saved to their client record too.</p>
                         )}
                         {!['heading','paragraph'].includes(f.type) && (
                           <label style={{ ...s.toggleRow, marginTop: '0.3rem' }}>
@@ -1675,7 +1676,6 @@ export default function SettingsPage() {
                     fields={templateFields}
                     requiresSig={templateRequiresSig}
                     requiresGuardian={templateRequiresGuardian}
-                    askAddress={templateAskAddress}
                     bg={validHex(widgetBgColor) ? widgetBgColor : CONSENT_DEFAULT_BG}
                     accent={validHex(widgetAccentColor) ? widgetAccentColor : CONSENT_DEFAULT_ACCENT}
                     studioName={name}
